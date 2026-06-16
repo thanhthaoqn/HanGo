@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/services/auth_service.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   final String email;
@@ -16,6 +17,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  final _authService = AuthService();
 
   // Real-time validation states
   bool _hasMinLength = false;
@@ -52,7 +54,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   bool get _isPasswordValid =>
       _hasMinLength && _hasUppercase && _hasLowercase && _hasNumber && _hasSpecialChar;
 
-  void _handleResetPassword() {
+  void _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_isPasswordValid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -68,12 +70,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       _isLoading = true;
     });
 
-    // Mock API call to reset password
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+    final result = await _authService.resetPassword(widget.email, _passwordController.text);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Password updated successfully! Please sign in with your new password.'),
@@ -82,8 +86,15 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
         );
         // Pop all routes and return to login page
         Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to update password. Please try again.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
-    });
+    }
   }
 
   Widget _buildRequirementItem(String label, bool isMet) {
