@@ -1,0 +1,46 @@
+# -------------------------------------------------------------------------
+# VS Code Configuration
+# -------------------------------------------------------------------------
+.vscode/
+!.vscode/extensions.json
+*.code-workspace
+
+# -------------------------------------------------------------------------
+# Flutter / Dart Specific
+# -------------------------------------------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Các file sinh ra khi build ứng dụng web/mobile
+/android/app/debug.keystore
+/android/app/local.properties
+/android/app/generated_light_metadata.properties
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/ios/Flutter/Flutter.podspec
+/assets/build/
+
+# -------------------------------------------------------------------------
+# Database & Backend (MySQL / Environment)
+# -------------------------------------------------------------------------
+# TUYỆT ĐỐI không đẩy thông tin kết nối DB và JWT Secret lên Git
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# File backup dữ liệu hoặc log của MySQL nếu bạn lưu trong thư mục code
+*.sql
+*.log
+
+# -------------------------------------------------------------------------
+# OS / System Files
+# -------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
