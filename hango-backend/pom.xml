@@ -34,8 +34,8 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
-		 <dependency>
-    <groupId>google-api-services-oauth2</groupId>
+		<dependency>
+    <groupId>com.google.apis</groupId>
     <artifactId>google-api-services-oauth2</artifactId>
     <version>v2-rev157-1.25.0</version>
 </dependency>
@@ -87,6 +87,28 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+  <groupId>com.cloudinary</groupId>
+  <artifactId>cloudinary-http44</artifactId>
+  <version>1.30.0</version>
+</dependency>
+<dependency>
+  <groupId>io.jsonwebtoken</groupId>
+  <artifactId>jjwt-api</artifactId>
+  <version>0.11.5</version>
+</dependency>
+<dependency>
+  <groupId>io.jsonwebtoken</groupId>
+  <artifactId>jjwt-impl</artifactId>
+  <version>0.11.5</version>
+  <scope>runtime</scope>
+</dependency>
+<dependency>
+  <groupId>io.jsonwebtoken</groupId>
+  <artifactId>jjwt-jackson</artifactId>
+  <version>0.11.5</version>
+  <scope>runtime</scope>
+</dependency>
 	</dependencies>
 
 	<build>

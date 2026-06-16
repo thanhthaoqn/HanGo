@@ -1,10 +1,16 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   // Use localhost or 10.0.2.2 for Android emulator
-  static const String baseUrl = 'http://localhost:8080/api/auth';
+  static String get baseUrl {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080/api/auth';
+    }
+    return 'http://localhost:8080/api/auth';
+  }
   
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';
@@ -94,20 +100,14 @@ class AuthService {
 
   // Perform Google login request
   Future<Map<String, dynamic>> loginWithGoogle({
-    required String email,
-    required String fullName,
-    String? avatarUrl,
-    String? googleId,
+    required String idToken,
   }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/google'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email,
-          'fullName': fullName,
-          'avatarUrl': avatarUrl,
-          'googleId': googleId,
+          'idToken': idToken,
         }),
       );
 

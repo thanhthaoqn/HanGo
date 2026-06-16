@@ -1,4 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
+import 'package:google_sign_in_web/google_sign_in_web.dart' as web;
 import '../../data/services/auth_service.dart';
 import 'register_page.dart';
 import 'learner/learner_home_page.dart';
@@ -20,9 +25,28 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   
   final _authService = AuthService();
+  
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: '793292778359-frlad2ktuqo6mo27fkilqbjqcdqbqko1.apps.googleusercontent.com',
+    scopes: const ['email', 'profile'],
+  );
+  
+  StreamSubscription<GoogleSignInAccount?>? _googleSignInSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _googleSignInSubscription = _googleSignIn.onCurrentUserChanged.listen((GoogleSignInAccount? account) {
+      if (account != null) {
+        _handleGoogleSignInSuccess(account);
+      }
+    });
+    _googleSignIn.signInSilently();
+  }
 
   @override
   void dispose() {
+    _googleSignInSubscription?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -46,6 +70,7 @@ class _LoginPageState extends State<LoginPage> {
 
     if (mounted) {
       if (result['success']) {
+        debugPrint('Sign in success! Navigating to LearnerHomePage. Data: ${result['data']}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Sign in successful!'),
@@ -59,6 +84,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
       } else {
+        debugPrint('Sign in failed! Error: ${result['message']}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Sign in failed. Please try again.'),
@@ -69,113 +95,136 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _handleGoogleSignIn() async {
-    final emailController = TextEditingController(text: 'student.google@gmail.com');
-    final nameController = TextEditingController(text: 'Google Student');
-    
-    final bool? shouldSignIn = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Image.network(
-                'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
-                width: 24,
-                height: 24,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, color: Color(0xFF28B79B)),
-              ),
-              const SizedBox(width: 12),
-              const Text('Google Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Sign in using your Google credentials. Since this is a local development environment, you can enter any Gmail to test auto-registration.',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Google Email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Google Full Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
-              child: const Text('Sign In', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldSignIn != true) return;
-
+  void _handleGoogleSignInSuccess(GoogleSignInAccount googleUser) async {
     setState(() {
       _isLoading = true;
     });
 
-    final email = emailController.text.trim();
-    final name = nameController.text.trim();
-    const avatarUrl = 'https://res.cloudinary.com/diqekap4o/image/upload/v1781621072/login_tolpmx.png';
-    const googleId = 'google_1234567890';
+    try {
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
 
-    final result = await _authService.loginWithGoogle(
-      email: email,
-      fullName: name,
-      avatarUrl: avatarUrl,
-      googleId: googleId,
-    );
+      if (idToken == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to retrieve ID Token from Google.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
+      }
 
-    setState(() {
-      _isLoading = false;
-    });
+      final result = await _authService.loginWithGoogle(idToken: idToken);
 
-    if (mounted) {
-      if (result['success']) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        if (result['success']) {
+          final String name = googleUser.displayName ?? 'Google User';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sign in successful: Welcome, $name!'),
+              backgroundColor: const Color(0xFF28B79B),
+            ),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LearnerHomePage(),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? 'Google Sign In failed.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Sign in successful: Welcome, $name!'),
-            backgroundColor: const Color(0xFF28B79B),
-          ),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const LearnerHomePage(),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Google Sign In failed.'),
+            content: Text('Google Sign In failed: ${e.toString()}'),
             backgroundColor: Colors.redAccent,
           ),
         );
       }
     }
+  }
+
+  Widget _buildGoogleSignInButton() {
+    if (kIsWeb) {
+      try {
+        final plugin = GoogleSignInPlatform.instance as web.GoogleSignInPlugin;
+        return plugin.renderButton(
+          configuration: web.GSIButtonConfiguration(
+            type: web.GSIButtonType.standard,
+            theme: web.GSIButtonTheme.outline,
+            size: web.GSIButtonSize.large,
+            text: web.GSIButtonText.signinWith,
+            shape: web.GSIButtonShape.rectangular,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error rendering GIS button: $e');
+      }
+    }
+    
+    // Fallback for non-web or if platform rendering fails
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: OutlinedButton(
+        onPressed: _isLoading ? null : () async {
+          try {
+            final GoogleSignInAccount? account = await _googleSignIn.signIn();
+            if (account != null) {
+              _handleGoogleSignInSuccess(account);
+            }
+          } catch (e) {
+            debugPrint('Google Sign In Error: $e');
+          }
+        },
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.network(
+              'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
+              width: 20,
+              height: 20,
+              errorBuilder: (context, error, stackTrace) => const Text('G'),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Sign in with Google',
+              style: TextStyle(
+                color: Color(0xFF374151),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -539,59 +588,7 @@ class _LoginPageState extends State<LoginPage> {
                         const SizedBox(height: 24),
                         
                         // Google Sign In Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: OutlinedButton(
-                            onPressed: _isLoading ? null : _handleGoogleSignIn,
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              side: const BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.network(
-                                  'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
-                                  width: 20,
-                                  height: 20,
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Text(
-                                      'G',
-                                      style: TextStyle(
-                                        color: Color(0xFF4285F4),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Sign in with Google',
-                                  style: TextStyle(
-                                    color: Color(0xFF374151),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        _buildGoogleSignInButton(),
                         const SizedBox(height: 36),
                         
                         // Sign Up Link

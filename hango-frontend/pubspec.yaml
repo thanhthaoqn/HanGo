@@ -29,6 +29,8 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   google_sign_in: ^6.2.1
+  google_sign_in_platform_interface: ^2.5.0
+  google_sign_in_web: ^0.12.4+4
   dio: ^5.4.0
   flutter:
     sdk: flutter

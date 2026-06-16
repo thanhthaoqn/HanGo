@@ -20,6 +20,11 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.beans.factory.annotation.Value;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -48,6 +53,9 @@ public class AuthService {
 
     @Autowired
     private CloudinaryService cloudinaryService;
+
+    @Value("${google.client-id}")
+    private String googleClientId;
 
     public LoginResponse authenticateUser(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
@@ -115,47 +123,69 @@ public class AuthService {
 
     @org.springframework.transaction.annotation.Transactional
     public LoginResponse googleLogin(com.hango.hango_backend.dto.GoogleLoginRequest googleLoginRequest) {
-        String email = googleLoginRequest.getEmail();
-        
-        User user = userRepository.findByEmail(email)
-                .orElseGet(() -> {
-                    Role userRole = roleRepository.findByRoleName("LEARNER")
-                            .orElseGet(() -> {
-                                Role newRole = Role.builder().roleName("LEARNER").build();
-                                return roleRepository.save(newRole);
-                            });
+        String idTokenString = googleLoginRequest.getIdToken();
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    new GsonFactory())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
 
-                    User newUser = User.builder()
-                            .email(email)
-                            .passwordHash(encoder.encode(java.util.UUID.randomUUID().toString()))
-                            .fullName(googleLoginRequest.getFullName())
-                            .avatarUrl(googleLoginRequest.getAvatarUrl())
-                            .roles(new HashSet<>(Collections.singletonList(userRole)))
-                            .build();
-                    
-                    return userRepository.save(newUser);
-                });
+            GoogleIdToken idToken = verifier.verify(idTokenString);
+            if (idToken != null) {
+                GoogleIdToken.Payload payload = idToken.getPayload();
 
-        if ((user.getAvatarUrl() == null || user.getAvatarUrl().isEmpty()) && googleLoginRequest.getAvatarUrl() != null) {
-            user.setAvatarUrl(googleLoginRequest.getAvatarUrl());
+                // Get profile information from payload
+                String email = payload.getEmail();
+                String name = (String) payload.get("name");
+                String pictureUrl = (String) payload.get("picture");
+
+                // Find or JIT-provision user
+                User user = userRepository.findByEmail(email)
+                        .orElseGet(() -> {
+                            // Find or create ROLE_USER role
+                            Role userRole = roleRepository.findByRoleName("ROLE_USER")
+                                    .orElseGet(() -> {
+                                        Role newRole = Role.builder().roleName("ROLE_USER").build();
+                                        return roleRepository.save(newRole);
+                                    });
+
+                            User newUser = User.builder()
+                                    .email(email)
+                                    .passwordHash(encoder.encode(java.util.UUID.randomUUID().toString()))
+                                    .fullName(name != null ? name : "Google User")
+                                    .avatarUrl(pictureUrl)
+                                    .roles(new HashSet<>(Collections.singletonList(userRole)))
+                                    .status("ACTIVE")
+                                    .isVerified(true)
+                                    .build();
+                            
+                            return userRepository.save(newUser);
+                        });
+
+                user.setLastLoginAt(LocalDateTime.now());
+                User savedUser = userRepository.save(user);
+
+                // Generate internal JWT token from the user's email
+                String jwt = jwtUtils.generateJwtTokenFromUsername(savedUser.getEmail());
+
+                List<String> roles = savedUser.getRoles().stream()
+                        .map(Role::getRoleName)
+                        .collect(Collectors.toList());
+
+                return new LoginResponse(
+                        jwt,
+                        savedUser.getId(),
+                        savedUser.getEmail(),
+                        savedUser.getFullName(),
+                        roles
+                );
+            } else {
+                throw new IllegalArgumentException("Invalid ID Token");
+            }
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Google authentication failed: " + e.getMessage());
         }
-
-        user.setLastLoginAt(LocalDateTime.now());
-        User savedUser = userRepository.save(user);
-
-        String jwt = jwtUtils.generateJwtTokenFromUsername(savedUser.getEmail());
-
-        List<String> roles = savedUser.getRoles().stream()
-                .map(Role::getRoleName)
-                .collect(Collectors.toList());
-
-        return new LoginResponse(
-                jwt,
-                savedUser.getId(),
-                savedUser.getEmail(),
-                savedUser.getFullName(),
-                roles
-        );
     }
 
     private UserResponse mapToUserResponse(User user) {

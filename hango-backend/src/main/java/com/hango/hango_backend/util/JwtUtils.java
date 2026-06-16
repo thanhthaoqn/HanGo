@@ -32,34 +32,34 @@ public class JwtUtils {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
         return Jwts.builder()
-                .subject(userPrincipal.getUsername())
-                .issuedAt(new Date())
-                .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(getSigningKey())
-                .compact();
+        .setSubject(userPrincipal.getUsername())
+        .setIssuedAt(new Date())
+        .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+        .signWith(getSigningKey())
+        .compact();
     }
 
     public String generateJwtTokenFromUsername(String username) {
         return Jwts.builder()
-                .subject(username)
-                .issuedAt(new Date())
-                .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .setSubject(username)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey())
                 .compact();
     }
 
     public String getUserNameFromJwtToken(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
-    }
+    return Jwts.parserBuilder()
+            .setSigningKey(getSigningKey())
+            .build()
+            .parseClaimsJws(token)
+            .getBody()
+            .getSubject();
+}
 
     public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(authToken);
+            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
         } catch (MalformedJwtException e) {
             logger.error("Invalid JWT token: {}", e.getMessage());
