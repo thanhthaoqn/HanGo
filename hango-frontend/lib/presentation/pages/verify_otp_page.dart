@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'reset_password_page.dart';
 
 class VerifyOtpPage extends StatefulWidget {
   final String email;
@@ -49,12 +50,16 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('OTP Verified successfully! Password reset option is enabled.'),
+            content: Text('OTP Verified successfully! Please set your new password.'),
             backgroundColor: Color(0xFF28B79B),
           ),
         );
-        // Pop back to login page
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResetPasswordPage(email: widget.email),
+          ),
+        );
       }
     });
   }
