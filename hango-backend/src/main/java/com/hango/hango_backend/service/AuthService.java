@@ -26,6 +26,11 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 
+import com.hango.hango_backend.dto.ForgotPasswordRequest;
+import com.hango.hango_backend.dto.VerifyOtpRequest;
+import com.hango.hango_backend.dto.ResetPasswordRequest;
+import com.hango.hango_backend.entity.PasswordResetOtp;
+import com.hango.hango_backend.repository.PasswordResetOtpRepository;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -53,6 +58,12 @@ public class AuthService {
 
     @Autowired
     private CloudinaryService cloudinaryService;
+
+    @Autowired
+    private PasswordResetOtpRepository passwordResetOtpRepository;
+
+    @Autowired
+    private EmailService emailService;
 
     @Value("${google.client-id}")
     private String googleClientId;
@@ -186,6 +197,54 @@ public class AuthService {
         } catch (Exception e) {
             throw new IllegalArgumentException("Google authentication failed: " + e.getMessage());
         }
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        String email = request.getEmail();
+        if (!userRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("Email is not registered in the system.");
+        }
+
+        // Delete any existing OTPs for this email
+        passwordResetOtpRepository.deleteByEmail(email);
+
+        // Generate 6 digit OTP
+        String otpCode = String.format("%06d", new java.util.Random().nextInt(1000000));
+
+        PasswordResetOtp otp = PasswordResetOtp.builder()
+                .email(email)
+                .otpCode(otpCode)
+                .expiryTime(LocalDateTime.now().plusMinutes(5))
+                .build();
+
+        passwordResetOtpRepository.save(otp);
+
+        // Send Email
+        emailService.sendOtpEmail(email, otpCode);
+    }
+
+    public void verifyOtp(VerifyOtpRequest request) {
+        PasswordResetOtp otp = passwordResetOtpRepository.findByEmailAndOtpCode(request.getEmail(), request.getOtpCode())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid OTP code."));
+
+        if (otp.getExpiryTime().isBefore(LocalDateTime.now())) {
+            passwordResetOtpRepository.delete(otp);
+            throw new IllegalArgumentException("OTP code has expired. Please request a new one.");
+        }
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + request.getEmail()));
+
+        // Encode and set new password
+        user.setPasswordHash(encoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // Clean up OTPs
+        passwordResetOtpRepository.deleteByEmail(request.getEmail());
     }
 
     private UserResponse mapToUserResponse(User user) {
