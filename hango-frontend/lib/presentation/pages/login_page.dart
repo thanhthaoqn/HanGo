@@ -6,6 +6,7 @@ import 'package:google_sign_in_platform_interface/google_sign_in_platform_interf
 import 'package:google_sign_in_web/google_sign_in_web.dart' as web;
 import '../../data/services/auth_service.dart';
 import 'register_page.dart';
+import 'forgot_password_page.dart';
 import 'learner/learner_home_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -516,7 +517,14 @@ class _LoginPageState extends State<LoginPage> {
                               ],
                             ),
                             GestureDetector(
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ForgotPasswordPage(),
+                                  ),
+                                );
+                              },
                               child: const Text(
                                 'Forgot password?',
                                 style: TextStyle(
