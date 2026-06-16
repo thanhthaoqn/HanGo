@@ -67,4 +67,59 @@ class AuthService {
     await prefs.remove(_userFullNameKey);
     await prefs.remove(_userRolesKey);
   }
+
+  // Perform registration request
+  Future<Map<String, dynamic>> register(String fullName, String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'fullName': fullName,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'message': response.body};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Perform Google login request
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String email,
+    required String fullName,
+    String? avatarUrl,
+    String? googleId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'fullName': fullName,
+          'avatarUrl': avatarUrl,
+          'googleId': googleId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await saveSession(data);
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'message': response.body};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
 }

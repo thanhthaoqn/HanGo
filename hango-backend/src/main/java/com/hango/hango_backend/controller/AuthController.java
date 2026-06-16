@@ -43,6 +43,16 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/google")
+    public ResponseEntity<?> googleLogin(@Valid @RequestBody GoogleLoginRequest googleLoginRequest) {
+        try {
+            LoginResponse response = authService.googleLogin(googleLoginRequest);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/profile/avatar")
     @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER') or hasRole('TRAINING_LEAD') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> uploadAvatar(
