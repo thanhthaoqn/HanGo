@@ -4,9 +4,19 @@
 .vscode/
 !.vscode/extensions.json
 *.code-workspace
+.history/
 
 # -------------------------------------------------------------------------
-# Flutter / Dart Specific
+# JetBrains IDEs (Android Studio, IntelliJ IDEA)
+# -------------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# -------------------------------------------------------------------------
+# Flutter / Dart Specific (Frontend)
 # -------------------------------------------------------------------------
 .dart_tool/
 .flutter-plugins
@@ -16,26 +26,34 @@
 .pub/
 build/
 
-# Các file sinh ra khi build ứng dụng web/mobile
-/android/app/debug.keystore
-/android/app/local.properties
-/android/app/generated_light_metadata.properties
-/ios/Flutter/Generated.xcconfig
-/ios/Flutter/flutter_export_environment.sh
-/ios/Flutter/Flutter.podspec
-/assets/build/
+# Các file cấu hình/build sinh ra khi chạy mobile (Đã bỏ / ở đầu)
+android/app/debug.keystore
+android/app/local.properties
+android/app/generated_light_metadata.properties
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Flutter.podspec
+assets/build/
 
 # -------------------------------------------------------------------------
-# Database & Backend (MySQL / Environment)
+# Backend Specific (Java Spring Boot / Maven / Gradle)
 # -------------------------------------------------------------------------
-# TUYỆT ĐỐI không đẩy thông tin kết nối DB và JWT Secret lên Git
+target/
+bin/
+.gradle/
+/build/
+*.class
+
+# -------------------------------------------------------------------------
+# Database & Backend Environment
+# -------------------------------------------------------------------------
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# File backup dữ liệu hoặc log của MySQL nếu bạn lưu trong thư mục code
+# File backup dữ liệu hoặc log của MySQL
 *.sql
 *.log
 
