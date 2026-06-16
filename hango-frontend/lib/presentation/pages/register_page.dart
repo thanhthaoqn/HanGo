@@ -1,43 +1,57 @@
 import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
-import 'register_page.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+  final _confirmPasswordController = TextEditingController();
+
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  bool _obscureConfirmPassword = true;
+  bool _agreeToTerms = false;
   bool _isLoading = false;
-  
+
   final _authService = AuthService();
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() async {
+  void _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
-    
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must agree to the Terms of Service and Privacy Policy'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
+    final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    final result = await _authService.login(email, password);
+    final result = await _authService.register(name, email, password);
 
     setState(() {
       _isLoading = false;
@@ -47,117 +61,15 @@ class _LoginPageState extends State<LoginPage> {
       if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Sign in successful!'),
+            content: Text('Registration successful! Please sign in.'),
             backgroundColor: Color(0xFF28B79B),
           ),
         );
+        Navigator.pop(context); // Go back to login page
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Sign in failed. Please try again.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
-  }
-
-  void _handleGoogleSignIn() async {
-    final emailController = TextEditingController(text: 'student.google@gmail.com');
-    final nameController = TextEditingController(text: 'Google Student');
-    
-    final bool? shouldSignIn = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Image.network(
-                'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
-                width: 24,
-                height: 24,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_circle, color: Color(0xFF28B79B)),
-              ),
-              const SizedBox(width: 12),
-              const Text('Google Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Sign in using your Google credentials. Since this is a local development environment, you can enter any Gmail to test auto-registration.',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Google Email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Google Full Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
-              child: const Text('Sign In', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldSignIn != true) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    final email = emailController.text.trim();
-    final name = nameController.text.trim();
-    const avatarUrl = 'https://res.cloudinary.com/diqekap4o/image/upload/v1781621072/login_tolpmx.png';
-    const googleId = 'google_1234567890';
-
-    final result = await _authService.loginWithGoogle(
-      email: email,
-      fullName: name,
-      avatarUrl: avatarUrl,
-      googleId: googleId,
-    );
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (mounted) {
-      if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sign in successful: Welcome, $name!'),
-            backgroundColor: const Color(0xFF28B79B),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Google Sign In failed.'),
+            content: Text(result['message'] ?? 'Registration failed. Please try again.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -238,7 +150,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ],
-          
+
           // Right Panel: Form
           Expanded(
             child: SingleChildScrollView(
@@ -304,19 +216,63 @@ class _LoginPageState extends State<LoginPage> {
                             );
                           },
                         ),
-                        const SizedBox(height: 48),
-                        
-                        // Sign In Title
+                        const SizedBox(height: 32),
+
+                        // Create Account Title
                         const Text(
-                          'Sign In',
+                          'Create Account',
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF1F2937),
                           ),
                         ),
-                        const SizedBox(height: 32),
-                        
+                        const SizedBox(height: 28),
+
+                        // Full Name Field
+                        const Text(
+                          'Full Name',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF374151),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _nameController,
+                          keyboardType: TextInputType.name,
+                          decoration: InputDecoration(
+                            hintText: 'Enter your full name',
+                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                            prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF9CA3AF), size: 20),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.redAccent),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Full Name is required';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
                         // Email Field
                         const Text(
                           'Email',
@@ -364,7 +320,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                         const SizedBox(height: 20),
-                        
+
                         // Password Field
                         const Text(
                           'Password',
@@ -422,58 +378,125 @@ class _LoginPageState extends State<LoginPage> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 16),
-                        
-                        // Remember me & Forgot password
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: const Color(0xFF28B79B),
-                                    onChanged: (val) {
-                                      setState(() {
-                                        _rememberMe = val ?? false;
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Remember me',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF4B5563),
-                                  ),
-                                ),
-                              ],
+                        const SizedBox(height: 20),
+
+                        // Confirm Password Field
+                        const Text(
+                          'Confirm Password',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF374151),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          obscureText: _obscureConfirmPassword,
+                          decoration: InputDecoration(
+                            hintText: 'Re-enter your password',
+                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                            prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                color: const Color(0xFF9CA3AF),
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                });
+                              },
                             ),
-                            GestureDetector(
-                              onTap: () {},
-                              child: const Text(
-                                'Forgot password?',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF28B79B),
-                                  fontWeight: FontWeight.w600,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Colors.redAccent),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Confirm Password is required';
+                            }
+                            if (value != _passwordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Terms of Service agreement
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                value: _agreeToTerms,
+                                activeColor: const Color(0xFF28B79B),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _agreeToTerms = val ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: const TextSpan(
+                                  text: 'By creating an account, you agree to HanGo\'s ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
+                                    height: 1.3,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Terms of Service',
+                                      style: TextStyle(
+                                        color: Color(0xFF28B79B),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    TextSpan(text: ' and '),
+                                    TextSpan(
+                                      text: 'Privacy Policy',
+                                      style: TextStyle(
+                                        color: Color(0xFF28B79B),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    TextSpan(text: '.'),
+                                  ],
                                 ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 28),
-                        
-                        // Sign In Button
+
+                        // Sign Up Button
                         SizedBox(
                           width: double.infinity,
                           height: 48,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleLogin,
+                            onPressed: _isLoading ? null : _handleRegister,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF28B79B),
                               shape: RoundedRectangleBorder(
@@ -494,7 +517,7 @@ class _LoginPageState extends State<LoginPage> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: const [
                                       Text(
-                                        'Sign In',
+                                        'Sign Up Now',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 15,
@@ -508,84 +531,12 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        
-                        // Divider
-                        Row(
-                          children: const [
-                            Expanded(child: Divider(color: Color(0xFFE5E7EB))),
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'or continue with',
-                                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                              ),
-                            ),
-                            Expanded(child: Divider(color: Color(0xFFE5E7EB))),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        
-                        // Google Sign In Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: OutlinedButton(
-                            onPressed: _isLoading ? null : _handleGoogleSignIn,
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              side: const BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.network(
-                                  'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
-                                  width: 20,
-                                  height: 20,
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Text(
-                                      'G',
-                                      style: TextStyle(
-                                        color: Color(0xFF4285F4),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Sign in with Google',
-                                  style: TextStyle(
-                                    color: Color(0xFF374151),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 36),
-                        
-                        // Sign Up Link
+
+                        // Bottom Sign In Navigation
                         Center(
                           child: RichText(
                             text: TextSpan(
-                              text: "Don't have an account? ",
+                              text: "Already have an account? ",
                               style: const TextStyle(
                                 color: Color(0xFF6B7280),
                                 fontSize: 14,
@@ -596,15 +547,10 @@ class _LoginPageState extends State<LoginPage> {
                                   baseline: TextBaseline.alphabetic,
                                   child: GestureDetector(
                                     onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const RegisterPage(),
-                                        ),
-                                      );
+                                      Navigator.pop(context);
                                     },
                                     child: const Text(
-                                      'Sign up',
+                                      'Sign In',
                                       style: TextStyle(
                                         color: Color(0xFF28B79B),
                                         fontWeight: FontWeight.bold,

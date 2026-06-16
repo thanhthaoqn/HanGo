@@ -113,6 +113,51 @@ public class AuthService {
         return mapToUserResponse(updatedUser);
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public LoginResponse googleLogin(com.hango.hango_backend.dto.GoogleLoginRequest googleLoginRequest) {
+        String email = googleLoginRequest.getEmail();
+        
+        User user = userRepository.findByEmail(email)
+                .orElseGet(() -> {
+                    Role userRole = roleRepository.findByRoleName("LEARNER")
+                            .orElseGet(() -> {
+                                Role newRole = Role.builder().roleName("LEARNER").build();
+                                return roleRepository.save(newRole);
+                            });
+
+                    User newUser = User.builder()
+                            .email(email)
+                            .passwordHash(encoder.encode(java.util.UUID.randomUUID().toString()))
+                            .fullName(googleLoginRequest.getFullName())
+                            .avatarUrl(googleLoginRequest.getAvatarUrl())
+                            .roles(new HashSet<>(Collections.singletonList(userRole)))
+                            .build();
+                    
+                    return userRepository.save(newUser);
+                });
+
+        if ((user.getAvatarUrl() == null || user.getAvatarUrl().isEmpty()) && googleLoginRequest.getAvatarUrl() != null) {
+            user.setAvatarUrl(googleLoginRequest.getAvatarUrl());
+        }
+
+        user.setLastLoginAt(LocalDateTime.now());
+        User savedUser = userRepository.save(user);
+
+        String jwt = jwtUtils.generateJwtTokenFromUsername(savedUser.getEmail());
+
+        List<String> roles = savedUser.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toList());
+
+        return new LoginResponse(
+                jwt,
+                savedUser.getId(),
+                savedUser.getEmail(),
+                savedUser.getFullName(),
+                roles
+        );
+    }
+
     private UserResponse mapToUserResponse(User user) {
         List<String> roles = user.getRoles().stream()
                 .map(Role::getRoleName)
