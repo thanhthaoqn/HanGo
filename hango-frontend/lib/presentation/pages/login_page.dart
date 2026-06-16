@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
 import 'register_page.dart';
+import 'learner/learner_home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -49,6 +50,12 @@ class _LoginPageState extends State<LoginPage> {
           const SnackBar(
             content: Text('Sign in successful!'),
             backgroundColor: Color(0xFF28B79B),
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const LearnerHomePage(),
           ),
         );
       } else {
@@ -152,6 +159,12 @@ class _LoginPageState extends State<LoginPage> {
           SnackBar(
             content: Text('Sign in successful: Welcome, $name!'),
             backgroundColor: const Color(0xFF28B79B),
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const LearnerHomePage(),
           ),
         );
       } else {

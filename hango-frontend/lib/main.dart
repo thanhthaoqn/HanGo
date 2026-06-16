@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'data/services/auth_service.dart';
 import 'presentation/pages/login_page.dart';
+import 'presentation/pages/learner/learner_home_page.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final authService = AuthService();
+  final isLoggedIn = await authService.isLoggedIn();
+  runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +23,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF28B79B)),
         useMaterial3: true,
       ),
-      home: const LoginPage(),
+      home: isLoggedIn ? const LearnerHomePage() : const LoginPage(),
     );
   }
 }
