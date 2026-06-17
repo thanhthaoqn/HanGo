@@ -1,18 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'data/services/auth_service.dart';
 import 'presentation/pages/login_page.dart';
 import 'presentation/pages/learner/learner_home_page.dart';
+import 'presentation/pages/admin/admin_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final authService = AuthService();
   final isLoggedIn = await authService.isLoggedIn();
-  runApp(MyApp(isLoggedIn: isLoggedIn));
+  
+  bool isAdmin = false;
+  if (isLoggedIn) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final roles = prefs.getStringList('user_roles') ?? [];
+      isAdmin = roles.any((r) => r.contains('ADMIN'));
+    } catch (e) {
+      debugPrint('Error loading user roles at startup: $e');
+    }
+  }
+  
+  runApp(MyApp(isLoggedIn: isLoggedIn, isAdmin: isAdmin));
 }
 
 class MyApp extends StatelessWidget {
   final bool isLoggedIn;
-  const MyApp({super.key, required this.isLoggedIn});
+  final bool isAdmin;
+  const MyApp({super.key, required this.isLoggedIn, this.isAdmin = false});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +38,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF28B79B)),
         useMaterial3: true,
       ),
-      home: isLoggedIn ? const LearnerHomePage() : const LoginPage(),
+      home: isLoggedIn
+          ? (isAdmin ? const AdminDashboardPage() : const LearnerHomePage())
+          : const LoginPage(),
     );
   }
 }
