@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
 
@@ -19,11 +20,15 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
   bool _isLoading = false;
+  bool _showCheckEmailScreen = false;
+  bool _isVerifying = false;
+  Timer? _verificationTimer;
 
   final _authService = AuthService();
 
   @override
   void dispose() {
+    _verificationTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -61,15 +66,71 @@ class _RegisterPageState extends State<RegisterPage> {
       if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Please sign in.'),
+            content: Text('Registration successful! Please check your email.'),
             backgroundColor: Color(0xFF28B79B),
           ),
         );
-        Navigator.pop(context); // Go back to login page
+        setState(() {
+          _showCheckEmailScreen = true;
+        });
+        _startVerificationPolling();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Registration failed. Please try again.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _startVerificationPolling() {
+    _verificationTimer?.cancel();
+    final email = _emailController.text.trim();
+    if (email.isEmpty) return;
+
+    _verificationTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      final isVerified = await _authService.checkVerificationStatus(email);
+      if (isVerified && mounted) {
+        timer.cancel();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account verified successfully! Please sign in.'),
+            backgroundColor: Color(0xFF28B79B),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  void _handleVerifyAccount() async {
+    setState(() {
+      _isVerifying = true;
+    });
+
+    final email = _emailController.text.trim();
+    final isVerified = await _authService.checkVerificationStatus(email);
+
+    if (mounted) {
+      setState(() {
+        _isVerifying = false;
+      });
+
+      if (isVerified) {
+        _verificationTimer?.cancel();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account verified successfully! Please sign in.'),
+            backgroundColor: Color(0xFF28B79B),
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account is not verified yet. Please check your email and click the verification link.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -218,350 +279,369 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                         const SizedBox(height: 32),
 
-                        // Create Account Title
-                        const Text(
-                          'Create Account',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1F2937),
+                        if (_showCheckEmailScreen)
+                          _buildCheckEmailView()
+                        else ...[
+                          // Create Account Title
+                          const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1F2937),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 28),
+                          const SizedBox(height: 28),
 
-                        // Full Name Field
-                        const Text(
-                          'Full Name',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF374151),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _nameController,
-                          keyboardType: TextInputType.name,
-                          decoration: InputDecoration(
-                            hintText: 'Enter your full name',
-                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                            prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF9CA3AF), size: 20),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.redAccent),
+                          // Full Name Field
+                          const Text(
+                            'Full Name',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
                             ),
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Full Name is required';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Email Field
-                        const Text(
-                          'Email',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF374151),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            hintText: 'Enter your email address',
-                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                            prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 20),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.redAccent),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Email is required';
-                            }
-                            final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                            if (!emailRegex.hasMatch(value)) {
-                              return 'Enter a valid email address';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Password Field
-                        const Text(
-                          'Password',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF374151),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            hintText: 'Enter your password',
-                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                            prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                color: const Color(0xFF9CA3AF),
-                                size: 20,
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _nameController,
+                            keyboardType: TextInputType.name,
+                            decoration: InputDecoration(
+                              hintText: 'Enter your full name',
+                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                              prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF9CA3AF), size: 20),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.redAccent),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Password is required';
-                            }
-                            if (value.length < 8) {
-                              return 'Password must be at least 8 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Confirm Password Field
-                        const Text(
-                          'Confirm Password',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF374151),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          obscureText: _obscureConfirmPassword,
-                          decoration: InputDecoration(
-                            hintText: 'Re-enter your password',
-                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                            prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                color: const Color(0xFF9CA3AF),
-                                size: 20,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureConfirmPassword = !_obscureConfirmPassword;
-                                });
-                              },
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Colors.redAccent),
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.redAccent),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Full Name is required';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Email Field
+                          const Text(
+                            'Email',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
                             ),
                           ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Confirm Password is required';
-                            }
-                            if (value != _passwordController.text) {
-                              return 'Passwords do not match';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              hintText: 'Enter your email address',
+                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                              prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 20),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Colors.redAccent),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Email is required';
+                              }
+                              if (!value.contains('@')) {
+                                return 'Email must contain @';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
 
-                        // Terms of Service agreement
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: Checkbox(
-                                value: _agreeToTerms,
-                                activeColor: const Color(0xFF28B79B),
-                                onChanged: (val) {
+                          // Password Field
+                          const Text(
+                            'Password',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: InputDecoration(
+                              hintText: 'Enter your password',
+                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  color: const Color(0xFF9CA3AF),
+                                  size: 20,
+                                ),
+                                onPressed: () {
                                   setState(() {
-                                    _agreeToTerms = val ?? false;
+                                    _obscurePassword = !_obscurePassword;
                                   });
                                 },
                               ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Colors.redAccent),
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: RichText(
-                                text: const TextSpan(
-                                  text: 'By creating an account, you agree to HanGo\'s ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF6B7280),
-                                    height: 1.3,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: 'Terms of Service',
-                                      style: TextStyle(
-                                        color: Color(0xFF28B79B),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    TextSpan(text: ' and '),
-                                    TextSpan(
-                                      text: 'Privacy Policy',
-                                      style: TextStyle(
-                                        color: Color(0xFF28B79B),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    TextSpan(text: '.'),
-                                  ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Password is required';
+                              }
+                              final missing = <String>[];
+                              if (value.length < 8) {
+                                missing.add('at least 8 characters');
+                              }
+                              if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                                missing.add('at least 1 uppercase letter');
+                              }
+                              if (!RegExp(r'[a-z]').hasMatch(value)) {
+                                missing.add('at least 1 lowercase letter');
+                              }
+                              if (!RegExp(r'[0-9]').hasMatch(value)) {
+                                missing.add('at least 1 number');
+                              }
+                              if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=~`[\]\\;/]').hasMatch(value)) {
+                                missing.add('at least 1 special character');
+                              }
+                              if (missing.isNotEmpty) {
+                                return 'Missing: ${missing.join(", ")}';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Confirm Password Field
+                          const Text(
+                            'Confirm Password',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: _obscureConfirmPassword,
+                            decoration: InputDecoration(
+                              hintText: 'Re-enter your password',
+                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  color: const Color(0xFF9CA3AF),
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  });
+                                },
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: Colors.redAccent),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Confirm Password is required';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Terms of Service agreement
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _agreeToTerms,
+                                  activeColor: const Color(0xFF28B79B),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _agreeToTerms = val ?? false;
+                                    });
+                                  },
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 28),
-
-                        // Sign Up Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _handleRegister,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF28B79B),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: RichText(
+                                  text: const TextSpan(
+                                    text: 'By creating an account, you agree to HanGo\'s ',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF6B7280),
+                                      height: 1.3,
                                     ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      Text(
-                                        'Sign Up Now',
+                                    children: [
+                                      TextSpan(
+                                        text: 'Terms of Service',
                                         style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
+                                          color: Color(0xFF28B79B),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      TextSpan(text: ' and '),
+                                      TextSpan(
+                                        text: 'Privacy Policy',
+                                        style: TextStyle(
+                                          color: Color(0xFF28B79B),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      TextSpan(text: '.'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+
+                          // Sign Up Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _handleRegister,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF28B79B),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: const [
+                                        Text(
+                                          'Sign Up Now',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Bottom Sign In Navigation
+                          Center(
+                            child: RichText(
+                              text: TextSpan(
+                                text: "Already have an account? ",
+                                style: const TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 14,
+                                ),
+                                children: [
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.baseline,
+                                    baseline: TextBaseline.alphabetic,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text(
+                                        'Sign In',
+                                        style: TextStyle(
+                                          color: Color(0xFF28B79B),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      SizedBox(width: 8),
-                                      Icon(Icons.arrow_forward, color: Colors.white, size: 18),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Bottom Sign In Navigation
-                        Center(
-                          child: RichText(
-                            text: TextSpan(
-                              text: "Already have an account? ",
-                              style: const TextStyle(
-                                color: Color(0xFF6B7280),
-                                fontSize: 14,
-                              ),
-                              children: [
-                                WidgetSpan(
-                                  alignment: PlaceholderAlignment.baseline,
-                                  baseline: TextBaseline.alphabetic,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                    },
-                                    child: const Text(
-                                      'Sign In',
-                                      style: TextStyle(
-                                        color: Color(0xFF28B79B),
-                                        fontWeight: FontWeight.bold,
-                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -571,6 +651,173 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCheckEmailView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(height: 40),
+        // Mail Icon Badge
+        Container(
+          width: 80,
+          height: 80,
+          decoration: const BoxDecoration(
+            color: Color(0xFFE6FDF9),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.mark_email_unread_outlined,
+            color: Color(0xFF28B79B),
+            size: 40,
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Title
+        const Text(
+          'Check your email',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1F2937),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Subtitle
+        const Text(
+          "We've sent a verification link to your email address.\nPlease click the link to activate your account.",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF4B5563),
+            height: 1.5,
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 32),
+        // Verify Account Button
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton(
+            onPressed: _isVerifying ? null : _handleVerifyAccount,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF28B79B),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            child: _isVerifying
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.verified,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Verify Account',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Back to Login Link
+        GestureDetector(
+          onTap: () {
+            Navigator.pop(context);
+          },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(
+                Icons.arrow_back,
+                color: Color(0xFF4B5563),
+                size: 16,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Back to Login',
+                style: TextStyle(
+                  color: Color(0xFF4B5563),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 40),
+        const Divider(
+          color: Color(0xFFE5E7EB),
+          thickness: 1,
+        ),
+        const SizedBox(height: 24),
+        // Footer Help Text
+        Center(
+          child: RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              text: "Didn't receive the email? Check your spam folder or ",
+              style: const TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 12,
+                height: 1.4,
+                fontFamily: 'Outfit',
+              ),
+              children: [
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: GestureDetector(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Contact support at support@hango.com'),
+                          backgroundColor: Color(0xFF28B79B),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'contact support',
+                      style: TextStyle(
+                        color: Color(0xFF28B79B),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                ),
+                const TextSpan(text: '.'),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
