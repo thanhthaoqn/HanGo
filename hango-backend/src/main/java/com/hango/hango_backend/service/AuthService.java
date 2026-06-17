@@ -125,6 +125,12 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
+        try {
+            emailService.sendVerificationEmail(savedUser.getEmail());
+        } catch (Exception e) {
+            System.err.println("Failed to send verification email: " + e.getMessage());
+        }
+
         return mapToUserResponse(savedUser);
     }
 
@@ -256,6 +262,20 @@ public class AuthService {
 
         // Clean up OTPs
         passwordResetOtpRepository.deleteByEmail(request.getEmail());
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void verifyAccount(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+        user.setIsVerified(true);
+        userRepository.save(user);
+    }
+
+    public boolean isAccountVerified(String email) {
+        return userRepository.findByEmail(email)
+                .map(User::getIsVerified)
+                .orElse(false);
     }
 
     private UserResponse mapToUserResponse(User user) {
