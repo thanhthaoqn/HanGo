@@ -185,4 +185,23 @@ class AuthService {
       return {'success': false, 'message': e.toString()};
     }
   }
+
+  // Check if user is verified by calling /check-verification
+  Future<bool> checkVerificationStatus(String email) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/check-verification?email=$email'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['verified'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error checking verification status: $e');
+      return false;
+    }
+  }
 }

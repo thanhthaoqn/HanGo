@@ -35,4 +35,28 @@ public class EmailService {
             System.out.println("[OTP CODE FOR DEVELOPMENT] Email: " + toEmail + " -> OTP: " + otpCode);
         }
     }
+
+    public void sendVerificationEmail(String toEmail) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("HanGo - Verify Your Account");
+        message.setText("Hello,\n\n" +
+                "Thank you for registering on HanGo. Please click the link below to verify and activate your account:\n\n" +
+                "http://localhost:8080/api/auth/verify?email=" + toEmail + "\n\n" +
+                "Best regards,\n" +
+                "HanGo Team");
+
+        try {
+            if (mailSender != null) {
+                mailSender.send(message);
+                System.out.println("[EMAIL SUCCESS] Sent verification link to: " + toEmail);
+            } else {
+                System.out.println("[EMAIL WARN] JavaMailSender is not initialized. Printing link to console instead.");
+                System.out.println("[VERIFICATION LINK FOR DEVELOPMENT] http://localhost:8080/api/auth/verify?email=" + toEmail);
+            }
+        } catch (Exception e) {
+            System.err.println("[EMAIL WARNING] Could not send verification email: " + e.getMessage());
+            System.out.println("[VERIFICATION LINK FOR DEVELOPMENT] http://localhost:8080/api/auth/verify?email=" + toEmail);
+        }
+    }
 }
