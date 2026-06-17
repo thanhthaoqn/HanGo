@@ -6,6 +6,8 @@ import '../../../data/services/course_service.dart';
 import '../../../domain/model/course.dart';
 import '../../../domain/model/exam.dart';
 import '../login_page.dart';
+import '../exam/list_exams_page.dart';
+import '../../widgets/shared_header.dart';
 
 class LearnerHomePage extends StatefulWidget {
   const LearnerHomePage({super.key});
@@ -114,10 +116,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
-        child: _buildHeader(context, isDesktop),
-      ),
+      appBar: SharedHeader(isDesktop: isDesktop, activeTab: ''),
       drawer: isDesktop ? null : _buildDrawer(context),
       body: SingleChildScrollView(
         child: Column(
@@ -158,216 +157,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     );
   }
 
-  // ----------------------------------------------------
-  // App Bar / Navigation Header
-  // ----------------------------------------------------
-  Widget _buildHeader(BuildContext context, bool isDesktop) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-      child: SafeArea(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Left Logo & Title
-            Row(
-              children: [
-                if (!isDesktop) ...[
-                  Builder(
-                    builder: (context) => IconButton(
-                      icon: const Icon(Icons.menu, color: Color(0xFF1F2937)),
-                      onPressed: () => Scaffold.of(context).openDrawer(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Image.network(
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                  height: 36,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE6FFFA),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.school, size: 18, color: Color(0xFF28B79B)),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'HanGo',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F2937),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
 
-            // Center Navigation Links (Visible on desktop only)
-            if (isDesktop)
-              Row(
-                children: [
-                  _buildHeaderNavLink('Exams', active: true),
-                  const SizedBox(width: 24),
-                  _buildHeaderNavLink('Courses'),
-                  const SizedBox(width: 24),
-                  _buildHeaderNavLink('Flashcard'),
-                ],
-              ),
-
-            // Right User Profile & Notification Actions
-            Row(
-              children: [
-                // Notification Bell with Badge
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF4B5563), size: 26),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('No new notifications'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                    ),
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-
-                // User profile with Popup Menu
-                PopupMenuButton<String>(
-                  onSelected: (val) {
-                    if (val == 'logout') {
-                      _handleLogout();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Profile details for $_userFullName')),
-                      );
-                    }
-                  },
-                  offset: const Offset(0, 50),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF6366F1), // Violet
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        _userInitials,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      enabled: false,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _userFullName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
-                          ),
-                          Text(
-                            _userEmail,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                          ),
-                          const Divider(),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'profile',
-                      child: Row(
-                        children: [
-                          Icon(Icons.person_outline, size: 20),
-                          SizedBox(width: 8),
-                          Text('Profile Settings'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'logout',
-                      child: Row(
-                        children: [
-                          Icon(Icons.logout, size: 20, color: Colors.redAccent),
-                          SizedBox(width: 8),
-                          Text('Log Out', style: TextStyle(color: Colors.redAccent)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Navigation Links Widget
-  Widget _buildHeaderNavLink(String text, {bool active = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: active ? const Color(0xFF28B79B) : Colors.transparent,
-            width: 2,
-          ),
-        ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: active ? const Color(0xFF28B79B) : const Color(0xFF4B5563),
-          fontWeight: active ? FontWeight.bold : FontWeight.w500,
-          fontSize: 15,
-        ),
-      ),
-    );
-  }
 
   // Adaptive drawer for mobile layouts
   Widget _buildDrawer(BuildContext context) {
@@ -393,7 +183,15 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Exams'),
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              Navigator.pop(context); // close drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ListExamsPage(),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.school_outlined),
@@ -802,7 +600,12 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             
             // See All Text Link
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                );
+              },
               child: const Row(
                 children: [
                   Text(

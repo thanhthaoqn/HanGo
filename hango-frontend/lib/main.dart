@@ -5,14 +5,11 @@ import 'presentation/pages/learner/learner_home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final authService = AuthService();
-  final isLoggedIn = await authService.isLoggedIn();
-  runApp(MyApp(isLoggedIn: isLoggedIn));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final bool isLoggedIn;
-  const MyApp({super.key, required this.isLoggedIn});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +20,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF28B79B)),
         useMaterial3: true,
       ),
-      home: isLoggedIn ? const LearnerHomePage() : const LoginPage(),
+      home: const LearnerHomePage(),
     );
   }
 }
