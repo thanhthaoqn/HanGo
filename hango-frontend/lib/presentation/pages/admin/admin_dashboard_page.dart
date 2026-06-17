@@ -34,6 +34,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isLoadingAccounts = false;
   List<dynamic> _accountsList = [];
   final TextEditingController _searchController = TextEditingController();
+  Map<String, dynamic>? _selectedUserForEdit;
+  String _editStatus = 'ACTIVE';
+  String _editRole = 'Trainer';
+  final TextEditingController _dobController = TextEditingController(text: '28/04/2004');
 
   // Resolve backend base URL dynamically based on platform (matching AuthService)
   String get apiBaseUrl {
@@ -52,6 +56,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _dobController.dispose();
     super.dispose();
   }
 
@@ -309,6 +314,41 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
+            )
+          else if (_selectedUserForEdit != null)
+            Row(
+              children: [
+                const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedUserForEdit = null;
+                    });
+                  },
+                  child: const Text(
+                    'Accounts',
+                    style: TextStyle(
+                      fontSize: 13, 
+                      color: Color(0xFF28B79B), 
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 6),
+                const Text(
+                  'Trainer Account Detail',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF28B79B),
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
             )
           else
             const SizedBox(), // Empty spacer on desktop
@@ -969,6 +1009,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // TAB 1: ACCOUNTS LIST MOCK
   // ------------------------------------------------------------------------
   Widget _buildAccountsTab() {
+    if (_selectedUserForEdit != null) {
+      return _buildTrainerDetailView(_selectedUserForEdit!);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1223,9 +1266,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                       child: IconButton(
                                         icon: const Icon(Icons.edit_outlined, color: Color(0xFF28B79B), size: 18),
                                         onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Editing user ${user['fullName']} (Mock)')),
-                                          );
+                                          setState(() {
+                                            _selectedUserForEdit = user;
+                                            _editStatus = user['status'] ?? 'ACTIVE';
+                                            final rolesList = user['roles'] as List?;
+                                            final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Trainer';
+                                            if (role.contains('TRAINING_LEAD')) {
+                                              _editRole = 'Training Lead';
+                                            } else if (role.contains('ADMIN')) {
+                                              _editRole = 'ADMIN';
+                                            } else {
+                                              _editRole = 'Trainer';
+                                            }
+                                            _dobController.text = '28/04/2004';
+                                          });
                                         },
                                       ),
                                     ),
@@ -1765,6 +1819,543 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTrainerDetailView(Map<String, dynamic> user) {
+    final fullName = user['fullName'] ?? '';
+    final email = user['email'] ?? '';
+    final username = email.split('@').first;
+    final userId = user['id'] ?? 0;
+    final rolesList = user['roles'] as List?;
+    final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Trainer';
+    
+    // Normalize role string for display (e.g. ROLE_TRAINING_LEAD -> Training Lead)
+    String displayRole = role.replaceAll('ROLE_', '').replaceAll('_', ' ');
+    // Capitalize words
+    displayRole = displayRole.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+
+    String userInitials = '';
+    if (fullName.trim().isNotEmpty) {
+      final parts = fullName.trim().split(' ');
+      if (parts.length > 1) {
+        userInitials = parts.first[0].toUpperCase() + parts.last[0].toUpperCase();
+      } else if (parts.isNotEmpty) {
+        userInitials = parts.first[0].toUpperCase();
+      }
+    }
+    if (userInitials.isEmpty) userInitials = 'U';
+
+    final genderStr = user['gender'] ?? 'Female';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title
+        const Text(
+          'Trainer Account Detail',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Main Card Container
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar & Basic Info Header
+              Row(
+                children: [
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+                        ),
+                        child: Center(
+                          child: Text(
+                            userInitials,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2563EB),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Pencil Edit Badge
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF28B79B),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 24),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fullName,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'ID: PS-$userId-CC',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF6B7280),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
+
+              // Fields Row 1: FullName & Username
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'FullName',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          initialValue: fullName,
+                          readOnly: true,
+                          enabled: false,
+                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            fillColor: const Color(0xFFF9FAFB),
+                            filled: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Username',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          initialValue: username,
+                          readOnly: true,
+                          enabled: false,
+                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            fillColor: const Color(0xFFF9FAFB),
+                            filled: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Fields Row 2: Email & Role
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Email',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          initialValue: email,
+                          readOnly: true,
+                          enabled: false,
+                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            fillColor: const Color(0xFFF9FAFB),
+                            filled: true,
+                            prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 20),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Role',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _editRole,
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _editRole = val;
+                              });
+                            }
+                          },
+                          items: const [
+                            DropdownMenuItem(value: 'Trainer', child: Text('Trainer')),
+                            DropdownMenuItem(value: 'Training Lead', child: Text('Training Lead')),
+                            DropdownMenuItem(value: 'ADMIN', child: Text('Admin')),
+                          ],
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Fields Row 3: Date of Birth & Gender
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Date of Birth',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _dobController,
+                          readOnly: true,
+                          enabled: false,
+                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            fillColor: const Color(0xFFF9FAFB),
+                            filled: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Gender',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Row(
+                              children: [
+                                Radio<String>(
+                                  value: 'Female',
+                                  groupValue: genderStr,
+                                  onChanged: null,
+                                  activeColor: const Color(0xFF28B79B),
+                                ),
+                                const Text('Female', style: TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit')),
+                              ],
+                            ),
+                            const SizedBox(width: 20),
+                            Row(
+                              children: [
+                                Radio<String>(
+                                  value: 'Male',
+                                  groupValue: genderStr,
+                                  onChanged: null,
+                                  activeColor: const Color(0xFF28B79B),
+                                ),
+                                const Text('Male', style: TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit')),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // Account Status Section
+              const Text(
+                'Account Status',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4B5563),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _editStatus = 'ACTIVE';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _editStatus == 'ACTIVE' ? const Color(0xFFE6FDF9) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _editStatus == 'ACTIVE' ? const Color(0xFF28B79B) : const Color(0xFFD1D5DB),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: _editStatus == 'ACTIVE' ? const Color(0xFF28B79B) : const Color(0xFF6B7280),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Active',
+                            style: TextStyle(
+                              color: _editStatus == 'ACTIVE' ? const Color(0xFF28B79B) : const Color(0xFF4B5563),
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _editStatus = 'INACTIVE';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _editStatus == 'INACTIVE' ? const Color(0xFFF3F4F6) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _editStatus == 'INACTIVE' ? const Color(0xFF9CA3AF) : const Color(0xFFD1D5DB),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.cancel_outlined,
+                            color: _editStatus == 'INACTIVE' ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Inactive',
+                            style: TextStyle(
+                              color: _editStatus == 'INACTIVE' ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 40),
+              const Divider(color: Color(0xFFE5E7EB)),
+              const SizedBox(height: 24),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () async {
+                      if (user['status'] != _editStatus) {
+                        await _toggleUserStatus(userId, _editStatus == 'ACTIVE');
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Trainer details updated successfully (Mocked roles/DOB)'),
+                            backgroundColor: Color(0xFF28B79B),
+                          ),
+                        );
+                      }
+                      setState(() {
+                        _selectedUserForEdit = null;
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Update',
+                      style: TextStyle(
+                        color: Color(0xFF28B79B),
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedUserForEdit = null;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28B79B),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Back',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
