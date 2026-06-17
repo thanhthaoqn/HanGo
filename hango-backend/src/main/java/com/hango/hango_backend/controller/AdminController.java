@@ -3,6 +3,7 @@ package com.hango.hango_backend.controller;
 import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.entity.Role;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -81,6 +82,104 @@ public class AdminController {
             response.put("weeklyValues", values);
 
             return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/users")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getUsers(
+            @RequestParam(defaultValue = "staff") String roleType,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        try {
+            List<User> allUsers = userRepository.findAll();
+            List<User> filteredUsers = new ArrayList<>();
+
+            // 1. Filter by roleType
+            for (User user : allUsers) {
+                boolean isLearner = user.getRoles().stream()
+                        .anyMatch(r -> r.getRoleName().equalsIgnoreCase("LEARNER"));
+                
+                if ("learner".equalsIgnoreCase(roleType)) {
+                    if (isLearner) {
+                        filteredUsers.add(user);
+                    }
+                } else { // "staff"
+                    if (!isLearner) {
+                        filteredUsers.add(user);
+                    }
+                }
+            }
+
+            // 2. Filter by search query (name or email)
+            if (search != null && !search.trim().isEmpty()) {
+                String q = search.trim().toLowerCase();
+                filteredUsers.removeIf(u -> 
+                    (u.getFullName() == null || !u.getFullName().toLowerCase().contains(q)) && 
+                    (u.getEmail() == null || !u.getEmail().toLowerCase().contains(q))
+                );
+            }
+
+            // 3. Sort users (by id desc)
+            filteredUsers.sort((u1, u2) -> u2.getId().compareTo(u1.getId()));
+
+            // 4. Pagination
+            int totalCount = filteredUsers.size();
+            int totalPages = (int) Math.ceil((double) totalCount / size);
+            if (totalPages == 0) totalPages = 1;
+
+            int fromIndex = page * size;
+            int toIndex = Math.min(fromIndex + size, totalCount);
+
+            List<User> pagedUsers = new ArrayList<>();
+            if (fromIndex < totalCount) {
+                pagedUsers = filteredUsers.subList(fromIndex, toIndex);
+            }
+
+            // 5. Map to safe JSON structure
+            List<Map<String, Object>> content = pagedUsers.stream().map(u -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", u.getId());
+                map.put("fullName", u.getFullName());
+                map.put("email", u.getEmail());
+                map.put("status", u.getStatus() != null ? u.getStatus() : "ACTIVE");
+                
+                List<String> roleNames = u.getRoles().stream()
+                        .map(Role::getRoleName)
+                        .toList();
+                map.put("roles", roleNames);
+                return map;
+            }).toList();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", content);
+            response.put("totalElements", totalCount);
+            response.put("totalPages", totalPages);
+            response.put("page", page);
+            response.put("size", size);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/users/{id}/status")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> updateUserStatus(@PathVariable Long id, @RequestParam String status) {
+        try {
+            Optional<User> userOpt = userRepository.findById(id);
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                user.setStatus(status.toUpperCase());
+                userRepository.save(user);
+                return ResponseEntity.ok(Map.of("success", true, "message", "User status updated successfully"));
+            } else {
+                return ResponseEntity.status(404).body("User not found");
+            }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }

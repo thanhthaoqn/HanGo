@@ -72,19 +72,26 @@ public class AuthService {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
 
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        
+        // Fetch user from database to check their status
+        User user = userRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userDetails.getUsername()));
+
+        if ("INACTIVE".equalsIgnoreCase(user.getStatus())) {
+            throw new IllegalArgumentException("Your account is deactivated. Please contact support.");
+        }
+
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
 
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
 
         // Update last login timestamp
-        userRepository.findByEmail(userDetails.getUsername()).ifPresent(user -> {
-            user.setLastLoginAt(LocalDateTime.now());
-            userRepository.save(user);
-        });
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
 
         return new LoginResponse(
                 jwt,
@@ -173,6 +180,10 @@ public class AuthService {
                             
                             return userRepository.save(newUser);
                         });
+
+                if ("INACTIVE".equalsIgnoreCase(user.getStatus())) {
+                    throw new IllegalArgumentException("Your account is deactivated. Please contact support.");
+                }
 
                 user.setLastLoginAt(LocalDateTime.now());
                 User savedUser = userRepository.save(user);
