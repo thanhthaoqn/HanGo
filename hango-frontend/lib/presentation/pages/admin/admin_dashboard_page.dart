@@ -27,6 +27,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   List<String> _chartLabels = ['18/5', '19/5', '20/5', '21/5', '22/5', '23/5', '24/5'];
   List<double> _chartValues = [0, 0, 0, 0, 0, 0, 0];
 
+  // Accounts tab state and variables
+  String _accountsTab = 'staff'; // 'staff' | 'learner'
+  int _accountsPage = 0;
+  int _accountsTotalPages = 1;
+  bool _isLoadingAccounts = false;
+  List<dynamic> _accountsList = [];
+  final TextEditingController _searchController = TextEditingController();
+
   // Resolve backend base URL dynamically based on platform (matching AuthService)
   String get apiBaseUrl {
     final authUrl = AuthService.baseUrl; // e.g., 'http://localhost:8080/api/auth'
@@ -38,6 +46,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     super.initState();
     _loadAdminInfo();
     _fetchDashboardStats();
+    _fetchAccounts();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAdminInfo() async {
@@ -112,6 +127,102 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       setState(() {
         _isLoadingStats = false;
       });
+    }
+  }
+
+  Future<void> _fetchAccounts() async {
+    setState(() {
+      _isLoadingAccounts = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        debugPrint('No auth token found, cannot fetch accounts.');
+        setState(() {
+          _isLoadingAccounts = false;
+        });
+        return;
+      }
+
+      final search = Uri.encodeComponent(_searchController.text.trim());
+      final url = Uri.parse(
+        '$apiBaseUrl/admin/users?roleType=$_accountsTab&search=$search&page=$_accountsPage&size=6'
+      );
+      
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _accountsList = data['content'] ?? [];
+          _accountsTotalPages = data['totalPages'] ?? 1;
+          _isLoadingAccounts = false;
+        });
+      } else {
+        debugPrint('Failed to load accounts: ${response.statusCode} - ${response.body}');
+        setState(() {
+          _isLoadingAccounts = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching accounts: $e');
+      setState(() {
+        _isLoadingAccounts = false;
+      });
+    }
+  }
+
+  Future<void> _toggleUserStatus(int userId, bool newStatus) async {
+    final statusStr = newStatus ? 'ACTIVE' : 'INACTIVE';
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/users/$userId/status?status=$statusStr');
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          final userIndex = _accountsList.indexWhere((u) => u['id'] == userId);
+          if (userIndex != -1) {
+            _accountsList[userIndex]['status'] = statusStr;
+          }
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('User status updated to $statusStr'),
+              backgroundColor: const Color(0xFF28B79B),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      } else {
+        debugPrint('Failed to update status: ${response.statusCode} - ${response.body}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update status: ${response.body}'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling status: $e');
     }
   }
 
@@ -469,6 +580,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           setState(() {
             _selectedMenuIndex = index;
           });
+          if (index == 1) {
+            _fetchAccounts();
+          }
           if (isMobileDrawer) {
             Navigator.pop(context);
           }
@@ -855,38 +969,61 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // TAB 1: ACCOUNTS LIST MOCK
   // ------------------------------------------------------------------------
   Widget _buildAccountsTab() {
-    final mockAccounts = [
-      {'name': 'Nguyễn Văn A', 'email': 'a.nguyen@hango.edu', 'role': 'Learner', 'status': 'Active'},
-      {'name': 'Trần Thị B', 'email': 'b.tran@hango.edu', 'role': 'Trainer', 'status': 'Active'},
-      {'name': 'Lê Văn C', 'email': 'c.le@hango.edu', 'role': 'Training Lead', 'status': 'Inactive'},
-      {'name': 'Admin Thao', 'email': 'thao@hango.edu', 'role': 'Administrator', 'status': 'Active'},
-      {'name': 'Phạm Minh D', 'email': 'd.pham@hango.edu', 'role': 'Learner', 'status': 'Active'},
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Accounts Management',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-            fontFamily: 'Outfit',
-          ),
+        // 1. Breadcrumbs
+        Row(
+          children: [
+            const Text(
+              'Accounts',
+              style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
+            const SizedBox(width: 6),
+            Text(
+              _accountsTab == 'staff' ? 'Trainer' : 'Learner',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF28B79B),
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Manage all registered accounts, assignments, and roles in the platform.',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF6B7280),
-            fontFamily: 'Outfit',
-          ),
+        const SizedBox(height: 20),
+
+        // 2. Subtabs Menu (Trainer | Learner)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _buildAccountsSubTab('Trainer', _accountsTab == 'staff', () {
+                  setState(() {
+                    _accountsTab = 'staff';
+                    _accountsPage = 0;
+                  });
+                  _fetchAccounts();
+                }),
+                const SizedBox(width: 24),
+                _buildAccountsSubTab('Learner', _accountsTab == 'learner', () {
+                  setState(() {
+                    _accountsTab = 'learner';
+                    _accountsPage = 0;
+                  });
+                  _fetchAccounts();
+                }),
+              ],
+            ),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          ],
         ),
         const SizedBox(height: 24),
-        
-        // Search and Actions Header
+
+        // 3. Search and Actions Header
         Row(
           children: [
             Expanded(
@@ -899,18 +1036,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
-                  children: const [
-                    Icon(Icons.search, color: Color(0xFF9CA3AF), size: 20),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.search, color: Color(0xFF9CA3AF), size: 20),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
-                        decoration: InputDecoration(
+                        controller: _searchController,
+                        onChanged: (val) {
+                          setState(() {
+                            _accountsPage = 0;
+                          });
+                          _fetchAccounts();
+                        },
+                        decoration: const InputDecoration(
                           hintText: 'Search by name or email...',
                           hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
                           border: InputBorder.none,
                           isDense: true,
                         ),
-                        style: TextStyle(fontSize: 14, fontFamily: 'Outfit'),
+                        style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
                       ),
                     ),
                   ],
@@ -919,9 +1063,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
             const SizedBox(width: 16),
             ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Account registration is handled via Auth registration flows.')),
+                );
+              },
               icon: const Icon(Icons.add, color: Colors.white, size: 18),
-              label: const Text('Add Account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: const Text('Create', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -933,7 +1081,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         const SizedBox(height: 20),
 
-        // Accounts Table Card
+        // 4. Accounts Table Card
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -941,83 +1089,409 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: DataTable(
-              headingRowColor: MaterialStateProperty.all(const Color(0xFFF9FAFB)),
-              dataRowHeight: 60,
-              columns: const [
-                DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'))),
-                DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'))),
-                DataColumn(label: Text('Role', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'))),
-                DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'))),
-              ],
-              rows: mockAccounts.map((account) {
-                final isActive = account['status'] == 'Active';
-                return DataRow(
-                  cells: [
-                    DataCell(Text(account['name']!, style: const TextStyle(fontWeight: FontWeight.w500, fontFamily: 'Outfit'))),
-                    DataCell(Text(account['email']!, style: const TextStyle(fontFamily: 'Outfit'))),
-                    DataCell(_buildRoleBadge(account['role']!)),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isActive ? const Color(0xFFD1FAE5) : const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          account['status']!,
-                          style: TextStyle(
-                            color: isActive ? const Color(0xFF065F46) : const Color(0xFF4B5563),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Outfit',
-                          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Table Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  children: const [
+                    Expanded(flex: 3, child: Text('NAME', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4B5563), fontFamily: 'Outfit'))),
+                    Expanded(flex: 3, child: Text('EMAIL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4B5563), fontFamily: 'Outfit'))),
+                    Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4B5563), fontFamily: 'Outfit'))),
+                    Expanded(flex: 2, child: Text('ACTIVITY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4B5563), fontFamily: 'Outfit'))),
+                    Expanded(flex: 1, child: Text('ACTION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4B5563), fontFamily: 'Outfit'))),
+                  ],
+                ),
+              ),
+              
+              // Table Rows
+              _isLoadingAccounts
+                  ? const SizedBox(
+                      height: 300,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
+                    )
+                  : _accountsList.isEmpty
+                      ? const SizedBox(
+                          height: 200,
+                          child: Center(
+                            child: Text(
+                              'No accounts found.',
+                              style: TextStyle(color: Color(0xFF6B7280), fontSize: 14, fontFamily: 'Outfit'),
+                            ),
+                          ),
+                        )
+                      : Column(
+                          children: _accountsList.map((user) {
+                            final isActive = user['status'] == 'ACTIVE';
+                            final List roles = user['roles'] ?? [];
+                            final roleStr = roles.isNotEmpty ? roles.first.toString() : 'LEARNER';
+                            final int userId = user['id'] ?? 0;
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                border: Border(
+                                  bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  // NAME Column
+                                  Expanded(
+                                    flex: 3,
+                                    child: Row(
+                                      children: [
+                                        _buildAvatarCircle(user['fullName'] ?? ''),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            user['fullName'] ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                              color: Color(0xFF1F2937),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // EMAIL Column
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      user['email'] ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF4B5563),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ),
+                                  // ROLE Column
+                                  Expanded(
+                                    flex: 2,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: _buildRoleBadge(roleStr),
+                                    ),
+                                  ),
+                                  // ACTIVITY Column
+                                  Expanded(
+                                    flex: 2,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Transform.scale(
+                                        scale: 0.8,
+                                        alignment: Alignment.centerLeft,
+                                        child: Switch(
+                                          value: isActive,
+                                          activeColor: const Color(0xFF28B79B),
+                                          onChanged: (newVal) {
+                                            if (userId != 0) {
+                                              _toggleUserStatus(userId, newVal);
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // ACTION Column
+                                  Expanded(
+                                    flex: 1,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.edit_outlined, color: Color(0xFF28B79B), size: 18),
+                                        onPressed: () {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Editing user ${user['fullName']} (Mock)')),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+            ],
           ),
         ),
+        const SizedBox(height: 20),
+
+        // 5. Pagination Footer
+        _buildPagination(),
+
+        // 6. Main Lower Footer
+        _buildAccountsFooter(),
       ],
     );
   }
 
+  Widget _buildAccountsSubTab(String text, bool active, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: active ? const Color(0xFF28B79B) : Colors.transparent,
+              width: 2.5,
+            ),
+          ),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: active ? const Color(0xFF28B79B) : const Color(0xFF4B5563),
+            fontSize: 14,
+            fontWeight: active ? FontWeight.bold : FontWeight.w500,
+            fontFamily: 'Outfit',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarCircle(String fullName) {
+    String initials = '';
+    if (fullName.trim().isNotEmpty) {
+      final parts = fullName.trim().split(' ');
+      if (parts.length > 1) {
+        initials = parts.first[0].toUpperCase() + parts.last[0].toUpperCase();
+      } else if (parts.isNotEmpty) {
+        initials = parts.first[0].toUpperCase();
+      }
+    }
+    if (initials.isEmpty) initials = 'U';
+
+    final colors = [
+      const Color(0xFFEFF6FF), // Blue
+      const Color(0xFFECFDF5), // Green
+      const Color(0xFFFDF2F8), // Pink
+      const Color(0xFFF5F3FF), // Purple
+      const Color(0xFFFFF7ED), // Orange
+    ];
+    final textColors = [
+      const Color(0xFF2563EB),
+      const Color(0xFF059669),
+      const Color(0xFFDB2777),
+      const Color(0xFF7C3AED),
+      const Color(0xFFEA580C),
+    ];
+    final hash = fullName.hashCode.abs() % colors.length;
+
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: colors[hash],
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: textColors[hash],
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            fontFamily: 'Outfit',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPagination() {
+    if (_accountsTotalPages <= 1) return const SizedBox();
+    
+    List<Widget> children = [];
+    
+    // Left arrow
+    children.add(
+      IconButton(
+        icon: const Icon(Icons.chevron_left, size: 18),
+        onPressed: _accountsPage > 0 
+          ? () {
+              setState(() {
+                _accountsPage--;
+              });
+              _fetchAccounts();
+            }
+          : null,
+      ),
+    );
+    
+    // Page numbers
+    for (int i = 0; i < _accountsTotalPages; i++) {
+      final isCurrent = _accountsPage == i;
+      children.add(
+        InkWell(
+          onTap: () {
+            setState(() {
+              _accountsPage = i;
+            });
+            _fetchAccounts();
+          },
+          child: Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: isCurrent ? const Color(0xFF28B79B) : Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Center(
+              child: Text(
+                '${i + 1}',
+                style: TextStyle(
+                  color: isCurrent ? Colors.white : const Color(0xFF4B5563),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Right arrow
+    children.add(
+      IconButton(
+        icon: const Icon(Icons.chevron_right, size: 18),
+        onPressed: _accountsPage < _accountsTotalPages - 1 
+          ? () {
+              setState(() {
+                _accountsPage++;
+              });
+              _fetchAccounts();
+            }
+          : null,
+      ),
+    );
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: children,
+    );
+  }
+
+  Widget _buildAccountsFooter() {
+    return Container(
+      padding: const EdgeInsets.only(top: 48, bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: const [
+              Text(
+                'HanGo',
+                style: TextStyle(
+                  color: Color(0xFF28B79B),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Smart Language Self-Study Platform',
+                style: TextStyle(
+                  color: Color(0xFF9CA3AF),
+                  fontSize: 12,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              _buildFooterLink('Privacy Policy'),
+              const SizedBox(width: 16),
+              _buildFooterLink('Terms of Service'),
+              const SizedBox(width: 16),
+              _buildFooterLink('Contact Support'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterLink(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF9CA3AF),
+        fontSize: 12,
+        fontFamily: 'Outfit',
+      ),
+    );
+  }
+
   Widget _buildRoleBadge(String role) {
+    String cleanRole = role.replaceAll('ROLE_', '').toUpperCase();
+    
     Color bg = const Color(0xFFF3F4F6);
     Color fg = const Color(0xFF4B5563);
-    
-    switch (role) {
-      case 'Administrator':
-        bg = const Color(0xFFFEE2E2);
-        fg = const Color(0xFF991B1B);
+    String label = cleanRole;
+
+    switch (cleanRole) {
+      case 'ADMINISTRATOR':
+      case 'ADMIN':
+        bg = const Color(0xFFF3E8FF);
+        fg = const Color(0xFF7C3AED);
+        label = 'Admin';
         break;
-      case 'Training Lead':
-        bg = const Color(0xFFFDE8E8);
-        fg = const Color(0xFFC27803);
+      case 'TRAINING_LEAD':
+        bg = const Color(0xFFEEF2F6);
+        fg = const Color(0xFF6366F1);
+        label = 'Training Lead';
         break;
-      case 'Trainer':
-        bg = const Color(0xFFE0F2FE);
-        fg = const Color(0xFF0369A1);
+      case 'TRAINER':
+        bg = const Color(0xFFDBEAFE);
+        fg = const Color(0xFF2563EB);
+        label = 'Trainer';
         break;
-      case 'Learner':
+      case 'LEARNER':
         bg = const Color(0xFFE6FFFA);
         fg = const Color(0xFF047857);
+        label = 'Learner';
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        role,
+        label,
         style: TextStyle(
           color: fg,
           fontSize: 12,
