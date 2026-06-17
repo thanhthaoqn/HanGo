@@ -8,6 +8,7 @@ import '../../data/services/auth_service.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
 import 'learner/learner_home_page.dart';
+import 'admin/admin_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -71,7 +72,9 @@ class _LoginPageState extends State<LoginPage> {
 
     if (mounted) {
       if (result['success']) {
-        debugPrint('Sign in success! Navigating to LearnerHomePage. Data: ${result['data']}');
+        final roles = List<String>.from(result['data']['roles'] ?? []);
+        final isAdmin = roles.any((r) => r.contains('ADMIN'));
+        debugPrint('Sign in success! Navigating. Admin: $isAdmin. Data: ${result['data']}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Sign in successful!'),
@@ -81,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const LearnerHomePage(),
+            builder: (context) => isAdmin ? const AdminDashboardPage() : const LearnerHomePage(),
           ),
         );
       } else {
@@ -129,6 +132,8 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         if (result['success']) {
           final String name = googleUser.displayName ?? 'Google User';
+          final roles = List<String>.from(result['data']['roles'] ?? []);
+          final isAdmin = roles.any((r) => r.contains('ADMIN'));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Sign in successful: Welcome, $name!'),
@@ -138,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => const LearnerHomePage(),
+              builder: (context) => isAdmin ? const AdminDashboardPage() : const LearnerHomePage(),
             ),
           );
         } else {
