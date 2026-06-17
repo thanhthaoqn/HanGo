@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/services/auth_service.dart';
 import 'verify_otp_page.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
@@ -12,6 +13,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _isLoading = false;
+  final _authService = AuthService();
 
   @override
   void dispose() {
@@ -19,33 +21,43 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
-  void _handleSendOtp() {
+  void _handleSendOtp() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
     });
 
-    // Mock sending OTP
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+    final email = _emailController.text.trim();
+    final result = await _authService.forgotPassword(email);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('OTP code sent successfully to ${_emailController.text}!'),
-            backgroundColor: const Color(0xFF28B79B),
+          const SnackBar(
+            content: Text('OTP code sent successfully! Please check your email.'),
+            backgroundColor: Color(0xFF28B79B),
           ),
         );
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => VerifyOtpPage(email: _emailController.text.trim()),
+            builder: (context) => VerifyOtpPage(email: email),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to send OTP code.'),
+            backgroundColor: Colors.redAccent,
           ),
         );
       }
-    });
+    }
   }
 
   @override

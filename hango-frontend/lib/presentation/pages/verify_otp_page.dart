@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../data/services/auth_service.dart';
 import 'reset_password_page.dart';
 
 class VerifyOtpPage extends StatefulWidget {
@@ -14,6 +15,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
+  final _authService = AuthService();
 
   @override
   void dispose() {
@@ -26,7 +28,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
     super.dispose();
   }
 
-  void _handleVerify() {
+  void _handleVerify() async {
     String otp = _controllers.map((c) => c.text).join();
     if (otp.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -42,12 +44,14 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
       _isLoading = true;
     });
 
-    // Mock OTP Verification
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+    final result = await _authService.verifyOtp(widget.email, otp);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('OTP Verified successfully! Please set your new password.'),
@@ -60,17 +64,25 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
             builder: (context) => ResetPasswordPage(email: widget.email),
           ),
         );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'OTP verification failed.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
-    });
+    }
   }
 
-  void _handleResend() {
+  void _handleResend() async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('A new OTP code has been sent to ${widget.email}.'),
+        content: Text('Resending OTP code to ${widget.email}...'),
         backgroundColor: const Color(0xFF28B79B),
       ),
     );
+    await _authService.forgotPassword(widget.email);
   }
 
   @override
