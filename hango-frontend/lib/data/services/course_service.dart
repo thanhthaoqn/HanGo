@@ -2,89 +2,42 @@ import '../../domain/model/course.dart';
 import '../../domain/model/exam.dart';
 
 class CourseService {
-  // Mock Course database matching the mockup and SQL seeds
+  // Mock Course database matching the mockup and SQL seeds from database.env
   final List<Course> _mockCourses = [
     // Featured Courses
     const Course(
       id: 1,
-      title: 'Passage Arrangement',
-      category: 'Reading Comprehension',
+      title: 'National High School Graduation Exam Prep - Basic Grammar',
+      category: 'Core Grammar',
       creatorName: 'Nguyen Xuan Thinh',
-      stars: 5.0,
-      difficulty: 'Hard',
-      learnerCount: '152k Learner',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=600',
+      stars: 4.8, // From enrollments / mock
+      difficulty: 'Medium',
+      learnerCount: '85k Learner',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=600',
       status: 'featured',
     ),
     const Course(
       id: 2,
-      title: 'Information Gap Filling',
-      category: 'Core Grammar',
-      creatorName: 'Nguyen Xuan Thinh',
-      stars: 5.0,
-      difficulty: 'Medium',
-      learnerCount: '152k Learner',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=600',
-      status: 'featured',
-    ),
-    const Course(
-      id: 3,
-      title: 'Reading Comprehension',
+      title: 'Advanced English Reading Comprehension Techniques for the National Exam',
       category: 'Reading Comprehension',
       creatorName: 'Nguyen Xuan Thinh',
-      stars: 5.0,
-      difficulty: 'Beginer',
-      learnerCount: '152k Learner',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=600',
-      status: 'featured',
-    ),
-    const Course(
-      id: 4,
-      title: 'Speed Grammar to 8+',
-      category: 'Core Grammar',
-      creatorName: 'Nguyen Xuan Thinh',
-      stars: 5.0,
-      difficulty: 'Beginer',
-      learnerCount: '152k Learner',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=600',
-      status: 'featured',
-    ),
-    
-    // In Progress Courses
-    const Course(
-      id: 5,
-      title: 'National High School Graduation Exam Prep - Basic Grammar',
-      category: 'Core Grammar',
-      creatorName: 'Nguyen Xuan Thinh',
-      stars: 4.8,
-      difficulty: 'Medium',
-      learnerCount: '85k Learner',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=600',
-      status: 'in_progress',
-    ),
-    const Course(
-      id: 6,
-      title: 'Advanced English Reading Techniques for National Exam',
-      category: 'Reading Comprehension',
-      creatorName: 'Luong Thi Thanh Thao',
       stars: 4.9,
       difficulty: 'Hard',
       learnerCount: '64k Learner',
       thumbnailUrl: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=600',
-      status: 'in_progress',
+      status: 'featured',
     ),
-
-    // Completed Courses
+    // In Progress Courses
     const Course(
-      id: 7,
-      title: 'Basic Tenses and Vocabulary Quick-Review',
+      id: 3,
+      title: 'Conquering Advanced Vocabulary for the National High School Graduation Exam',
       category: 'Topic-based Vocabulary',
-      creatorName: 'Luong Thi Thanh Thao',
-      stars: 4.7,
-      difficulty: 'Easy',
-      learnerCount: '120k Learner',
+      creatorName: 'Nguyen Xuan Thinh',
+      stars: 0.0,
+      difficulty: 'Hard',
+      learnerCount: '0 Learner',
       thumbnailUrl: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=600',
-      status: 'completed',
+      status: 'draft',
     ),
   ];
 

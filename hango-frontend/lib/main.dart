@@ -7,27 +7,11 @@ import 'presentation/pages/admin/admin_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final authService = AuthService();
-  final isLoggedIn = await authService.isLoggedIn();
-  
-  bool isAdmin = false;
-  if (isLoggedIn) {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final roles = prefs.getStringList('user_roles') ?? [];
-      isAdmin = roles.any((r) => r.contains('ADMIN'));
-    } catch (e) {
-      debugPrint('Error loading user roles at startup: $e');
-    }
-  }
-  
-  runApp(MyApp(isLoggedIn: isLoggedIn, isAdmin: isAdmin));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final bool isLoggedIn;
-  final bool isAdmin;
-  const MyApp({super.key, required this.isLoggedIn, this.isAdmin = false});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +22,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF28B79B)),
         useMaterial3: true,
       ),
-      home: isLoggedIn
-          ? (isAdmin ? const AdminDashboardPage() : const LearnerHomePage())
-          : const LoginPage(),
+      home: const LearnerHomePage(),
     );
   }
 }
