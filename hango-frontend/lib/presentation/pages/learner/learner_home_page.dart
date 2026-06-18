@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/services/course_service.dart';
 import '../../../domain/model/course.dart';
-import '../../../domain/model/exam.dart';
+import '../../../domain/entities/exam.dart';
+import '../../../data/repositories/exam_repository.dart';
 import '../login_page.dart';
 import '../exam/list_exams_page.dart';
 import '../../widgets/shared_header.dart';
@@ -19,6 +20,7 @@ class LearnerHomePage extends StatefulWidget {
 class _LearnerHomePageState extends State<LearnerHomePage> {
   final _authService = AuthService();
   final _courseService = CourseService();
+  final _examRepository = ExamRepository();
 
   String _userFullName = 'Learner';
   String _userEmail = '';
@@ -86,7 +88,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       _isLoadingExams = true;
     });
     try {
-      final exams = await _courseService.getExams(_activeExamTab);
+      final exams = await _examRepository.fetchExams(status: _activeExamTab == 'featured' ? 'PUBLISHED' : _activeExamTab);
       setState(() {
         _exams = exams;
         _isLoadingExams = false;
@@ -754,7 +756,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       const Icon(Icons.menu_book_outlined, size: 13, color: Color(0xFF6B7280)),
                       const SizedBox(width: 4),
                       Text(
-                        '${exam.sentencesCount} sentences',
+                        '${exam.questionCount} sentences',
                         style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
                       ),
                       const Spacer(),
@@ -772,15 +774,17 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   Row(
                     children: [
                       ...List.generate(5, (index) {
-                        return const Icon(
+                        return Icon(
                           Icons.star,
                           size: 12,
-                          color: Color(0xFFFBBF24),
+                          color: index < (exam.rating).floor() 
+                              ? const Color(0xFFFBBF24) 
+                              : Colors.grey.shade300,
                         );
                       }),
                       const SizedBox(width: 4),
                       Text(
-                        exam.learnerCount,
+                        exam.learnerCountFormatted,
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xFF9CA3AF),
