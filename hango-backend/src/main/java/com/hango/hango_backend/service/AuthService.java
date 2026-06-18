@@ -343,6 +343,8 @@ public class AuthService {
                 .roles(roles)
                 .dateOfBirth(user.getDateOfBirth())
                 .status(user.getStatus())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }
