@@ -322,6 +322,12 @@ public class AuthService {
                 .orElse(false);
     }
 
+    public UserResponse getUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with id: " + id));
+        return mapToUserResponse(user);
+    }
+
     private UserResponse mapToUserResponse(User user) {
         List<String> roles = user.getRoles().stream()
                 .map(Role::getRoleName)
@@ -335,6 +341,8 @@ public class AuthService {
                 .gender(user.getGender())
                 .avatarUrl(user.getAvatarUrl())
                 .roles(roles)
+                .dateOfBirth(user.getDateOfBirth())
+                .status(user.getStatus())
                 .build();
     }
 }

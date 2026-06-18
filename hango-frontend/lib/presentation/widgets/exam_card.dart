@@ -133,14 +133,14 @@ class _ExamCardState extends State<ExamCard> {
                           return Icon(
                             Icons.star,
                             size: 12,
-                            color: index < (widget.exam.rating ?? 5.0).floor() 
+                            color: index < widget.exam.rating.floor() 
                                 ? const Color(0xFFFBBF24) 
                                 : Colors.grey.shade300,
                           );
                         }),
                         const SizedBox(width: 4),
                         Text(
-                          widget.exam.learnerCountFormatted ?? '0 Learner',
+                          widget.exam.learnerCountFormatted,
                           style: const TextStyle(
                             fontSize: 10,
                             color: Color(0xFF9CA3AF),
