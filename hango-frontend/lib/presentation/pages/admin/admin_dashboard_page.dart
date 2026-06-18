@@ -1093,6 +1093,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // ------------------------------------------------------------------------
   Widget _buildAccountsTab() {
     if (_selectedUserForEdit != null) {
+      final rolesList = _selectedUserForEdit!['roles'] as List?;
+      final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Trainer';
+      if (role.contains('LEARNER')) {
+        return _buildLearnerDetailView(_selectedUserForEdit!);
+      }
       return _buildTrainerDetailView(_selectedUserForEdit!);
     }
     return Column(
@@ -2407,6 +2412,357 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                   ),
                   const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedUserForEdit = null;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28B79B),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Back',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Map<String, String> _splitFullName(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) {
+      return {'firstName': '', 'name': ''};
+    }
+    final parts = trimmed.split(' ');
+    if (parts.length <= 1) {
+      return {'firstName': '', 'name': trimmed};
+    }
+    final name = parts.last;
+    final firstName = parts.sublist(0, parts.length - 1).join(' ');
+    return {'firstName': firstName, 'name': name};
+  }
+
+  String _formatDateString(dynamic dateInput) {
+    if (dateInput == null) return '';
+    final str = dateInput.toString();
+    if (str.isEmpty) return '';
+    try {
+      if (str.contains('T')) {
+        final dateTime = DateTime.parse(str);
+        final day = dateTime.day.toString().padLeft(2, '0');
+        final month = dateTime.month.toString().padLeft(2, '0');
+        final year = dateTime.year.toString();
+        return '$day/$month/$year';
+      }
+      final parts = str.split('-');
+      if (parts.length == 3) {
+        if (parts[0].length == 4) {
+          return '${parts[2]}/${parts[1]}/${parts[0]}';
+        }
+        return '${parts[0]}/${parts[1]}/${parts[2]}';
+      }
+    } catch (e) {
+      debugPrint('Error formatting date: $e');
+    }
+    return str;
+  }
+
+  Widget _buildReadOnlyField(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4B5563),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          initialValue: value,
+          readOnly: true,
+          style: const TextStyle(
+            color: Color(0xFF1F2937),
+            fontSize: 14,
+            fontFamily: 'Outfit',
+          ),
+          decoration: InputDecoration(
+            fillColor: Colors.white,
+            filled: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderSelectionField(String label, String gender) {
+    final isFemale = gender.toLowerCase() == 'female';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4B5563),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            // Female Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isFemale ? const Color(0xFF28B79B) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isFemale ? const Color(0xFF28B79B) : const Color(0xFFD1D5DB),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isFemale ? Colors.white : Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: isFemale ? Colors.white : const Color(0xFF9CA3AF), width: 2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Female',
+                    style: TextStyle(
+                      color: isFemale ? Colors.white : const Color(0xFF1F2937),
+                      fontWeight: isFemale ? FontWeight.w600 : FontWeight.normal,
+                      fontFamily: 'Outfit',
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Male Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: !isFemale ? const Color(0xFF28B79B) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: !isFemale ? const Color(0xFF28B79B) : const Color(0xFFD1D5DB),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: !isFemale ? Colors.white : Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: !isFemale ? Colors.white : const Color(0xFF9CA3AF), width: 2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Male',
+                    style: TextStyle(
+                      color: !isFemale ? Colors.white : const Color(0xFF1F2937),
+                      fontWeight: !isFemale ? FontWeight.w600 : FontWeight.normal,
+                      fontFamily: 'Outfit',
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLearnerDetailView(Map<String, dynamic> user) {
+    if (_isLoadingUserDetail) {
+      return const SizedBox(
+        height: 400,
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+          ),
+        ),
+      );
+    }
+
+    final fullName = user['fullName'] ?? '';
+    final nameParts = _splitFullName(fullName);
+    final firstName = nameParts['firstName'] ?? '';
+    final name = nameParts['name'] ?? '';
+
+    final email = user['email'] ?? '';
+    final phoneNumber = user['phoneNumber'] ?? '';
+    final genderStr = user['gender'] ?? 'Female';
+    final address = user['address'] ?? 'Khu công nghệ cao Hòa Lạc';
+    
+    final rolesList = user['roles'] as List?;
+    final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Learner';
+    String displayRole = 'Learner';
+    if (role.contains('TRAINER')) {
+      displayRole = 'Trainer';
+    } else if (role.contains('TRAINING_LEAD')) {
+      displayRole = 'Training Lead';
+    } else if (role.contains('ADMIN')) {
+      displayRole = 'Admin';
+    }
+
+    final dobFormatted = _formatDateString(user['dateOfBirth']);
+    final createdAtFormatted = _formatDateString(user['createdAt']);
+    final updatedAtFormatted = _formatDateString(user['updatedAt']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Learner Account Detail',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Learner Detail',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF4B5563),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildReadOnlyField('First Name', firstName),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: _buildReadOnlyField('Name', name),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildReadOnlyField('Email', email),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: _buildReadOnlyField('Date of Birth', dobFormatted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildGenderSelectionField('Gender', genderStr),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: _buildReadOnlyField('Địa chỉ', address),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildReadOnlyField('Phone Number', phoneNumber),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: _buildReadOnlyField('Roles', displayRole),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildReadOnlyField('Created Time', createdAtFormatted),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: _buildReadOnlyField('Last Modified Time', updatedAtFormatted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
                   ElevatedButton(
                     onPressed: () {
                       setState(() {

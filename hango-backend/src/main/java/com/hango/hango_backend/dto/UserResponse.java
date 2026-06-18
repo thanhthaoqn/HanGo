@@ -17,4 +17,6 @@ public class UserResponse {
     private List<String> roles;
     private LocalDate dateOfBirth;
     private String status;
+    private java.time.LocalDateTime createdAt;
+    private java.time.LocalDateTime updatedAt;
 }
