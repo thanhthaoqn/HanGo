@@ -21,4 +21,13 @@ cloudinary.cloud-name=YOUR_CLOUD_NAME
 cloudinary.api-key=YOUR_API_KEY
 cloudinary.api-secret=YOUR_API_SECRET
 
-google.client-id=YOUR_GOOGLE_CLIENT_ID
+google.client-id=793292778359-frlad2ktuqo6mo27fkilqbjqcdqbqko1.apps.googleusercontent.com
+
+# Spring Mail Properties
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=thanhthao2004qn@gmail.com
+spring.mail.password=ogeh ltbuydhxwjnq
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
