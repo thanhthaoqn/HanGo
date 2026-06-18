@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import java.time.LocalDate;
 
 @Data
 public class RegisterRequest {
@@ -20,4 +21,6 @@ public class RegisterRequest {
 
     private String phoneNumber;
     private String gender;
+    private String role;
+    private LocalDate dateOfBirth;
 }

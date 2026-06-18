@@ -40,6 +40,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final TextEditingController _dobController = TextEditingController(text: '28/04/2004');
   bool _isLoadingUserDetail = false;
 
+  // Create account variables
+  bool _showCreateNewAccountView = false;
+  final TextEditingController _createFirstNameController = TextEditingController();
+  final TextEditingController _createNameController = TextEditingController();
+  final TextEditingController _createEmailController = TextEditingController();
+  final TextEditingController _createDobController = TextEditingController();
+  String _createGender = 'Male';
+  final TextEditingController _createAddressController = TextEditingController();
+  final TextEditingController _createPhoneController = TextEditingController();
+  String? _createRole;
+  bool _isCreatingUser = false;
+
   // Resolve backend base URL dynamically based on platform (matching AuthService)
   String get apiBaseUrl {
     final authUrl = AuthService.baseUrl; // e.g., 'http://localhost:8080/api/auth'
@@ -58,6 +70,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void dispose() {
     _searchController.dispose();
     _dobController.dispose();
+    _createFirstNameController.dispose();
+    _createNameController.dispose();
+    _createEmailController.dispose();
+    _createDobController.dispose();
+    _createAddressController.dispose();
+    _createPhoneController.dispose();
     super.dispose();
   }
 
@@ -153,7 +171,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       final search = Uri.encodeComponent(_searchController.text.trim());
       final url = Uri.parse(
-        '$apiBaseUrl/admin/users?roleType=$_accountsTab&search=$search&page=$_accountsPage&size=3'
+        '$apiBaseUrl/admin/users?roleType=$_accountsTab&search=$search&page=$_accountsPage&size=6'
       );
       
       final response = await http.get(
@@ -389,11 +407,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               children: [
                 const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
                 const SizedBox(width: 6),
-                _selectedUserForEdit != null
+                _selectedUserForEdit != null || _showCreateNewAccountView
                     ? GestureDetector(
                         onTap: () {
                           setState(() {
                             _selectedUserForEdit = null;
+                            _showCreateNewAccountView = false;
                           });
                         },
                         child: const Text(
@@ -423,7 +442,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ? ((_selectedUserForEdit!['roles'] as List?)?.first?.toString().contains('LEARNER') == true
                           ? 'Learner Account Detail'
                           : 'Trainer Account Detail')
-                      : (_accountsTab == 'staff' ? 'Trainer' : 'Learner'),
+                      : (_showCreateNewAccountView ? 'Create New Account' : (_accountsTab == 'staff' ? 'Trainer' : 'Learner')),
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF28B79B),
@@ -1100,6 +1119,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
       return _buildTrainerDetailView(_selectedUserForEdit!);
     }
+    if (_showCreateNewAccountView) {
+      return _buildCreateAccountView();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1172,7 +1194,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
             const SizedBox(width: 16),
             ElevatedButton.icon(
-              onPressed: _showCreateUserDialog,
+              onPressed: () {
+                setState(() {
+                  _resetCreateForm();
+                  _showCreateNewAccountView = true;
+                });
+              },
               icon: const Icon(Icons.add, color: Colors.white, size: 18),
               label: const Text('Create', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
               style: ElevatedButton.styleFrom(
@@ -1362,9 +1389,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
         // 5. Pagination Footer
         _buildPagination(),
-
-        // 6. Main Lower Footer
-        _buildAccountsFooter(),
       ],
     );
   }
@@ -1520,58 +1544,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildAccountsFooter() {
-    return Container(
-      padding: const EdgeInsets.only(top: 48, bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: const [
-              Text(
-                'HanGo',
-                style: TextStyle(
-                  color: Color(0xFF28B79B),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Smart Language Self-Study Platform',
-                style: TextStyle(
-                  color: Color(0xFF9CA3AF),
-                  fontSize: 12,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              _buildFooterLink('Privacy Policy'),
-              const SizedBox(width: 16),
-              _buildFooterLink('Terms of Service'),
-              const SizedBox(width: 16),
-              _buildFooterLink('Contact Support'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildFooterLink(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: Color(0xFF9CA3AF),
-        fontSize: 12,
-        fontFamily: 'Outfit',
-      ),
-    );
-  }
 
   Widget _buildRoleBadge(String role) {
     String cleanRole = role.replaceAll('ROLE_', '').toUpperCase();
@@ -2795,344 +2768,569 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  void _showCreateUserDialog() {
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
-    bool obscurePassword = true;
-    bool dialogLoading = false;
+  void _resetCreateForm() {
+    _createFirstNameController.clear();
+    _createNameController.clear();
+    _createEmailController.clear();
+    _createDobController.clear();
+    _createAddressController.clear();
+    _createPhoneController.clear();
+    _createGender = 'Male';
+    _createRole = null;
+  }
 
-    showDialog(
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF28B79B),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF1F2937),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF28B79B),
               ),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 450),
-                padding: const EdgeInsets.all(28.0),
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Create Trainer Account',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1F2937),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Color(0xFF9CA3AF)),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Create a new Trainer account. This account will be immediately active and verified.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF6B7280),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Full Name',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF374151),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: nameController,
-                        keyboardType: TextInputType.name,
-                        decoration: InputDecoration(
-                          hintText: 'Enter full name',
-                          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                          prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF9CA3AF), size: 18),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                          ),
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Colors.redAccent),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Full Name is required';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Email Address',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF374151),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          hintText: 'Enter email address',
-                          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                          prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 18),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                          ),
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Colors.redAccent),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Email is required';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Email must contain @';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Password',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF374151),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: passwordController,
-                        obscureText: obscurePassword,
-                        decoration: InputDecoration(
-                          hintText: 'Enter password',
-                          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 18),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                              color: const Color(0xFF9CA3AF),
-                              size: 18,
-                            ),
-                            onPressed: () {
-                              setDialogState(() {
-                                obscurePassword = !obscurePassword;
-                              });
-                            },
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                          ),
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Colors.redAccent),
-                          ),
-                        ),
-                        style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Password is required';
-                          }
-                          final missing = <String>[];
-                          if (value.length < 8) {
-                            missing.add('at least 8 characters');
-                          }
-                          if (!RegExp(r'[A-Z]').hasMatch(value)) {
-                            missing.add('at least 1 uppercase letter');
-                          }
-                          if (!RegExp(r'[a-z]').hasMatch(value)) {
-                            missing.add('at least 1 lowercase letter');
-                          }
-                          if (!RegExp(r'[0-9]').hasMatch(value)) {
-                            missing.add('at least 1 number');
-                          }
-                          if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=~`[\]\\;/]').hasMatch(value)) {
-                            missing.add('at least 1 special character');
-                          }
-                          if (missing.isNotEmpty) {
-                            return 'Missing: ${missing.join(", ")}';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 28),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: dialogLoading ? null : () => Navigator.pop(context),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(
-                                color: Color(0xFF4B5563),
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton(
-                            onPressed: dialogLoading ? null : () async {
-                              if (!formKey.currentState!.validate()) return;
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _createDobController.text = "${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}";
+      });
+    }
+  }
 
-                              setDialogState(() {
-                                dialogLoading = true;
-                              });
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    required String hintText,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4B5563),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            fillColor: Colors.white,
+            filled: true,
+            hintText: hintText,
+            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontFamily: 'Outfit'),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+            ),
+          ),
+          style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
+        ),
+      ],
+    );
+  }
 
-                              final name = nameController.text.trim();
-                              final email = emailController.text.trim();
-                              final password = passwordController.text;
+  Widget _buildDateField({
+    required String label,
+    required TextEditingController controller,
+    required VoidCallback onTap,
+    required String hintText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4B5563),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          onTap: onTap,
+          decoration: InputDecoration(
+            fillColor: Colors.white,
+            filled: true,
+            hintText: hintText,
+            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontFamily: 'Outfit'),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            suffixIcon: const Icon(Icons.calendar_today_outlined, color: Color(0xFF9CA3AF), size: 20),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+            ),
+          ),
+          style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
+        ),
+      ],
+    );
+  }
 
-                              try {
-                                final token = await _authService.getToken();
-                                if (token == null) {
-                                  throw Exception('Authentication token missing.');
-                                }
+  Widget _buildGenderRadioField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4B5563),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Row(
+              children: [
+                Radio<String>(
+                  value: 'Male',
+                  groupValue: _createGender,
+                  activeColor: const Color(0xFF28B79B),
+                  onChanged: (val) {
+                    setState(() {
+                      if (val != null) _createGender = val;
+                    });
+                  },
+                ),
+                const Text(
+                  'Male',
+                  style: TextStyle(
+                    color: Color(0xFF4B5563),
+                    fontFamily: 'Outfit',
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 24),
+            Row(
+              children: [
+                Radio<String>(
+                  value: 'Female',
+                  groupValue: _createGender,
+                  activeColor: const Color(0xFF28B79B),
+                  onChanged: (val) {
+                    setState(() {
+                      if (val != null) _createGender = val;
+                    });
+                  },
+                ),
+                const Text(
+                  'Female',
+                  style: TextStyle(
+                    color: Color(0xFF4B5563),
+                    fontFamily: 'Outfit',
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
-                                final response = await http.post(
-                                  Uri.parse('$apiBaseUrl/admin/users'),
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': 'Bearer $token',
-                                  },
-                                  body: jsonEncode({
-                                    'fullName': name,
-                                    'email': email,
-                                    'password': password,
-                                  }),
-                                );
+  Widget _buildRoleDropdownField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Role',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF4B5563),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _createRole,
+          hint: const Text(
+            'Select user role',
+            style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, fontFamily: 'Outfit'),
+          ),
+          onChanged: (val) {
+            setState(() {
+              _createRole = val;
+            });
+          },
+          items: const [
+            DropdownMenuItem(value: 'Trainer', child: Text('Trainer', style: TextStyle(fontFamily: 'Outfit'))),
+            DropdownMenuItem(value: 'Training Lead', child: Text('Training Lead', style: TextStyle(fontFamily: 'Outfit'))),
+            DropdownMenuItem(value: 'Admin', child: Text('Admin', style: TextStyle(fontFamily: 'Outfit'))),
+          ],
+          decoration: InputDecoration(
+            fillColor: Colors.white,
+            filled: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-                                if (response.statusCode == 200) {
-                                  if (context.mounted) {
-                                    Navigator.pop(context); // Close dialog
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Trainer account created successfully!'),
-                                        backgroundColor: Color(0xFF28B79B),
-                                      ),
-                                    );
-                                  }
-                                  _fetchAccounts(); // Refresh table
-                                } else {
-                                  throw Exception(response.body);
-                                }
-                              } catch (e) {
-                                setDialogState(() {
-                                  dialogLoading = false;
-                                });
-                                String errMsg = e.toString();
-                                if (errMsg.startsWith('Exception: ')) {
-                                  errMsg = errMsg.substring(11);
-                                }
-                                if (errMsg.startsWith('Error: ')) {
-                                  errMsg = errMsg.substring(7);
-                                }
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to create account: $errMsg'),
-                                      backgroundColor: Colors.redAccent,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF28B79B),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              elevation: 0,
-                            ),
-                            child: dialogLoading
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Create',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Outfit',
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ],
+  Future<void> _handleCreateUser() async {
+    final firstName = _createFirstNameController.text.trim();
+    final name = _createNameController.text.trim();
+    final email = _createEmailController.text.trim();
+    
+    if (firstName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('First Name is required')),
+      );
+      return;
+    }
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name is required')),
+      );
+      return;
+    }
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return;
+    }
+    if (_createRole == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a user role')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isCreatingUser = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Authentication token missing.');
+      }
+
+      String backendRole = 'TRAINER';
+      if (_createRole == 'Training Lead') {
+        backendRole = 'TRAINING_LEAD';
+      } else if (_createRole == 'Admin') {
+        backendRole = 'ADMINISTRATOR';
+      }
+
+      String? formattedDob;
+      if (_createDobController.text.isNotEmpty) {
+        final parts = _createDobController.text.split('/');
+        if (parts.length == 3) {
+          formattedDob = '${parts[2]}-${parts[0]}-${parts[1]}'; // yyyy-MM-dd
+        }
+      }
+
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/admin/users'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'fullName': '$firstName $name'.trim(),
+          'email': email,
+          'password': 'Hango@2026!',
+          'phoneNumber': _createPhoneController.text.trim(),
+          'gender': _createGender,
+          'role': backendRole,
+          'dateOfBirth': formattedDob,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully!'),
+              backgroundColor: Color(0xFF28B79B),
+            ),
+          );
+          setState(() {
+            _showCreateNewAccountView = false;
+            _resetCreateForm();
+          });
+          _fetchAccounts();
+        }
+      } else {
+        throw Exception(response.body);
+      }
+    } catch (e) {
+      String errMsg = e.toString();
+      if (errMsg.startsWith('Exception: ')) {
+        errMsg = errMsg.substring(11);
+      }
+      if (errMsg.startsWith('Error: ')) {
+        errMsg = errMsg.substring(7);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create account: $errMsg'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreatingUser = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildCreateAccountView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Create New Account',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header of the card
+              Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                child: const Text(
+                  'Create New Account',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                    fontFamily: 'Outfit',
                   ),
                 ),
               ),
-            );
-          },
-        );
-      },
+
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'First Name',
+                            controller: _createFirstNameController,
+                            hintText: 'Enter first name',
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Name',
+                            controller: _createNameController,
+                            hintText: 'Enter name',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Email',
+                            controller: _createEmailController,
+                            hintText: 'Enter email address',
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          child: _buildDateField(
+                            label: 'Date of Birth',
+                            controller: _createDobController,
+                            onTap: () => _selectDate(context),
+                            hintText: 'mm/dd/yyyy',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildGenderRadioField(),
+                        ),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Address',
+                            controller: _createAddressController,
+                            hintText: 'Enter address',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Phone Number',
+                            controller: _createPhoneController,
+                            hintText: 'Enter phone number',
+                            keyboardType: TextInputType.phone,
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          child: _buildRoleDropdownField(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _resetCreateForm();
+                              _showCreateNewAccountView = false;
+                            });
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFD1D5DB)),
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Back',
+                            style: TextStyle(
+                              color: Color(0xFF4B5563),
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton(
+                          onPressed: _isCreatingUser ? null : _handleCreateUser,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF28B79B),
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isCreatingUser
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Create',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
