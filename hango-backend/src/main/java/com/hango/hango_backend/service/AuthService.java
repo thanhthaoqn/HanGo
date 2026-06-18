@@ -134,6 +134,34 @@ public class AuthService {
         return mapToUserResponse(savedUser);
     }
 
+    public UserResponse createUserByAdmin(RegisterRequest registerRequest) {
+        if (userRepository.existsByEmail(registerRequest.getEmail())) {
+            throw new IllegalArgumentException("Error: Email is already in use!");
+        }
+
+        // Admin-created role is: TRAINER
+        Role userRole = roleRepository.findByRoleName("TRAINER")
+                .orElseGet(() -> {
+                    Role newRole = Role.builder().roleName("TRAINER").build();
+                    return roleRepository.save(newRole);
+                });
+
+        User user = User.builder()
+                .email(registerRequest.getEmail())
+                .passwordHash(encoder.encode(registerRequest.getPassword()))
+                .fullName(registerRequest.getFullName())
+                .phoneNumber(registerRequest.getPhoneNumber())
+                .gender(registerRequest.getGender())
+                .roles(new java.util.HashSet<>(java.util.Collections.singletonList(userRole)))
+                .isVerified(true) // Admin created accounts are verified by default
+                .status("ACTIVE") // Default status ACTIVE
+                .build();
+
+        User savedUser = userRepository.save(user);
+        return mapToUserResponse(savedUser);
+    }
+
+
     public UserResponse updateAvatar(String email, MultipartFile file) throws IOException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
@@ -271,6 +299,22 @@ public class AuthService {
         user.setIsVerified(true);
         userRepository.save(user);
     }
+
+    public void resendVerificationEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+
+        if (Boolean.TRUE.equals(user.getIsVerified())) {
+            throw new IllegalArgumentException("Account is already verified.");
+        }
+
+        try {
+            emailService.sendVerificationEmail(email);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to send verification email: " + e.getMessage());
+        }
+    }
+
 
     public boolean isAccountVerified(String email) {
         return userRepository.findByEmail(email)
