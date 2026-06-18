@@ -22,6 +22,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isLoading = false;
   bool _showCheckEmailScreen = false;
   bool _isVerifying = false;
+  bool _isResending = false;
   Timer? _verificationTimer;
 
   final _authService = AuthService();
@@ -137,6 +138,44 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     }
   }
+
+  void _handleResendVerificationLink() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) return;
+
+    setState(() {
+      _isResending = true;
+    });
+
+    final result = await _authService.resendVerificationEmail(email);
+
+    if (mounted) {
+      setState(() {
+        _isResending = false;
+      });
+
+      if (result['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Verification link has been resent! Please check your email.'),
+            backgroundColor: Color(0xFF28B79B),
+          ),
+        );
+      } else {
+        String errMsg = result['message'] ?? 'Failed to resend verification link.';
+        if (errMsg.startsWith('Error: ')) {
+          errMsg = errMsg.substring(7);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to resend link: $errMsg'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -658,8 +697,41 @@ class _RegisterPageState extends State<RegisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(height: 40),
-        // Mail Icon Badge
+        // 1. Back to Login link at top left
+        Align(
+          alignment: Alignment.centerLeft,
+          child: GestureDetector(
+            onTap: () {
+              Navigator.pop(context);
+            },
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    Icons.arrow_back,
+                    color: Color(0xFF28B79B),
+                    size: 16,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Back to Login',
+                    style: TextStyle(
+                      color: Color(0xFF28B79B),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 30),
+
+        // 2. Mail Icon Badge
         Container(
           width: 80,
           height: 80,
@@ -674,7 +746,8 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
         const SizedBox(height: 24),
-        // Title
+
+        // 3. Title
         const Text(
           'Check your email',
           textAlign: TextAlign.center,
@@ -686,7 +759,8 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
         const SizedBox(height: 12),
-        // Subtitle
+
+        // 4. Subtitle
         const Text(
           "We've sent a verification link to your email address.\nPlease click the link to activate your account.",
           textAlign: TextAlign.center,
@@ -698,7 +772,8 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
         const SizedBox(height: 32),
-        // Verify Account Button
+
+        // 5. Verify Account Button
         SizedBox(
           width: double.infinity,
           height: 48,
@@ -743,40 +818,52 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
         const SizedBox(height: 24),
-        // Back to Login Link
-        GestureDetector(
-          onTap: () {
-            Navigator.pop(context);
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(
-                Icons.arrow_back,
+
+        // 6. Didn't receive the link? Resend link
+        Center(
+          child: RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              text: "Didn't receive the link? ",
+              style: const TextStyle(
                 color: Color(0xFF4B5563),
-                size: 16,
+                fontSize: 14,
+                fontFamily: 'Outfit',
               ),
-              SizedBox(width: 8),
-              Text(
-                'Back to Login',
-                style: TextStyle(
-                  color: Color(0xFF4B5563),
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Outfit',
+              children: [
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: GestureDetector(
+                    onTap: _isResending ? null : _handleResendVerificationLink,
+                    child: MouseRegion(
+                      cursor: _isResending ? SystemMouseCursors.basic : SystemMouseCursors.click,
+                      child: Text(
+                        'Resend link',
+                        style: TextStyle(
+                          color: _isResending ? const Color(0xFF9CA3AF) : const Color(0xFF28B79B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 40),
+
+        // 7. Divider
         const Divider(
           color: Color(0xFFE5E7EB),
           thickness: 1,
         ),
         const SizedBox(height: 24),
-        // Footer Help Text
+
+        // 8. Footer Help Text
         Center(
           child: RichText(
             textAlign: TextAlign.center,
@@ -801,13 +888,16 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       );
                     },
-                    child: const Text(
-                      'contact support',
-                      style: TextStyle(
-                        color: Color(0xFF28B79B),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        fontFamily: 'Outfit',
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: const Text(
+                        'contact support',
+                        style: TextStyle(
+                          color: Color(0xFF28B79B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ),
                   ),

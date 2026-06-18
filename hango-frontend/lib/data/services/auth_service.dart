@@ -204,4 +204,22 @@ class AuthService {
       return false;
     }
   }
+
+  // Resend verification email
+  Future<Map<String, dynamic>> resendVerificationEmail(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/resend-verification?email=$email'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': response.body};
+      } else {
+        return {'success': false, 'message': response.body};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
 }
