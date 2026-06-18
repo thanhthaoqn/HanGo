@@ -139,10 +139,21 @@ public class AuthService {
             throw new IllegalArgumentException("Error: Email is already in use!");
         }
 
-        // Admin-created role is: TRAINER
-        Role userRole = roleRepository.findByRoleName("TRAINER")
+        // Get requested role, default to TRAINER
+        String targetRole = registerRequest.getRole();
+        if (targetRole == null || targetRole.trim().isEmpty()) {
+            targetRole = "TRAINER";
+        } else {
+            targetRole = targetRole.trim().toUpperCase();
+            if (targetRole.equals("ADMIN")) {
+                targetRole = "ADMINISTRATOR";
+            }
+        }
+
+        final String roleName = targetRole;
+        Role userRole = roleRepository.findByRoleName(roleName)
                 .orElseGet(() -> {
-                    Role newRole = Role.builder().roleName("TRAINER").build();
+                    Role newRole = Role.builder().roleName(roleName).build();
                     return roleRepository.save(newRole);
                 });
 
@@ -152,6 +163,7 @@ public class AuthService {
                 .fullName(registerRequest.getFullName())
                 .phoneNumber(registerRequest.getPhoneNumber())
                 .gender(registerRequest.getGender())
+                .dateOfBirth(registerRequest.getDateOfBirth())
                 .roles(new java.util.HashSet<>(java.util.Collections.singletonList(userRole)))
                 .isVerified(true) // Admin created accounts are verified by default
                 .status("ACTIVE") // Default status ACTIVE
