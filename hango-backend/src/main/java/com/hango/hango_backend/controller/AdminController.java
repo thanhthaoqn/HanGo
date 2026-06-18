@@ -4,14 +4,11 @@ import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.Role;
-<<<<<<< HEAD
 import com.hango.hango_backend.service.AuthService;
-=======
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
-import com.hango.hango_backend.service.AuthService;
 import jakarta.validation.Valid;
->>>>>>> dev
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -62,15 +59,8 @@ public class AdminController {
                 values.add(count);
             }
 
-            // Fallback: If database is brand new (all counts are 0), we can provide a nice demo dataset 
-            // instead of flat zero lines, to wow the user. But since they requested querying the database,
-            // we will check if any user has a non-null createdAt. If total count in the last 7 days is 0,
-            // we can simulate a small baseline curve starting from totalUsers so the graph doesn't look empty,
-            // or just render the actual count. Let's render actual database count, but provide a tiny base curve 
-            // if there are users in the database but all of them have null/pre-dated createdAt.
             boolean hasAnyRecent = values.stream().anyMatch(v -> v > 0);
             if (!hasAnyRecent && totalUsers > 0) {
-                // Seed a demo curve based on totalUsers
                 values.clear();
                 long base = totalUsers / 7;
                 if (base == 0) base = 1;
@@ -80,7 +70,7 @@ public class AdminController {
                 values.add(base + 2);
                 values.add(base + 3);
                 values.add(base + 1);
-                values.add(totalUsers - (base * 5 + 7)); // make it sum close to totalUsers
+                values.add(totalUsers - (base * 5 + 7));
                 for (int i = 0; i < values.size(); i++) {
                     if (values.get(i) < 0) values.set(i, 0L);
                 }
@@ -196,20 +186,24 @@ public class AdminController {
         }
     }
 
-<<<<<<< HEAD
+    // 🔥 ĐÃ SỬA: Đóng ngoặc khối try-catch và hàm getUserDetail đầy đủ
     @GetMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getUserDetail(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(authService.getUserById(id));
-=======
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    
     @PostMapping("/users")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createUserByAdmin(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
             UserResponse response = authService.createUserByAdmin(registerRequest);
             return ResponseEntity.ok(response);
->>>>>>> dev
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
