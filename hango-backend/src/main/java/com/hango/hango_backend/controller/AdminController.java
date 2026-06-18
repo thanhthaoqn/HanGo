@@ -4,6 +4,7 @@ import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.Role;
+import com.hango.hango_backend.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +26,9 @@ public class AdminController {
 
     @Autowired
     private RoleRepository roleRepository;
+
+    @Autowired
+    private AuthService authService;
 
     @GetMapping("/dashboard/stats")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
@@ -180,6 +184,16 @@ public class AdminController {
             } else {
                 return ResponseEntity.status(404).body("User not found");
             }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/users/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getUserDetail(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(authService.getUserById(id));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
