@@ -152,7 +152,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       final search = Uri.encodeComponent(_searchController.text.trim());
       final url = Uri.parse(
-        '$apiBaseUrl/admin/users?roleType=$_accountsTab&search=$search&page=$_accountsPage&size=6'
+        '$apiBaseUrl/admin/users?roleType=$_accountsTab&search=$search&page=$_accountsPage&size=3'
       );
       
       final response = await http.get(
@@ -315,33 +315,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             )
-          else if (_selectedUserForEdit != null)
+          else if (_selectedMenuIndex == 1)
             Row(
               children: [
                 const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
                 const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedUserForEdit = null;
-                    });
-                  },
-                  child: const Text(
-                    'Accounts',
-                    style: TextStyle(
-                      fontSize: 13, 
-                      color: Color(0xFF28B79B), 
-                      fontFamily: 'Outfit',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                _selectedUserForEdit != null
+                    ? GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedUserForEdit = null;
+                          });
+                        },
+                        child: const Text(
+                          'Accounts',
+                          style: TextStyle(
+                            fontSize: 13, 
+                            color: Color(0xFF28B79B), 
+                            fontFamily: 'Outfit',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    : const Text(
+                        'Accounts',
+                        style: TextStyle(
+                          fontSize: 13, 
+                          color: Color(0xFF28B79B), 
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                 const SizedBox(width: 6),
                 const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
                 const SizedBox(width: 6),
-                const Text(
-                  'Trainer Account Detail',
-                  style: TextStyle(
+                Text(
+                  _selectedUserForEdit != null
+                      ? 'Trainer Account Detail'
+                      : (_accountsTab == 'staff' ? 'Trainer' : 'Learner'),
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF28B79B),
                     fontWeight: FontWeight.bold,
@@ -1015,28 +1027,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Breadcrumbs
-        Row(
-          children: [
-            const Text(
-              'Accounts',
-              style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
-            const SizedBox(width: 6),
-            Text(
-              _accountsTab == 'staff' ? 'Trainer' : 'Learner',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF28B79B),
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
 
         // 2. Subtabs Menu (Trainer | Learner)
         Column(
@@ -1106,11 +1096,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
             const SizedBox(width: 16),
             ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Account registration is handled via Auth registration flows.')),
-                );
-              },
+              onPressed: _showCreateUserDialog,
               icon: const Icon(Icons.add, color: Colors.white, size: 18),
               label: const Text('Create', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
               style: ElevatedButton.styleFrom(
@@ -1379,7 +1365,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildPagination() {
-    if (_accountsTotalPages <= 1) return const SizedBox();
+    if (_accountsTotalPages < 1) return const SizedBox();
     
     List<Widget> children = [];
     
@@ -2356,6 +2342,347 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showCreateUserDialog() {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool obscurePassword = true;
+    bool dialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 450),
+                padding: const EdgeInsets.all(28.0),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Create Trainer Account',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Color(0xFF9CA3AF)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Create a new Trainer account. This account will be immediately active and verified.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Full Name',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: nameController,
+                        keyboardType: TextInputType.name,
+                        decoration: InputDecoration(
+                          hintText: 'Enter full name',
+                          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                          prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF9CA3AF), size: 18),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Colors.redAccent),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Full Name is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Email Address',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          hintText: 'Enter email address',
+                          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                          prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 18),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Colors.redAccent),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Email is required';
+                          }
+                          if (!value.contains('@')) {
+                            return 'Email must contain @';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Password',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: passwordController,
+                        obscureText: obscurePassword,
+                        decoration: InputDecoration(
+                          hintText: 'Enter password',
+                          hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 18),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                              color: const Color(0xFF9CA3AF),
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                obscurePassword = !obscurePassword;
+                              });
+                            },
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Colors.redAccent),
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 14, fontFamily: 'Outfit'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password is required';
+                          }
+                          final missing = <String>[];
+                          if (value.length < 8) {
+                            missing.add('at least 8 characters');
+                          }
+                          if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                            missing.add('at least 1 uppercase letter');
+                          }
+                          if (!RegExp(r'[a-z]').hasMatch(value)) {
+                            missing.add('at least 1 lowercase letter');
+                          }
+                          if (!RegExp(r'[0-9]').hasMatch(value)) {
+                            missing.add('at least 1 number');
+                          }
+                          if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=~`[\]\\;/]').hasMatch(value)) {
+                            missing.add('at least 1 special character');
+                          }
+                          if (missing.isNotEmpty) {
+                            return 'Missing: ${missing.join(", ")}';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 28),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: dialogLoading ? null : () => Navigator.pop(context),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: Color(0xFF4B5563),
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: dialogLoading ? null : () async {
+                              if (!formKey.currentState!.validate()) return;
+
+                              setDialogState(() {
+                                dialogLoading = true;
+                              });
+
+                              final name = nameController.text.trim();
+                              final email = emailController.text.trim();
+                              final password = passwordController.text;
+
+                              try {
+                                final token = await _authService.getToken();
+                                if (token == null) {
+                                  throw Exception('Authentication token missing.');
+                                }
+
+                                final response = await http.post(
+                                  Uri.parse('$apiBaseUrl/admin/users'),
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer $token',
+                                  },
+                                  body: jsonEncode({
+                                    'fullName': name,
+                                    'email': email,
+                                    'password': password,
+                                  }),
+                                );
+
+                                if (response.statusCode == 200) {
+                                  if (context.mounted) {
+                                    Navigator.pop(context); // Close dialog
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Trainer account created successfully!'),
+                                        backgroundColor: Color(0xFF28B79B),
+                                      ),
+                                    );
+                                  }
+                                  _fetchAccounts(); // Refresh table
+                                } else {
+                                  throw Exception(response.body);
+                                }
+                              } catch (e) {
+                                setDialogState(() {
+                                  dialogLoading = false;
+                                });
+                                String errMsg = e.toString();
+                                if (errMsg.startsWith('Exception: ')) {
+                                  errMsg = errMsg.substring(11);
+                                }
+                                if (errMsg.startsWith('Error: ')) {
+                                  errMsg = errMsg.substring(7);
+                                }
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to create account: $errMsg'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF28B79B),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              elevation: 0,
+                            ),
+                            child: dialogLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Create',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
