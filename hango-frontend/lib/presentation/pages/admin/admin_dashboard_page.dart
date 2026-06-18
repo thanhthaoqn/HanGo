@@ -419,15 +419,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
                 const SizedBox(width: 6),
                 Text(
-<<<<<<< HEAD
-                  _selectedUserForEdit != null && (_selectedUserForEdit!['roles'] as List?)?.first?.toString().contains('LEARNER') == true 
-                      ? 'Learner Account Detail' 
-                      : 'Trainer Account Detail',
-=======
                   _selectedUserForEdit != null
-                      ? 'Trainer Account Detail'
+                      ? ((_selectedUserForEdit!['roles'] as List?)?.first?.toString().contains('LEARNER') == true
+                          ? 'Learner Account Detail'
+                          : 'Trainer Account Detail')
                       : (_accountsTab == 'staff' ? 'Trainer' : 'Learner'),
->>>>>>> dev
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF28B79B),

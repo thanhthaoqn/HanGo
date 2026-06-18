@@ -4,14 +4,10 @@ import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.Role;
-<<<<<<< HEAD
-import com.hango.hango_backend.service.AuthService;
-=======
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
 import com.hango.hango_backend.service.AuthService;
 import jakarta.validation.Valid;
->>>>>>> dev
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -196,20 +192,22 @@ public class AdminController {
         }
     }
 
-<<<<<<< HEAD
     @GetMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getUserDetail(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(authService.getUserById(id));
-=======
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/users")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createUserByAdmin(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
             UserResponse response = authService.createUserByAdmin(registerRequest);
             return ResponseEntity.ok(response);
->>>>>>> dev
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
