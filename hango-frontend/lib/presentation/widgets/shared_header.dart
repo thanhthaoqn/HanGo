@@ -4,6 +4,7 @@ import '../../../data/services/auth_service.dart';
 import '../pages/login_page.dart';
 import '../pages/register_page.dart';
 import '../pages/exam/list_exams_page.dart';
+import '../pages/course/list_courses_page.dart';
 import '../pages/learner/learner_home_page.dart';
 
 class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
@@ -127,7 +128,8 @@ class _SharedHeaderState extends State<SharedHeader> {
             // Left Logo & Title
             InkWell(
               onTap: () {
-                if (widget.activeTab != 'Courses') {
+                // If not already on home page (activeTab is empty string for LearnerHomePage)
+                if (widget.activeTab != '') {
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const LearnerHomePage()),
@@ -206,7 +208,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const LearnerHomePage(),
+                            builder: (context) => const ListCoursesPage(),
                           ),
                         );
                       }

@@ -8,6 +8,7 @@ import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../login_page.dart';
 import '../exam/list_exams_page.dart';
+import '../course/list_courses_page.dart';
 import '../../widgets/shared_header.dart';
 
 class LearnerHomePage extends StatefulWidget {
@@ -198,7 +199,15 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           ListTile(
             leading: const Icon(Icons.school_outlined),
             title: const Text('Courses'),
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ListCoursesPage(),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.style_outlined),
@@ -356,7 +365,12 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             
             // See All Text Link
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ListCoursesPage()),
+                );
+              },
               child: const Row(
                 children: [
                   Text(
