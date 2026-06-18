@@ -38,6 +38,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _editStatus = 'ACTIVE';
   String _editRole = 'Trainer';
   final TextEditingController _dobController = TextEditingController(text: '28/04/2004');
+  bool _isLoadingUserDetail = false;
 
   // Resolve backend base URL dynamically based on platform (matching AuthService)
   String get apiBaseUrl {
@@ -231,6 +232,74 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  Future<void> _fetchUserDetail(int userId) async {
+    setState(() {
+      _isLoadingUserDetail = true;
+    });
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _isLoadingUserDetail = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse('$apiBaseUrl/admin/users/$userId');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _selectedUserForEdit = data;
+          _editStatus = data['status'] ?? 'ACTIVE';
+          final rolesList = data['roles'] as List?;
+          final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Trainer';
+          if (role.contains('TRAINING_LEAD')) {
+            _editRole = 'Training Lead';
+          } else if (role.contains('ADMIN')) {
+            _editRole = 'ADMIN';
+          } else {
+            _editRole = 'Trainer';
+          }
+          
+          if (data['dateOfBirth'] != null) {
+            try {
+              final dobStr = data['dateOfBirth'].toString(); // yyyy-MM-dd
+              final parts = dobStr.split('-');
+              if (parts.length == 3) {
+                _dobController.text = '${parts[2]}/${parts[1]}/${parts[0]}';
+              } else {
+                _dobController.text = dobStr;
+              }
+            } catch (e) {
+              _dobController.text = '';
+            }
+          } else {
+            _dobController.text = '';
+          }
+          _isLoadingUserDetail = false;
+        });
+      } else {
+        debugPrint('Failed to load user detail: ${response.statusCode}');
+        setState(() {
+          _isLoadingUserDetail = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching user detail: $e');
+      setState(() {
+        _isLoadingUserDetail = false;
+      });
+    }
+  }
+
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
@@ -350,9 +419,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
                 const SizedBox(width: 6),
                 Text(
+<<<<<<< HEAD
+                  _selectedUserForEdit != null && (_selectedUserForEdit!['roles'] as List?)?.first?.toString().contains('LEARNER') == true 
+                      ? 'Learner Account Detail' 
+                      : 'Trainer Account Detail',
+=======
                   _selectedUserForEdit != null
                       ? 'Trainer Account Detail'
                       : (_accountsTab == 'staff' ? 'Trainer' : 'Learner'),
+>>>>>>> dev
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF28B79B),
@@ -1252,6 +1327,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                       child: IconButton(
                                         icon: const Icon(Icons.edit_outlined, color: Color(0xFF28B79B), size: 18),
                                         onPressed: () {
+                                          final userId = user['id'] ?? 0;
                                           setState(() {
                                             _selectedUserForEdit = user;
                                             _editStatus = user['status'] ?? 'ACTIVE';
@@ -1264,8 +1340,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                             } else {
                                               _editRole = 'Trainer';
                                             }
-                                            _dobController.text = '28/04/2004';
+                                            _dobController.text = ''; // Clear initially
                                           });
+                                          if (userId != 0) {
+                                            _fetchUserDetail(userId);
+                                          }
                                         },
                                       ),
                                     ),
@@ -1809,6 +1888,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildTrainerDetailView(Map<String, dynamic> user) {
+    if (_isLoadingUserDetail) {
+      return const SizedBox(
+        height: 400,
+        child: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+          ),
+        ),
+      );
+    }
+
     final fullName = user['fullName'] ?? '';
     final email = user['email'] ?? '';
     final username = email.split('@').first;
@@ -1835,15 +1925,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
     if (userInitials.isEmpty) userInitials = 'U';
 
-    final genderStr = user['gender'] ?? 'Female';
+    String genderStr = user['gender'] ?? 'Female';
+    if (genderStr.toLowerCase() == 'male') {
+      genderStr = 'Male';
+    } else {
+      genderStr = 'Female';
+    }
+
+    final isLearner = role.contains('LEARNER');
+    final titleText = isLearner ? 'Learner Account Detail' : 'Trainer Account Detail';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
-        const Text(
-          'Trainer Account Detail',
-          style: TextStyle(
+        Text(
+          titleText,
+          style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Color(0xFF1F2937),

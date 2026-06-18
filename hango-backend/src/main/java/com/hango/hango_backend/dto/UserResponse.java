@@ -2,6 +2,7 @@ package com.hango.hango_backend.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -14,4 +15,6 @@ public class UserResponse {
     private String gender;
     private String avatarUrl;
     private List<String> roles;
+    private LocalDate dateOfBirth;
+    private String status;
 }
