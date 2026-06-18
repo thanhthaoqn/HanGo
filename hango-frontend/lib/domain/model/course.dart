@@ -20,4 +20,18 @@ class Course {
     required this.thumbnailUrl,
     required this.status,
   });
+
+  factory Course.fromJson(Map<String, dynamic> json) {
+    return Course(
+      id: json['id'],
+      title: json['title'] ?? '',
+      category: json['categoryName'] ?? '',
+      creatorName: json['creatorName'] ?? '',
+      stars: (json['rating'] ?? 0.0).toDouble(),
+      difficulty: json['difficultyName'] ?? 'Medium',
+      learnerCount: '${json['learnersCount'] ?? 0}',
+      thumbnailUrl: json['thumbnailUrl'] ?? '',
+      status: 'featured',
+    );
+  }
 }

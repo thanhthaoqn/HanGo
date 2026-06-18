@@ -108,6 +108,7 @@ CREATE TABLE courses (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     created_by BIGINT NOT NULL,
     category_param_id BIGINT NOT NULL,
+    difficulty_param_id BIGINT NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT NULL,
     thumbnail_url TEXT NULL,
@@ -115,8 +116,9 @@ CREATE TABLE courses (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
     CONSTRAINT fk_course_creator FOREIGN KEY (created_by) REFERENCES users(id),
-    CONSTRAINT fk_course_category FOREIGN KEY (category_param_id) REFERENCES system_parameters(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uttnicode_ci;
+    CONSTRAINT fk_course_category FOREIGN KEY (category_param_id) REFERENCES system_parameters(id),
+    CONSTRAINT fk_course_difficulty FOREIGN KEY (difficulty_param_id) REFERENCES system_parameters(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE course_reviews (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -518,10 +520,10 @@ INSERT INTO user_roles (user_id, role_id) VALUES
 (4, 4);
 
 -- 7. Courses
-INSERT INTO courses (id, created_by, category_param_id, title, description, thumbnail_url, status) VALUES
-(1, 3, 1, 'National High School Graduation Exam Prep - Basic Grammar', 'This course provides all key grammar knowledge for the National High School Graduation English Exam, including verb tenses, subject-verb agreement, passive voice, reported speech, and relative clauses.', 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=600', 'PUBLISHED'),
-(2, 3, 3, 'Advanced English Reading Comprehension Techniques for the National Exam', 'An advanced course that helps students familiarize themselves with reading comprehension formats, develop skimming and scanning skills, and practice guessing vocabulary meanings through context.', 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=600', 'PUBLISHED'),
-(3, 3, 2, 'Conquering Advanced Vocabulary for the National High School Graduation Exam', 'A comprehensive course summarizing 1000+ academic vocabulary words commonly appearing in the National Exams to target scores of 8, 9, and 10.', 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=600', 'DRAFT');
+INSERT INTO courses (id, created_by, category_param_id, difficulty_param_id, title, description, thumbnail_url, status) VALUES
+(1, 3, 1, 14, 'National High School Graduation Exam Prep - Basic Grammar', 'This course provides all key grammar knowledge for the National High School Graduation English Exam, including verb tenses, subject-verb agreement, passive voice, reported speech, and relative clauses.', 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=600', 'PUBLISHED'),
+(2, 3, 3, 15, 'Advanced English Reading Comprehension Techniques for the National Exam', 'An advanced course that helps students familiarize themselves with reading comprehension formats, develop skimming and scanning skills, and practice guessing vocabulary meanings through context.', 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=600', 'PUBLISHED'),
+(3, 3, 2, 16, 'Conquering Advanced Vocabulary for the National High School Graduation Exam', 'A comprehensive course summarizing 1000+ academic vocabulary words commonly appearing in the National Exams to target scores of 8, 9, and 10.', 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=600', 'DRAFT');
 
 -- 8. Course Reviews
 INSERT INTO course_reviews (id, course_id, reviewer_id, action, comment) VALUES
