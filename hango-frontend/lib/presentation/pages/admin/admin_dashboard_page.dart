@@ -18,7 +18,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _adminName = 'Thao';
   String _adminEmail = 'thao@hango.edu';
   String _adminInitials = 'T';
-  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles
+  String _adminAvatarUrl = '';
+  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Profile
+
+  // Profile tab state variables
+  bool _isLoadingProfile = false;
+  final _profileNameController = TextEditingController();
+  final _profileEmailController = TextEditingController();
+  final _profilePhoneController = TextEditingController();
+  final _profileAvatarController = TextEditingController();
+  String _profileGender = 'Male';
+  final TextEditingController _profileDobController = TextEditingController();
 
   // Dashboard stats fetched dynamically from DB
   bool _isLoadingStats = true;
@@ -76,6 +86,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _createDobController.dispose();
     _createAddressController.dispose();
     _createPhoneController.dispose();
+    _profileNameController.dispose();
+    _profileEmailController.dispose();
+    _profilePhoneController.dispose();
+    _profileAvatarController.dispose();
+    _profileDobController.dispose();
     super.dispose();
   }
 
@@ -97,6 +112,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _adminEmail = email;
       _adminInitials = initials;
     });
+
+    _fetchAdminProfile();
   }
 
   Future<void> _fetchDashboardStats() async {
@@ -494,10 +511,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 onSelected: (val) {
                   if (val == 'logout') {
                     _handleLogout();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Settings under development for $_adminName')),
-                    );
+                  } else if (val == 'profile') {
+                    _initProfileFields();
+                    setState(() {
+                      _selectedMenuIndex = 4;
+                    });
                   }
                 },
                 offset: const Offset(0, 50),
@@ -512,17 +530,36 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           color: Color(0xFFFFEDD5), // Peach light
                           shape: BoxShape.circle,
                         ),
-                        child: Center(
-                          child: Text(
-                            _adminInitials,
-                            style: const TextStyle(
-                              color: Color(0xFFEA580C), // Dark Orange
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ),
+                        child: _adminAvatarUrl.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(18),
+                                child: Image.network(
+                                  _adminAvatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Center(
+                                    child: Text(
+                                      _adminInitials,
+                                      style: const TextStyle(
+                                        color: Color(0xFFEA580C),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  _adminInitials,
+                                  style: const TextStyle(
+                                    color: Color(0xFFEA580C), // Dark Orange
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 10),
                       Text(
@@ -558,12 +595,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                   ),
                   const PopupMenuItem(
-                    value: 'settings',
+                    value: 'profile',
                     child: Row(
                       children: [
-                        Icon(Icons.settings_outlined, size: 20),
+                        Icon(Icons.person_outline, size: 20),
                         SizedBox(width: 8),
-                        Text('Settings', style: TextStyle(fontFamily: 'Outfit')),
+                        Text('Profile', style: TextStyle(fontFamily: 'Outfit')),
                       ],
                     ),
                   ),
@@ -811,6 +848,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         return _buildAnalyticsTab(isDesktop);
       case 3:
         return _buildRolesTab(isDesktop);
+      case 4:
+        return _buildProfileTab(isDesktop);
       default:
         return _buildDashboardTab(isDesktop);
     }
@@ -3328,6 +3367,694 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _initProfileFields() {
+    _profileNameController.text = _adminName;
+    _profileEmailController.text = _adminEmail;
+    _profilePhoneController.text = '';
+    _profileAvatarController.text = _adminAvatarUrl;
+    _profileGender = 'Male';
+    _profileDobController.text = '';
+    _fetchAdminProfile();
+  }
+
+  Future<void> _fetchAdminProfile() async {
+    setState(() {
+      _isLoadingProfile = true;
+    });
+    try {
+      final res = await _authService.getProfile();
+      if (res['success'] == true) {
+        final data = res['data'];
+        setState(() {
+          _adminName = data['fullName'] ?? '';
+          _adminEmail = data['email'] ?? '';
+          _adminAvatarUrl = data['avatarUrl'] ?? '';
+          
+          _profileNameController.text = _adminName;
+          _profileEmailController.text = _adminEmail;
+          _profilePhoneController.text = data['phoneNumber'] ?? '';
+          _profileAvatarController.text = _adminAvatarUrl;
+          _profileGender = data['gender'] ?? 'Male';
+          
+          if (data['dateOfBirth'] != null) {
+            try {
+              final dobStr = data['dateOfBirth'].toString();
+              final parts = dobStr.split('-');
+              if (parts.length == 3) {
+                _profileDobController.text = '${parts[2]}/${parts[1]}/${parts[0]}';
+              } else {
+                _profileDobController.text = dobStr;
+              }
+            } catch (e) {
+              _profileDobController.text = '';
+            }
+          } else {
+            _profileDobController.text = '';
+          }
+
+          if (_adminName.trim().isNotEmpty) {
+            final parts = _adminName.trim().split(' ');
+            if (parts.isNotEmpty) {
+              _adminInitials = parts.last[0].toUpperCase();
+            }
+          }
+          _isLoadingProfile = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+        debugPrint('Failed to load profile: ${res['message']}');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingProfile = false;
+      });
+      debugPrint('Error loading profile: $e');
+    }
+  }
+
+  Future<void> _saveProfileChanges() async {
+    setState(() {
+      _isLoadingProfile = true;
+    });
+
+    try {
+      String? formattedDob;
+      if (_profileDobController.text.isNotEmpty) {
+        final parts = _profileDobController.text.split('/');
+        if (parts.length == 3) {
+          formattedDob = '${parts[2]}-${parts[1]}-${parts[0]}';
+        }
+      }
+
+      final profileData = {
+        'fullName': _profileNameController.text.trim(),
+        'email': _profileEmailController.text.trim(),
+        'phoneNumber': _profilePhoneController.text.trim(),
+        'avatarUrl': _profileAvatarController.text.trim(),
+        'gender': _profileGender,
+        if (formattedDob != null) 'dateOfBirth': formattedDob,
+      };
+
+      final res = await _authService.updateProfile(profileData);
+      if (res['success'] == true) {
+        final data = res['data'];
+        setState(() {
+          _adminName = data['fullName'] ?? '';
+          _adminEmail = data['email'] ?? '';
+          _adminAvatarUrl = data['avatarUrl'] ?? '';
+          
+          if (_adminName.trim().isNotEmpty) {
+            final parts = _adminName.trim().split(' ');
+            if (parts.isNotEmpty) {
+              _adminInitials = parts.last[0].toUpperCase();
+            }
+          }
+          _isLoadingProfile = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile updated successfully!'),
+              backgroundColor: Color(0xFF28B79B),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update profile: ${res['message']}'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingProfile = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildProfileTab(bool isDesktop) {
+    if (_isLoadingProfile) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+        ),
+      );
+    }
+
+    // Compute username from email
+    String username = '';
+    if (_adminEmail.isNotEmpty) {
+      username = _adminEmail.split('@').first;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Breadcrumb
+        Row(
+          children: const [
+            Icon(Icons.chevron_right, size: 16, color: Color(0xFF28B79B)),
+            SizedBox(width: 4),
+            Text(
+              'Profile',
+              style: TextStyle(
+                color: Color(0xFF28B79B),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Title
+        const Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Main Card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Profile Photo & Name Section
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    children: [
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF1F2937), width: 2),
+                        ),
+                        child: _profileAvatarController.text.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(45),
+                                child: Image.network(
+                                  _profileAvatarController.text,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Center(
+                                    child: Text(
+                                      _adminInitials,
+                                      style: const TextStyle(
+                                        color: Color(0xFFEA580C),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 32,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  _adminInitials,
+                                  style: const TextStyle(
+                                    color: Color(0xFFEA580C),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 32,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ),
+                      ),
+                      // Pencil edit button overlay on bottom right
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _showAvatarEditDialog,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF28B79B),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _adminName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'ID: PS-29384-CC',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // Form fields grid/layout matching the mockup exactly
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final formWidth = constraints.maxWidth;
+                  final isWide = formWidth > 600;
+
+                  return Column(
+                    children: [
+                      // Row 1: FullName & Username
+                      _buildFormRow(
+                        isWide,
+                        _buildTextFieldNoIcon('FullName', _profileNameController),
+                        _buildTextFieldNoIcon('Username', TextEditingController(text: username), enabled: false),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Row 2: Email & Role
+                      _buildFormRow(
+                        isWide,
+                        _buildTextFieldWithEmailIcon('Email', _profileEmailController),
+                        _buildRoleDisplayBox('Role', 'Admin'),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Row 3: Date of Birth & Gender
+                      _buildFormRow(
+                        isWide,
+                        _buildDatePickerField(context),
+                        _buildGenderRadioGroup(),
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 40),
+              const Divider(color: Color(0xFFE5E7EB)),
+              const SizedBox(height: 24),
+
+              // Bottom Action Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: _saveProfileChanges,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                      side: const BorderSide(color: Color(0xFF28B79B)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text(
+                      'Update',
+                      style: TextStyle(
+                        color: Color(0xFF28B79B),
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedMenuIndex = 0; // Go back to dashboard
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28B79B),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Back',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAvatarEditDialog() {
+    final controller = TextEditingController(text: _profileAvatarController.text);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Avatar URL', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter image URL',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _profileAvatarController.text = controller.text;
+              });
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormRow(bool isWide, Widget left, Widget right) {
+    if (isWide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 24),
+          Expanded(child: right),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        left,
+        const SizedBox(height: 20),
+        right,
+      ],
+    );
+  }
+
+  Widget _buildTextFieldNoIcon(String label, TextEditingController controller, {bool enabled = true}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151), fontFamily: 'Outfit'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: enabled ? Colors.white : const Color(0xFFF3F4F6),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextFieldWithEmailIcon(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151), fontFamily: 'Outfit'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: false,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF9CA3AF), size: 20),
+            filled: true,
+            fillColor: const Color(0xFFF3F4F6),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleDisplayBox(String label, String roleName) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151), fontFamily: 'Outfit'),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 48,
+          width: double.infinity,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF2FF),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+          ),
+          child: Text(
+            roleName,
+            style: const TextStyle(
+              color: Color(0xFF3F51B5),
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              fontFamily: 'Outfit',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderRadioGroup() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151), fontFamily: 'Outfit'),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _profileGender = 'Female';
+                });
+              },
+              child: Row(
+                children: [
+                  Radio<String>(
+                    value: 'Female',
+                    groupValue: _profileGender,
+                    activeColor: const Color(0xFF28B79B),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _profileGender = val;
+                        });
+                      }
+                    },
+                  ),
+                  const Text('Female', style: TextStyle(fontFamily: 'Outfit', fontSize: 15)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 24),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _profileGender = 'Male';
+                });
+              },
+              child: Row(
+                children: [
+                  Radio<String>(
+                    value: 'Male',
+                    groupValue: _profileGender,
+                    activeColor: const Color(0xFF28B79B),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _profileGender = val;
+                        });
+                      }
+                    },
+                  ),
+                  const Text('Male', style: TextStyle(fontFamily: 'Outfit', fontSize: 15)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePickerField(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Date of Birth',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF374151), fontFamily: 'Outfit'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _profileDobController,
+          readOnly: true,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
+          onTap: () async {
+            DateTime? initialDate;
+            try {
+              final parts = _profileDobController.text.split('/');
+              if (parts.length == 3) {
+                initialDate = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+              }
+            } catch (e) {
+              initialDate = null;
+            }
+            
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: initialDate ?? DateTime(2000, 1, 1),
+              firstDate: DateTime(1900),
+              lastDate: DateTime.now(),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: Color(0xFF28B79B),
+                      onPrimary: Colors.white,
+                      onSurface: Color(0xFF1F2937),
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              setState(() {
+                final day = picked.day.toString().padLeft(2, '0');
+                final month = picked.month.toString().padLeft(2, '0');
+                _profileDobController.text = '$day/$month/${picked.year}';
+              });
+            }
+          },
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+            ),
           ),
         ),
       ],

@@ -222,4 +222,69 @@ class AuthService {
       return {'success': false, 'message': e.toString()};
     }
   }
+
+  // Get current user profile details
+  Future<Map<String, dynamic>> getProfile() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'No auth token found.'};
+      }
+
+      final url = baseUrl.replaceAll('/auth', '/v1/users/me');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'message': response.body};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Update current user profile details
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'No auth token found.'};
+      }
+
+      final url = baseUrl.replaceAll('/auth', '/v1/users/me');
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        final updatedData = jsonDecode(response.body);
+        // Also update local SharedPreferences cache
+        final prefs = await SharedPreferences.getInstance();
+        if (updatedData['fullName'] != null) {
+          await prefs.setString(_userFullNameKey, updatedData['fullName']);
+        }
+        if (updatedData['email'] != null) {
+          await prefs.setString(_userEmailKey, updatedData['email']);
+        }
+        return {'success': true, 'data': updatedData};
+      } else {
+        return {'success': false, 'message': response.body};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
 }
