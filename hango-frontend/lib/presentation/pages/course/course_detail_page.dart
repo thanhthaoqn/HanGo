@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../domain/model/course_review_summary.dart';
+import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
+import '../register_page.dart';
 import 'review_tab.dart';
 
 class CourseDetailPage extends StatefulWidget {
@@ -34,6 +36,17 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
   }
 
   void _enroll(CourseDetail course) async {
+    final authService = AuthService();
+    final isLoggedIn = await authService.isLoggedIn();
+    if (!isLoggedIn) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const RegisterPage()),
+      );
+      return;
+    }
+
     setState(() {
       _isEnrolling = true;
     });
