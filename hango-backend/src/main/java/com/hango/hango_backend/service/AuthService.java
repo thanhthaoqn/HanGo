@@ -29,6 +29,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.hango.hango_backend.dto.ForgotPasswordRequest;
 import com.hango.hango_backend.dto.VerifyOtpRequest;
 import com.hango.hango_backend.dto.ResetPasswordRequest;
+import com.hango.hango_backend.dto.ProfileUpdateRequest;
 import com.hango.hango_backend.entity.PasswordResetOtp;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
 import java.io.IOException;
@@ -338,6 +339,44 @@ public class AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with id: " + id));
         return mapToUserResponse(user);
+    }
+
+    public UserResponse getUserProfile(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+        return mapToUserResponse(user);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public UserResponse updateProfile(String email, ProfileUpdateRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+
+        if (request.getFullName() != null) {
+            user.setFullName(request.getFullName());
+        }
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getDateOfBirth() != null) {
+            user.setDateOfBirth(request.getDateOfBirth());
+        }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+
+        if (request.getEmail() != null && !request.getEmail().equalsIgnoreCase(user.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new IllegalArgumentException("Error: Email is already in use!");
+            }
+            user.setEmail(request.getEmail());
+        }
+
+        User updatedUser = userRepository.save(user);
+        return mapToUserResponse(updatedUser);
     }
 
     private UserResponse mapToUserResponse(User user) {
