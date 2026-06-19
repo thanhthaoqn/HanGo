@@ -3,6 +3,7 @@ import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../widgets/course_card.dart';
 import '../../widgets/shared_header.dart';
+import 'course_detail_page.dart';
 
 class ListCoursesPage extends StatefulWidget {
   const ListCoursesPage({Key? key}) : super(key: key);
@@ -309,7 +310,17 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
               mainAxisSpacing: 20,
             ),
             itemBuilder: (context, index) {
-              return CourseCard(course: courses[index]);
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CourseDetailPage(courseId: courses[index].id),
+                    ),
+                  );
+                },
+                child: CourseCard(course: courses[index]),
+              );
             },
           ),
         );

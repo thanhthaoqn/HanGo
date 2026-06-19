@@ -8,7 +8,6 @@ import com.hango.hango_backend.service.AuthService;
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
 import jakarta.validation.Valid;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -197,7 +196,6 @@ public class AdminController {
         }
     }
 
-    
     @PostMapping("/users")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createUserByAdmin(@Valid @RequestBody RegisterRequest registerRequest) {

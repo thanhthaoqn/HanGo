@@ -1,6 +1,7 @@
 package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.CourseSummaryDTO;
+import com.hango.hango_backend.service.CourseRatingService;
 import com.hango.hango_backend.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.util.List;
 public class CourseController {
 
     private final CourseService courseService;
+    private final CourseRatingService courseRatingService;
 
     @GetMapping
     public ResponseEntity<List<CourseSummaryDTO>> getCourses(
@@ -23,5 +25,49 @@ public class CourseController {
         
         List<CourseSummaryDTO> courses = courseService.getCourses(search, filterType, difficulty);
         return ResponseEntity.ok(courses);
+    }
+
+    private Long getCurrentUserId() {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
+            return ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+        }
+        return null;
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getCourseDetail(@PathVariable Long id) {
+        try {
+            Long currentUserId = getCurrentUserId();
+            return ResponseEntity.ok(courseService.getCourseDetail(id, currentUserId));
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(404).body(e.getClass().getName() + ": " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/enroll")
+    public ResponseEntity<?> enrollCourse(@PathVariable Long id) {
+        try {
+            Long currentUserId = getCurrentUserId();
+            if (currentUserId == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            courseService.enrollCourse(id, currentUserId);
+            return ResponseEntity.ok().body("{\"message\": \"Enrollment successful\"}");
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(400).body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/{id}/reviews")
+    public ResponseEntity<?> getCourseReviews(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(courseRatingService.getCourseReviews(id));
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(404).body(e.getClass().getName() + ": " + e.getMessage());
+        }
     }
 }

@@ -9,6 +9,7 @@ import '../../../data/repositories/exam_repository.dart';
 import '../login_page.dart';
 import '../exam/list_exams_page.dart';
 import '../course/list_courses_page.dart';
+import '../course/course_detail_page.dart';
 import '../../widgets/shared_header.dart';
 
 class LearnerHomePage extends StatefulWidget {
@@ -439,113 +440,126 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   // Course Card Builder
   Widget _buildCourseCard(Course course) {
-    return HoverableCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Top Colored Section
-          Container(
-            height: 100,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF28B79B), Color(0xFF1E8D77)],
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CourseDetailPage(courseId: course.id),
             ),
-            child: Stack(
-              children: [
-                // Text category watermark/title
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Text(
-                    course.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+          );
+        },
+        child: HoverableCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top Colored Section
+              Container(
+                height: 100,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF28B79B), Color(0xFF1E8D77)],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
                   ),
                 ),
-                
-                // Mortarboard watermark icon on bottom right
-                Positioned(
-                  bottom: -10,
-                  right: -10,
-                  child: Icon(
-                    Icons.school,
-                    size: 68,
-                    color: Colors.white.withOpacity(0.12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Bottom Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    course.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Created By: ${course.creatorName}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      // Gold stars
-                      ...List.generate(5, (index) {
-                        return const Icon(
-                          Icons.star,
-                          size: 12,
-                          color: Color(0xFFFBBF24),
-                        );
-                      }),
-                      const SizedBox(width: 4),
-                      Text(
-                        course.learnerCount,
+                child: Stack(
+                  children: [
+                    // Text category watermark/title
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Text(
+                        course.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 10,
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    
+                    // Mortarboard watermark icon on bottom right
+                    Positioned(
+                      bottom: -10,
+                      right: -10,
+                      child: Icon(
+                        Icons.school,
+                        size: 68,
+                        color: Colors.white.withOpacity(0.12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Bottom Content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        course.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Created By: ${course.creatorName}',
+                        style: const TextStyle(
+                          fontSize: 11,
                           color: Color(0xFF9CA3AF),
                         ),
                       ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          // Gold stars
+                          ...List.generate(5, (index) {
+                            return const Icon(
+                              Icons.star,
+                              size: 12,
+                              color: Color(0xFFFBBF24),
+                            );
+                          }),
+                          const SizedBox(width: 4),
+                          Text(
+                            course.learnerCount,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Difficulty Tag
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildDifficultyBadge(course.difficulty),
+                        ],
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  
-                  // Difficulty Tag
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildDifficultyBadge(course.difficulty),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          )
-        ],
+                ),
+              )
+            ],
+          ),
+        ),
       ),
     );
   }

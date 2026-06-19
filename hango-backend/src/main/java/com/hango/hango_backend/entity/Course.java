@@ -38,6 +38,9 @@ public class Course {
     @Column(name = "thumbnail_url", columnDefinition = "TEXT")
     private String thumbnailUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String objectives;
+
     @Builder.Default
     @Column(length = 30)
     private String status = "DRAFT";
