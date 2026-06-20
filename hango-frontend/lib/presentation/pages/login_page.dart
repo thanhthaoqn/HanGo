@@ -174,13 +174,15 @@ class _LoginPageState extends State<LoginPage> {
     if (kIsWeb) {
       try {
         final plugin = GoogleSignInPlatform.instance as web.GoogleSignInPlugin;
-        return plugin.renderButton(
-          configuration: web.GSIButtonConfiguration(
-            type: web.GSIButtonType.standard,
-            theme: web.GSIButtonTheme.outline,
-            size: web.GSIButtonSize.large,
-            text: web.GSIButtonText.signinWith,
-            shape: web.GSIButtonShape.rectangular,
+        return Center(
+          child: plugin.renderButton(
+            configuration: web.GSIButtonConfiguration(
+              type: web.GSIButtonType.standard,
+              theme: web.GSIButtonTheme.outline,
+              size: web.GSIButtonSize.large,
+              text: web.GSIButtonText.signinWith,
+              shape: web.GSIButtonShape.rectangular,
+            ),
           ),
         );
       } catch (e) {
@@ -316,7 +318,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               child: Center(
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 420),
+                  constraints: const BoxConstraints(maxWidth: 500),
                   child: Form(
                     key: _formKey,
                     child: Column(

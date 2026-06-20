@@ -7,6 +7,7 @@ import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.service.AuthService;
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
+import com.hango.hango_backend.dto.AdminUserUpdateRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -202,6 +203,63 @@ public class AdminController {
         try {
             UserResponse response = authService.createUserByAdmin(registerRequest);
             return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/users/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> updateUserByAdmin(
+            @PathVariable Long id, 
+            @Valid @RequestBody AdminUserUpdateRequest updateRequest) {
+        try {
+            Optional<User> userOpt = userRepository.findById(id);
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                
+                if (updateRequest.getFullName() != null) {
+                    user.setFullName(updateRequest.getFullName());
+                }
+                
+                if (updateRequest.getEmail() != null && !updateRequest.getEmail().equalsIgnoreCase(user.getEmail())) {
+                    if (userRepository.existsByEmail(updateRequest.getEmail())) {
+                        throw new IllegalArgumentException("Error: Email is already in use!");
+                    }
+                    user.setEmail(updateRequest.getEmail());
+                }
+                
+                if (updateRequest.getPhoneNumber() != null) {
+                    user.setPhoneNumber(updateRequest.getPhoneNumber());
+                }
+                
+                if (updateRequest.getGender() != null) {
+                    user.setGender(updateRequest.getGender());
+                }
+                
+                if (updateRequest.getDateOfBirth() != null) {
+                    user.setDateOfBirth(updateRequest.getDateOfBirth());
+                }
+                
+                if (updateRequest.getStatus() != null) {
+                    user.setStatus(updateRequest.getStatus().toUpperCase());
+                }
+                
+                if (updateRequest.getRole() != null) {
+                    Role roleObj = roleRepository.findByRoleName(updateRequest.getRole().toUpperCase());
+                    if (roleObj == null) {
+                        throw new IllegalArgumentException("Error: Role not found!");
+                    }
+                    Set<Role> roles = new HashSet<>();
+                    roles.add(roleObj);
+                    user.setRoles(roles);
+                }
+                
+                userRepository.save(user);
+                return ResponseEntity.ok(authService.getUserById(id));
+            } else {
+                return ResponseEntity.status(404).body("User not found");
+            }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }

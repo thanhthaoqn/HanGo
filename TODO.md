@@ -256,17 +256,17 @@
 
 ### 🎨 Phase 1: Frontend UI & Mock Data _(Assigned to: Frontend Agent)_
 
-- [ ] Build Recursive Widget UI for parent-child comments.
-- [ ] Use Mock Comment repository with a few levels of nesting.
+- [x] Build Recursive Widget UI for parent-child comments.
+- [x] Use Mock Comment repository with a few levels of nesting.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
-- [ ] Self-referencing `comments` table structure (`parent_id`).
-- [ ] Use `JOIN FETCH` to resolve N+1 query issues. Implement Soft Delete feature.
+- [x] Self-referencing `comments` table structure (`parent_id`).
+- [x] Use `JOIN FETCH` to resolve N+1 query issues. Implement Soft Delete feature.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Replace mock with backend `GET` mapping recursive JSON.
+- [x] Replace mock with backend `GET` mapping recursive JSON.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 
