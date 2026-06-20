@@ -61,6 +61,21 @@ public class CourseController {
         }
     }
 
+    @DeleteMapping("/{id}/enroll")
+    public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
+        try {
+            Long currentUserId = getCurrentUserId();
+            if (currentUserId == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            courseService.unenrollCourse(id, currentUserId);
+            return ResponseEntity.ok().body("{\"message\": \"Unenrollment successful\"}");
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(400).body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @GetMapping("/{id}/reviews")
     public ResponseEntity<?> getCourseReviews(@PathVariable Long id) {
         try {

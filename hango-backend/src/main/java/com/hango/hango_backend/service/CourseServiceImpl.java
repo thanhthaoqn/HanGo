@@ -146,4 +146,13 @@ public class CourseServiceImpl implements CourseService {
 
         enrollmentRepository.save(enrollment);
     }
+
+    @Override
+    @Transactional
+    public void unenrollCourse(Long courseId, Long userId) {
+        if (!enrollmentRepository.existsByUserIdAndCourseId(userId, courseId)) {
+            throw new RuntimeException("User is not enrolled in this course");
+        }
+        enrollmentRepository.deleteByUserIdAndCourseId(userId, courseId);
+    }
 }

@@ -8,4 +8,5 @@ public interface CourseService {
     List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty);
     CourseDetailDTO getCourseDetail(Long id, Long currentUserId);
     void enrollCourse(Long courseId, Long userId);
+    void unenrollCourse(Long courseId, Long userId);
 }
