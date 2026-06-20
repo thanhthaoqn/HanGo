@@ -29,7 +29,11 @@ public class AdminCommentController {
             for (Comment c : comments) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("id", c.getId());
-                map.put("type", "lesson"); // default type to lesson
+                String commentType = "lesson";
+                if (c.getLesson() != null && "PRACTICE".equalsIgnoreCase(c.getLesson().getLessonType())) {
+                    commentType = "quiz";
+                }
+                map.put("type", commentType);
                 map.put("userId", c.getUser() != null ? c.getUser().getId() : 0);
                 map.put("commenter", c.getUser() != null ? c.getUser().getFullName() : "Anonymous");
                 map.put("email", c.getUser() != null ? c.getUser().getEmail() : "");
