@@ -114,4 +114,26 @@ class CourseRepository {
       throw Exception('Error enrolling in course: $e');
     }
   }
+
+  Future<void> unenrollCourse(int courseId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/courses/$courseId/enroll');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to unenroll: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error unenrolling from course: $e');
+    }
+  }
 }

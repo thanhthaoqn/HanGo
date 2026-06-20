@@ -65,3 +65,4 @@ hango-backend/src/main/resources/application.properties
 Thumbs.db
 hango-backend/src/main/resources/application.properties
 devtools_options.yaml
+database.sql
