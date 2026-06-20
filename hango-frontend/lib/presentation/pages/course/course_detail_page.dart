@@ -4,7 +4,7 @@ import '../../../domain/model/course_detail.dart';
 import '../../../domain/model/course_review_summary.dart';
 import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
-import '../register_page.dart';
+import '../login_page.dart';
 import 'review_tab.dart';
 
 class CourseDetailPage extends StatefulWidget {
@@ -21,6 +21,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
   late Future<CourseDetail> _courseDetailFuture;
   late TabController _tabController;
   bool _isEnrolling = false;
+  bool _isUnenrolling = false;
 
   @override
   void initState() {
@@ -42,7 +43,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
       if (!mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const RegisterPage()),
+        MaterialPageRoute(builder: (context) => const LoginPage()),
       );
       return;
     }
@@ -89,6 +90,78 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
       if (mounted) {
         setState(() {
           _isEnrolling = false;
+        });
+      }
+    }
+  }
+
+  void _showUnenrollConfirmDialog(CourseDetail course) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Cancel Enrollment'),
+          content: Text('Are you sure you want to cancel your enrollment for ${course.title}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('No', style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _unenroll(course);
+              },
+              child: const Text('Yes, Cancel', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _unenroll(CourseDetail course) async {
+    setState(() {
+      _isUnenrolling = true;
+    });
+    try {
+      await _repository.unenrollCourse(course.id);
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('You have successfully canceled your enrollment.'),
+          backgroundColor: const Color(0xFF28B79B),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(
+            bottom: MediaQuery.of(context).size.height - 100,
+            right: 20,
+            left: MediaQuery.of(context).size.width > 600 ? MediaQuery.of(context).size.width - 400 : 20,
+          ),
+        ),
+      );
+
+      setState(() {
+        _courseDetailFuture = _repository.fetchCourseDetail(widget.courseId);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to cancel enrollment: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(
+            bottom: MediaQuery.of(context).size.height - 100,
+            right: 20,
+            left: MediaQuery.of(context).size.width > 600 ? MediaQuery.of(context).size.width - 400 : 20,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUnenrolling = false;
         });
       }
     }
@@ -512,6 +585,32 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
                     ),
             ),
           ),
+          if (course.isEnrolled) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _isUnenrolling ? null : () => _showUnenrollConfirmDialog(course),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: Colors.redAccent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: _isUnenrolling
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Cancel Enrollment',
+                        style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+              ),
+            ),
+          ],
         ],
       ),
     );
