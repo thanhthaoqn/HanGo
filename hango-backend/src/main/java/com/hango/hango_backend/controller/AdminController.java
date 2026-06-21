@@ -246,7 +246,7 @@ public class AdminController {
                 }
                 
                 if (updateRequest.getRole() != null) {
-                    Role roleObj = roleRepository.findByRoleName(updateRequest.getRole().toUpperCase());
+                    Role roleObj = roleRepository.findByRoleName(updateRequest.getRole().toUpperCase()).orElse(null);
                     if (roleObj == null) {
                         throw new IllegalArgumentException("Error: Role not found!");
                     }
