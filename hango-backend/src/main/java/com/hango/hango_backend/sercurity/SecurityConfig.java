@@ -59,6 +59,7 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/api/v1/exams", "/api/v1/exams/**").permitAll()
                     .requestMatchers("/api/v1/courses", "/api/v1/courses/**").permitAll()
+                    .requestMatchers("/api/v1/lessons/**", "/api/v1/comments/**").permitAll()
                     .anyRequest().authenticated()
             );
 

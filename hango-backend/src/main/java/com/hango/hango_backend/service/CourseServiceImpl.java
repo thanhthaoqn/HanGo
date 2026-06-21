@@ -89,10 +89,9 @@ public class CourseServiceImpl implements CourseService {
                     .build();
         }).collect(Collectors.toList());
 
-        // For Learners Count and Rating, using dummy/hardcoded for now as discussed or if real metrics are missing.
-        // Or calculate if we have queries.
-        // Assuming we mock rating and count if there are no specific tables easily queryable right here.
-        // e.g. learnersCount = 36595, rating = 4.3 as requested in mockup if real ones not available yet.
+        // For Learners Count and Rating
+        int learnersCount = enrollmentRepository.countByCourseId(id);
+        
         String creatorName = "Unknown Trainer";
         try {
             if (course.getCreator() != null) {
@@ -116,8 +115,8 @@ public class CourseServiceImpl implements CourseService {
                 .title(course.getTitle())
                 .creatorName(creatorName)
                 .difficultyName(difficultyName)
-                .rating(4.3) 
-                .learnersCount(36595)
+                .rating(4.3) // Keeping mock rating until Review system is fully implemented
+                .learnersCount(learnersCount)
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
                 .isEnrolled(isEnrolled)
