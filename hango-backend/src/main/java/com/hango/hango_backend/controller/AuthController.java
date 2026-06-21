@@ -126,7 +126,7 @@ public class AuthController {
     }
 
     @PostMapping("/profile/avatar")
-    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER') or hasRole('TRAINING_LEAD') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER') or hasRole('TRAINER_LEAD') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> uploadAvatar(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam("file") MultipartFile file) {

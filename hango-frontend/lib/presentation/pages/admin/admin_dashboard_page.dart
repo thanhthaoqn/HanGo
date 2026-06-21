@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
+import 'comment_management_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -19,12 +20,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _adminEmail = 'thao@hango.edu';
   String _adminInitials = 'T';
   String _adminAvatarUrl = '';
-  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Profile
+  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Comment, 5: Profile
+  String _currentCommentTab = 'Lesson';
 
   // Profile tab state variables
   bool _isLoadingProfile = false;
   final _profileNameController = TextEditingController();
   final _profileEmailController = TextEditingController();
+  final _profileUsernameController = TextEditingController();
   final _profilePhoneController = TextEditingController();
   final _profileAvatarController = TextEditingController();
   String _profileGender = 'Male';
@@ -48,6 +51,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _editStatus = 'ACTIVE';
   String _editRole = 'Trainer';
   final TextEditingController _dobController = TextEditingController(text: '28/04/2004');
+  final TextEditingController _editNameController = TextEditingController();
+  final TextEditingController _editEmailController = TextFormField().controller ?? TextEditingController();
+  final TextEditingController _editUsernameController = TextEditingController();
+  String _editGender = 'Male';
   bool _isLoadingUserDetail = false;
 
   // Create account variables
@@ -88,9 +95,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _createPhoneController.dispose();
     _profileNameController.dispose();
     _profileEmailController.dispose();
+    _profileUsernameController.dispose();
     _profilePhoneController.dispose();
     _profileAvatarController.dispose();
     _profileDobController.dispose();
+     _editNameController.dispose();
+    _editEmailController.dispose();
+    _editUsernameController.dispose();
     super.dispose();
   }
 
@@ -267,6 +278,213 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  Future<void> _updateUserDetails(int userId) async {
+    setState(() {
+      _isLoadingAccounts = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      String backendRole = 'TRAINER';
+      if (_editRole == 'Trainer Lead') {
+        backendRole = 'TRAINER_LEAD';
+      } else if (_editRole == 'ADMIN') {
+        backendRole = 'ADMINISTRATOR';
+      }
+
+      String? formattedDob;
+      if (_dobController.text.isNotEmpty) {
+        final parts = _dobController.text.split('/');
+        if (parts.length == 3) {
+          formattedDob = '${parts[2]}-${parts[1]}-${parts[0]}'; // yyyy-MM-dd
+        }
+      }
+
+      final body = {
+        'fullName': _editNameController.text.trim(),
+        'email': _editEmailController.text.trim(),
+        'gender': _editGender,
+        'role': backendRole,
+        'dateOfBirth': formattedDob,
+        'status': _editStatus,
+      };
+
+      final url = Uri.parse('$apiBaseUrl/admin/users/$userId');
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('User details updated successfully!'),
+              backgroundColor: Color(0xFF28B79B),
+            ),
+          );
+        }
+        _fetchAccounts();
+        setState(() {
+          _selectedUserForEdit = null;
+        });
+      } else {
+        debugPrint('Failed to update user details: ${response.statusCode} - ${response.body}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update details: ${response.body}'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error updating user details: $e');
+    } finally {
+      setState(() {
+        _isLoadingAccounts = false;
+      });
+    }
+  }
+
+  void _showStatusConfirmDialog(String targetStatus) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final isDeactivating = targetStatus == 'INACTIVE';
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                isDeactivating ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                color: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                isDeactivating ? 'Deactivate Account' : 'Activate Account',
+                style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            isDeactivating
+                ? 'Are you sure you want to deactivate this account? The staff member will not be able to log in to the platform.'
+                : 'Are you sure you want to activate this account? The staff member will regain access to the platform.',
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF6B7280), fontFamily: 'Outfit'),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _editStatus = targetStatus;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Status changed to $targetStatus. Click Update to save changes.'),
+                    backgroundColor: const Color(0xFF28B79B),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showActivityToggleConfirmDialog(int userId, bool newVal, String userName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final isDeactivating = !newVal;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                isDeactivating ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                color: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                isDeactivating ? 'Deactivate Account' : 'Activate Account',
+                style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            isDeactivating
+                ? 'Are you sure you want to deactivate the account for \'$userName\'? This user will not be able to log in to the platform.'
+                : 'Are you sure you want to activate the account for \'$userName\'? This user will regain access to the platform.',
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF6B7280), fontFamily: 'Outfit'),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _toggleUserStatus(userId, newVal);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _fetchUserDetail(int userId) async {
     setState(() {
       _isLoadingUserDetail = true;
@@ -296,13 +514,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           _editStatus = data['status'] ?? 'ACTIVE';
           final rolesList = data['roles'] as List?;
           final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Trainer';
-          if (role.contains('TRAINING_LEAD')) {
-            _editRole = 'Training Lead';
+          if (role.contains('TRAINER_LEAD')) {
+            _editRole = 'Trainer Lead';
           } else if (role.contains('ADMIN')) {
             _editRole = 'ADMIN';
           } else {
             _editRole = 'Trainer';
           }
+          
+          _editNameController.text = data['fullName'] ?? '';
+          _editEmailController.text = data['email'] ?? '';
+          final emailStr = data['email'] ?? '';
+          _editUsernameController.text = emailStr.split('@').first;
+          _editGender = (data['gender']?.toString().toLowerCase() == 'male') ? 'Male' : 'Female';
           
           if (data['dateOfBirth'] != null) {
             try {
@@ -469,6 +693,34 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ],
             )
+          else if (_selectedMenuIndex == 4)
+            Row(
+              children: [
+                const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 6),
+                const Text(
+                  'Comment',
+                  style: TextStyle(
+                    fontSize: 13, 
+                    color: Color(0xFF28B79B), 
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
+                const SizedBox(width: 6),
+                Text(
+                  _currentCommentTab,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF28B79B),
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
+            )
           else
             const SizedBox(), // Empty spacer on desktop
 
@@ -514,104 +766,219 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   } else if (val == 'profile') {
                     _initProfileFields();
                     setState(() {
-                      _selectedMenuIndex = 4;
+                      _selectedMenuIndex = 5;
                     });
                   }
                 },
-                offset: const Offset(0, 50),
+                offset: const Offset(0, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+                ),
+                elevation: 10,
+                color: Colors.white,
+                shadowColor: Colors.black.withOpacity(0.08),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFFEDD5), // Peach light
-                          shape: BoxShape.circle,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                        child: _adminAvatarUrl.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(18),
-                                child: Image.network(
-                                  _adminAvatarUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Center(
-                                    child: Text(
-                                      _adminInitials,
-                                      style: const TextStyle(
-                                        color: Color(0xFFEA580C),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        fontFamily: 'Outfit',
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF28B79B).withOpacity(0.2),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: _adminAvatarUrl.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Image.network(
+                                    _adminAvatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Center(
+                                      child: Text(
+                                        _adminInitials,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                          fontFamily: 'Outfit',
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  _adminInitials,
-                                  style: const TextStyle(
-                                    color: Color(0xFFEA580C), // Dark Orange
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    fontFamily: 'Outfit',
+                                )
+                              : Center(
+                                  child: Text(
+                                    _adminInitials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      fontFamily: 'Outfit',
+                                    ),
                                   ),
                                 ),
-                              ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        _adminName,
-                        style: const TextStyle(
-                          color: Color(0xFF1F2937),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF4B5563)),
-                    ],
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _adminName,
+                              style: const TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                            Container(
+                              margin: const EdgeInsets.only(top: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE6FFFA),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Admin',
+                                style: TextStyle(
+                                  color: Color(0xFF1F9E84),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 8,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                      ],
+                    ),
                   ),
                 ),
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     enabled: false,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _adminName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1F2937), fontFamily: 'Outfit'),
-                        ),
-                        Text(
-                          _adminEmail,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontFamily: 'Outfit'),
-                        ),
-                        const Divider(),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _adminInitials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _adminName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 14,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                    Text(
+                                      _adminEmail,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF64748B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        ],
+                      ),
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'profile',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_outline, size: 20),
-                        SizedBox(width: 8),
-                        Text('Profile', style: TextStyle(fontFamily: 'Outfit')),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout, size: 20, color: Colors.redAccent),
-                        SizedBox(width: 8),
-                        Text('Log Out', style: TextStyle(color: Colors.redAccent, fontFamily: 'Outfit')),
-                      ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6FFFA),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.person_outline_rounded,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Profile ',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -708,6 +1075,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   index: 3,
                   icon: Icons.security_outlined,
                   title: 'Roles',
+                  isMobileDrawer: isMobileDrawer,
+                ),
+                const SizedBox(height: 8),
+                _buildSidebarMenuItem(
+                  index: 4,
+                  icon: Icons.comment_outlined,
+                  title: 'Comment',
                   isMobileDrawer: isMobileDrawer,
                 ),
                 
@@ -849,6 +1223,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       case 3:
         return _buildRolesTab(isDesktop);
       case 4:
+        return CommentManagementPage(
+          onTabChanged: (tabName) {
+            setState(() {
+              _currentCommentTab = tabName;
+            });
+          },
+        );
+      case 5:
         return _buildProfileTab(isDesktop);
       default:
         return _buildDashboardTab(isDesktop);
@@ -1379,7 +1761,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                           activeColor: const Color(0xFF28B79B),
                                           onChanged: (newVal) {
                                             if (userId != 0) {
-                                              _toggleUserStatus(userId, newVal);
+                                              _showActivityToggleConfirmDialog(
+                                                userId,
+                                                newVal,
+                                                user['fullName'] ?? 'User',
+                                              );
                                             }
                                           },
                                         ),
@@ -1400,13 +1786,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                             _editStatus = user['status'] ?? 'ACTIVE';
                                             final rolesList = user['roles'] as List?;
                                             final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Trainer';
-                                            if (role.contains('TRAINING_LEAD')) {
-                                              _editRole = 'Training Lead';
+                                            if (role.contains('TRAINER_LEAD')) {
+                                              _editRole = 'Trainer Lead';
                                             } else if (role.contains('ADMIN')) {
                                               _editRole = 'ADMIN';
                                             } else {
                                               _editRole = 'Trainer';
                                             }
+                                            _editNameController.text = user['fullName'] ?? '';
+                                            _editEmailController.text = user['email'] ?? '';
+                                            _editGender = (user['gender']?.toString().toLowerCase() == 'male') ? 'Male' : 'Female';
                                             _dobController.text = ''; // Clear initially
                                           });
                                           if (userId != 0) {
@@ -1599,10 +1988,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         fg = const Color(0xFF7C3AED);
         label = 'Admin';
         break;
-      case 'TRAINING_LEAD':
+      case 'TRAINER_LEAD':
         bg = const Color(0xFFEEF2F6);
         fg = const Color(0xFF6366F1);
-        label = 'Training Lead';
+        label = 'Trainer Lead';
         break;
       case 'TRAINER':
         bg = const Color(0xFFDBEAFE);
@@ -1810,7 +2199,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               cardWidth,
             ),
             _buildRoleConfigCard(
-              'TRAINING LEAD',
+              'TRAINER LEAD',
               'Managerial supervisor role. Has the access right to assign syllabus, audit trainer profiles, verify courses before publishing, and read learning analytics.',
               ['Audit Courses', 'Approve Syllabus Releases', 'Read Training Analytics'],
               cardWidth,
@@ -1913,13 +2302,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     final fullName = user['fullName'] ?? '';
-    final email = user['email'] ?? '';
-    final username = email.split('@').first;
     final userId = user['id'] ?? 0;
     final rolesList = user['roles'] as List?;
     final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Trainer';
     
-    // Normalize role string for display (e.g. ROLE_TRAINING_LEAD -> Training Lead)
+    // Normalize role string for display (e.g. ROLE_TRAINER_LEAD -> Trainer Lead)
     String displayRole = role.replaceAll('ROLE_', '').replaceAll('_', ' ');
     // Capitalize words
     displayRole = displayRole.split(' ').map((word) {
@@ -2069,17 +2456,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
-                          initialValue: fullName,
-                          readOnly: true,
-                          enabled: false,
-                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          controller: _editNameController,
+                          style: const TextStyle(color: Color(0xFF1F2937), fontFamily: 'Outfit'),
                           decoration: InputDecoration(
-                            fillColor: const Color(0xFFF9FAFB),
+                            fillColor: Colors.white,
                             filled: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            disabledBorder: OutlineInputBorder(
+                            enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
                             ),
                           ),
                         ),
@@ -2102,19 +2491,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
-                          initialValue: username,
-                          readOnly: true,
-                          enabled: false,
-                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          controller: _editUsernameController,
+                          style: const TextStyle(color: Color(0xFF1F2937), fontFamily: 'Outfit'),
                           decoration: InputDecoration(
-                            fillColor: const Color(0xFFF9FAFB),
+                            fillColor: Colors.white,
                             filled: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            disabledBorder: OutlineInputBorder(
+                            enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
                             ),
                           ),
+                          onChanged: (val) {
+                            final emailVal = _editEmailController.text.trim();
+                            final parts = emailVal.split('@');
+                            final domain = parts.length > 1 ? parts.last : 'hango.edu.vn';
+                            _editEmailController.text = '${val.trim()}@$domain';
+                          },
                         ),
                       ],
                     ),
@@ -2141,20 +2538,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ),
                         const SizedBox(height: 8),
                         TextFormField(
-                          initialValue: email,
-                          readOnly: true,
-                          enabled: false,
-                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          controller: _editEmailController,
+                          style: const TextStyle(color: Color(0xFF1F2937), fontFamily: 'Outfit'),
                           decoration: InputDecoration(
-                            fillColor: const Color(0xFFF9FAFB),
+                            fillColor: Colors.white,
                             filled: true,
                             prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 20),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            disabledBorder: OutlineInputBorder(
+                            enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
                             ),
                           ),
+                          onChanged: (val) {
+                            final parts = val.trim().split('@');
+                            if (parts.isNotEmpty) {
+                              _editUsernameController.text = parts.first;
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -2185,7 +2590,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           },
                           items: const [
                             DropdownMenuItem(value: 'Trainer', child: Text('Trainer')),
-                            DropdownMenuItem(value: 'Training Lead', child: Text('Training Lead')),
+                            DropdownMenuItem(value: 'Trainer Lead', child: Text('Trainer Lead')),
                             DropdownMenuItem(value: 'ADMIN', child: Text('Admin')),
                           ],
                           decoration: InputDecoration(
@@ -2231,15 +2636,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         TextFormField(
                           controller: _dobController,
                           readOnly: true,
-                          enabled: false,
-                          style: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
+                          onTap: () => _selectEditDate(context),
+                          style: const TextStyle(color: Color(0xFF1F2937), fontFamily: 'Outfit'),
                           decoration: InputDecoration(
-                            fillColor: const Color(0xFFF9FAFB),
+                            fillColor: Colors.white,
                             filled: true,
+                            suffixIcon: const Icon(Icons.calendar_today_outlined, color: Color(0xFF9CA3AF), size: 18),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            disabledBorder: OutlineInputBorder(
+                            enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
                             ),
                           ),
                         ),
@@ -2267,11 +2677,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               children: [
                                 Radio<String>(
                                   value: 'Female',
-                                  groupValue: genderStr,
-                                  onChanged: null,
+                                  groupValue: _editGender,
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _editGender = val;
+                                      });
+                                    }
+                                  },
                                   activeColor: const Color(0xFF28B79B),
                                 ),
-                                const Text('Female', style: TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit')),
+                                const Text('Female', style: TextStyle(color: Color(0xFF1F2937), fontFamily: 'Outfit')),
                               ],
                             ),
                             const SizedBox(width: 20),
@@ -2279,11 +2695,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               children: [
                                 Radio<String>(
                                   value: 'Male',
-                                  groupValue: genderStr,
-                                  onChanged: null,
+                                  groupValue: _editGender,
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _editGender = val;
+                                      });
+                                    }
+                                  },
                                   activeColor: const Color(0xFF28B79B),
                                 ),
-                                const Text('Male', style: TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit')),
+                                const Text('Male', style: TextStyle(color: Color(0xFF1F2937), fontFamily: 'Outfit')),
                               ],
                             ),
                           ],
@@ -2309,11 +2731,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _editStatus = 'ACTIVE';
-                      });
-                    },
+                    onTap: () => _showStatusConfirmDialog('ACTIVE'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
@@ -2346,11 +2764,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ),
                   const SizedBox(width: 16),
                   GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _editStatus = 'INACTIVE';
-                      });
-                    },
+                    onTap: () => _showStatusConfirmDialog('INACTIVE'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
@@ -2392,21 +2806,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   OutlinedButton(
-                    onPressed: () async {
-                      if (user['status'] != _editStatus) {
-                        await _toggleUserStatus(userId, _editStatus == 'ACTIVE');
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Trainer details updated successfully (Mocked roles/DOB)'),
-                            backgroundColor: Color(0xFF28B79B),
-                          ),
-                        );
-                      }
-                      setState(() {
-                        _selectedUserForEdit = null;
-                      });
-                    },
+                    onPressed: () => _updateUserDetails(userId),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
@@ -2654,8 +3054,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     String displayRole = 'Learner';
     if (role.contains('TRAINER')) {
       displayRole = 'Trainer';
-    } else if (role.contains('TRAINING_LEAD')) {
-      displayRole = 'Training Lead';
+    } else if (role.contains('TRAINER_LEAD')) {
+      displayRole = 'Trainer Lead';
     } else if (role.contains('ADMIN')) {
       displayRole = 'Admin';
     }
@@ -2849,6 +3249,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  Future<void> _selectEditDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF28B79B),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF1F2937),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF28B79B),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _dobController.text = "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+      });
+    }
+  }
+
   Widget _buildInputField({
     required String label,
     required TextEditingController controller,
@@ -3031,7 +3462,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           },
           items: const [
             DropdownMenuItem(value: 'Trainer', child: Text('Trainer', style: TextStyle(fontFamily: 'Outfit'))),
-            DropdownMenuItem(value: 'Training Lead', child: Text('Training Lead', style: TextStyle(fontFamily: 'Outfit'))),
+            DropdownMenuItem(value: 'Trainer Lead', child: Text('Trainer Lead', style: TextStyle(fontFamily: 'Outfit'))),
             DropdownMenuItem(value: 'Admin', child: Text('Admin', style: TextStyle(fontFamily: 'Outfit'))),
           ],
           decoration: InputDecoration(
@@ -3093,8 +3524,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
 
       String backendRole = 'TRAINER';
-      if (_createRole == 'Training Lead') {
-        backendRole = 'TRAINING_LEAD';
+      if (_createRole == 'Trainer Lead') {
+        backendRole = 'TRAINER_LEAD';
       } else if (_createRole == 'Admin') {
         backendRole = 'ADMINISTRATOR';
       }
@@ -3376,6 +3807,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _initProfileFields() {
     _profileNameController.text = _adminName;
     _profileEmailController.text = _adminEmail;
+    _profileUsernameController.text = _adminEmail.split('@').first;
     _profilePhoneController.text = '';
     _profileAvatarController.text = _adminAvatarUrl;
     _profileGender = 'Male';
@@ -3398,6 +3830,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           
           _profileNameController.text = _adminName;
           _profileEmailController.text = _adminEmail;
+          _profileUsernameController.text = _adminEmail.split('@').first;
           _profilePhoneController.text = data['phoneNumber'] ?? '';
           _profileAvatarController.text = _adminAvatarUrl;
           _profileGender = data['gender'] ?? 'Male';
@@ -3526,11 +3959,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       );
     }
 
-    // Compute username from email
-    String username = '';
-    if (_adminEmail.isNotEmpty) {
-      username = _adminEmail.split('@').first;
-    }
+
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3691,23 +4120,49 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       _buildFormRow(
                         isWide,
                         _buildTextFieldNoIcon('FullName', _profileNameController),
-                        _buildTextFieldNoIcon('Username', TextEditingController(text: username), enabled: false),
+                        _buildTextFieldNoIcon(
+                          'Username',
+                          _profileUsernameController,
+                          onChanged: (val) {
+                            final emailVal = _profileEmailController.text.trim();
+                            final parts = emailVal.split('@');
+                            final domain = parts.length > 1 ? parts.last : 'hango.edu.vn';
+                            _profileEmailController.text = '${val.trim()}@$domain';
+                          },
+                        ),
                       ),
                       const SizedBox(height: 24),
-
-                      // Row 2: Email & Role
+ 
+                      // Row 2: Email & Phone Number
                       _buildFormRow(
                         isWide,
-                        _buildTextFieldWithEmailIcon('Email', _profileEmailController),
-                        _buildRoleDisplayBox('Role', 'Admin'),
+                        _buildTextFieldWithEmailIcon(
+                          'Email',
+                          _profileEmailController,
+                          onChanged: (val) {
+                            final parts = val.trim().split('@');
+                            if (parts.isNotEmpty) {
+                              _profileUsernameController.text = parts.first;
+                            }
+                          },
+                        ),
+                        _buildTextFieldNoIcon('Phone Number', _profilePhoneController),
                       ),
                       const SizedBox(height: 24),
-
+ 
                       // Row 3: Date of Birth & Gender
                       _buildFormRow(
                         isWide,
                         _buildDatePickerField(context),
                         _buildGenderRadioGroup(),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Row 4: Role & spacer
+                      _buildFormRow(
+                        isWide,
+                        _buildRoleDisplayBox('Role', 'Admin'),
+                        const SizedBox(),
                       ),
                     ],
                   );
@@ -3825,7 +4280,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildTextFieldNoIcon(String label, TextEditingController controller, {bool enabled = true}) {
+  Widget _buildTextFieldNoIcon(String label, TextEditingController controller, {bool enabled = true, ValueChanged<String>? onChanged}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3837,6 +4292,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         TextField(
           controller: controller,
           enabled: enabled,
+          onChanged: onChanged,
           style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
           decoration: InputDecoration(
             filled: true,
@@ -3860,7 +4316,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildTextFieldWithEmailIcon(String label, TextEditingController controller) {
+  Widget _buildTextFieldWithEmailIcon(String label, TextEditingController controller, {bool enabled = true, ValueChanged<String>? onChanged}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3871,12 +4327,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
-          enabled: false,
+          enabled: enabled,
+          onChanged: onChanged,
           style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF9CA3AF), size: 20),
             filled: true,
-            fillColor: const Color(0xFFF3F4F6),
+            fillColor: enabled ? Colors.white : const Color(0xFFF3F4F6),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -3885,6 +4342,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
             ),
           ),
         ),

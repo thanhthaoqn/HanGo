@@ -48,6 +48,7 @@ public class CommentServiceImpl implements CommentService {
                 .lesson(lesson)
                 .user(user)
                 .content(request.getContent())
+                .status("APPROVED")
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
@@ -58,7 +59,7 @@ public class CommentServiceImpl implements CommentService {
                 .userName(savedComment.getUser().getFullName())
                 .userAvatar(savedComment.getUser().getAvatarUrl())
                 .content(savedComment.getContent())
-                .createdAt(savedComment.getCreatedAt()) // will be set by PrePersist
+                .createdAt(savedComment.getCreatedAt() != null ? savedComment.getCreatedAt() : java.time.LocalDateTime.now())
                 .build();
     }
 
