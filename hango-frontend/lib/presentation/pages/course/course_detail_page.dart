@@ -6,6 +6,7 @@ import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
 import '../login_page.dart';
 import 'review_tab.dart';
+import 'lesson_detail_page.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final int courseId;
@@ -427,6 +428,20 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
     );
   }
 
+  IconData _getLessonIcon(String? itemType) {
+    if (itemType == null) return Icons.menu_book_outlined;
+    switch (itemType.toLowerCase()) {
+      case 'learning':
+        return Icons.menu_book_outlined;
+      case 'practice':
+        return Icons.assignment_outlined;
+      case 'quiz':
+        return Icons.quiz_outlined;
+      default:
+        return Icons.menu_book_outlined;
+    }
+  }
+
   Widget _buildSyllabusTab(CourseDetail course) {
     if (course.sessions.isEmpty) {
       return const Text('No syllabus available.', style: TextStyle(color: Colors.grey));
@@ -484,30 +499,53 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                   ),
                   children: session.lessons.map((lesson) {
-                    bool isQuiz = lesson.itemType?.toUpperCase() == 'QUIZ';
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      color: Colors.white,
-                      child: Row(
-                        children: [
-                          Icon(
-                            isQuiz ? Icons.quiz_outlined : Icons.description_outlined,
-                            size: 18,
-                            color: const Color(0xFF28B79B),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Text(
-                              lesson.title,
-                              style: const TextStyle(fontSize: 14, color: Color(0xFF4B5563)),
+                    final itemType = lesson.itemType?.toLowerCase();
+                    final isExercise = itemType == 'quiz' || itemType == 'practice';
+                    return InkWell(
+                      onTap: course.isEnrolled
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => LessonDetailPage(
+                                    courseId: course.id,
+                                    lessonId: lesson.id,
+                                  ),
+                                ),
+                              );
+                            }
+                          : () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please enroll in the course to view this lesson.')),
+                              );
+                            },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        color: Colors.transparent,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _getLessonIcon(lesson.itemType),
+                              size: 18,
+                              color: course.isEnrolled ? const Color(0xFF28B79B) : Colors.grey,
                             ),
-                          ),
-                          if (isQuiz)
-                            TextButton(
-                              onPressed: () {},
-                              child: const Text('Try Now', style: TextStyle(color: Color(0xFF28B79B), fontSize: 13)),
-                            )
-                        ],
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                lesson.title,
+                                style: TextStyle(
+                                  fontSize: 14, 
+                                  color: course.isEnrolled ? const Color(0xFF4B5563) : Colors.grey.shade500,
+                                ),
+                              ),
+                            ),
+                            if (isExercise)
+                              TextButton(
+                                onPressed: course.isEnrolled ? () {} : null,
+                                child: Text('Try Now', style: TextStyle(color: course.isEnrolled ? const Color(0xFF28B79B) : Colors.grey, fontSize: 13)),
+                              )
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),
@@ -563,7 +601,22 @@ class _CourseDetailPageState extends State<CourseDetailPage> with SingleTickerPr
             width: double.infinity,
             child: ElevatedButton(
               onPressed: course.isEnrolled ? () {
-                // Navigate to study page
+                if (course.sessions.isNotEmpty && course.sessions.first.lessons.isNotEmpty) {
+                  final firstLessonId = course.sessions.first.lessons.first.id;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LessonDetailPage(
+                        courseId: course.id,
+                        lessonId: firstLessonId,
+                      ),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No lessons available yet.')),
+                  );
+                }
               } : () => _enroll(course),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),

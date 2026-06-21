@@ -2647,7 +2647,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final email = user['email'] ?? '';
     final phoneNumber = user['phoneNumber'] ?? '';
     final genderStr = user['gender'] ?? 'Female';
-    final address = user['address'] ?? 'Khu công nghệ cao Hòa Lạc';
+    final address = user['address'] ?? 'Hoa Lac High Tech Park';
     
     final rolesList = user['roles'] as List?;
     final role = (rolesList != null && rolesList.isNotEmpty) ? rolesList.first.toString() : 'Learner';
@@ -2740,7 +2740,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ),
                   const SizedBox(width: 24),
                   Expanded(
-                    child: _buildReadOnlyField('Địa chỉ', address),
+                    child: _buildReadOnlyField('Address', address),
                   ),
                 ],
               ),
