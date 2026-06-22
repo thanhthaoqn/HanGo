@@ -45,4 +45,8 @@ public class Lesson {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exam_id")
+    private Exam exam;
 }
