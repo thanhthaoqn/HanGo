@@ -9,4 +9,7 @@ import java.util.List;
 @Repository
 public interface LessonRepository extends JpaRepository<Lesson, Long> {
     List<Lesson> findBySectionIdOrderByDisplayOrderAsc(Long sectionId);
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT COUNT(*) FROM lesson_quizzes WHERE lesson_id = :lessonId", nativeQuery = true)
+    int countQuestionsByLessonId(@org.springframework.data.repository.query.Param("lessonId") Long lessonId);
 }

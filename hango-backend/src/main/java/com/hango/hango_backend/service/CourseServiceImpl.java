@@ -71,15 +71,21 @@ public class CourseServiceImpl implements CourseService {
         
         List<CourseSessionDTO> sessionDTOs = sections.stream().map(section -> {
             List<Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId());
-            List<CourseLessonDTO> lessonDTOs = lessons.stream().map(lesson -> 
-                CourseLessonDTO.builder()
+            List<CourseLessonDTO> lessonDTOs = lessons.stream().map(lesson -> {
+                Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
+                int qCount = 0;
+                if ("quiz".equalsIgnoreCase(lesson.getLessonType()) || "practice".equalsIgnoreCase(lesson.getLessonType())) {
+                    qCount = lessonRepository.countQuestionsByLessonId(lesson.getId());
+                }
+                return CourseLessonDTO.builder()
                     .id(lesson.getId())
                     .title(lesson.getTitle())
                     .orderIndex(lesson.getDisplayOrder())
                     .itemType(lesson.getLessonType())
-                    .examId(null) // Not directly linked in the Lesson entity for now
-                    .build()
-            ).collect(Collectors.toList());
+                    .examId(examId)
+                    .questionCount(qCount)
+                    .build();
+            }).collect(Collectors.toList());
 
             return CourseSessionDTO.builder()
                     .id(section.getId())

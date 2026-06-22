@@ -567,21 +567,28 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   Widget _buildDifficultyBadge(String difficulty) {
     Color bg;
     Color fg;
-    
+    String displayText = difficulty;
+
     switch (difficulty.toLowerCase()) {
+      case 'advanced':
       case 'hard':
         bg = const Color(0xFFFEF2F2);
         fg = const Color(0xFFEF4444);
+        displayText = 'Advanced';
         break;
+      case 'intermediate':
       case 'medium':
         bg = const Color(0xFFFFF7ED);
         fg = const Color(0xFFF97316);
+        displayText = 'Intermediate';
         break;
+      case 'basic':
       case 'beginer':
       case 'easy':
       default:
         bg = const Color(0xFFF0FDF4);
         fg = const Color(0xFF22C55E);
+        displayText = 'Basic';
         break;
     }
 
@@ -592,7 +599,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        difficulty,
+        displayText,
         style: TextStyle(
           color: fg,
           fontSize: 11,

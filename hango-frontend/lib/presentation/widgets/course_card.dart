@@ -140,11 +140,14 @@ class _CourseCardState extends State<CourseCard> {
                     
                     // Difficulty
                     Text(
+                      widget.course.difficulty.toUpperCase() == 'BASIC' ? 'Basic' :
+                      widget.course.difficulty.toUpperCase() == 'INTERMEDIATE' ? 'Intermediate' :
+                      widget.course.difficulty.toUpperCase() == 'ADVANCED' ? 'Advanced' :
                       widget.course.difficulty,
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFF1F2937),
+                        color: const Color(0xFF1F2937),
                       ),
                     ),
                   ],

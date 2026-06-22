@@ -10,11 +10,13 @@ import '../pages/learner/learner_home_page.dart';
 class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isDesktop;
   final String activeTab;
+  final bool hideNavLinks;
 
   const SharedHeader({
     Key? key,
     required this.isDesktop,
     this.activeTab = 'Courses',
+    this.hideNavLinks = false,
   }) : super(key: key);
 
   @override
@@ -40,7 +42,7 @@ class _SharedHeaderState extends State<SharedHeader> {
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    
+
     if (token == null) {
       if (mounted) {
         setState(() {
@@ -52,7 +54,7 @@ class _SharedHeaderState extends State<SharedHeader> {
 
     final fullName = prefs.getString('user_fullname') ?? 'Learner';
     final email = prefs.getString('user_email') ?? '';
-    
+
     String initials = 'L';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -82,7 +84,11 @@ class _SharedHeaderState extends State<SharedHeader> {
     }
   }
 
-  Widget _buildHeaderNavLink(String text, {bool active = false, VoidCallback? onTap}) {
+  Widget _buildHeaderNavLink(
+    String text, {
+    bool active = false,
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -109,6 +115,439 @@ class _SharedHeaderState extends State<SharedHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final logoWidget = InkWell(
+      onTap: widget.hideNavLinks
+          ? null
+          : () {
+              // If not already on home page (activeTab is empty string for LearnerHomePage)
+              if (widget.activeTab != '') {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LearnerHomePage(),
+                  ),
+                  (route) => false,
+                );
+              }
+            },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!widget.isDesktop && !widget.hideNavLinks) ...[
+            Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu, color: Color(0xFF1F2937)),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Image.network(
+            'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+            height: 36,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE6FFFA),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.school,
+                      size: 18,
+                      color: Color(0xFF28B79B),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'HanGo',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+
+    final navLinksWidget = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildHeaderNavLink(
+          'Exams',
+          active: widget.activeTab == 'Exams',
+          onTap: () {
+            if (widget.activeTab != 'Exams') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ListExamsPage()),
+              );
+            }
+          },
+        ),
+        const SizedBox(width: 24),
+        _buildHeaderNavLink(
+          'Courses',
+          active: widget.activeTab == 'Courses',
+          onTap: () {
+            if (widget.activeTab != 'Courses') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ListCoursesPage(),
+                ),
+              );
+            }
+          },
+        ),
+        const SizedBox(width: 24),
+        _buildHeaderNavLink('Flashcard'),
+      ],
+    );
+
+    final rightActionsWidget = _isLoggedIn
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Notification Bell
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_none_outlined,
+                      color: Color(0xFF4B5563),
+                      size: 26,
+                    ),
+                    onPressed: widget.hideNavLinks
+                        ? null
+                        : () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('No new notifications'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+
+              // User profile with Popup Menu
+              PopupMenuButton<String>(
+                enabled: !widget.hideNavLinks,
+                onSelected: (val) {
+                  if (val == 'logout') {
+                    _handleLogout();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Profile details for $_userFullName'),
+                      ),
+                    );
+                  }
+                },
+                offset: const Offset(0, 52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+                ),
+                elevation: 10,
+                color: Colors.white,
+                shadowColor: Colors.black.withOpacity(0.08),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFFE5E7EB),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              _userInitials,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _userFullName,
+                          style: const TextStyle(
+                            color: Color(0xFF1E293B),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: Color(0xFF64748B),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    enabled: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xFF28B79B),
+                                      Color(0xFF1F9E84),
+                                    ],
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _userInitials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _userFullName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 14,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                    Text(
+                                      _userEmail,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF64748B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'profile',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6FFFA),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.person_outline_rounded,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Profile Settings',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'logout',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFDE8E8),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.logout_rounded,
+                              size: 18,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Log Out',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RegisterPage(),
+                    ),
+                  );
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+                child: const Text(
+                  'Register',
+                  style: TextStyle(
+                    color: Color(0xFF2DD4BF),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF14B8A6), Color(0xFF0891B2)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginPage(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text(
+                    'Login',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -124,390 +563,26 @@ class _SharedHeaderState extends State<SharedHeader> {
       child: SafeArea(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Left Logo & Title
-            InkWell(
-              onTap: () {
-                // If not already on home page (activeTab is empty string for LearnerHomePage)
-                if (widget.activeTab != '') {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-                    (route) => false,
-                  );
-                }
-              },
-              child: Row(
-                children: [
-                  if (!widget.isDesktop) ...[
-                    Builder(
-                      builder: (context) => IconButton(
-                        icon: const Icon(Icons.menu, color: Color(0xFF1F2937)),
-                        onPressed: () => Scaffold.of(context).openDrawer(),
-                      ),
+          children: widget.isDesktop
+              ? [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: logoWidget,
                     ),
-                    const SizedBox(width: 8),
-                  ],
-                  Image.network(
-                    'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                    height: 36,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE6FFFA),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.school, size: 18, color: Color(0xFF28B79B)),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'HanGo',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1F2937),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
                   ),
-                ],
-              ),
-            ),
-
-            // Center Navigation Links (Visible on desktop only)
-            if (widget.isDesktop)
-              Row(
-                children: [
-                  _buildHeaderNavLink(
-                    'Exams',
-                    active: widget.activeTab == 'Exams',
-                    onTap: () {
-                      if (widget.activeTab != 'Exams') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ListExamsPage(),
-                          ),
-                        );
-                      }
-                    },
+                  if (!widget.hideNavLinks)
+                    Expanded(child: Center(child: navLinksWidget))
+                  else
+                    const Spacer(),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: rightActionsWidget,
+                    ),
                   ),
-                  const SizedBox(width: 24),
-                  _buildHeaderNavLink(
-                    'Courses',
-                    active: widget.activeTab == 'Courses',
-                    onTap: () {
-                      if (widget.activeTab != 'Courses') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ListCoursesPage(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 24),
-                  _buildHeaderNavLink('Flashcard'),
-                ],
-              ),
-
-            // Right User Profile & Notification Actions OR Login/Register
-            _isLoggedIn
-                ? Row(
-                    children: [
-                      // Notification Bell
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF4B5563), size: 26),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('No new notifications'),
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            top: 10,
-                            right: 10,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFEF4444),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 16),
-
-                      // User profile with Popup Menu
-                      PopupMenuButton<String>(
-                        onSelected: (val) {
-                          if (val == 'logout') {
-                            _handleLogout();
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Profile details for $_userFullName')),
-                            );
-                          }
-                        },
-                        offset: const Offset(0, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
-                        ),
-                        elevation: 10,
-                        color: Colors.white,
-                        shadowColor: Colors.black.withOpacity(0.08),
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: const BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      _userInitials,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                        fontFamily: 'Outfit',
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _userFullName,
-                                  style: const TextStyle(
-                                    color: Color(0xFF1E293B),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
-                              ],
-                            ),
-                          ),
-                        ),
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            enabled: false,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: const BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
-                                          ),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            _userInitials,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                              fontFamily: 'Outfit',
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              _userFullName,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF0F172A),
-                                                fontSize: 14,
-                                                fontFamily: 'Outfit',
-                                              ),
-                                            ),
-                                            Text(
-                                              _userEmail,
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: Color(0xFF64748B),
-                                                fontFamily: 'Outfit',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                                ],
-                              ),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'profile',
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE6FFFA),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.person_outline_rounded,
-                                      size: 18,
-                                      color: Color(0xFF28B79B),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Profile Settings',
-                                    style: TextStyle(
-                                      fontFamily: 'Outfit',
-                                      color: Color(0xFF1E293B),
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'logout',
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFDE8E8),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.logout_rounded,
-                                      size: 18,
-                                      color: Colors.redAccent,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Log Out',
-                                    style: TextStyle(
-                                      fontFamily: 'Outfit',
-                                      color: Colors.redAccent,
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const RegisterPage()),
-                          );
-                        },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        child: const Text('Register', style: TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF14B8A6), Color(0xFF0891B2)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const LoginPage()),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                          ),
-                          child: const Text('Login', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                        ),
-                      ),
-                    ],
-                  ),
-          ],
+                ]
+              : [logoWidget, rightActionsWidget],
         ),
       ),
     );

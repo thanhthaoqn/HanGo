@@ -11,4 +11,5 @@ public class CourseLessonDTO {
     private Integer orderIndex;
     private String itemType;
     private Long examId;
+    private Integer questionCount;
 }

@@ -11,12 +11,11 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LessonDetailDTO {
+public class QuizQuestionDTO {
     private Long id;
-    private String title;
-    private String content;
-    private Long sectionId;
-    private Long courseId;
-    private List<CommentDTO> comments;
-    private List<QuizQuestionDTO> questions;
+    private String passage;
+    private String questionText;
+    private String explanation;
+    private List<String> options;
+    private Integer correctIndex;
 }

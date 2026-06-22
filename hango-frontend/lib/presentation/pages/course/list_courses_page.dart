@@ -18,7 +18,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
 
   String _searchQuery = '';
   String _filterType = 'All'; // All, Enrolled
-  String _difficulty = 'All'; // All, Beginner, Medium, Hard
+  String _difficulty = 'All'; // All, Basic, Intermediate, Advanced
 
   @override
   void initState() {
@@ -27,14 +27,12 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
   }
 
   void _fetchCourses() {
-    // Map dropdown value "Enrolled" to "ENROLLED", "Beginner" to "EASY" if needed, 
-    // or just pass as is and let backend handle it.
-    // Assuming backend handles "ENROLLED" and "EASY"
+    // Map dropdown values to backend query params
     String backendFilterType = _filterType == 'Enrolled' ? 'ENROLLED' : 'ALL';
     String backendDifficulty = 'ALL';
-    if (_difficulty == 'Beginner') backendDifficulty = 'EASY';
-    if (_difficulty == 'Medium') backendDifficulty = 'MEDIUM';
-    if (_difficulty == 'Hard') backendDifficulty = 'HARD';
+    if (_difficulty == 'Basic') backendDifficulty = 'BASIC';
+    if (_difficulty == 'Intermediate') backendDifficulty = 'INTERMEDIATE';
+    if (_difficulty == 'Advanced') backendDifficulty = 'ADVANCED';
 
     setState(() {
       _coursesFuture = _repository.fetchCourses(
@@ -255,7 +253,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
-              items: ['All', 'Beginner', 'Medium', 'Hard'].map((String value) {
+              items: ['All', 'Basic', 'Intermediate', 'Advanced'].map((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
                   child: Text(value),

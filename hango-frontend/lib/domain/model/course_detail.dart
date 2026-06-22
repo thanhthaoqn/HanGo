@@ -4,6 +4,7 @@ class CourseLesson {
   final int orderIndex;
   final String? itemType;
   final int? examId;
+  final int? questionCount;
 
   CourseLesson({
     required this.id,
@@ -11,6 +12,7 @@ class CourseLesson {
     required this.orderIndex,
     this.itemType,
     this.examId,
+    this.questionCount,
   });
 
   factory CourseLesson.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class CourseLesson {
       orderIndex: json['orderIndex'] as int,
       itemType: json['itemType'] as String?,
       examId: json['examId'] as int?,
+      questionCount: json['questionCount'] as int?,
     );
   }
 }
