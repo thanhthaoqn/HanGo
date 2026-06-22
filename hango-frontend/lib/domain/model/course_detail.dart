@@ -95,4 +95,30 @@ class CourseDetail {
       sessions: sessionsList,
     );
   }
+
+  CourseDetail copyWith({
+    int? id,
+    String? title,
+    String? creatorName,
+    String? difficultyName,
+    double? rating,
+    int? learnersCount,
+    String? description,
+    String? objectives,
+    bool? isEnrolled,
+    List<CourseSession>? sessions,
+  }) {
+    return CourseDetail(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      creatorName: creatorName ?? this.creatorName,
+      difficultyName: difficultyName ?? this.difficultyName,
+      rating: rating ?? this.rating,
+      learnersCount: learnersCount ?? this.learnersCount,
+      description: description ?? this.description,
+      objectives: objectives ?? this.objectives,
+      isEnrolled: isEnrolled ?? this.isEnrolled,
+      sessions: sessions ?? this.sessions,
+    );
+  }
 }

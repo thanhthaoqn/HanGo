@@ -20,7 +20,9 @@ class CourseDetailPage extends StatefulWidget {
 class _CourseDetailPageState extends State<CourseDetailPage>
     with SingleTickerProviderStateMixin {
   final CourseRepository _repository = CourseRepository();
-  late Future<CourseDetail> _courseDetailFuture;
+  CourseDetail? _courseDetail;
+  bool _isLoading = true;
+  String? _errorMessage;
   late TabController _tabController;
   bool _isEnrolling = false;
   bool _isUnenrolling = false;
@@ -28,7 +30,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   @override
   void initState() {
     super.initState();
-    _courseDetailFuture = _repository.fetchCourseDetail(widget.courseId);
+    _loadCourseDetail();
     _tabController = TabController(length: 3, vsync: this);
   }
 
@@ -36,6 +38,25 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCourseDetail() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      final course = await _repository.fetchCourseDetail(widget.courseId);
+      setState(() {
+        _courseDetail = course;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   void _enroll(CourseDetail course) async {
@@ -52,6 +73,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
     setState(() {
       _isEnrolling = true;
+      // Optimistic update to immediately reflect the state in UI without visual jumps
+      _courseDetail = course.copyWith(
+        isEnrolled: true,
+        learnersCount: course.learnersCount + 1,
+      );
     });
     try {
       await _repository.enrollCourse(course.id);
@@ -75,11 +101,19 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         ),
       );
 
-      setState(() {
-        _courseDetailFuture = _repository.fetchCourseDetail(widget.courseId);
-      });
+      // Silently fetch fresh details in background to sync any other backend updates
+      final updated = await _repository.fetchCourseDetail(widget.courseId);
+      if (mounted) {
+        setState(() {
+          _courseDetail = updated;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
+      // Rollback optimistic update
+      setState(() {
+        _courseDetail = course;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to enroll: $e'),
@@ -106,28 +140,101 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   void _showUnenrollConfirmDialog(CourseDetail course) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Cancel Enrollment'),
-          content: Text(
-            'Are you sure you want to cancel your enrollment for ${course.title}?',
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 10,
+          backgroundColor: Colors.white,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEE2E2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFEF4444),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Cancel Enrollment',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Are you sure you want to cancel your enrollment for ${course.title}?',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'No, Keep It',
+                          style: TextStyle(
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _unenroll(course);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Yes, Cancel',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('No', style: TextStyle(color: Colors.grey)),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _unenroll(course);
-              },
-              child: const Text(
-                'Yes, Cancel',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
         );
       },
     );
@@ -136,6 +243,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   void _unenroll(CourseDetail course) async {
     setState(() {
       _isUnenrolling = true;
+      // Optimistic update to immediately reflect the state in UI without visual jumps
+      _courseDetail = course.copyWith(
+        isEnrolled: false,
+        learnersCount: (course.learnersCount - 1).clamp(0, 999999),
+      );
     });
     try {
       await _repository.unenrollCourse(course.id);
@@ -158,11 +270,19 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         ),
       );
 
-      setState(() {
-        _courseDetailFuture = _repository.fetchCourseDetail(widget.courseId);
-      });
+      // Silently fetch fresh details in background to sync any other backend updates
+      final updated = await _repository.fetchCourseDetail(widget.courseId);
+      if (mounted) {
+        setState(() {
+          _courseDetail = updated;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
+      // Rollback optimistic update
+      setState(() {
+        _courseDetail = course;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to cancel enrollment: $e'),
@@ -193,101 +313,93 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Courses'),
-      body: FutureBuilder<CourseDetail>(
-        future: _courseDetailFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+      body: _isLoading
+          ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
-            );
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text('Course not found.'));
-          }
-
-          final course = snapshot.data!;
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 24,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Back Button
-                        InkWell(
-                          onTap: () {
-                            Navigator.pop(context);
-                          },
-                          hoverColor: Colors.transparent,
-                          splashColor: Colors.transparent,
-                          highlightColor: Colors.transparent,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.arrow_back_ios,
-                                  size: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Back to Courses',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
+            )
+          : (_errorMessage != null)
+              ? Center(child: Text('Error: $_errorMessage'))
+              : (_courseDetail == null)
+                  ? const Center(child: Text('Course not found.'))
+                  : SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          Center(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 1200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 24,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Back Button
+                                  InkWell(
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                    },
+                                    hoverColor: Colors.transparent,
+                                    splashColor: Colors.transparent,
+                                    highlightColor: Colors.transparent,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(bottom: 16.0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.arrow_back_ios,
+                                            size: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Back to Courses',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
+
+                                  _buildBanner(_courseDetail!, isDesktop),
+                                  const SizedBox(height: 32),
+
+                                  if (isDesktop)
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          flex: 2,
+                                          child: _buildMainContent(_courseDetail!),
+                                        ),
+                                        const SizedBox(width: 32),
+                                        Expanded(
+                                          flex: 1,
+                                          child: _buildEnrollCard(_courseDetail!),
+                                        ),
+                                      ],
+                                    )
+                                  else
+                                    Column(
+                                      children: [
+                                        _buildEnrollCard(_courseDetail!),
+                                        const SizedBox(height: 32),
+                                        _buildMainContent(_courseDetail!),
+                                      ],
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-
-                        _buildBanner(course, isDesktop),
-                        const SizedBox(height: 32),
-
-                        if (isDesktop)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: _buildMainContent(course),
-                              ),
-                              const SizedBox(width: 32),
-                              Expanded(
-                                flex: 1,
-                                child: _buildEnrollCard(course),
-                              ),
-                            ],
-                          )
-                        else
-                          Column(
-                            children: [
-                              _buildEnrollCard(course),
-                              const SizedBox(height: 32),
-                              _buildMainContent(course),
-                            ],
-                          ),
-                      ],
+                          _buildFooter(),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                _buildFooter(),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 
