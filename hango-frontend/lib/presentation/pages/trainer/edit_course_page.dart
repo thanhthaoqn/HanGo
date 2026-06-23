@@ -6,9 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
-import '../login_page.dart';
-import 'trainer_courses_page.dart';
-import 'trainer_dashboard_page.dart';
+
+import 'create_section_page.dart';
 
 class EditCoursePage extends StatefulWidget {
   final int courseId;
@@ -54,6 +53,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
   String _uploadStatusText = '';
+  List<dynamic> _sections = [];
+  int _activeStep = 1;
 
   String get apiBaseUrl {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -171,6 +172,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
             _selectedLevelKey = data['difficultyKey'].toString().toUpperCase();
           }
 
+          if (data['sessions'] != null) {
+            _sections = List.from(data['sessions']);
+          } else {
+            _sections = [];
+          }
+
           _isLoadingCourse = false;
         });
       } else {
@@ -192,16 +199,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
   }
 
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
+
 
   Future<void> _pickAndUploadImage() async {
     try {
@@ -320,15 +318,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Slate 50
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
-      body: Row(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(context, !isDesktop),
+          _buildHeader(context, false),
                 Expanded(
                   child: _isLoadingCourse
                       ? const Center(
@@ -355,9 +348,20 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.stretch,
                                           children: [
-                                            _buildGeneralInfoCard(),
-                                            const SizedBox(height: 24),
-                                            _buildMediaCard(),
+                                            if (_activeStep == 1) ...[
+                                              _buildGeneralInfoCard(),
+                                              const SizedBox(height: 24),
+                                              _buildMediaCard(),
+                                            ] else ...[
+                                              CreateSectionPage(
+                                                sections: _sections,
+                                                onSectionsChanged: (updatedSections) {
+                                                  setState(() {
+                                                    _sections = updatedSections;
+                                                  });
+                                                },
+                                              ),
+                                            ],
                                             const SizedBox(height: 24),
                                             _buildActionsRow(),
                                           ],
@@ -371,9 +375,20 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                     children: [
                                       _buildLeftPanel(context),
                                       const SizedBox(height: 24),
-                                      _buildGeneralInfoCard(),
-                                      const SizedBox(height: 24),
-                                      _buildMediaCard(),
+                                      if (_activeStep == 1) ...[
+                                        _buildGeneralInfoCard(),
+                                        const SizedBox(height: 24),
+                                        _buildMediaCard(),
+                                      ] else ...[
+                                        CreateSectionPage(
+                                          sections: _sections,
+                                          onSectionsChanged: (updatedSections) {
+                                            setState(() {
+                                              _sections = updatedSections;
+                                            });
+                                          },
+                                        ),
+                                      ],
                                       const SizedBox(height: 24),
                                       _buildActionsRow(),
                                     ],
@@ -385,118 +400,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Logo
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6FFFA),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.school,
-                    size: 18,
-                    color: Color(0xFF20B486),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'HanGo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          // Sidebar menu items
-          _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true, onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerCoursesPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
-          _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank'),
-          _buildSidebarItem(Icons.task_alt_outlined, 'Task'),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Help Center is under construction')),
-            );
-          }),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildHeader(BuildContext context, bool showMenuButton) {
     return Container(
@@ -678,6 +585,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   }
 
   Widget _buildLeftPanel(BuildContext context) {
+    final activeColor = const Color(0xFF20B486);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -702,80 +610,162 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Item 1: Introduction (Active, checkmark circle)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6FFFA),
+              // Item 1: Introduction
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _activeStep = 1;
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF20B486).withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF20B486),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.check, size: 14, color: Colors.white),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFEFF2F5)),
                     ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Introduction',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        fontFamily: 'Outfit',
-                      ),
+                    child: Stack(
+                      children: [
+                        if (_activeStep == 1)
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 4,
+                              color: activeColor,
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF20B486),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check, size: 14, color: Colors.white),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Introduction',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1E293B),
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Completed',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: activeColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
-              // Item 2: Curriculum (Locked)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
+              // Item 2: Curriculum
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _activeStep = 2;
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFEFF2F5)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF94A3B8)),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text(
-                        '2',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF94A3B8),
-                          fontFamily: 'Outfit',
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFEFF2F5)),
+                    ),
+                    child: Stack(
+                      children: [
+                        if (_activeStep == 2)
+                          Positioned(
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 4,
+                              color: activeColor,
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: _activeStep == 2 ? activeColor : const Color(0xFF94A3B8),
+                                    width: 1.5,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '2',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: _activeStep == 2 ? activeColor : const Color(0xFF94A3B8),
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Curriculum',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: _activeStep == 2 ? FontWeight.bold : FontWeight.w500,
+                                      color: _activeStep == 2 ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'In progress',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF94A3B8),
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Curriculum',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF94A3B8),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.lock_outline, size: 16, color: Color(0xFF94A3B8)),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -851,6 +841,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
       ],
     );
   }
+
+
 
   Widget _buildGeneralInfoCard() {
     return Container(
