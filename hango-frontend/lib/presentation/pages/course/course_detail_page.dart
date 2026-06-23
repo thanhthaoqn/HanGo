@@ -24,20 +24,95 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   bool _isLoading = true;
   String? _errorMessage;
   late TabController _tabController;
+  late ScrollController _scrollController;
+  late Future<CourseReviewSummary> _reviewsFuture;
   bool _isEnrolling = false;
   bool _isUnenrolling = false;
+
+  final GlobalKey _introduceKey = GlobalKey();
+  final GlobalKey _syllabusKey = GlobalKey();
+  final GlobalKey _reviewKey = GlobalKey();
+  bool _isScrollingToTab = false;
 
   @override
   void initState() {
     super.initState();
     _loadCourseDetail();
     _tabController = TabController(length: 3, vsync: this);
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+    _reviewsFuture = _repository.fetchCourseReviews(widget.courseId);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_isScrollingToTab) return;
+    if (!mounted) return;
+
+    final introduceContext = _introduceKey.currentContext;
+    final syllabusContext = _syllabusKey.currentContext;
+    final reviewContext = _reviewKey.currentContext;
+
+    if (introduceContext == null || syllabusContext == null || reviewContext == null) return;
+
+    final introduceBox = introduceContext.findRenderObject() as RenderBox?;
+    final syllabusBox = syllabusContext.findRenderObject() as RenderBox?;
+    final reviewBox = reviewContext.findRenderObject() as RenderBox?;
+
+    if (introduceBox == null || syllabusBox == null || reviewBox == null) return;
+
+    final introduceY = introduceBox.localToGlobal(Offset.zero).dy;
+    final syllabusY = syllabusBox.localToGlobal(Offset.zero).dy;
+    final reviewY = reviewBox.localToGlobal(Offset.zero).dy;
+
+    const double threshold = 200.0;
+
+    int targetIndex = 0;
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+      targetIndex = 2;
+    } else if (reviewY <= threshold) {
+      targetIndex = 2;
+    } else if (syllabusY <= threshold) {
+      targetIndex = 1;
+    } else {
+      targetIndex = 0;
+    }
+
+    if (_tabController.index != targetIndex) {
+      setState(() {
+        _tabController.index = targetIndex;
+      });
+    }
+  }
+
+  void _scrollToSection(GlobalKey key, int tabIndex) async {
+    final context = key.currentContext;
+    if (context != null) {
+      setState(() {
+        _isScrollingToTab = true;
+        _tabController.index = tabIndex;
+      });
+
+      await Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 300),
+        alignment: 0.0,
+        curve: Curves.easeInOut,
+      );
+
+      await Future.delayed(const Duration(milliseconds: 100));
+      setState(() {
+        _isScrollingToTab = false;
+      });
+    }
   }
 
   Future<void> _loadCourseDetail() async {
@@ -322,6 +397,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               : (_courseDetail == null)
                   ? const Center(child: Text('Course not found.'))
                   : SingleChildScrollView(
+                      controller: _scrollController,
                       child: Column(
                         children: [
                           Center(
@@ -519,18 +595,43 @@ class _CourseDetailPageState extends State<CourseDetailPage>
             Tab(text: 'Syllabus'),
             Tab(text: 'Review'),
           ],
+          onTap: (index) {
+            if (index == 0) {
+              _scrollToSection(_introduceKey, 0);
+            } else if (index == 1) {
+              _scrollToSection(_syllabusKey, 1);
+            } else if (index == 2) {
+              _scrollToSection(_reviewKey, 2);
+            }
+          },
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          height:
-              1000, // Or use constraints/Sliver to let it size automatically
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildIntroduceTab(course),
-              _buildSyllabusTab(course),
-              FutureBuilder<CourseReviewSummary>(
-                future: _repository.fetchCourseReviews(widget.courseId),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Introduce section
+            Container(
+              key: _introduceKey,
+              child: _buildIntroduceTab(course),
+            ),
+            const SizedBox(height: 32),
+            const Divider(color: Color(0xFFE2E8F0)),
+            const SizedBox(height: 32),
+            
+            // Syllabus section
+            Container(
+              key: _syllabusKey,
+              child: _buildSyllabusTab(course),
+            ),
+            const SizedBox(height: 32),
+            const Divider(color: Color(0xFFE2E8F0)),
+            const SizedBox(height: 32),
+            
+            // Review section
+            Container(
+              key: _reviewKey,
+              child: FutureBuilder<CourseReviewSummary>(
+                future: _reviewsFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
@@ -546,73 +647,71 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                   return ReviewTab(summary: snapshot.data!);
                 },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
   }
 
   Widget _buildIntroduceTab(CourseDetail course) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (course.description != null && course.description!.isNotEmpty)
-            Text(
-              course.description!,
-              style: const TextStyle(
-                fontSize: 15,
-                color: Color(0xFF4B5563),
-                height: 1.6,
-              ),
-            ),
-          const SizedBox(height: 32),
-          const Text(
-            'After completing this course, you will be able to:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (course.description != null && course.description!.isNotEmpty)
+          Text(
+            course.description!,
+            style: const TextStyle(
+              fontSize: 15,
+              color: Color(0xFF4B5563),
+              height: 1.6,
             ),
           ),
-          const SizedBox(height: 16),
-          if (course.objectives != null && course.objectives!.isNotEmpty)
-            ...course.objectives!.split('\n').map((obj) {
-              final trimmed = obj.trim();
-              if (trimmed.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF28B79B),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        trimmed,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF4B5563),
-                          height: 1.5,
-                        ),
+        const SizedBox(height: 32),
+        const Text(
+          'After completing this course, you will be able to:',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (course.objectives != null && course.objectives!.isNotEmpty)
+          ...course.objectives!.split('\n').map((obj) {
+            final trimmed = obj.trim();
+            if (trimmed.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: Color(0xFF28B79B),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      trimmed,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Color(0xFF4B5563),
+                        height: 1.5,
                       ),
                     ),
-                  ],
-                ),
-              );
-            }).toList()
-          else
-            const Text(
-              'No objectives defined.',
-              style: TextStyle(color: Colors.grey),
-            ),
-        ],
-      ),
+                  ),
+                ],
+              ),
+            );
+          }).toList()
+        else
+          const Text(
+            'No objectives defined.',
+            style: TextStyle(color: Colors.grey),
+          ),
+      ],
     );
   }
 
@@ -644,157 +743,155 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       (sum, session) => sum + session.lessons.length,
     );
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Course content',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F2937),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Course content',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937),
+              ),
+            ),
+            Text(
+              '$totalSessions Sessions • $totalLessons Lessons',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: course.sessions.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final session = course.sessions[index];
+              return ExpansionTile(
+                title: Row(
+                  children: [
+                    Text(
+                      'Session ${index + 1}',
+                      style: const TextStyle(
+                        color: Color(0xFF28B79B),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      session.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                '$totalSessions Sessions • $totalLessons Lessons',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: course.sessions.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final session = course.sessions[index];
-                return ExpansionTile(
-                  title: Row(
-                    children: [
-                      Text(
-                        'Session ${index + 1}',
-                        style: const TextStyle(
-                          color: Color(0xFF28B79B),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        session.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                    ],
-                  ),
-                  trailing: Text(
-                    '${session.lessons.length} lessons',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  ),
-                  children: session.lessons.map((lesson) {
-                    final itemType = lesson.itemType?.toLowerCase();
-                    final isExercise =
-                        itemType == 'quiz' || itemType == 'practice';
-                    return InkWell(
-                      onTap: course.isEnrolled
-                          ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => LessonDetailPage(
-                                    courseId: course.id,
-                                    lessonId: lesson.id,
-                                  ),
+                trailing: Text(
+                  '${session.lessons.length} lessons',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+                children: session.lessons.map((lesson) {
+                  final itemType = lesson.itemType?.toLowerCase();
+                  final isExercise =
+                      itemType == 'quiz' || itemType == 'practice';
+                  return InkWell(
+                    onTap: course.isEnrolled
+                        ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => LessonDetailPage(
+                                  courseId: course.id,
+                                  lessonId: lesson.id,
                                 ),
-                              );
-                            }
-                          : () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please enroll in the course to view this lesson.',
-                                  ),
+                              ),
+                            );
+                          }
+                        : () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Please enroll in the course to view this lesson.',
                                 ),
-                              );
-                            },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        color: Colors.transparent,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getLessonIcon(lesson.itemType),
-                              size: 18,
-                              color: course.isEnrolled
-                                  ? const Color(0xFF28B79B)
-                                  : Colors.grey,
+                              ),
+                            );
+                          },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      color: Colors.transparent,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getLessonIcon(lesson.itemType),
+                            size: 18,
+                            color: course.isEnrolled
+                                ? const Color(0xFF28B79B)
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              lesson.title,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: course.isEnrolled
+                                    ? const Color(0xFF4B5563)
+                                    : Colors.grey.shade500,
+                              ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
+                          ),
+                          if (isExercise)
+                            TextButton(
+                              onPressed: course.isEnrolled
+                                  ? () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              LessonDetailPage(
+                                                courseId: course.id,
+                                                lessonId: lesson.id,
+                                                startQuizImmediately: true,
+                                              ),
+                                        ),
+                                      );
+                                    }
+                                  : null,
                               child: Text(
-                                lesson.title,
+                                'Try Now',
                                 style: TextStyle(
-                                  fontSize: 14,
                                   color: course.isEnrolled
-                                      ? const Color(0xFF4B5563)
-                                      : Colors.grey.shade500,
+                                      ? const Color(0xFF28B79B)
+                                      : Colors.grey,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
-                            if (isExercise)
-                              TextButton(
-                                onPressed: course.isEnrolled
-                                    ? () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                LessonDetailPage(
-                                                  courseId: course.id,
-                                                  lessonId: lesson.id,
-                                                  startQuizImmediately: true,
-                                                ),
-                                          ),
-                                        );
-                                      }
-                                    : null,
-                                child: Text(
-                                  'Try Now',
-                                  style: TextStyle(
-                                    color: course.isEnrolled
-                                        ? const Color(0xFF28B79B)
-                                        : Colors.grey,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
