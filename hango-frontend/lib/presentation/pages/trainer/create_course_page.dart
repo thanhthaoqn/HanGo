@@ -6,9 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
-import '../login_page.dart';
-import 'trainer_courses_page.dart';
-import 'trainer_dashboard_page.dart';
+
+
 
 class CreateCoursePage extends StatefulWidget {
   const CreateCoursePage({super.key});
@@ -132,16 +131,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     }
   }
 
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
+
 
   Future<void> _pickAndUploadImage() async {
     try {
@@ -257,51 +247,43 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Slate 50
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
-      body: Row(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          _buildHeader(context, false),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(context, !isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTitleSection(),
+                    const SizedBox(height: 24),
+                    if (isDesktop)
+                      Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTitleSection(),
+                          Expanded(flex: 2, child: _buildGeneralInfoCard()),
+                          const SizedBox(width: 24),
+                          Expanded(flex: 1, child: _buildMediaCard()),
+                        ],
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildGeneralInfoCard(),
                           const SizedBox(height: 24),
-                          if (isDesktop)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(flex: 2, child: _buildGeneralInfoCard()),
-                                const SizedBox(width: 24),
-                                Expanded(flex: 1, child: _buildMediaCard()),
-                              ],
-                            )
-                          else
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildGeneralInfoCard(),
-                                const SizedBox(height: 24),
-                                _buildMediaCard(),
-                              ],
-                            ),
-                          const SizedBox(height: 32),
-                          _buildActionsRow(),
+                          _buildMediaCard(),
                         ],
                       ),
-                    ),
-                  ),
+                    const SizedBox(height: 32),
+                    _buildActionsRow(),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -309,112 +291,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     );
   }
 
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Logo
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6FFFA),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.school,
-                    size: 18,
-                    color: Color(0xFF20B486),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'HanGo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          // Sidebar menu items
-          _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true, onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerCoursesPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
-          _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank'),
-          _buildSidebarItem(Icons.task_alt_outlined, 'Task'),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Help Center is under construction')),
-            );
-          }),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildHeader(BuildContext context, bool showMenuButton) {
     return Container(
