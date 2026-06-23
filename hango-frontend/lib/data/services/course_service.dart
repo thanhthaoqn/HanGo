@@ -1,5 +1,4 @@
 import '../../domain/model/course.dart';
-import '../../domain/model/exam.dart';
 
 class CourseService {
   // Mock Course database matching the mockup and SQL seeds from database.env
@@ -40,83 +39,9 @@ class CourseService {
       status: 'draft',
     ),
   ];
-
-  // Mock Exam database matching mockup
-  final List<Exam> _mockExams = [
-    // Featured Exams
-    const Exam(
-      id: 1,
-      title: 'Đề thi thử tốt nghiệp THPT năm 2025 - Sở GD&ĐT Hà Tĩnh',
-      creatorName: 'Nguyen Xuan Thinh',
-      sentencesCount: 40,
-      durationMinutes: 50,
-      stars: 5.0,
-      learnerCount: '252k Learner',
-      status: 'featured',
-    ),
-    const Exam(
-      id: 2,
-      title: 'Đề Thi Thử Tốt Nghiệp THPT - Chuyên Trần Phú, Hải Phòng',
-      creatorName: 'Luong Thi Thanh Thao',
-      sentencesCount: 40,
-      durationMinutes: 50,
-      stars: 5.0,
-      learnerCount: '252k Learner',
-      status: 'featured',
-    ),
-    const Exam(
-      id: 3,
-      title: 'Đề Thi Thử Tốt Nghiệp THPT - Bộ Giáo Dục Và Đào Tạo',
-      creatorName: 'Nguyen Viet Hoang',
-      sentencesCount: 40,
-      durationMinutes: 50,
-      stars: 5.0,
-      learnerCount: '252k Learner',
-      status: 'featured',
-    ),
-    const Exam(
-      id: 4,
-      title: 'Đề Thi Thử Tốt Nghiệp THPT - Sở GD&ĐT Đồng Nai',
-      creatorName: 'Nguyen Xuan Thinh',
-      sentencesCount: 40,
-      durationMinutes: 50,
-      stars: 5.0,
-      learnerCount: '252k Learner',
-      status: 'featured',
-    ),
-
-    // Completed Exams
-    const Exam(
-      id: 5,
-      title: 'Đề thi thử tốt nghiệp THPT năm 2024 - Sở GD&ĐT Hà Nội',
-      creatorName: 'Nguyen Xuan Thinh',
-      sentencesCount: 50,
-      durationMinutes: 60,
-      stars: 4.9,
-      learnerCount: '312k Learner',
-      status: 'completed',
-    ),
-    const Exam(
-      id: 6,
-      title: 'Đề Thi Thử Tốt Nghiệp THPT - Chuyên Lê Hồng Phong, TP.HCM',
-      creatorName: 'Luong Thi Thanh Thao',
-      sentencesCount: 50,
-      durationMinutes: 60,
-      stars: 4.8,
-      learnerCount: '198k Learner',
-      status: 'completed',
-    ),
-  ];
-
   // Fetch courses by status
   Future<List<Course>> getCourses(String status) async {
     await Future.delayed(const Duration(milliseconds: 300)); // Simulate API delay
     return _mockCourses.where((c) => c.status == status).toList();
-  }
-
-  // Fetch exams by status
-  Future<List<Exam>> getExams(String status) async {
-    await Future.delayed(const Duration(milliseconds: 300)); // Simulate API delay
-    return _mockExams.where((e) => e.status == status).toList();
   }
 }
