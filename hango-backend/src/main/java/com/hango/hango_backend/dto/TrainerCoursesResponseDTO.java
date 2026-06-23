@@ -1,0 +1,20 @@
+package com.hango.hango_backend.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class TrainerCoursesResponseDTO {
+    private long allCount;
+    private long draftCount;
+    private long publishedCount;
+    private long hiddenCount;
+    private long pendingCount;
+    private List<TrainerCourseDetailDTO> courses;
+}
