@@ -27,17 +27,29 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   // Form values
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  String _selectedCategory = 'Grammar';
-  String _selectedLevel = 'Beginner';
   bool _isSaving = false;
+
+  // Dynamic dropdown lists (populated from DB with default fallbacks)
+  List<Map<String, dynamic>> _dbCategories = [
+    {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
+    {'paramKey': 'VOCABULARY', 'paramValue': 'Vocabulary'},
+    {'paramKey': 'LISTENING', 'paramValue': 'Listening'},
+    {'paramKey': 'READING_COMPREHENSION', 'paramValue': 'Reading Comprehension'},
+    {'paramKey': 'WRITING', 'paramValue': 'Writing'},
+    {'paramKey': 'PRONUNCIATION', 'paramValue': 'Pronunciation'},
+  ];
+  List<Map<String, dynamic>> _dbLevels = [
+    {'paramKey': 'BASIC', 'paramValue': 'Basic'},
+    {'paramKey': 'INTERMEDIATE', 'paramValue': 'Intermediate'},
+    {'paramKey': 'ADVANCED', 'paramValue': 'Advanced'},
+  ];
+  String _selectedCategoryKey = 'GRAMMAR';
+  String _selectedLevelKey = 'BASIC';
 
   // Image Upload state variables
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
   String _uploadStatusText = '';
-
-  final List<String> _categories = ['Grammar', 'Vocabulary', 'Listening', 'Reading', 'Writing', 'Speaking'];
-  final List<String> _levels = ['Beginner', 'Intermediate', 'Advanced'];
 
   String get apiBaseUrl {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -50,6 +62,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   void initState() {
     super.initState();
     _loadTrainerInfo();
+    _loadSystemParameters();
   }
 
   @override
@@ -75,6 +88,50 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     });
   }
 
+  Future<void> _loadSystemParameters() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final catUri = Uri.parse('$apiBaseUrl/trainer/system-parameters?type=course_category');
+      final catResponse = await http.get(catUri, headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      });
+
+      final levelUri = Uri.parse('$apiBaseUrl/trainer/system-parameters?type=academic_level');
+      final levelResponse = await http.get(levelUri, headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      });
+
+      if (catResponse.statusCode == 200 && levelResponse.statusCode == 200) {
+        final List<dynamic> catData = jsonDecode(utf8.decode(catResponse.bodyBytes));
+        final List<dynamic> levelData = jsonDecode(utf8.decode(levelResponse.bodyBytes));
+
+        setState(() {
+          _dbCategories = catData.map((e) => Map<String, dynamic>.from(e)).toList();
+          _dbLevels = levelData.map((e) => Map<String, dynamic>.from(e)).toList();
+
+          if (_dbCategories.isNotEmpty) {
+            final hasSelectedCat = _dbCategories.any((e) => e['paramKey'] == _selectedCategoryKey);
+            if (!hasSelectedCat) {
+              _selectedCategoryKey = _dbCategories.first['paramKey'] ?? 'GRAMMAR';
+            }
+          }
+          if (_dbLevels.isNotEmpty) {
+            final hasSelectedLevel = _dbLevels.any((e) => e['paramKey'] == _selectedLevelKey);
+            if (!hasSelectedLevel) {
+              _selectedLevelKey = _dbLevels.first['paramKey'] ?? 'BASIC';
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading system parameters: $e');
+    }
+  }
+
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
@@ -96,14 +153,9 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
         _uploadStatusText = 'Uploading...';
       });
 
-      final token = await _authService.getToken();
-      if (token == null) {
-        throw Exception('Token not found');
-      }
-
-      final uri = Uri.parse('$apiBaseUrl/trainer/courses/upload');
-      final request = http.MultipartRequest('POST', uri)
-        ..headers['Authorization'] = 'Bearer $token'
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'hango_preset'
         ..files.add(http.MultipartFile.fromBytes(
           'file',
           picked.bytes,
@@ -113,14 +165,14 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(responseBody);
         setState(() {
-          _uploadedImageUrl = data['url'];
+          _uploadedImageUrl = data['secure_url'] ?? data['url'];
           _isUploadingImage = false;
         });
       } else {
-        throw Exception('Upload failed: ${response.statusCode}');
+        throw Exception('Cloudinary upload failed with status: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -155,8 +207,8 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       final body = jsonEncode({
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
-        'categoryKey': _selectedCategory,
-        'difficultyKey': _selectedLevel,
+        'categoryKey': _selectedCategoryKey,
+        'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
       });
 
@@ -592,7 +644,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _selectedCategory,
+                      value: _selectedCategoryKey,
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
@@ -609,16 +661,16 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                         ),
                       ),
                       style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
-                      items: _categories.map((String category) {
+                      items: _dbCategories.map((dynamic item) {
                         return DropdownMenuItem<String>(
-                          value: category,
-                          child: Text(category),
+                          value: item['paramKey'] as String,
+                          child: Text(item['paramValue'] as String),
                         );
                       }).toList(),
                       onChanged: (String? newValue) {
                         if (newValue != null) {
                           setState(() {
-                            _selectedCategory = newValue;
+                            _selectedCategoryKey = newValue;
                           });
                         }
                       },
@@ -642,7 +694,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _selectedLevel,
+                      value: _selectedLevelKey,
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
@@ -659,16 +711,16 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                         ),
                       ),
                       style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
-                      items: _levels.map((String level) {
+                      items: _dbLevels.map((dynamic item) {
                         return DropdownMenuItem<String>(
-                          value: level,
-                          child: Text(level),
+                          value: item['paramKey'] as String,
+                          child: Text(item['paramValue'] as String),
                         );
                       }).toList(),
                       onChanged: (String? newValue) {
                         if (newValue != null) {
                           setState(() {
-                            _selectedLevel = newValue;
+                            _selectedLevelKey = newValue;
                           });
                         }
                       },

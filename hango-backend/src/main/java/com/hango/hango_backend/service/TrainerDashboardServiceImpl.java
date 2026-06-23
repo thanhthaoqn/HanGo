@@ -178,4 +178,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         courseRepository.save(course);
     }
+
+    @Override
+    public java.util.List<com.hango.hango_backend.entity.SystemParameter> getSystemParametersByType(String paramType) {
+        return systemParameterRepository.findByParamTypeAndIsActiveTrue(paramType.toUpperCase());
+    }
 }
