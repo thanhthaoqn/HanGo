@@ -108,9 +108,22 @@ public class CourseServiceImpl implements CourseService {
         }
 
         String difficultyName = "Unknown Level";
+        String difficultyKey = "";
         try {
             if (course.getDifficulty() != null) {
                 difficultyName = course.getDifficulty().getParamValue();
+                difficultyKey = course.getDifficulty().getParamKey();
+            }
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            // Ignore
+        }
+
+        String categoryKey = "";
+        String categoryName = "";
+        try {
+            if (course.getCategory() != null) {
+                categoryKey = course.getCategory().getParamKey();
+                categoryName = course.getCategory().getParamValue();
             }
         } catch (jakarta.persistence.EntityNotFoundException e) {
             // Ignore
@@ -121,6 +134,10 @@ public class CourseServiceImpl implements CourseService {
                 .title(course.getTitle())
                 .creatorName(creatorName)
                 .difficultyName(difficultyName)
+                .difficultyKey(difficultyKey)
+                .categoryKey(categoryKey)
+                .categoryName(categoryName)
+                .thumbnailUrl(course.getThumbnailUrl())
                 .rating(4.3) // Keeping mock rating until Review system is fully implemented
                 .learnersCount(learnersCount)
                 .description(course.getDescription())
