@@ -13,6 +13,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+import com.hango.hango_backend.service.CloudinaryService;
+import com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -21,6 +27,47 @@ import org.springframework.web.bind.annotation.RestController;
 public class TrainerDashboardController {
 
     private final TrainerDashboardService trainerDashboardService;
+    private final CloudinaryService cloudinaryService;
+
+    @PostMapping("/courses/upload")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> uploadCourseThumbnail(@RequestPart("file") MultipartFile file) {
+        try {
+            String url = cloudinaryService.uploadImage(file);
+            return ResponseEntity.ok("{\"url\": \"" + url + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/system-parameters")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> getSystemParameters(@RequestParam("type") String type) {
+        try {
+            return ResponseEntity.ok(trainerDashboardService.getSystemParametersByType(type));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/courses")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> createCourse(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody TrainerCreateCourseRequestDTO request) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.createTrainerCourse(userDetails.getUsername(), request);
+            return ResponseEntity.ok("{\"message\": \"Course created successfully in DRAFT status\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
