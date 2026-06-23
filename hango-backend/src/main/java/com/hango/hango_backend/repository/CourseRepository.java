@@ -30,4 +30,17 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<CourseSummaryDTO> findCoursesWithFilters(@Param("search") String search,
                                                   @Param("difficulty") String difficulty,
                                                   @Param("enrolledUserId") Long enrolledUserId);
+
+    @Query("SELECT COUNT(c) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
+    long countByCreatorIdAndDeletedAtIsNull(@Param("creatorId") Long creatorId);
+
+    @Query(value = "SELECT c.id AS id, c.title AS title, " +
+           "(SELECT COUNT(e.id) FROM enrollments e WHERE e.course_id = c.id) AS learnersCount, " +
+           "(SELECT COUNT(l.id) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id AND l.deleted_at IS NULL) AS lessonsCount, " +
+           "c.thumbnail_url AS thumbnailUrl " +
+           "FROM courses c " +
+           "WHERE c.created_by = :trainerId AND c.deleted_at IS NULL " +
+           "ORDER BY c.created_at DESC", 
+           nativeQuery = true)
+    List<TrainerCourseProjection> findTrainerCourses(@Param("trainerId") Long trainerId);
 }
