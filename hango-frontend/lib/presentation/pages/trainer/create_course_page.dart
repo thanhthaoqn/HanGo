@@ -1,7 +1,11 @@
 // ignore_for_file: deprecated_member_use
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
+import '../../../utils/file_picker_helper.dart';
 import '../login_page.dart';
 import 'trainer_courses_page.dart';
 import 'trainer_dashboard_page.dart';
@@ -27,8 +31,20 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   String _selectedLevel = 'Beginner';
   bool _isSaving = false;
 
+  // Image Upload state variables
+  String? _uploadedImageUrl;
+  bool _isUploadingImage = false;
+  String _uploadStatusText = '';
+
   final List<String> _categories = ['Grammar', 'Vocabulary', 'Listening', 'Reading', 'Writing', 'Speaking'];
   final List<String> _levels = ['Beginner', 'Intermediate', 'Advanced'];
+
+  String get apiBaseUrl {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080/api/v1';
+    }
+    return 'http://localhost:8080/api/v1';
+  }
 
   @override
   void initState() {
@@ -70,7 +86,57 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     }
   }
 
-  void _saveCourse() {
+  Future<void> _pickAndUploadImage() async {
+    try {
+      final picked = await pickImage();
+      if (picked == null) return;
+
+      setState(() {
+        _isUploadingImage = true;
+        _uploadStatusText = 'Uploading...';
+      });
+
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Token not found');
+      }
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/courses/upload');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          picked.bytes,
+          filename: picked.name,
+        ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody);
+        setState(() {
+          _uploadedImageUrl = data['url'];
+          _isUploadingImage = false;
+        });
+      } else {
+        throw Exception('Upload failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      setState(() {
+        _isUploadingImage = false;
+        _uploadStatusText = 'Upload failed';
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+    }
+  }
+
+  void _saveCourse() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -79,25 +145,57 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       _isSaving = true;
     });
 
-    // Simulate saving delay
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/courses');
+      final body = jsonEncode({
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'categoryKey': _selectedCategory,
+        'difficultyKey': _selectedLevel,
+        'thumbnailUrl': _uploadedImageUrl ?? '',
+      });
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: body,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Course created successfully as DRAFT!'),
+              backgroundColor: Color(0xFF20B486),
+            ),
+          );
+          Navigator.pop(context, true); // Return true to refresh list
+        }
+      } else {
+        throw Exception('Failed to create course: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error saving course: $e');
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving course: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
         setState(() {
           _isSaving = false;
         });
-        
-        // Show success Snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Course created successfully! (Mocked)'),
-            backgroundColor: Color(0xFF20B486),
-          ),
-        );
-        
-        // Navigate back to Courses list
-        Navigator.pop(context);
       }
-    });
+    }
   }
 
   @override
@@ -673,11 +771,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
           const SizedBox(height: 12),
           // Dotted Upload Box
           InkWell(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Media picker is under construction (Mocked)')),
-              );
-            },
+            onTap: _isUploadingImage ? null : _pickAndUploadImage,
             borderRadius: BorderRadius.circular(12),
             child: CustomPaint(
               painter: DashedBorderPainter(
@@ -689,38 +783,71 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                 height: 180,
                 padding: const EdgeInsets.all(20),
                 alignment: Alignment.center,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.cloud_upload_outlined,
-                      color: Color(0xFF64748B),
-                      size: 40,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Click to upload or drag & drop',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF475569),
-                        fontFamily: 'Outfit',
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Recommended: 1280x720\n(PNG/JPG)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF94A3B8),
-                        fontFamily: 'Outfit',
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+                child: _isUploadingImage
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _uploadStatusText,
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 12,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      )
+                    : _uploadedImageUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              _uploadedImageUrl!,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.cloud_upload_outlined,
+                                color: Color(0xFF64748B),
+                                size: 40,
+                              ),
+                              SizedBox(height: 12),
+                              Text(
+                                'Click to upload or drag & drop',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF475569),
+                                  fontFamily: 'Outfit',
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Recommended: 1280x720\n(PNG/JPG)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF94A3B8),
+                                  fontFamily: 'Outfit',
+                                  height: 1.4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
               ),
             ),
           ),
