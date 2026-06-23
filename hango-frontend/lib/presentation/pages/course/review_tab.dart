@@ -8,13 +8,13 @@ class ReviewTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Student Reviews',
+            'Learner Reviews',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
