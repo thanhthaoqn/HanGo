@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
+import 'trainer_courses_page.dart';
 
 class TrainerDashboardPage extends StatefulWidget {
   const TrainerDashboardPage({super.key});
@@ -218,7 +219,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           const SizedBox(height: 40),
           // Sidebar menu items
           _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.book_outlined, 'Courses'),
+          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const TrainerCoursesPage()),
+            );
+          }),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
           _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank'),
@@ -540,7 +546,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         border: border,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: const Color.fromRGBO(0, 0, 0, 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -598,7 +604,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: const Color.fromRGBO(0, 0, 0, 0.04),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 )
@@ -712,7 +718,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         border: Border.all(color: const Color(0xFFEFF2F5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: const Color.fromRGBO(0, 0, 0, 0.01),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
