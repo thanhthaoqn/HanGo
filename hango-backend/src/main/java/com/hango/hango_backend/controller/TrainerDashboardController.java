@@ -41,6 +41,17 @@ public class TrainerDashboardController {
         }
     }
 
+    @GetMapping("/system-parameters")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> getSystemParameters(@RequestParam("type") String type) {
+        try {
+            return ResponseEntity.ok(trainerDashboardService.getSystemParametersByType(type));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @PostMapping("/courses")
     @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
     public ResponseEntity<?> createCourse(
