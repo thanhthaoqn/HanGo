@@ -74,10 +74,11 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        
+
         // Fetch user from database to check their status
         User user = userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userDetails.getUsername()));
+                .orElseThrow(
+                        () -> new UsernameNotFoundException("User not found with email: " + userDetails.getUsername()));
 
         if ("INACTIVE".equalsIgnoreCase(user.getStatus())) {
             throw new IllegalArgumentException("Your account is deactivated. Please contact support.");
@@ -99,8 +100,7 @@ public class AuthService {
                 userDetails.getId(),
                 userDetails.getUsername(),
                 userDetails.getFullName(),
-                roles
-        );
+                roles);
     }
 
     public UserResponse registerUser(RegisterRequest registerRequest) {
@@ -174,7 +174,6 @@ public class AuthService {
         return mapToUserResponse(savedUser);
     }
 
-
     public UserResponse updateAvatar(String email, MultipartFile file) throws IOException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
@@ -224,7 +223,7 @@ public class AuthService {
                                     .status("ACTIVE")
                                     .isVerified(true)
                                     .build();
-                            
+
                             return userRepository.save(newUser);
                         });
 
@@ -247,8 +246,7 @@ public class AuthService {
                         savedUser.getId(),
                         savedUser.getEmail(),
                         savedUser.getFullName(),
-                        roles
-                );
+                        roles);
             } else {
                 throw new IllegalArgumentException("Invalid ID Token");
             }
@@ -283,7 +281,8 @@ public class AuthService {
     }
 
     public void verifyOtp(VerifyOtpRequest request) {
-        PasswordResetOtp otp = passwordResetOtpRepository.findByEmailAndOtpCode(request.getEmail(), request.getOtpCode())
+        PasswordResetOtp otp = passwordResetOtpRepository
+                .findByEmailAndOtpCode(request.getEmail(), request.getOtpCode())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid OTP code."));
 
         if (otp.getExpiryTime().isBefore(LocalDateTime.now())) {
@@ -308,14 +307,16 @@ public class AuthService {
     @org.springframework.transaction.annotation.Transactional
     public void verifyAccount(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with email: " + email));
         user.setIsVerified(true);
         userRepository.save(user);
     }
 
     public void resendVerificationEmail(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with email: " + email));
 
         if (Boolean.TRUE.equals(user.getIsVerified())) {
             throw new IllegalArgumentException("Account is already verified.");
@@ -328,7 +329,6 @@ public class AuthService {
         }
     }
 
-
     public boolean isAccountVerified(String email) {
         return userRepository.findByEmail(email)
                 .map(User::getIsVerified)
@@ -337,20 +337,23 @@ public class AuthService {
 
     public UserResponse getUserById(Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with id: " + id));
         return mapToUserResponse(user);
     }
 
     public UserResponse getUserProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with email: " + email));
         return mapToUserResponse(user);
     }
 
     @org.springframework.transaction.annotation.Transactional
     public UserResponse updateProfile(String email, ProfileUpdateRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with email: " + email));
 
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName());
