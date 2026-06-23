@@ -9,6 +9,7 @@ import 'register_page.dart';
 import 'forgot_password_page.dart';
 import 'learner/learner_home_page.dart';
 import 'admin/admin_dashboard_page.dart';
+import 'trainer_lead/trainer_lead_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -74,17 +75,26 @@ class _LoginPageState extends State<LoginPage> {
       if (result['success']) {
         final roles = List<String>.from(result['data']['roles'] ?? []);
         final isAdmin = roles.any((r) => r.contains('ADMIN'));
-        debugPrint('Sign in success! Navigating. Admin: $isAdmin. Data: ${result['data']}');
+        final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
+        debugPrint('Sign in success! Navigating. Roles: $roles. Data: ${result['data']}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Sign in successful!'),
             backgroundColor: Color(0xFF28B79B),
           ),
         );
+        Widget destination;
+        if (isAdmin) {
+          destination = const AdminDashboardPage();
+        } else if (isTrainerLead) {
+          destination = const TrainerLeadDashboardPage();
+        } else {
+          destination = const LearnerHomePage();
+        }
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => isAdmin ? const AdminDashboardPage() : const LearnerHomePage(),
+            builder: (context) => destination,
           ),
         );
       } else {
@@ -134,16 +144,25 @@ class _LoginPageState extends State<LoginPage> {
           final String name = googleUser.displayName ?? 'Google User';
           final roles = List<String>.from(result['data']['roles'] ?? []);
           final isAdmin = roles.any((r) => r.contains('ADMIN'));
+          final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Sign in successful: Welcome, $name!'),
               backgroundColor: const Color(0xFF28B79B),
             ),
           );
+          Widget destination;
+          if (isAdmin) {
+            destination = const AdminDashboardPage();
+          } else if (isTrainerLead) {
+            destination = const TrainerLeadDashboardPage();
+          } else {
+            destination = const LearnerHomePage();
+          }
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => isAdmin ? const AdminDashboardPage() : const LearnerHomePage(),
+              builder: (context) => destination,
             ),
           );
         } else {

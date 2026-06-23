@@ -30,4 +30,5 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<CourseSummaryDTO> findCoursesWithFilters(@Param("search") String search,
                                                   @Param("difficulty") String difficulty,
                                                   @Param("enrolledUserId") Long enrolledUserId);
+    long countByStatus(String status);
 }
