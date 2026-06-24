@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'create_lesson_text_page.dart';
 
 class CreateLessonPage extends StatefulWidget {
   final int courseId;
@@ -112,6 +113,122 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               child: const Text('Add', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _deleteLesson(int sectionIndex, int lessonIndex) {
+    setState(() {
+      final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
+      lessons.removeAt(lessonIndex);
+      _localSections[sectionIndex]['lessons'] = lessons;
+    });
+    _notifyParent();
+  }
+
+  void _showEditLessonDialog(int sectionIndex, int lessonIndex) {
+    final lesson = _localSections[sectionIndex]['lessons'][lessonIndex];
+    final titleController = TextEditingController(text: lesson['title']);
+    String selectedType = lesson['itemType'] ?? 'video';
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                'Edit Lesson',
+                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'LESSON TITLE *',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: titleController,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Nouns and Pronouns',
+                      hintStyle: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF94A3B8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF20B486)),
+                      ),
+                    ),
+                    autofocus: true,
+                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'LESSON TYPE',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedType,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF20B486)),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'video', child: Text('Video Lecture', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                      DropdownMenuItem(value: 'text', child: Text('Document/Reading', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                      DropdownMenuItem(value: 'quiz', child: Text('Quiz/Assessment', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          selectedType = val;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final text = titleController.text.trim();
+                    if (text.isNotEmpty) {
+                      setState(() {
+                        final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
+                        lessons[lessonIndex] = {
+                          ...lessons[lessonIndex],
+                          'title': text,
+                          'itemType': selectedType,
+                        };
+                        _localSections[sectionIndex]['lessons'] = lessons;
+                      });
+                      _notifyParent();
+                      Navigator.pop(context);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20B486),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Save', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -338,50 +455,56 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               ),
               const SizedBox(height: 16),
               // Step 1: Introduction
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFEFF2F5)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF20B486),
-                        shape: BoxShape.circle,
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context, 'goToIntroduction');
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFEFF2F5)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF20B486),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check, size: 14, color: Colors.white),
                       ),
-                      child: const Icon(Icons.check, size: 14, color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Introduction',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
-                            fontFamily: 'Outfit',
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Introduction',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                              fontFamily: 'Outfit',
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Completed',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: activeColor,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Outfit',
+                          const SizedBox(height: 2),
+                          Text(
+                            'Completed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: activeColor,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -626,7 +749,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
             final lessons = section['lessons'] as List<dynamic>? ?? [];
             final isExpanded = _expandedIndices.contains(index);
 
-            return Container(
+            final sectionCard = Container(
               margin: EdgeInsets.only(bottom: index == _localSections.length - 1 ? 0 : 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFEDF5FF),
@@ -724,171 +847,20 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                       ],
                     ),
                   ),
-                  if (isExpanded && _activeSectionIndex == index) ...[
+                  if (isExpanded) ...[
                     const Divider(color: Color(0xFFD0E7FF), height: 1),
                     Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Select content type:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () => _showAddLessonDialog(index, 'text'),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFE6FFFA),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(
-                                            Icons.description_outlined,
-                                            color: Color(0xFF20B486),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: const [
-                                            Text(
-                                              'Lesson',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF1E293B),
-                                                fontFamily: 'Outfit',
-                                              ),
-                                            ),
-                                            SizedBox(height: 2),
-                                            Text(
-                                              'Text',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFF64748B),
-                                                fontFamily: 'Outfit',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () => _showAddLessonDialog(index, 'quiz'),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFE6FFFA),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(
-                                            Icons.help_outline,
-                                            color: Color(0xFF20B486),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: const [
-                                            Text(
-                                              'Quiz',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF1E293B),
-                                                fontFamily: 'Outfit',
-                                              ),
-                                            ),
-                                            SizedBox(height: 2),
-                                            Text(
-                                              'Test',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFF64748B),
-                                                fontFamily: 'Outfit',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          Center(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _activeSectionIndex = null;
-                                });
-                              },
-                              icon: const Icon(Icons.close, size: 16),
-                              label: const Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF64748B),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(8),
+                          bottomRight: Radius.circular(8),
+                        ),
+                        border: Border.all(
+                          color: const Color(0xFF20B486).withAlpha(51),
+                          width: 1,
+                        ),
                       ),
-                    ),
-                  ] else if (isExpanded) ...[
-                    const Divider(color: Color(0xFFD0E7FF), height: 1),
-                    Container(
-                      color: Colors.white.withAlpha(102),
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -925,36 +897,127 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                               itemCount: lessons.length,
                               itemBuilder: (context, lessonIndex) {
                                 final lesson = lessons[lessonIndex];
+                                final itemType = lesson['itemType'] ?? 'video';
                                 IconData lessonIcon = Icons.play_circle_outline;
-                                if (lesson['itemType'] == 'quiz' || lesson['itemType'] == 'practice') {
+                                String typeBadge = 'VIDEO';
+                                
+                                if (itemType == 'quiz' || itemType == 'practice') {
                                   lessonIcon = Icons.assignment_outlined;
-                                } else if (lesson['itemType'] == 'document' || lesson['itemType'] == 'text') {
+                                  typeBadge = 'QUIZ';
+                                } else if (itemType == 'document' || itemType == 'text') {
                                   lessonIcon = Icons.description_outlined;
+                                  typeBadge = 'TEXT';
                                 }
 
                                 return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: const Color(0xFFE2E8F0)),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(lessonIcon, color: const Color(0xFF64748B), size: 18),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          lesson['title'] ?? 'Untitled Lesson',
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: Color(0xFF1E293B),
-                                            fontFamily: 'Outfit',
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          // Leftmost solid green strip
+                                          Container(
+                                            width: 4,
+                                            color: const Color(0xFF20B486),
                                           ),
-                                        ),
+                                          const SizedBox(width: 16),
+                                          // Leftmost icon in rounded circle
+                                          Center(
+                                            child: Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE6FFFA),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Icon(lessonIcon, color: const Color(0xFF20B486), size: 18),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          // Title, Badge and Description
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        lesson['title'] ?? 'Untitled Lesson',
+                                                        style: const TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Color(0xFF1E293B),
+                                                          fontFamily: 'Outfit',
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      // Badge
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFF1F5F9),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          typeBadge,
+                                                          style: const TextStyle(
+                                                            fontSize: 9,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: Color(0xFF475569),
+                                                            fontFamily: 'Outfit',
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  if (lesson['description'] != null && lesson['description'].toString().trim().isNotEmpty) ...[
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      lesson['description'],
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: Color(0xFF64748B),
+                                                        fontFamily: 'Outfit',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          // Action buttons
+                                          Row(
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 18),
+                                                tooltip: 'Edit Lesson',
+                                                onPressed: () => _showEditLessonDialog(index, lessonIndex),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                                                tooltip: 'Delete Lesson',
+                                                onPressed: () => _deleteLesson(index, lessonIndex),
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 );
                               },
@@ -966,6 +1029,211 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 ],
               ),
             );
+
+            if (isExpanded && _activeSectionIndex == index) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF20B486).withAlpha(77), width: 1.5),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color.fromRGBO(32, 180, 134, 0.05),
+                          blurRadius: 10,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Select content type:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CreateLessonTextPage(
+                                        courseId: widget.courseId,
+                                        courseTitle: widget.courseTitle,
+                                        trainerName: widget.trainerName,
+                                        trainerInitials: widget.trainerInitials,
+                                        sections: _localSections,
+                                        sectionIndex: index,
+                                        onSectionsChanged: (updatedSections) {
+                                          setState(() {
+                                            _localSections = updatedSections;
+                                          });
+                                          _notifyParent();
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                  if (result == 'goToIntroduction' && context.mounted) {
+                                    Navigator.pop(context, 'goToIntroduction');
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE6FFFA),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(
+                                          Icons.description_outlined,
+                                          color: Color(0xFF20B486),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: const [
+                                          Text(
+                                            'Lesson',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF1E293B),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Text',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF64748B),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _showAddLessonDialog(index, 'quiz'),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE6FFFA),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Icon(
+                                          Icons.help_outline,
+                                          color: Color(0xFF20B486),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: const [
+                                          Text(
+                                            'Quiz',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF1E293B),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Test',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF64748B),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Center(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _activeSectionIndex = null;
+                              });
+                            },
+                            icon: const Icon(Icons.close, size: 16),
+                            label: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF64748B),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  sectionCard,
+                ],
+              );
+            }
+
+            return sectionCard;
           },
         ),
       ),

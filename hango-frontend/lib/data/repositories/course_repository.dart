@@ -136,4 +136,53 @@ class CourseRepository {
       throw Exception('Error unenrolling from course: $e');
     }
   }
+
+  Future<void> submitCourseReview(int courseId, double rating, String content) async {
+    try {
+      final uri = Uri.parse('$baseUrl/courses/$courseId/reviews');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'rating': rating.round(),
+          'content': content,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to submit review: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error submitting review: $e');
+    }
+  }
+
+  Future<void> deleteCourseReview(int courseId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/courses/$courseId/reviews');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to delete review: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error deleting review: $e');
+    }
+  }
 }

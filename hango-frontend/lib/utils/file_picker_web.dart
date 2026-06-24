@@ -27,3 +27,28 @@ Future<PickedFile?> pickImageFile() async {
 
   return completer.future;
 }
+
+Future<PickedFile?> pickPdfFile() async {
+  final completer = Completer<PickedFile?>();
+  final uploadInput = html.InputElement()..type = 'file'..accept = 'application/pdf';
+  uploadInput.click();
+
+  uploadInput.onChange.listen((e) {
+    final files = uploadInput.files;
+    if (files != null && files.isNotEmpty) {
+      final file = files[0];
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      reader.onLoadEnd.listen((e) {
+        completer.complete(PickedFile(
+          name: file.name,
+          bytes: reader.result as List<int>,
+        ));
+      });
+    } else {
+      completer.complete(null);
+    }
+  });
+
+  return completer.future;
+}

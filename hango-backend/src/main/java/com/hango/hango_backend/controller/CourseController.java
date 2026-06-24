@@ -1,6 +1,7 @@
 package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.CourseSummaryDTO;
+import com.hango.hango_backend.dto.CourseReviewRequestDTO;
 import com.hango.hango_backend.service.CourseRatingService;
 import com.hango.hango_backend.service.CourseService;
 import lombok.RequiredArgsConstructor;
@@ -83,6 +84,37 @@ public class CourseController {
         } catch (RuntimeException e) {
             e.printStackTrace();
             return ResponseEntity.status(404).body(e.getClass().getName() + ": " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/reviews")
+    public ResponseEntity<?> addCourseReview(@PathVariable Long id,
+                                             @RequestBody @jakarta.validation.Valid CourseReviewRequestDTO request) {
+        try {
+            Long currentUserId = getCurrentUserId();
+            if (currentUserId == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            courseRatingService.addCourseReview(id, currentUserId, request.getRating(), request.getContent());
+            return ResponseEntity.ok().body("{\"message\": \"Review posted successfully\"}");
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(400).body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @DeleteMapping("/{id}/reviews")
+    public ResponseEntity<?> deleteCourseReview(@PathVariable Long id) {
+        try {
+            Long currentUserId = getCurrentUserId();
+            if (currentUserId == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            courseRatingService.deleteCourseReview(id, currentUserId);
+            return ResponseEntity.ok().body("{\"message\": \"Review deleted successfully\"}");
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(400).body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
 }
