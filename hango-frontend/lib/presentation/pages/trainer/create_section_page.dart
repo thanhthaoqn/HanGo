@@ -17,19 +17,19 @@ class CreateSectionPage extends StatefulWidget {
 
 class _CreateSectionPageState extends State<CreateSectionPage> {
   late List<dynamic> _localSections;
-  final _sectionNameController = TextEditingController();
-  final _sectionDescController = TextEditingController();
-  int? _editingSectionIndex; // null if creating a new section
-  final Map<int, bool> _expandedSections = {}; // track expanded/collapsed state
+  int? _editingIndex;
+  
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+  final Set<int> _expandedIndices = {};
 
   @override
   void initState() {
     super.initState();
     _localSections = List.from(widget.sections);
-    // Expand all sections by default
-    for (var i = 0; i < _localSections.length; i++) {
-      final id = _localSections[i]['id'] as int? ?? i;
-      _expandedSections[id] = true;
+    // Expand the first section by default if any exist
+    if (_localSections.isNotEmpty) {
+      _expandedIndices.add(0);
     }
   }
 
@@ -38,19 +38,13 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.sections != oldWidget.sections) {
       _localSections = List.from(widget.sections);
-      for (var i = 0; i < _localSections.length; i++) {
-        final id = _localSections[i]['id'] as int? ?? i;
-        if (!_expandedSections.containsKey(id)) {
-          _expandedSections[id] = true;
-        }
-      }
     }
   }
 
   @override
   void dispose() {
-    _sectionNameController.dispose();
-    _sectionDescController.dispose();
+    _nameController.dispose();
+    _descController.dispose();
     super.dispose();
   }
 
@@ -58,82 +52,129 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     widget.onSectionsChanged(_localSections);
   }
 
-  void _resetForm() {
-    setState(() {
-      _sectionNameController.clear();
-      _sectionDescController.clear();
-      _editingSectionIndex = null;
-    });
-  }
-
-  void _saveSectionForm() {
-    final title = _sectionNameController.text.trim();
-    final description = _sectionDescController.text.trim();
-    if (title.isEmpty) {
+  void _addSection() {
+    final name = _nameController.text.trim();
+    final desc = _descController.text.trim();
+    if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a section name')),
+        const SnackBar(
+          content: Text('Please enter a section name'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
       return;
     }
 
     setState(() {
-      if (_editingSectionIndex != null) {
-        // Edit existing
-        final index = _editingSectionIndex!;
-        _localSections[index]['title'] = title;
-        _localSections[index]['description'] = description;
-      } else {
-        // Add new
-        final newSection = {
-          'id': DateTime.now().millisecondsSinceEpoch,
-          'title': title,
-          'description': description,
-          'orderIndex': _localSections.length + 1,
-          'lessons': [],
-        };
-        _localSections.add(newSection);
-        _expandedSections[newSection['id'] as int] = true; // Expand by default
-      }
-      _resetForm();
+      final newIndex = _localSections.length;
+      _localSections.add({
+        'id': DateTime.now().millisecondsSinceEpoch,
+        'title': name,
+        'description': desc,
+        'orderIndex': newIndex + 1,
+        'lessons': [],
+      });
+      // Expand the newly added section
+      _expandedIndices.add(newIndex);
+      _nameController.clear();
+      _descController.clear();
     });
     _notifyParent();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Section added successfully'),
+        backgroundColor: Color(0xFF20B486),
+      ),
+    );
   }
 
-  void _confirmDeleteSection(int index) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete Section', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
-          content: Text(
-            'Are you sure you want to delete "${_localSections[index]['title']}"? All lessons inside this section will be permanently deleted.',
-            style: const TextStyle(fontFamily: 'Outfit'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontFamily: 'Outfit')),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _localSections.removeAt(index);
-                  if (_editingSectionIndex == index) {
-                    _resetForm();
-                  } else if (_editingSectionIndex != null && _editingSectionIndex! > index) {
-                    _editingSectionIndex = _editingSectionIndex! - 1;
-                  }
-                });
-                _notifyParent();
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-              child: const Text('Delete', style: TextStyle(color: Colors.white, fontFamily: 'Outfit')),
-            ),
-          ],
-        );
-      },
+  void _startEditing(int index) {
+    setState(() {
+      _editingIndex = index;
+      _nameController.text = _localSections[index]['title'] ?? '';
+      _descController.text = _localSections[index]['description'] ?? '';
+    });
+  }
+
+  void _updateSection() {
+    final name = _nameController.text.trim();
+    final desc = _descController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a section name'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    if (_editingIndex != null && _editingIndex! < _localSections.length) {
+      setState(() {
+        _localSections[_editingIndex!]['title'] = name;
+        _localSections[_editingIndex!]['description'] = desc;
+        _editingIndex = null;
+        _nameController.clear();
+        _descController.clear();
+      });
+      _notifyParent();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Section updated successfully'),
+          backgroundColor: Color(0xFF20B486),
+        ),
+      );
+    }
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingIndex = null;
+      _nameController.clear();
+      _descController.clear();
+    });
+  }
+
+  void _deleteSection(int index) {
+    setState(() {
+      _localSections.removeAt(index);
+      if (_editingIndex == index) {
+        _editingIndex = null;
+        _nameController.clear();
+        _descController.clear();
+      } else if (_editingIndex != null && _editingIndex! > index) {
+        _editingIndex = _editingIndex! - 1;
+      }
+      
+      // Update expanded indices map
+      final Set<int> updatedExpanded = {};
+      for (final expandedIndex in _expandedIndices) {
+        if (expandedIndex < index) {
+          updatedExpanded.add(expandedIndex);
+        } else if (expandedIndex > index) {
+          updatedExpanded.add(expandedIndex - 1);
+        }
+      }
+      _expandedIndices.clear();
+      _expandedIndices.addAll(updatedExpanded);
+    });
+    _notifyParent();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Section deleted'),
+        backgroundColor: Color(0xFF64748B),
+      ),
     );
+  }
+
+  void _toggleExpanded(int index) {
+    setState(() {
+      if (_expandedIndices.contains(index)) {
+        _expandedIndices.remove(index);
+      } else {
+        _expandedIndices.add(index);
+      }
+    });
   }
 
   void _showAddLessonDialog(int sectionIndex) {
@@ -145,36 +186,55 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Text(
                 'Add Lesson',
-                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text(
+                    'LESSON TITLE *',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Lesson Title *',
+                    decoration: InputDecoration(
                       hintText: 'e.g. Nouns and Pronouns',
-                      labelStyle: TextStyle(fontFamily: 'Outfit'),
+                      hintStyle: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF94A3B8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF20B486)),
+                      ),
                     ),
                     autofocus: true,
+                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
                   ),
                   const SizedBox(height: 16),
+                  const Text(
+                    'LESSON TYPE',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: selectedType,
-                    decoration: const InputDecoration(
-                      labelText: 'Lesson Type',
-                      labelStyle: TextStyle(fontFamily: 'Outfit'),
+                    initialValue: selectedType,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF20B486)),
+                      ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'video', child: Text('Video Lecture', style: TextStyle(fontFamily: 'Outfit'))),
-                      DropdownMenuItem(value: 'text', child: Text('Document/Reading', style: TextStyle(fontFamily: 'Outfit'))),
-                      DropdownMenuItem(value: 'quiz', child: Text('Quiz/Assessment', style: TextStyle(fontFamily: 'Outfit'))),
+                      DropdownMenuItem(value: 'video', child: Text('Video Lecture', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                      DropdownMenuItem(value: 'text', child: Text('Document/Reading', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                      DropdownMenuItem(value: 'quiz', child: Text('Quiz/Assessment', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -189,14 +249,14 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontFamily: 'Outfit')),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     final text = titleController.text.trim();
                     if (text.isNotEmpty) {
                       setState(() {
-                        final lessons = _localSections[sectionIndex]['lessons'] as List<dynamic>? ?? [];
+                        final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
                         lessons.add({
                           'id': DateTime.now().millisecondsSinceEpoch,
                           'title': text,
@@ -211,8 +271,10 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text('Add', style: TextStyle(color: Colors.white, fontFamily: 'Outfit')),
+                  child: const Text('Add', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -232,35 +294,55 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Text(
                 'Edit Lesson',
-                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text(
+                    'LESSON TITLE *',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Lesson Title *',
-                      labelStyle: TextStyle(fontFamily: 'Outfit'),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Nouns and Pronouns',
+                      hintStyle: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF94A3B8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF20B486)),
+                      ),
                     ),
                     autofocus: true,
+                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
                   ),
                   const SizedBox(height: 16),
+                  const Text(
+                    'LESSON TYPE',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    value: selectedType,
-                    decoration: const InputDecoration(
-                      labelText: 'Lesson Type',
-                      labelStyle: TextStyle(fontFamily: 'Outfit'),
+                    initialValue: selectedType,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF20B486)),
+                      ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'video', child: Text('Video Lecture', style: TextStyle(fontFamily: 'Outfit'))),
-                      DropdownMenuItem(value: 'text', child: Text('Document/Reading', style: TextStyle(fontFamily: 'Outfit'))),
-                      DropdownMenuItem(value: 'quiz', child: Text('Quiz/Assessment', style: TextStyle(fontFamily: 'Outfit'))),
+                      DropdownMenuItem(value: 'video', child: Text('Video Lecture', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                      DropdownMenuItem(value: 'text', child: Text('Document/Reading', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                      DropdownMenuItem(value: 'quiz', child: Text('Quiz/Assessment', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -275,15 +357,20 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontFamily: 'Outfit')),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     final text = titleController.text.trim();
                     if (text.isNotEmpty) {
                       setState(() {
-                        _localSections[sectionIndex]['lessons'][lessonIndex]['title'] = text;
-                        _localSections[sectionIndex]['lessons'][lessonIndex]['itemType'] = selectedType;
+                        final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
+                        lessons[lessonIndex] = {
+                          ...lessons[lessonIndex],
+                          'title': text,
+                          'itemType': selectedType,
+                        };
+                        _localSections[sectionIndex]['lessons'] = lessons;
                       });
                       _notifyParent();
                       Navigator.pop(context);
@@ -291,8 +378,10 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text('Save', style: TextStyle(color: Colors.white, fontFamily: 'Outfit')),
+                  child: const Text('Save', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -302,498 +391,459 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     );
   }
 
-  Widget _buildSectionFormCard() {
-    final isEditing = _editingSectionIndex != null;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2F9F3), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF20B486).withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  void _deleteLesson(int sectionIndex, int lessonIndex) {
+    setState(() {
+      final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
+      lessons.removeAt(lessonIndex);
+      _localSections[sectionIndex]['lessons'] = lessons;
+    });
+    _notifyParent();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Lesson deleted'),
+        backgroundColor: Color(0xFF64748B),
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Badge on the top border
-          Positioned(
-            top: -36,
-            left: -8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE6FFFA),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF20B486).withOpacity(0.2)),
-              ),
-              child: Text(
-                isEditing ? 'EDIT SECTION ${_editingSectionIndex! + 1}' : 'NEW SECTION',
-                style: const TextStyle(
-                  color: Color(0xFF20B486),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 10,
-                  letterSpacing: 1.0,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              // Section Name label
-              const Text(
-                'SECTION NAME',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4B5563),
-                  fontFamily: 'Outfit',
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Section Name Field
-              TextFormField(
-                controller: _sectionNameController,
-                decoration: InputDecoration(
-                  hintText: 'Section 1: Introduction to English Grammar',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  suffixIcon: const Icon(Icons.notes, color: Color(0xFFCBD5E1), size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF20B486)),
-                  ),
-                ),
-                style: const TextStyle(
-                  fontFamily: 'Outfit',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Section Description label
-              const Text(
-                'SECTION DESCRIPTION (OPTIONAL)',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4B5563),
-                  fontFamily: 'Outfit',
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Section Description Field
-              TextFormField(
-                controller: _sectionDescController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'Briefly describe what students will learn in this chapter...',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                    fontStyle: FontStyle.italic,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF20B486)),
-                  ),
-                ),
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
-              ),
-              const SizedBox(height: 16),
-              // Form actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (isEditing) ...[
-                    TextButton(
-                      onPressed: _resetForm,
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  ElevatedButton(
-                    onPressed: _saveSectionForm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF20B486),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      isEditing ? 'Save Changes' : 'Add Section',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionsList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _localSections.length,
-      itemBuilder: (context, index) {
-        final section = _localSections[index];
-        final sectionId = section['id'] as int? ?? index;
-        final lessons = section['lessons'] as List<dynamic>? ?? [];
-        final isExpanded = _expandedSections[sectionId] ?? true;
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEFF2F5)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Section Header Card
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2F9F3).withOpacity(0.3),
-                  borderRadius: isExpanded
-                      ? const BorderRadius.vertical(top: Radius.circular(12))
-                      : BorderRadius.circular(12),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: isExpanded ? const Color(0xFFEFF2F5) : Colors.transparent,
-                    ),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    // Badge Number
-                    Container(
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE2F9F3),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${index + 1}',
-                        style: const TextStyle(
-                          color: Color(0xFF20B486),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Title and Items Count
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Section ${index + 1}: ${section['title']}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: Color(0xFF1E293B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${lessons.length} ${lessons.length == 1 ? "item" : "items"}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Action Buttons
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, color: Color(0xFFE2A93E), size: 20),
-                          tooltip: 'Edit Section',
-                          onPressed: () {
-                            setState(() {
-                              _editingSectionIndex = index;
-                              _sectionNameController.text = section['title'] ?? '';
-                              _sectionDescController.text = section['description'] ?? '';
-                            });
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
-                          tooltip: 'Delete Section',
-                          onPressed: () => _confirmDeleteSection(index),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                            color: const Color(0xFF64748B),
-                            size: 24,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _expandedSections[sectionId] = !isExpanded;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Section Lessons List (when expanded)
-              if (isExpanded)
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (lessons.isEmpty)
-                        // Dashed Border box for 0 items
-                        CustomPaint(
-                          painter: DashedBorderPainter(
-                            color: const Color(0xFFCBD5E1),
-                            borderRadius: 8,
-                          ),
-                          child: Container(
-                            height: 100,
-                            alignment: Alignment.center,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  'No lessons in this section yet.',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF94A3B8),
-                                    fontStyle: FontStyle.italic,
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextButton.icon(
-                                  onPressed: () => _showAddLessonDialog(index),
-                                  icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
-                                  label: const Text(
-                                    'Add Lesson',
-                                    style: TextStyle(
-                                      color: Color(0xFF20B486),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      fontFamily: 'Outfit',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else ...[
-                        // Lessons List
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: lessons.length,
-                          itemBuilder: (context, lessonIndex) {
-                            final lesson = lessons[lessonIndex];
-                            IconData lessonIcon = Icons.play_circle_outline;
-                            if (lesson['itemType'] == 'quiz' || lesson['itemType'] == 'practice') {
-                              lessonIcon = Icons.assignment_outlined;
-                            } else if (lesson['itemType'] == 'document' || lesson['itemType'] == 'text') {
-                              lessonIcon = Icons.description_outlined;
-                            }
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFEFF2F5)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(lessonIcon, color: const Color(0xFF64748B), size: 18),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      lesson['title'] ?? 'Untitled Lesson',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF1E293B),
-                                        fontFamily: 'Outfit',
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 16),
-                                    onPressed: () => _showEditLessonDialog(index, lessonIndex),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 16),
-                                    onPressed: () {
-                                      setState(() {
-                                        (section['lessons'] as List<dynamic>).removeAt(lessonIndex);
-                                      });
-                                      _notifyParent();
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: () => _showAddLessonDialog(index),
-                            icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
-                            label: const Text(
-                              'Add Lesson',
-                              style: TextStyle(
-                                color: Color(0xFF20B486),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEFF2F5)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.01),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildSectionFormCard(),
-          const SizedBox(height: 32),
-          const Text(
-            'Course Curriculum',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-              fontFamily: 'Outfit',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFormCard(),
+        const SizedBox(height: 24),
+        _buildSectionsContainer(),
+      ],
+    );
+  }
+
+  Widget _buildFormCard() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFCCFBF1), // very light green border
+              width: 1.5,
             ),
           ),
-          const SizedBox(height: 16),
-          if (_localSections.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEFF2F5)),
-              ),
-              child: const Text(
-                'No sections added yet. Use the form above to create your first section.',
+          padding: const EdgeInsets.only(left: 24, right: 24, top: 28, bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'SECTION NAME',
                 style: TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 13,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF64748B),
+                  letterSpacing: 1.2,
                   fontFamily: 'Outfit',
-                  fontStyle: FontStyle.italic,
                 ),
               ),
-            )
-          else
-            _buildSectionsList(),
-        ],
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  hintText: 'Section 1: Introduction to English Grammar',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  suffixIcon: const Icon(Icons.subject, color: Color(0xFF94A3B8)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
+                  ),
+                ),
+                style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'SECTION DESCRIPTION (OPTIONAL)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF64748B),
+                  letterSpacing: 1.2,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _descController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Briefly describe what students will learn in this chapter...',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
+                  ),
+                ),
+                style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (_editingIndex != null) ...[
+                    OutlinedButton(
+                      onPressed: _cancelEditing,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _updateSection,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20B486),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Update Section',
+                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ] else ...[
+                    ElevatedButton.icon(
+                      onPressed: _addSection,
+                      icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                      label: const Text(
+                        'Add Section',
+                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20B486),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 24,
+          top: -12,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF20B486),
+                width: 1.5,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              _editingIndex != null ? 'EDIT SECTION' : 'NEW SECTION',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF20B486),
+                letterSpacing: 1.0,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionsContainer() {
+    if (_localSections.isEmpty) {
+      return CustomPaint(
+        painter: DashedRoundedBorderPainter(
+          color: const Color(0xFFCBD5E1),
+          borderRadius: 12,
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+          alignment: Alignment.center,
+          child: const Text(
+            'No sections created yet. Use the form above to add a section.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF64748B),
+              fontFamily: 'Outfit',
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return CustomPaint(
+      painter: DashedRoundedBorderPainter(
+        color: const Color(0xFFCBD5E1),
+        borderRadius: 12,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _localSections.length,
+          itemBuilder: (context, index) {
+            final section = _localSections[index];
+            final lessons = section['lessons'] as List<dynamic>? ?? [];
+            final isExpanded = _expandedIndices.contains(index);
+
+            return Container(
+              margin: EdgeInsets.only(bottom: index == _localSections.length - 1 ? 0 : 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDF5FF), // premium light blue bg
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        // Circle Index Badge
+                        Container(
+                          width: 32,
+                          height: 32,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFD0E7FF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0369A1),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Title and count
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                section['title'] ?? 'Untitled Section',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${lessons.length} ${lessons.length == 1 ? "item" : "items"}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Action buttons
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
+                          tooltip: 'Edit Section',
+                          onPressed: () => _startEditing(index),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                          tooltip: 'Delete Section',
+                          onPressed: () => _deleteSection(index),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            color: const Color(0xFF64748B),
+                            size: 22,
+                          ),
+                          tooltip: isExpanded ? 'Collapse' : 'Expand',
+                          onPressed: () => _toggleExpanded(index),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isExpanded) ...[
+                    const Divider(color: Color(0xFFD0E7FF), height: 1),
+                    Container(
+                      color: Colors.white.withAlpha(102),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (section['description'] != null && section['description'].toString().isNotEmpty) ...[
+                            Text(
+                              section['description'],
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF475569),
+                                fontFamily: 'Outfit',
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (lessons.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                'No lessons in this section yet.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: Color(0xFF94A3B8),
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            )
+                          else
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: lessons.length,
+                              itemBuilder: (context, lessonIndex) {
+                                final lesson = lessons[lessonIndex];
+                                IconData lessonIcon = Icons.play_circle_outline;
+                                if (lesson['itemType'] == 'quiz' || lesson['itemType'] == 'practice') {
+                                  lessonIcon = Icons.assignment_outlined;
+                                } else if (lesson['itemType'] == 'document' || lesson['itemType'] == 'text') {
+                                  lessonIcon = Icons.description_outlined;
+                                }
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(lessonIcon, color: const Color(0xFF64748B), size: 18),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          lesson['title'] ?? 'Untitled Lesson',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF1E293B),
+                                            fontFamily: 'Outfit',
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, color: Color(0xFF64748B), size: 16),
+                                        onPressed: () => _showEditLessonDialog(index, lessonIndex),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                                        onPressed: () => _deleteLesson(index, lessonIndex),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: () => _showAddLessonDialog(index),
+                            icon: const Icon(Icons.add, size: 14, color: Color(0xFF20B486)),
+                            label: const Text(
+                              'Add Lesson',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                fontFamily: 'Outfit',
+                                color: Color(0xFF20B486),
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF20B486)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 }
 
-class DashedBorderPainter extends CustomPainter {
+class DashedRoundedBorderPainter extends CustomPainter {
   final Color color;
   final double strokeWidth;
   final double dashWidth;
   final double dashSpace;
   final double borderRadius;
 
-  DashedBorderPainter({
+  DashedRoundedBorderPainter({
     required this.color,
     this.strokeWidth = 1.5,
     this.dashWidth = 6.0,
@@ -808,34 +858,38 @@ class DashedBorderPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
 
-    final double w = size.width;
-    final double h = size.height;
-
-    // Draw dashed path for rounded rect
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, w, h),
+    final RRect rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
       Radius.circular(borderRadius),
     );
-    final path = Path()..addRRect(rrect);
 
+    final Path path = Path()..addRRect(rrect);
     final Path dashedPath = Path();
-    double distance = 0.0;
-    for (final PathMetric measurePath in path.computeMetrics()) {
-      while (distance < measurePath.length) {
-        dashedPath.addPath(
-          measurePath.extractPath(distance, distance + dashWidth),
-          Offset.zero,
-        );
-        distance += dashWidth + dashSpace;
+
+    for (final PathMetric metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final double len = dashWidth;
+        if (distance + len > metric.length) {
+          dashedPath.addPath(
+            metric.extractPath(distance, metric.length),
+            Offset.zero,
+          );
+        } else {
+          dashedPath.addPath(
+            metric.extractPath(distance, distance + len),
+            Offset.zero,
+          );
+        }
+        distance += len + dashSpace;
       }
-      distance = 0.0;
     }
 
     canvas.drawPath(dashedPath, paint);
   }
 
   @override
-  bool shouldRepaint(DashedBorderPainter oldDelegate) {
+  bool shouldRepaint(DashedRoundedBorderPainter oldDelegate) {
     return oldDelegate.color != color ||
         oldDelegate.strokeWidth != strokeWidth ||
         oldDelegate.dashWidth != dashWidth ||
