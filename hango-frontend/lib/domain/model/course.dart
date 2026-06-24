@@ -8,6 +8,7 @@ class Course {
   final String learnerCount;
   final String thumbnailUrl;
   final String status; // 'featured' | 'in_progress' | 'completed'
+  final double progressPercentage;
 
   const Course({
     required this.id,
@@ -19,6 +20,7 @@ class Course {
     required this.learnerCount,
     required this.thumbnailUrl,
     required this.status,
+    required this.progressPercentage,
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class Course {
       learnerCount: '${json['learnersCount'] ?? 0}',
       thumbnailUrl: json['thumbnailUrl'] ?? '',
       status: 'featured',
+      progressPercentage: (json['progressPercentage'] ?? 0.0).toDouble(),
     );
   }
 }

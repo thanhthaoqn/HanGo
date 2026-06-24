@@ -31,7 +31,7 @@ class _CourseCardState extends State<CourseCard> {
                   : Colors.black.withOpacity(0.05),
               blurRadius: isHovered ? 20 : 10,
               offset: Offset(0, isHovered ? 10 : 4),
-            )
+            ),
           ],
         ),
         child: Column(
@@ -67,7 +67,7 @@ class _CourseCardState extends State<CourseCard> {
                       ),
                     ),
                   ),
-                  
+
                   // Mortarboard watermark icon
                   Positioned(
                     bottom: -15,
@@ -81,7 +81,7 @@ class _CourseCardState extends State<CourseCard> {
                 ],
               ),
             ),
-            
+
             // Card Body
             Expanded(
               child: Padding(
@@ -109,7 +109,7 @@ class _CourseCardState extends State<CourseCard> {
                       ),
                     ),
                     const Spacer(),
-                    
+
                     // Stars and learner count
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -120,8 +120,8 @@ class _CourseCardState extends State<CourseCard> {
                               return Icon(
                                 Icons.star,
                                 size: 12,
-                                color: index < widget.course.stars.floor() 
-                                    ? const Color(0xFFFBBF24) 
+                                color: index < widget.course.stars.floor()
+                                    ? const Color(0xFFFBBF24)
                                     : Colors.grey.shade300,
                               );
                             }),
@@ -137,13 +137,17 @@ class _CourseCardState extends State<CourseCard> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Difficulty
                     Text(
-                      widget.course.difficulty.toUpperCase() == 'BASIC' ? 'Basic' :
-                      widget.course.difficulty.toUpperCase() == 'INTERMEDIATE' ? 'Intermediate' :
-                      widget.course.difficulty.toUpperCase() == 'ADVANCED' ? 'Advanced' :
-                      widget.course.difficulty,
+                      widget.course.difficulty.toUpperCase() == 'BASIC'
+                          ? 'Basic'
+                          : widget.course.difficulty.toUpperCase() ==
+                                'INTERMEDIATE'
+                          ? 'Intermediate'
+                          : widget.course.difficulty.toUpperCase() == 'ADVANCED'
+                          ? 'Advanced'
+                          : widget.course.difficulty,
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -153,7 +157,7 @@ class _CourseCardState extends State<CourseCard> {
                   ],
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),

@@ -8,7 +8,6 @@ import '../login_page.dart';
 import 'trainer_courses_page.dart';
 import 'edit_course_page.dart';
 
-
 class TrainerDashboardPage extends StatefulWidget {
   const TrainerDashboardPage({super.key});
 
