@@ -34,6 +34,7 @@ class CourseReviewSummary {
 
 class CourseReview {
   final int id;
+  final int? userId;
   final String userName;
   final String userInitial;
   final int rating;
@@ -42,6 +43,7 @@ class CourseReview {
 
   CourseReview({
     required this.id,
+    this.userId,
     required this.userName,
     required this.userInitial,
     required this.rating,
@@ -52,6 +54,7 @@ class CourseReview {
   factory CourseReview.fromJson(Map<String, dynamic> json) {
     return CourseReview(
       id: json['id'] ?? 0,
+      userId: json['userId'],
       userName: json['userName'] ?? 'unknown',
       userInitial: json['userInitial'] ?? 'U',
       rating: json['rating'] ?? 0,

@@ -3,6 +3,8 @@ import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../widgets/course_card.dart';
 import '../../widgets/shared_header.dart';
+import '../../widgets/shared_footer.dart';
+import '../learner/learner_home_page.dart';
 import 'course_detail_page.dart';
 
 class ListCoursesPage extends StatefulWidget {
@@ -63,7 +65,15 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
                     // Back Button
                     InkWell(
                       onTap: () {
-                        Navigator.pop(context);
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+                            (route) => false,
+                          );
+                        }
                       },
                       hoverColor: Colors.transparent,
                       splashColor: Colors.transparent,
@@ -94,7 +104,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
                 ),
               ),
             ),
-            _buildFooter(),
+            SharedFooter(isDesktop: isDesktop),
           ],
         ),
       ),
@@ -326,106 +336,5 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
     );
   }
 
-  Widget _buildFooter() {
-    return Container(
-      color: const Color(0xFFF6FBF9),
-      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 40.0),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Logo and description
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.school, color: Color(0xFF38B29E)),
-                        SizedBox(width: 8),
-                        Text(
-                          'HanGo',
-                          style: TextStyle(
-                            color: Color(0xFF38B29E),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'The leading digital coaching platform for high school students aiming for distinction in the THPTQG English National Exam.',
-                      style: TextStyle(color: Colors.black54, height: 1.5),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        _buildSocialIcon(Icons.facebook),
-                        const SizedBox(width: 16),
-                        _buildSocialIcon(Icons.link), // Placeholder for other icons
-                      ],
-                    )
-                  ],
-                ),
-              ),
-              const SizedBox(width: 40),
-              // Learning Links
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('LEARNING', style: TextStyle(fontWeight: FontWeight.bold)),
-                    SizedBox(height: 16),
-                    Text('Mock Tests', style: TextStyle(color: Colors.black54)),
-                    SizedBox(height: 8),
-                    Text('Vocabulary Sets', style: TextStyle(color: Colors.black54)),
-                    SizedBox(height: 8),
-                    Text('Grammar Courses', style: TextStyle(color: Colors.black54)),
-                  ],
-                ),
-              ),
-              // Support Links
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('SUPPORT', style: TextStyle(fontWeight: FontWeight.bold)),
-                    SizedBox(height: 16),
-                    Text('Learner FAQ', style: TextStyle(color: Colors.black54)),
-                    SizedBox(height: 8),
-                    Text('Privacy Policy', style: TextStyle(color: Colors.black54)),
-                    SizedBox(height: 8),
-                    Text('Terms of Service', style: TextStyle(color: Colors.black54)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 40),
-          const Divider(color: Colors.black12),
-          const SizedBox(height: 20),
-          const Text(
-            '© 2024 HanGo. Built for academic excellence.',
-            style: TextStyle(color: Colors.black54, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSocialIcon(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Icon(icon, color: Colors.grey.shade600, size: 20),
-    );
-  }
 }
