@@ -8,6 +8,8 @@ import '../../../domain/model/lesson_detail.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/ai_assistant_drawer.dart';
 import '../../../utils/fullscreen_helper.dart';
+import '../../widgets/lesson_ai_chatbox.dart';
+import 'package:provider/provider.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
@@ -86,7 +88,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _errorMessage = null;
       });
       final course = await _courseRepository.fetchCourseDetail(widget.courseId);
-      final lesson = await _lessonRepository.fetchLessonDetail(_currentLessonId);
+      final lesson = await _lessonRepository.fetchLessonDetail(
+        _currentLessonId,
+      );
       setState(() {
         _courseDetail = course;
         _lessonDetail = lesson;
@@ -184,7 +188,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _commentController.text.trim(),
       );
       _commentController.clear();
-      final updatedLesson = await _lessonRepository.fetchLessonDetail(_currentLessonId);
+      final updatedLesson = await _lessonRepository.fetchLessonDetail(
+        _currentLessonId,
+      );
       setState(() {
         _lessonDetail = updatedLesson;
       });
@@ -211,7 +217,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _currentUserId,
         _editCommentController.text.trim(),
       );
-      final updatedLesson = await _lessonRepository.fetchLessonDetail(_currentLessonId);
+      final updatedLesson = await _lessonRepository.fetchLessonDetail(
+        _currentLessonId,
+      );
       setState(() {
         _editingCommentId = null;
         _lessonDetail = updatedLesson;
@@ -229,7 +237,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   Future<void> _deleteComment(int commentId) async {
     try {
       await _lessonRepository.deleteComment(commentId, _currentUserId);
-      final updatedLesson = await _lessonRepository.fetchLessonDetail(_currentLessonId);
+      final updatedLesson = await _lessonRepository.fetchLessonDetail(
+        _currentLessonId,
+      );
       setState(() {
         _lessonDetail = updatedLesson;
       });
@@ -358,7 +368,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   void _showDeleteConfirmation(int commentId) {
     _showModernConfirmDialog(
       title: 'Delete Comment',
-      content: const Text('Are you sure you want to delete this comment? This action cannot be undone.'),
+      content: const Text(
+        'Are you sure you want to delete this comment? This action cannot be undone.',
+      ),
       confirmText: 'Delete',
       confirmColor: const Color(0xFFEF4444),
       icon: Icons.delete_outline_rounded,
@@ -407,37 +419,37 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
             )
           : (_errorMessage != null)
-              ? Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                        ),
-                      ],
+          ? Center(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          color: Colors.red,
-                          size: 48,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'An error occurred: $_errorMessage',
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ],
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 48,
                     ),
-                  ),
-                )
-              : _buildPageContent(isDesktop, showHideNavLinks),
+                    const SizedBox(height: 16),
+                    Text(
+                      'An error occurred: $_errorMessage',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : _buildPageContent(isDesktop, showHideNavLinks),
     );
   }
 
@@ -466,20 +478,24 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     return Stack(
       children: [
+        // TẦNG 1: Toàn bộ nội dung chính của trang bài học (Giữ nguyên)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Left Sidebar
             if (isDesktop)
-              Container(
-                width: 320,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(
-                    right: BorderSide(color: Colors.grey.shade200),
+              Material(
+                // Đổi từ Container thành Material
+                color: Colors.white, // Giữ nguyên màu nền trắng
+                child: Container(
+                  width: 320,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      right: BorderSide(color: Colors.grey.shade200),
+                    ),
                   ),
+                  child: _buildSidebar(course),
                 ),
-                child: _buildSidebar(course),
               ),
 
             // Main Content
@@ -575,9 +591,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                               ],
                             ),
                           ),
-                          // Spacer if AI Assistant is open on smaller screen
-                          if (_isAIAssistantOpen && !isDesktop)
-                            const SizedBox(width: 320),
                         ],
                       ),
                     ),
@@ -585,76 +598,22 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 ],
               ),
             ),
-
-            // AI Assistant Drawer (Inline for Desktop if opened)
-            if (isDesktop && _isAIAssistantOpen && !_isDoingQuiz)
-              AIAssistantDrawer(onClose: _toggleAIAssistant),
           ],
         ),
 
-        // Floating AI Button
-        if (!_isAIAssistantOpen && !_isDoingQuiz)
-          Positioned(
-            right: 24,
-            bottom: 24,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF28B79B).withOpacity(0.3),
-                    blurRadius: 16,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: FloatingActionButton(
-                onPressed: _toggleAIAssistant,
-                backgroundColor: Colors.white,
-                elevation: 4,
-                shape: const CircleBorder(),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: Image.asset(
-                      'assets/images/robot_logo.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const CircleAvatar(
-                          backgroundColor: Color(0xFF28B79B),
-                          child: Icon(
-                            Icons.smart_toy_outlined,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
+        // TẦNG 2: AI CHATBOX MỚI (Được đưa xuống dưới cùng danh sách children để nổi lên trên hết)
+        // Lưu ý: Đảm bảo điều kiện ẩn Chatbox khi đang làm bài Quiz (nếu muốn) giống code cũ
+        // SỬA THÀNH NHƯ THẾ NÀY:
+        if (!_isDoingQuiz)
+          LessonAiChatbox(
+            lessonId: _currentLessonId,
+            lessonTitle: lesson.title,
           ),
 
-        // Overlay AI Drawer for Mobile/Tablet
-        if (!isDesktop && _isAIAssistantOpen && !_isDoingQuiz)
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: _toggleAIAssistant,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width - 320,
-                    color: Colors.black12,
-                  ),
-                ),
-                AIAssistantDrawer(onClose: _toggleAIAssistant),
-              ],
-            ),
-          ),
+        // ====================================================================
+        // KHÔNG ĐƯỢC ĐỂ ĐOẠN CODE "Floating AI Button" VÀ "Overlay AI Drawer" CŨ Ở ĐÂY NỮA.
+        // TÔI ĐÃ XÓA CHÚNG ĐỂ TRÁNH XUNG ĐỘT CHẶN CẢM ỨNG CỦA CHATBOX MỚI.
+        // ====================================================================
       ],
     );
   }
@@ -674,75 +633,84 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   }
 
   Widget _buildSidebar(CourseDetail course) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      itemCount: course.sessions.length,
-      itemBuilder: (context, index) {
-        final session = course.sessions[index];
-        return Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            initiallyExpanded: session.lessons.any(
-              (l) => l.id == _currentLessonId,
-            ),
-            title: Text(
-              'SECTION ${index + 1}',
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF28B79B),
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.0,
+    // THÊM: Bọc Material transparent ở đây để sửa lỗi Ink Splashes
+    return Material(
+      color: Colors.transparent,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        itemCount: course.sessions.length,
+        itemBuilder: (context, index) {
+          final session = course.sessions[index];
+          return Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: session.lessons.any(
+                (l) => l.id == _currentLessonId,
               ),
-            ),
-            subtitle: Text(
-              session.title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+              title: Text(
+                'SECTION ${index + 1}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF28B79B),
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
               ),
-            ),
-            childrenPadding: const EdgeInsets.symmetric(vertical: 4),
-            children: session.lessons.map((l) {
-              final isCurrent = l.id == _currentLessonId;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: Material(
-                  color: isCurrent
-                      ? const Color(0xFFE6F7F4)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    leading: Icon(
-                      _getLessonIcon(l.itemType),
-                      color: isCurrent
-                          ? const Color(0xFF28B79B)
-                          : const Color(0xFF94A3B8),
-                      size: 20,
-                    ),
-                    title: Text(
-                      l.title,
-                      style: TextStyle(
-                        fontSize: 13,
+              subtitle: Text(
+                session.title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              childrenPadding: const EdgeInsets.symmetric(vertical: 4),
+              children: session.lessons.map((l) {
+                final isCurrent = l.id == _currentLessonId;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  child: Material(
+                    color: isCurrent
+                        ? const Color(0xFFE6F7F4)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      leading: Icon(
+                        _getLessonIcon(l.itemType),
                         color: isCurrent
                             ? const Color(0xFF28B79B)
-                            : const Color(0xFF475569),
-                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                            : const Color(0xFF94A3B8),
+                        size: 20,
                       ),
+                      title: Text(
+                        l.title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isCurrent
+                              ? const Color(0xFF28B79B)
+                              : const Color(0xFF475569),
+                          fontWeight: isCurrent
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        _navigateToLesson(l.id);
+                      },
                     ),
-                    onTap: () {
-                      _navigateToLesson(l.id);
-                    },
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
+                );
+              }).toList(),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -2539,18 +2507,19 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                   width: 36,
                                   height: 36,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Text(
-                                    comment.userName.isNotEmpty
-                                        ? comment.userName[0].toUpperCase()
-                                        : '?',
-                                    style: TextStyle(
-                                      color: isOwnComment
-                                          ? Colors.white
-                                          : const Color(0xFF64748B),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Text(
+                                        comment.userName.isNotEmpty
+                                            ? comment.userName[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          color: isOwnComment
+                                              ? Colors.white
+                                              : const Color(0xFF64748B),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
                                 ),
                               )
                             : Text(
@@ -2610,7 +2579,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                   PopupMenuButton<String>(
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
-                                      side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+                                      side: const BorderSide(
+                                        color: Color(0xFFF1F5F9),
+                                        width: 1,
+                                      ),
                                     ),
                                     color: Colors.white,
                                     elevation: 4,
