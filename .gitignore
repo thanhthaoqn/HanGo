@@ -71,3 +71,8 @@ database.sql
 **/generated_plugin_registrant.*
 **/generated_plugins.cmake
 **/GeneratedPluginRegistrant.swift
+
+# Chặn các file build tự sinh của các nền tảng desktop
+**/linux/flutter/generated_*
+**/macos/Flutter/Generated*
+**/windows/flutter/generated_*

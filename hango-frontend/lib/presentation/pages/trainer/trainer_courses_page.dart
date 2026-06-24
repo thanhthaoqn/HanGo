@@ -24,8 +24,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   String _errorMessage = '';
 
   // Tab Status Filters
-  String _selectedStatus = 'ALL'; // 'ALL', 'DRAFT', 'PUBLISHED', 'HIDDEN', 'PENDING'
-  
+  String _selectedStatus =
+      'ALL'; // 'ALL', 'DRAFT', 'PUBLISHED', 'HIDDEN', 'PENDING'
+
   // Status Counts
   int _allCount = 0;
   int _draftCount = 0;
@@ -99,7 +100,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         queryParams['search'] = searchVal;
       }
 
-      final uri = Uri.parse('$apiBaseUrl/trainer/courses').replace(queryParameters: queryParams);
+      final uri = Uri.parse(
+        '$apiBaseUrl/trainer/courses',
+      ).replace(queryParameters: queryParams);
       final response = await http.get(
         uri,
         headers: {
@@ -144,12 +147,13 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           'id': 1,
           'title': 'Grammar 8+',
           'status': 'PUBLISHED',
-          'description': 'Advanced grammar concepts tailored for high-achieving students....',
+          'description':
+              'Advanced grammar concepts tailored for high-achieving students....',
           'learnersCount': 0,
           'lessonsCount': 1,
           'thumbnailUrl': null,
-          'createdAt': '2026-06-03T00:00:00'
-        }
+          'createdAt': '2026-06-03T00:00:00',
+        },
       ];
     });
   }
@@ -170,8 +174,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     try {
       final dateTime = DateTime.parse(dateStr.toString());
       final months = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
       final month = months[dateTime.month - 1];
       return 'Updated $month ${dateTime.day}, ${dateTime.year}';
@@ -259,12 +273,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           ),
           const SizedBox(height: 40),
           // Sidebar menu items
-          _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
-            );
-          }),
+          _buildSidebarItem(
+            Icons.dashboard_outlined,
+            'Dashboard',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerDashboardPage(),
+                ),
+              );
+            },
+          ),
           _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
@@ -273,18 +293,35 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Help Center is under construction')),
-            );
-          }),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
+          _buildSidebarItem(
+            Icons.help_outline,
+            'Help Center',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Help Center is under construction'),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.logout,
+            'Logout',
+            color: Colors.redAccent,
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -301,14 +338,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
+                color: isActive
+                    ? Colors.white
+                    : (color ?? const Color(0xFF4B5563)),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
+                  color: isActive
+                      ? Colors.white
+                      : (color ?? const Color(0xFF1F2937)),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',
@@ -422,7 +463,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   color: Color(0xFF20B486),
                   shape: BoxShape.circle,
                 ),
-              )
+              ),
             ],
           ),
         ],
@@ -445,16 +486,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         ),
         ElevatedButton.icon(
           onPressed: () {
-<<<<<<< HEAD
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Create Course is under construction')),
-            );
-=======
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const CreateCoursePage()),
             ).then((_) => _fetchCoursesData());
->>>>>>> dev
           },
           icon: const Icon(Icons.add, color: Colors.white, size: 18),
           label: const Text(
@@ -511,15 +546,25 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           LayoutBuilder(
             builder: (context, constraints) {
               final useRow = constraints.maxWidth > 768;
-              
+
               final searchField = TextField(
                 controller: _searchController,
                 onChanged: (val) => _fetchCoursesData(),
                 decoration: InputDecoration(
                   hintText: 'Search for courses...',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8), size: 20),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF94A3B8),
+                    size: 20,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   filled: true,
                   fillColor: const Color(0xFFF8FAFC),
                   border: OutlineInputBorder(
@@ -540,9 +585,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               final sortByDropdown = _buildDropdown(
                 value: _selectedSortBy,
                 items: const [
-                  DropdownMenuItem(value: 'NEWEST', child: Text('Sort by: Newest')),
-                  DropdownMenuItem(value: 'OLDEST', child: Text('Sort by: Oldest')),
-                  DropdownMenuItem(value: 'ALPHABETICAL', child: Text('Sort by: Alphabetical')),
+                  DropdownMenuItem(
+                    value: 'NEWEST',
+                    child: Text('Sort by: Newest'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'OLDEST',
+                    child: Text('Sort by: Oldest'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'ALPHABETICAL',
+                    child: Text('Sort by: Alphabetical'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -555,9 +609,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               final timePeriodDropdown = _buildDropdown(
                 value: _selectedTimePeriod,
                 items: const [
-                  DropdownMenuItem(value: 'ALL', child: Text('Time Period: All')),
-                  DropdownMenuItem(value: 'THIS_WEEK', child: Text('Time Period: This Week')),
-                  DropdownMenuItem(value: 'THIS_MONTH', child: Text('Time Period: This Month')),
+                  DropdownMenuItem(
+                    value: 'ALL',
+                    child: Text('Time Period: All'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'THIS_WEEK',
+                    child: Text('Time Period: This Week'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'THIS_MONTH',
+                    child: Text('Time Period: This Month'),
+                  ),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -588,7 +651,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         const SizedBox(width: 12),
                         Expanded(child: timePeriodDropdown),
                       ],
-                    )
+                    ),
                   ],
                 );
               }
@@ -622,7 +685,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             Text(
               label,
               style: TextStyle(
-                color: isActive ? const Color(0xFF20B486) : const Color(0xFF4B5563),
+                color: isActive
+                    ? const Color(0xFF20B486)
+                    : const Color(0xFF4B5563),
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                 fontSize: 14,
                 fontFamily: 'Outfit',
@@ -632,7 +697,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isActive ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
+                color: isActive
+                    ? const Color(0xFF20B486)
+                    : const Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -643,7 +710,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -667,7 +734,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           value: value,
           items: items,
           onChanged: onChanged,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 18),
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: Color(0xFF64748B),
+            size: 18,
+          ),
           style: const TextStyle(
             color: Color(0xFF1E293B),
             fontSize: 14,
@@ -700,39 +771,39 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             ? const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 48.0),
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF20B486),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFF20B486)),
                 ),
               )
             : _coursesList.isEmpty
-                ? Container(
-                    padding: const EdgeInsets.symmetric(vertical: 64),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFEFF2F5)),
+            ? Container(
+                padding: const EdgeInsets.symmetric(vertical: 64),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFEFF2F5)),
+                ),
+                child: Column(
+                  children: const [
+                    Icon(Icons.folder_open, size: 48, color: Color(0xFF94A3B8)),
+                    SizedBox(height: 16),
+                    Text(
+                      'No courses found matching this criteria',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Outfit',
+                      ),
                     ),
-                    child: Column(
-                      children: const [
-                        Icon(Icons.folder_open, size: 48, color: Color(0xFF94A3B8)),
-                        SizedBox(height: 16),
-                        Text(
-                          'No courses found matching this criteria',
-                          style: TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Column(
-                    children: _coursesList.map((course) => _buildCourseCard(course)).toList(),
-                  ),
+                  ],
+                ),
+              )
+            : Column(
+                children: _coursesList
+                    .map((course) => _buildCourseCard(course))
+                    .toList(),
+              ),
         const SizedBox(height: 24),
         _buildPagination(),
       ],
@@ -768,7 +839,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final useRow = constraints.maxWidth > 600;
-          
+
           final imageContainer = Container(
             width: useRow ? 120 : double.infinity,
             height: 90,
@@ -782,8 +853,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                     child: Image.network(
                       thumbnail,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.school, color: Color(0xFF20B486), size: 32),
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.school,
+                        color: Color(0xFF20B486),
+                        size: 32,
+                      ),
                     ),
                   )
                 : const Icon(Icons.school, color: Color(0xFF20B486), size: 32),
@@ -808,15 +882,22 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: isPublished ? const Color(0xFFE6FFFA) : const Color(0xFFF1F5F9),
+                      color: isPublished
+                          ? const Color(0xFFE6FFFA)
+                          : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       status.toString().toUpperCase(),
                       style: TextStyle(
-                        color: isPublished ? const Color(0xFF20B486) : const Color(0xFF64748B),
+                        color: isPublished
+                            ? const Color(0xFF20B486)
+                            : const Color(0xFF64748B),
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
@@ -833,11 +914,19 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.people_outline, size: 16, color: Color(0xFF94A3B8)),
+                      const Icon(
+                        Icons.people_outline,
+                        size: 16,
+                        color: Color(0xFF94A3B8),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '$learners learners',
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontFamily: 'Outfit'),
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ],
                   ),
@@ -845,11 +934,19 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.class_outlined, size: 16, color: Color(0xFF94A3B8)),
+                      const Icon(
+                        Icons.class_outlined,
+                        size: 16,
+                        color: Color(0xFF94A3B8),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '$lessons lesson',
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontFamily: 'Outfit'),
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ],
                   ),
@@ -857,11 +954,19 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF94A3B8)),
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 14,
+                        color: Color(0xFF94A3B8),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         dateStr,
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontFamily: 'Outfit'),
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ],
                   ),
@@ -889,7 +994,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               _buildActionButton(
                 icon: Icons.edit_outlined,
                 onTap: () {
-                  final courseId = course['id'] is int ? course['id'] as int : int.parse(course['id'].toString());
+                  final courseId = course['id'] is int
+                      ? course['id'] as int
+                      : int.parse(course['id'].toString());
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -903,7 +1010,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                 icon: Icons.remove_red_eye_outlined,
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('View course $title details is under construction')),
+                    SnackBar(
+                      content: Text(
+                        'View course $title details is under construction',
+                      ),
+                    ),
                   );
                 },
               ),
@@ -935,11 +1046,14 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                     _buildActionButton(
                       icon: Icons.edit_outlined,
                       onTap: () {
-                        final courseId = course['id'] is int ? course['id'] as int : int.parse(course['id'].toString());
+                        final courseId = course['id'] is int
+                            ? course['id'] as int
+                            : int.parse(course['id'].toString());
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => EditCoursePage(courseId: courseId),
+                            builder: (context) =>
+                                EditCoursePage(courseId: courseId),
                           ),
                         ).then((_) => _fetchCoursesData());
                       },
@@ -950,7 +1064,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                       onTap: () {},
                     ),
                   ],
-                )
+                ),
               ],
             );
           }
@@ -959,7 +1073,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     );
   }
 
-  Widget _buildActionButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _buildActionButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -988,7 +1105,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.chevron_left, size: 16, color: Color(0xFF94A3B8)),
+            child: const Icon(
+              Icons.chevron_left,
+              size: 16,
+              color: Color(0xFF94A3B8),
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -1018,7 +1139,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
+            child: const Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: Color(0xFF94A3B8),
+            ),
           ),
         ),
       ],
