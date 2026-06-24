@@ -24,6 +24,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final EnrollmentRepository enrollmentRepository;
     private final ExamRepository examRepository;
     private final SystemParameterRepository systemParameterRepository;
+    private final SectionRepository sectionRepository;
+    private final LessonRepository lessonRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -224,6 +226,83 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             course.setThumbnailUrl(request.getThumbnailUrl());
         }
 
-        courseRepository.save(course);
+        com.hango.hango_backend.entity.Course savedCourse = courseRepository.save(course);
+
+        // Update sections and lessons
+        List<com.hango.hango_backend.entity.Section> existingSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(savedCourse.getId());
+        List<com.hango.hango_backend.dto.CourseSessionDTO> sessionDTOs = request.getSessions();
+        if (sessionDTOs == null) {
+            sessionDTOs = new java.util.ArrayList<>();
+        }
+
+        java.util.Set<Long> requestSectionIds = sessionDTOs.stream()
+                .map(com.hango.hango_backend.dto.CourseSessionDTO::getId)
+                .filter(sid -> sid != null && sid < 1000000000000L)
+                .collect(java.util.stream.Collectors.toSet());
+
+        // Delete sections not in request
+        for (com.hango.hango_backend.entity.Section existingSection : existingSections) {
+            if (!requestSectionIds.contains(existingSection.getId())) {
+                sectionRepository.delete(existingSection);
+            }
+        }
+
+        // Save/update sections
+        for (int sIdx = 0; sIdx < sessionDTOs.size(); sIdx++) {
+            com.hango.hango_backend.dto.CourseSessionDTO sDto = sessionDTOs.get(sIdx);
+            com.hango.hango_backend.entity.Section section;
+            if (sDto.getId() != null && sDto.getId() < 1000000000000L) {
+                section = sectionRepository.findById(sDto.getId())
+                        .orElse(new com.hango.hango_backend.entity.Section());
+            } else {
+                section = new com.hango.hango_backend.entity.Section();
+            }
+            section.setCourse(savedCourse);
+            section.setTitle(sDto.getTitle());
+            section.setDisplayOrder(sIdx + 1);
+
+            final com.hango.hango_backend.entity.Section savedSection = sectionRepository.save(section);
+
+            // Update lessons in this section
+            List<com.hango.hango_backend.entity.Lesson> existingLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(savedSection.getId());
+            List<com.hango.hango_backend.dto.CourseLessonDTO> lessonDTOs = sDto.getLessons();
+            if (lessonDTOs == null) {
+                lessonDTOs = new java.util.ArrayList<>();
+            }
+
+            java.util.Set<Long> requestLessonIds = lessonDTOs.stream()
+                    .map(com.hango.hango_backend.dto.CourseLessonDTO::getId)
+                    .filter(lid -> lid != null && lid < 1000000000000L)
+                    .collect(java.util.stream.Collectors.toSet());
+
+            // Delete lessons not in request
+            for (com.hango.hango_backend.entity.Lesson existingLesson : existingLessons) {
+                if (!requestLessonIds.contains(existingLesson.getId())) {
+                    lessonRepository.delete(existingLesson);
+                }
+            }
+
+            // Save/update lessons
+            for (int lIdx = 0; lIdx < lessonDTOs.size(); lIdx++) {
+                com.hango.hango_backend.dto.CourseLessonDTO lDto = lessonDTOs.get(lIdx);
+                com.hango.hango_backend.entity.Lesson lesson;
+                if (lDto.getId() != null && lDto.getId() < 1000000000000L) {
+                    lesson = lessonRepository.findById(lDto.getId())
+                            .orElse(new com.hango.hango_backend.entity.Lesson());
+                } else {
+                    lesson = new com.hango.hango_backend.entity.Lesson();
+                }
+                lesson.setSection(savedSection);
+                lesson.setTitle(lDto.getTitle());
+                lesson.setLessonType(lDto.getItemType() != null ? lDto.getItemType() : "video");
+                lesson.setDisplayOrder(lIdx + 1);
+                
+                // Set mandatory fields using Course category and difficulty parameters
+                lesson.setSkill(savedCourse.getCategory());
+                lesson.setDifficulty(savedCourse.getDifficulty());
+
+                lessonRepository.save(lesson);
+            }
+        }
     }
 }

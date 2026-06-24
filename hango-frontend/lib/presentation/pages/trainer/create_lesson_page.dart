@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'create_lesson_text_page.dart';
 
 class CreateLessonPage extends StatefulWidget {
   final int courseId;
@@ -746,7 +747,27 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                             children: [
                               Expanded(
                                 child: InkWell(
-                                  onTap: () => _showAddLessonDialog(index, 'text'),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => CreateLessonTextPage(
+                                          courseId: widget.courseId,
+                                          courseTitle: widget.courseTitle,
+                                          trainerName: widget.trainerName,
+                                          trainerInitials: widget.trainerInitials,
+                                          sections: _localSections,
+                                          sectionIndex: index,
+                                          onSectionsChanged: (updatedSections) {
+                                            setState(() {
+                                              _localSections = updatedSections;
+                                            });
+                                            _notifyParent();
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  },
                                   borderRadius: BorderRadius.circular(12),
                                   child: Container(
                                     padding: const EdgeInsets.all(16),

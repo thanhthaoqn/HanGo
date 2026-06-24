@@ -268,6 +268,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
+        'sessions': _sections,
       });
 
       final response = await http.put(
