@@ -3,6 +3,8 @@ package com.hango.hango_backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.Set;
+import java.util.HashSet;
 
 @Entity
 @Table(name = "comments")
@@ -32,6 +34,15 @@ public class Comment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "comment_likes",
+        joinColumns = @JoinColumn(name = "comment_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    @Builder.Default
+    private Set<User> likedUsers = new HashSet<>();
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;

@@ -1,10 +1,11 @@
 package com.hango.hango_backend.dto;
 
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CourseLessonDTO {
     private Long id;
     private String title;
@@ -12,4 +13,5 @@ public class CourseLessonDTO {
     private String itemType;
     private Long examId;
     private Integer questionCount;
+    private Boolean isCompleted;
 }

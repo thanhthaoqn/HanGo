@@ -445,10 +445,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         ),
         ElevatedButton.icon(
           onPressed: () {
+<<<<<<< HEAD
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Create Course is under construction')),
+            );
+=======
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const CreateCoursePage()),
             ).then((_) => _fetchCoursesData());
+>>>>>>> dev
           },
           icon: const Icon(Icons.add, color: Colors.white, size: 18),
           label: const Text(

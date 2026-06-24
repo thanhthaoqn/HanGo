@@ -5,6 +5,7 @@ class CourseLesson {
   final String? itemType;
   final int? examId;
   final int? questionCount;
+  final bool isCompleted;
 
   CourseLesson({
     required this.id,
@@ -13,6 +14,7 @@ class CourseLesson {
     this.itemType,
     this.examId,
     this.questionCount,
+    this.isCompleted = false,
   });
 
   factory CourseLesson.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class CourseLesson {
       itemType: json['itemType'] as String?,
       examId: json['examId'] as int?,
       questionCount: json['questionCount'] as int?,
+      isCompleted: json['isCompleted'] as bool? ?? false,
     );
   }
 }

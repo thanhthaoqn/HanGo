@@ -268,6 +268,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
+        'sessions': _sections,
       });
 
       final response = await http.put(
@@ -308,6 +309,56 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _isSaving = false;
         });
       }
+    }
+  }
+
+  void _autoSaveCourse() async {
+    setState(() {
+      _lastSavedText = 'Saving draft...';
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _lastSavedText = 'Failed to auto-save';
+        });
+        return;
+      }
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/courses/${widget.courseId}');
+      final body = jsonEncode({
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'categoryKey': _selectedCategoryKey,
+        'difficultyKey': _selectedLevelKey,
+        'thumbnailUrl': _uploadedImageUrl ?? '',
+        'sessions': _sections,
+      });
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _lastSavedText = 'Draft saved automatically just now';
+        });
+      } else {
+        setState(() {
+          _lastSavedText = 'Failed to auto-save';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error auto-saving course: $e');
+      setState(() {
+        _lastSavedText = 'Failed to auto-save';
+      });
     }
   }
 
@@ -363,6 +414,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                   setState(() {
                                                     _sections = updatedSections;
                                                   });
+                                                  _autoSaveCourse();
+                                                },
+                                                onStepChanged: (step) {
+                                                  setState(() {
+                                                    _activeStep = step;
+                                                  });
                                                 },
                                               ),
                                             ],
@@ -393,6 +450,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                           onSectionsChanged: (updatedSections) {
                                             setState(() {
                                               _sections = updatedSections;
+                                            });
+                                            _autoSaveCourse();
+                                          },
+                                          onStepChanged: (step) {
+                                            setState(() {
+                                              _activeStep = step;
                                             });
                                           },
                                         ),
@@ -1130,87 +1193,130 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ),
           ),
           const SizedBox(height: 12),
-          InkWell(
-            onTap: _isUploadingImage ? null : _pickAndUploadImage,
-            borderRadius: BorderRadius.circular(12),
-            child: CustomPaint(
-              painter: DashedBorderPainter(
-                color: const Color(0xFFCBD5E1),
-                borderRadius: 12,
-              ),
-              child: Container(
-                width: double.infinity,
-                height: 180,
-                padding: const EdgeInsets.all(20),
-                alignment: Alignment.center,
-                child: _isUploadingImage
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _uploadStatusText,
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 12,
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ],
-                      )
-                    : _uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              _uploadedImageUrl!,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.cloud_upload_outlined,
-                                color: Color(0xFF64748B),
-                                size: 40,
-                              ),
-                              SizedBox(height: 12),
-                              Text(
-                                'Click to upload or drag & drop',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF475569),
-                                  fontFamily: 'Outfit',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Recommended: 1280x720\n(PNG/JPG)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF94A3B8),
-                                  fontFamily: 'Outfit',
-                                  height: 1.4,
-                                ),
-                                textAlign: TextAlign.center,
+          _uploadedImageUrl != null && _uploadedImageUrl!.isNotEmpty
+              ? Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          _uploadedImageUrl!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _uploadedImageUrl = null;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEF4444),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
                               ),
                             ],
                           ),
-              ),
-            ),
-          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : InkWell(
+                  onTap: _isUploadingImage ? null : _pickAndUploadImage,
+                  borderRadius: BorderRadius.circular(12),
+                  child: CustomPaint(
+                    painter: DashedBorderPainter(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: 12,
+                    ),
+                    child: Container(
+                      width: double.infinity,
+                      height: 180,
+                      padding: const EdgeInsets.all(20),
+                      alignment: Alignment.center,
+                      child: _isUploadingImage
+                          ? Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _uploadStatusText,
+                                  style: const TextStyle(
+                                    color: Color(0xFF64748B),
+                                    fontSize: 12,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(
+                                  Icons.cloud_upload_outlined,
+                                  color: Color(0xFF64748B),
+                                  size: 40,
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Click to upload or drag & drop',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF475569),
+                                    fontFamily: 'Outfit',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Recommended: 1280x720\n(PNG/JPG)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF94A3B8),
+                                    fontFamily: 'Outfit',
+                                    height: 1.4,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
         ],
       ),
     );
