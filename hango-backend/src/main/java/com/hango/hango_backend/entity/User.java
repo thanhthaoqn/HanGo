@@ -39,6 +39,11 @@ public class User {
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
+    @Column(unique = true)
+    private String username;
+
+    private String address;
+
     @Builder.Default
     private String status = "ACTIVE";
 

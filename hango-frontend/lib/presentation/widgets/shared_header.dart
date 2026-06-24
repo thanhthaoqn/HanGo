@@ -6,6 +6,7 @@ import '../pages/register_page.dart';
 import '../pages/exam/list_exams_page.dart';
 import '../pages/course/list_courses_page.dart';
 import '../pages/learner/learner_home_page.dart';
+import '../pages/learner/my_information_page.dart';
 
 class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isDesktop;
@@ -32,6 +33,7 @@ class _SharedHeaderState extends State<SharedHeader> {
   String _userFullName = 'Learner';
   String _userEmail = '';
   String _userInitials = 'L';
+  String _userAvatarUrl = '';
 
   @override
   void initState() {
@@ -54,6 +56,7 @@ class _SharedHeaderState extends State<SharedHeader> {
 
     final fullName = prefs.getString('user_fullname') ?? 'Learner';
     final email = prefs.getString('user_email') ?? '';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
 
     String initials = 'L';
     if (fullName.trim().isNotEmpty) {
@@ -69,6 +72,7 @@ class _SharedHeaderState extends State<SharedHeader> {
         _userFullName = fullName;
         _userEmail = email;
         _userInitials = initials;
+        _userAvatarUrl = avatarUrl;
       });
     }
   }
@@ -82,6 +86,32 @@ class _SharedHeaderState extends State<SharedHeader> {
         (route) => false,
       );
     }
+  }
+
+  Widget _buildInitialsAvatar(double size, double fontSize) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          _userInitials,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: fontSize,
+            fontFamily: 'Outfit',
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildHeaderNavLink(
@@ -262,10 +292,11 @@ class _SharedHeaderState extends State<SharedHeader> {
                 onSelected: (val) {
                   if (val == 'logout') {
                     _handleLogout();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Profile details for $_userFullName'),
+                  } else if (val == 'my_info' || val == 'profile') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyInformationPage(),
                       ),
                     );
                   }
@@ -307,23 +338,17 @@ class _SharedHeaderState extends State<SharedHeader> {
                           width: 28,
                           height: 28,
                           decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
                             shape: BoxShape.circle,
                           ),
-                          child: Center(
-                            child: Text(
-                              _userInitials,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
+                          child: ClipOval(
+                            child: _userAvatarUrl.isNotEmpty
+                                ? Image.network(
+                                    _userAvatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        _buildInitialsAvatar(28, 12),
+                                  )
+                                : _buildInitialsAvatar(28, 12),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -360,24 +385,17 @@ class _SharedHeaderState extends State<SharedHeader> {
                                 width: 36,
                                 height: 36,
                                 decoration: const BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xFF28B79B),
-                                      Color(0xFF1F9E84),
-                                    ],
-                                  ),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    _userInitials,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      fontFamily: 'Outfit',
-                                    ),
-                                  ),
+                                child: ClipOval(
+                                  child: _userAvatarUrl.isNotEmpty
+                                      ? Image.network(
+                                          _userAvatarUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) =>
+                                              _buildInitialsAvatar(36, 14),
+                                        )
+                                      : _buildInitialsAvatar(36, 14),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -414,6 +432,38 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
                   PopupMenuItem(
+                    value: 'my_info',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6F4EA),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.assignment_ind_outlined,
+                              size: 18,
+                              color: Color(0xFF137333),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'My Information',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
                     value: 'profile',
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -426,7 +476,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
-                              Icons.person_outline_rounded,
+                              Icons.settings_outlined,
                               size: 18,
                               color: Color(0xFF28B79B),
                             ),
