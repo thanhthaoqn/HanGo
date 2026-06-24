@@ -455,50 +455,56 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               ),
               const SizedBox(height: 16),
               // Step 1: Introduction
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: const Color(0xFFEFF2F5)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF20B486),
-                        shape: BoxShape.circle,
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context, 'goToIntroduction');
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFEFF2F5)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF20B486),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check, size: 14, color: Colors.white),
                       ),
-                      child: const Icon(Icons.check, size: 14, color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Introduction',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
-                            fontFamily: 'Outfit',
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Introduction',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                              fontFamily: 'Outfit',
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Completed',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: activeColor,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Outfit',
+                          const SizedBox(height: 2),
+                          Text(
+                            'Completed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: activeColor,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1060,8 +1066,8 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                           children: [
                             Expanded(
                               child: InkWell(
-                                onTap: () {
-                                  Navigator.push(
+                                onTap: () async {
+                                  final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => CreateLessonTextPage(
@@ -1080,6 +1086,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                       ),
                                     ),
                                   );
+                                  if (result == 'goToIntroduction' && context.mounted) {
+                                    Navigator.pop(context, 'goToIntroduction');
+                                  }
                                 },
                                 borderRadius: BorderRadius.circular(12),
                                 child: Container(

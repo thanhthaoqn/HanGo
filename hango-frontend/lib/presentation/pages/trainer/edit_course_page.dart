@@ -365,6 +365,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                     _sections = updatedSections;
                                                   });
                                                 },
+                                                onStepChanged: (step) {
+                                                  setState(() {
+                                                    _activeStep = step;
+                                                  });
+                                                },
                                               ),
                                             ],
                                             const SizedBox(height: 24),
@@ -394,6 +399,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                           onSectionsChanged: (updatedSections) {
                                             setState(() {
                                               _sections = updatedSections;
+                                            });
+                                          },
+                                          onStepChanged: (step) {
+                                            setState(() {
+                                              _activeStep = step;
                                             });
                                           },
                                         ),

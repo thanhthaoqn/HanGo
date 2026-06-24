@@ -9,6 +9,7 @@ class CreateSectionPage extends StatefulWidget {
   final String trainerInitials;
   final List<dynamic> sections;
   final ValueChanged<List<dynamic>> onSectionsChanged;
+  final ValueChanged<int>? onStepChanged;
 
   const CreateSectionPage({
     super.key,
@@ -18,6 +19,7 @@ class CreateSectionPage extends StatefulWidget {
     required this.trainerInitials,
     required this.sections,
     required this.onSectionsChanged,
+    this.onStepChanged,
   });
 
   @override
@@ -696,8 +698,8 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                         IconButton(
                           icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
                           tooltip: 'Edit Section',
-                          onPressed: () {
-                            Navigator.push(
+                          onPressed: () async {
+                            final result = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => CreateLessonPage(
@@ -716,6 +718,9 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                 ),
                               ),
                             );
+                            if (result == 'goToIntroduction' && widget.onStepChanged != null) {
+                              widget.onStepChanged!(1);
+                            }
                           },
                         ),
                         IconButton(
