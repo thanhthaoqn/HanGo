@@ -66,3 +66,8 @@ Thumbs.db
 hango-backend/src/main/resources/application.properties
 devtools_options.yaml
 database.sql
+
+# Bỏ qua toàn bộ các file sinh tự động cho các nền tảng Desktop/Web/Mobile
+**/generated_plugin_registrant.*
+**/generated_plugins.cmake
+**/GeneratedPluginRegistrant.swift

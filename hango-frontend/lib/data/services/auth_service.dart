@@ -4,6 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
+  // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
+  static Function(Map<String, dynamic>)? onLoginSuccess;
+
   // Use localhost or 10.0.2.2 for Android emulator
   static String get baseUrl {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -11,7 +14,7 @@ class AuthService {
     }
     return 'http://localhost:8080/api/auth';
   }
-  
+
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';
   static const String _userEmailKey = 'user_email';
@@ -24,15 +27,18 @@ class AuthService {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
+        body: jsonEncode({'email': email, 'password': password}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await saveSession(data);
+
+        // 🔥 PHÁT TÍN HIỆU NGẦM: Báo cho AppState biết để cập nhật UI ngay lập tức
+        if (onLoginSuccess != null) {
+          onLoginSuccess!(data);
+        }
+
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': response.body};
@@ -75,7 +81,11 @@ class AuthService {
   }
 
   // Perform registration request
-  Future<Map<String, dynamic>> register(String fullName, String email, String password) async {
+  Future<Map<String, dynamic>> register(
+    String fullName,
+    String email,
+    String password,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
@@ -106,14 +116,18 @@ class AuthService {
       final response = await http.post(
         Uri.parse('$baseUrl/google'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'idToken': idToken,
-        }),
+        body: jsonEncode({'idToken': idToken}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await saveSession(data);
+
+        // 🔥 PHÁT TÍN HIỆU NGẦM: Áp dụng tương tự cho đăng nhập Google
+        if (onLoginSuccess != null) {
+          onLoginSuccess!(data);
+        }
+
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': response.body};
@@ -148,10 +162,7 @@ class AuthService {
       final response = await http.post(
         Uri.parse('$baseUrl/verify-otp'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'otpCode': otpCode,
-        }),
+        body: jsonEncode({'email': email, 'otpCode': otpCode}),
       );
 
       if (response.statusCode == 200) {
@@ -165,15 +176,15 @@ class AuthService {
   }
 
   // Reset password to a new one
-  Future<Map<String, dynamic>> resetPassword(String email, String newPassword) async {
+  Future<Map<String, dynamic>> resetPassword(
+    String email,
+    String newPassword,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/reset-password'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'newPassword': newPassword,
-        }),
+        body: jsonEncode({'email': email, 'newPassword': newPassword}),
       );
 
       if (response.statusCode == 200) {

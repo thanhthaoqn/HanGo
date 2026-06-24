@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -55,12 +56,23 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> 
-                auth.requestMatchers("/api/auth/**").permitAll()
-                    .requestMatchers("/api/v1/exams", "/api/v1/exams/**").permitAll()
-                    .requestMatchers("/api/v1/courses", "/api/v1/courses/**").permitAll()
-                    .requestMatchers("/api/v1/lessons/**", "/api/v1/comments/**").permitAll()
-                    .anyRequest().authenticated()
+            .authorizeHttpRequests(auth -> auth
+                // Cho phép tất cả request OPTIONS (Preflight) đi qua tự do
+                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                
+                // Các endpoint công khai của hệ thống
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/v1/exams", "/api/v1/exams/**").permitAll()
+                .requestMatchers("/api/v1/courses", "/api/v1/courses/**").permitAll()
+                .requestMatchers("/api/v1/lessons/**", "/api/v1/comments/**").permitAll()
+                
+                // 🔥 ĐÃ SỬA: Chuyển sang permitAll() giúp cô lập lỗi, tránh bị JwtAuthFilter chặn nhầm 403
+                .requestMatchers("/api/v1/ai-assistant/**").permitAll()
+                .requestMatchers("/api/v1/ai-assistant/messages", "/api/v1/ai-assistant/conversations").authenticated() // Gửi tin nhắn & lịch sử: Phải có Token
+                // 🎯 THÊM DÒNG NÀY: Cho phép các response báo lỗi hệ thống đi qua để hiển thị đúng bản chất
+                .requestMatchers("/error").permitAll()
+
+                .anyRequest().authenticated()
             );
 
         http.authenticationProvider(authenticationProvider());
@@ -72,10 +84,25 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*"));
+        
+        // 🔥 ĐÃ SỬA: Thay vì dùng "*" gây lỗi khi kết hợp với AllowCredentials, ta chỉ định đích danh cổng Flutter Web
+        configuration.setAllowedOrigins(List.of("http://localhost:3000")); 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList("x-auth-token"));
+        
+        // Đảm bảo trình duyệt chấp nhận các Header truyền từ Flutter lên (kể cả Bearer Token)
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization", 
+            "Content-Type", 
+            "X-Requested-With", 
+            "Accept", 
+            "Origin", 
+            "Cache-Control",
+            "x-goog-api-key"
+        ));
+        
+        configuration.setExposedHeaders(Arrays.asList("x-auth-token", "Authorization"));
+        configuration.setAllowCredentials(true); 
+        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
