@@ -65,18 +65,18 @@
 
 ### 🎨 Phase 1: Frontend UI & Mock Data _(Assigned to: Frontend Agent)_
 
-- [ ] Build dynamic Course creation form allowing addition of multiple Sections/Lessons.
-- [ ] Build Course listing UI. Use Mock Course Repository for visual validation.
+- [x] Build dynamic Course creation form allowing addition of multiple Sections/Lessons.
+- [x] Build Course listing UI. Use Mock Course Repository for visual validation.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
 - [ ] Initialize `courses`, `sections`, `lessons` tables with `ON DELETE CASCADE` configuration.
 - [ ] Write `CourseService` combined with `@Transactional`.
-- [ ] Build `POST /api/v1/courses` API and integrate Course Thumbnail upload to Cloudinary.
+- [x] Build `POST /api/v1/courses` API and integrate Course Thumbnail upload to Cloudinary.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Integrate image picker library and call real `POST /api/v1/courses` API via `dio`.
+- [x] Integrate image picker library and call real `POST /api/v1/courses` API via `dio`.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 

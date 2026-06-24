@@ -17,5 +17,9 @@ public class CourseDetailDTO {
     private String description;
     private String objectives;
     private Boolean isEnrolled;
+    private String categoryKey;
+    private String categoryName;
+    private String difficultyKey;
+    private String thumbnailUrl;
     private List<CourseSessionDTO> sessions;
 }
