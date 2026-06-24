@@ -354,6 +354,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                               _buildMediaCard(),
                                             ] else ...[
                                               CreateSectionPage(
+                                                courseId: widget.courseId,
+                                                courseTitle: _titleController.text,
+                                                trainerName: _trainerName,
+                                                trainerInitials: _trainerInitials,
                                                 sections: _sections,
                                                 onSectionsChanged: (updatedSections) {
                                                   setState(() {
@@ -381,6 +385,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                         _buildMediaCard(),
                                       ] else ...[
                                         CreateSectionPage(
+                                          courseId: widget.courseId,
+                                          courseTitle: _titleController.text,
+                                          trainerName: _trainerName,
+                                          trainerInitials: _trainerInitials,
                                           sections: _sections,
                                           onSectionsChanged: (updatedSections) {
                                             setState(() {
