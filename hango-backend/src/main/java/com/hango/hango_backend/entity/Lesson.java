@@ -49,4 +49,14 @@ public class Lesson {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "exam_id")
     private Exam exam;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Lob
+    @Column(name = "content_embedding", columnDefinition = "TEXT")
+    private String contentEmbedding;
+
+    /** Đóng vai trò là cầu nối giúp AIPromptBuilder lấy nội dung không bị lỗi */
+    public String getContentText() {
+        return this.content;
+    }
 }

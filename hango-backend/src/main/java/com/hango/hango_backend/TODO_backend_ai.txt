@@ -1,0 +1,6 @@
+# Backend AI fix (tracking)
+
+- [x] Fix getSafeUserId: nhận trực tiếp UserDetailsImpl để lấy id
+- [ ] Validate luồng SecurityContext cho endpoint /ai-assistant/messages
+- [ ] Chạy gọi API thử với Authorization Bearer token để xác nhận hết learnerId null
+
