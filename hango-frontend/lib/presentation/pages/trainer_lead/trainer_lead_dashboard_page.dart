@@ -7,6 +7,7 @@ import '../../../data/models/trainer_lead_dashboard_stats_model.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import '../../widgets/trainer_lead_sidebar.dart';
+import 'trainer_lead_task_page.dart';
 
 
 class TrainerLeadDashboardPage extends StatefulWidget {
@@ -680,6 +681,8 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
         return _buildDashboardTab(isDesktop);
       case 'Profile':
         return _buildProfileTab(isDesktop);
+      case 'Task':
+        return const TrainerLeadTaskPage();
       default:
         return Center(
           child: Text(

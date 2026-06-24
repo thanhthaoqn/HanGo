@@ -2,6 +2,7 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.repository.TaskRepository;
 import com.hango.hango_backend.dto.TrainerLeadDashboardResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,9 @@ public class TrainerLeadController {
     @Autowired
     private CourseRepository courseRepository;
 
+    @Autowired
+    private TaskRepository taskRepository;
+
     @GetMapping("/dashboard/stats")
     @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'ADMINISTRATOR')")
     public ResponseEntity<?> getDashboardStats() {
@@ -32,8 +36,8 @@ public class TrainerLeadController {
             // Inactive courses are DRAFT, INACTIVE, or DELETED
             long inactiveCourses = courseRepository.countByStatus("DRAFT") + courseRepository.countByStatus("INACTIVE") + courseRepository.countByStatus("DELETED");
 
-            // Mock Data for Task Management as FT-12 is not fully implemented
-            long assignedTasks = 10;
+            // Data for Task Management
+            long assignedTasks = taskRepository.count();
             long pendingApprovals = 2;
             double percentageIncrease = 12.5;
 
@@ -48,6 +52,27 @@ public class TrainerLeadController {
                     .build();
 
             return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/trainers")
+    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'ADMINISTRATOR')")
+    public ResponseEntity<?> getTrainers() {
+        try {
+            java.util.List<com.hango.hango_backend.entity.User> allUsers = userRepository.findAll();
+            java.util.List<java.util.Map<String, Object>> trainers = allUsers.stream()
+                .filter(u -> u.getRoles().stream().anyMatch(r -> r.getRoleName().equals("TRAINER") || r.getRoleName().equals("TRAINER_LEAD")))
+                .map(u -> {
+                    java.util.Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", u.getId());
+                    map.put("fullName", u.getFullName());
+                    map.put("roles", u.getRoles().stream().map(r -> r.getRoleName()).toList());
+                    return map;
+                })
+                .toList();
+            return ResponseEntity.ok(trainers);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
