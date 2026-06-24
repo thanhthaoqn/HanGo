@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_courses_page.dart';
+import 'edit_course_page.dart';
+
 
 class TrainerDashboardPage extends StatefulWidget {
   const TrainerDashboardPage({super.key});
@@ -638,7 +640,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               ),
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TrainerCoursesPage()),
+                );
+              },
               child: Row(
                 children: const [
                   Text(
@@ -800,18 +807,32 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             ),
           ),
           // Arrow button
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFF1F5F9)),
-            ),
-            child: const Icon(
-              Icons.arrow_forward,
-              color: Color(0xFF64748B),
-              size: 16,
+          InkWell(
+            onTap: () {
+              final courseId = course['id'] is int
+                  ? course['id'] as int
+                  : int.parse(course['id'].toString());
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditCoursePage(courseId: courseId),
+                ),
+              ).then((_) => _fetchDashboardData());
+            },
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFF1F5F9)),
+              ),
+              child: const Icon(
+                Icons.arrow_forward,
+                color: Color(0xFF64748B),
+                size: 16,
+              ),
             ),
           ),
         ],
