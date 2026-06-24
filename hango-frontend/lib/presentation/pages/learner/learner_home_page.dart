@@ -1,8 +1,7 @@
-// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
-import '../../../data/services/course_service.dart';
+import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
@@ -11,6 +10,7 @@ import '../exam/list_exams_page.dart';
 import '../course/list_courses_page.dart';
 import '../course/course_detail_page.dart';
 import '../../widgets/shared_header.dart';
+import '../../widgets/shared_footer.dart';
 
 class LearnerHomePage extends StatefulWidget {
   const LearnerHomePage({super.key});
@@ -21,7 +21,7 @@ class LearnerHomePage extends StatefulWidget {
 
 class _LearnerHomePageState extends State<LearnerHomePage> {
   final _authService = AuthService();
-  final _courseService = CourseService();
+  final _courseRepository = CourseRepository();
   final _examRepository = ExamRepository();
 
   String _userFullName = 'Learner';
@@ -29,7 +29,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   String _userInitials = 'L';
 
   // State variables for active tabs
-  String _activeCourseTab = 'featured'; // 'featured' | 'in_progress' | 'completed'
+  String _activeCourseTab =
+      'featured'; // 'featured' | 'in_progress' | 'completed'
   String _activeExamTab = 'featured'; // 'featured' | 'completed'
 
   List<Course> _courses = [];
@@ -50,7 +51,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Learner';
     final email = prefs.getString('user_email') ?? '';
-    
+
     String initials = 'L';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -72,7 +73,15 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       _isLoadingCourses = true;
     });
     try {
-      final courses = await _courseService.getCourses(_activeCourseTab);
+      String filterType = 'ALL';
+      if (_activeCourseTab == 'in_progress') {
+        filterType = 'IN_PROGRESS';
+      } else if (_activeCourseTab == 'completed') {
+        filterType = 'COMPLETED';
+      }
+      final courses = await _courseRepository.fetchCourses(
+        filterType: filterType,
+      );
       setState(() {
         _courses = courses;
         _isLoadingCourses = false;
@@ -90,7 +99,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       _isLoadingExams = true;
     });
     try {
-      final exams = await _examRepository.fetchExams(status: _activeExamTab == 'featured' ? 'PUBLISHED' : _activeExamTab);
+      final exams = await _examRepository.fetchExams(
+        status: _activeExamTab == 'featured' ? 'PUBLISHED' : _activeExamTab,
+      );
       setState(() {
         _exams = exams;
         _isLoadingExams = false;
@@ -129,7 +140,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             Center(
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 1200),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -152,16 +166,14 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 ),
               ),
             ),
-            
+
             // 5. Footer
-            _buildFooter(isDesktop),
+            SharedFooter(isDesktop: isDesktop),
           ],
         ),
       ),
     );
   }
-
-
 
   // Adaptive drawer for mobile layouts
   Widget _buildDrawer(BuildContext context) {
@@ -180,7 +192,11 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               backgroundColor: Colors.white,
               child: Text(
                 _userInitials,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF28B79B)),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF28B79B),
+                ),
               ),
             ),
           ),
@@ -191,9 +207,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               Navigator.pop(context); // close drawer
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const ListExamsPage(),
-                ),
+                MaterialPageRoute(builder: (context) => const ListExamsPage()),
               );
             },
           ),
@@ -218,7 +232,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text('Log Out', style: TextStyle(color: Colors.redAccent)),
+            title: const Text(
+              'Log Out',
+              style: TextStyle(color: Colors.redAccent),
+            ),
             onTap: () {
               Navigator.pop(context);
               _handleLogout();
@@ -250,7 +267,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             color: Color(0x1A28B79B),
             blurRadius: 15,
             offset: Offset(0, 6),
-          )
+          ),
         ],
       ),
       padding: EdgeInsets.symmetric(
@@ -275,7 +292,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
                 const SizedBox(height: 36),
-                
+
                 // Stats Row
                 Wrap(
                   spacing: 48,
@@ -291,12 +308,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
           // Right Graphic Illustration (Only on desktop to avoid crowding)
           if (isDesktop)
-            Expanded(
-              flex: 2,
-              child: Center(
-                child: HeroIllustrationWidget(),
-              ),
-            ),
+            Expanded(flex: 2, child: Center(child: HeroIllustrationWidget())),
         ],
       ),
     );
@@ -345,38 +357,56 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildTabSelector('Featured Courses', active: _activeCourseTab == 'featured', onTap: () {
-                      setState(() => _activeCourseTab = 'featured');
-                      _fetchCourses();
-                    }),
+                    _buildTabSelector(
+                      'Featured Courses',
+                      active: _activeCourseTab == 'featured',
+                      onTap: () {
+                        setState(() => _activeCourseTab = 'featured');
+                        _fetchCourses();
+                      },
+                    ),
                     const SizedBox(width: 16),
-                    _buildTabSelector('In Progress', active: _activeCourseTab == 'in_progress', onTap: () {
-                      setState(() => _activeCourseTab = 'in_progress');
-                      _fetchCourses();
-                    }),
+                    _buildTabSelector(
+                      'In Progress',
+                      active: _activeCourseTab == 'in_progress',
+                      onTap: () {
+                        setState(() => _activeCourseTab = 'in_progress');
+                        _fetchCourses();
+                      },
+                    ),
                     const SizedBox(width: 16),
-                    _buildTabSelector('Completed', active: _activeCourseTab == 'completed', onTap: () {
-                      setState(() => _activeCourseTab = 'completed');
-                      _fetchCourses();
-                    }),
+                    _buildTabSelector(
+                      'Completed',
+                      active: _activeCourseTab == 'completed',
+                      onTap: () {
+                        setState(() => _activeCourseTab = 'completed');
+                        _fetchCourses();
+                      },
+                    ),
                   ],
                 ),
               ),
             ),
-            
+
             // See All Text Link
             GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ListCoursesPage()),
+                  MaterialPageRoute(
+                    builder: (context) => const ListCoursesPage(),
+                  ),
                 );
               },
               child: const Row(
                 children: [
                   Text(
                     'See All',
-                    style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                   SizedBox(width: 4),
                   Icon(Icons.arrow_forward, size: 14, color: Color(0xFF6B7280)),
@@ -392,48 +422,52 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             ? const SizedBox(
                 height: 220,
                 child: Center(
-                  child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B))),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF28B79B),
+                    ),
+                  ),
                 ),
               )
             : _courses.isEmpty
-                ? const SizedBox(
-                    height: 220,
-                    child: Center(
-                      child: Text(
-                        'No courses available in this category.',
-                        style: TextStyle(color: Color(0xFF6B7280)),
-                      ),
-                    ),
-                  )
-                : isDesktop
-                    ? GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          crossAxisSpacing: 20,
-                          mainAxisSpacing: 20,
-                          childAspectRatio: 0.85,
-                        ),
-                        itemCount: _courses.length,
-                        itemBuilder: (context, index) {
-                          return _buildCourseCard(_courses[index]);
-                        },
-                      )
-                    : SizedBox(
-                        height: 250,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _courses.length,
-                          itemBuilder: (context, index) {
-                            return Container(
-                              width: 250,
-                              margin: const EdgeInsets.only(right: 16),
-                              child: _buildCourseCard(_courses[index]),
-                            );
-                          },
-                        ),
-                      ),
+            ? const SizedBox(
+                height: 220,
+                child: Center(
+                  child: Text(
+                    'No courses available in this category.',
+                    style: TextStyle(color: Color(0xFF6B7280)),
+                  ),
+                ),
+              )
+            : isDesktop
+            ? GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.85,
+                ),
+                itemCount: _courses.length,
+                itemBuilder: (context, index) {
+                  return _buildCourseCard(_courses[index]);
+                },
+              )
+            : SizedBox(
+                height: 250,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _courses.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      width: 250,
+                      margin: const EdgeInsets.only(right: 16),
+                      child: _buildCourseCard(_courses[index]),
+                    );
+                  },
+                ),
+              ),
       ],
     );
   }
@@ -483,7 +517,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         ),
                       ),
                     ),
-                    
+
                     // Mortarboard watermark icon on bottom right
                     Positioned(
                       bottom: -10,
@@ -497,7 +531,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ],
                 ),
               ),
-              
+
               // Bottom Content
               Expanded(
                 child: Padding(
@@ -525,18 +559,24 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       ),
                       const Spacer(),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Gold stars
-                          ...List.generate(5, (index) {
-                            return const Icon(
-                              Icons.star,
-                              size: 12,
-                              color: Color(0xFFFBBF24),
-                            );
-                          }),
-                          const SizedBox(width: 4),
+                          Row(
+                            children: [
+                              // Dynamic stars based on database rating
+                              ...List.generate(5, (index) {
+                                return Icon(
+                                  Icons.star,
+                                  size: 12,
+                                  color: index < course.stars.floor()
+                                      ? const Color(0xFFFBBF24)
+                                      : Colors.grey.shade300,
+                                );
+                              }),
+                            ],
+                          ),
                           Text(
-                            course.learnerCount,
+                            '${course.learnerCount} Learner',
                             style: const TextStyle(
                               fontSize: 10,
                               color: Color(0xFF9CA3AF),
@@ -545,18 +585,42 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      
-                      // Difficulty Tag
+
+                      // Difficulty Tag and Progress Info
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildDifficultyBadge(course.difficulty),
+                          if (_activeCourseTab != 'featured') ...[
+                            Text(
+                              '${course.progressPercentage.toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF28B79B),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
+                      if (_activeCourseTab != 'featured') ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: course.progressPercentage / 100.0,
+                            minHeight: 4,
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF28B79B),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -600,11 +664,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       ),
       child: Text(
         displayText,
-        style: TextStyle(
-          color: fg,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -623,31 +683,45 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           children: [
             Row(
               children: [
-                _buildTabSelector('Featured Exams', active: _activeExamTab == 'featured', onTap: () {
-                  setState(() => _activeExamTab = 'featured');
-                  _fetchExams();
-                }),
+                _buildTabSelector(
+                  'Featured Exams',
+                  active: _activeExamTab == 'featured',
+                  onTap: () {
+                    setState(() => _activeExamTab = 'featured');
+                    _fetchExams();
+                  },
+                ),
                 const SizedBox(width: 16),
-                _buildTabSelector('Completed', active: _activeExamTab == 'completed', onTap: () {
-                  setState(() => _activeExamTab = 'completed');
-                  _fetchExams();
-                }),
+                _buildTabSelector(
+                  'Completed',
+                  active: _activeExamTab == 'completed',
+                  onTap: () {
+                    setState(() => _activeExamTab = 'completed');
+                    _fetchExams();
+                  },
+                ),
               ],
             ),
-            
+
             // See All Text Link
             GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                  MaterialPageRoute(
+                    builder: (context) => const ListExamsPage(),
+                  ),
                 );
               },
               child: const Row(
                 children: [
                   Text(
                     'See All',
-                    style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                   SizedBox(width: 4),
                   Icon(Icons.arrow_forward, size: 14, color: Color(0xFF6B7280)),
@@ -663,48 +737,52 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             ? const SizedBox(
                 height: 220,
                 child: Center(
-                  child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B))),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF28B79B),
+                    ),
+                  ),
                 ),
               )
             : _exams.isEmpty
-                ? const SizedBox(
-                    height: 220,
-                    child: Center(
-                      child: Text(
-                        'No exams available in this category.',
-                        style: TextStyle(color: Color(0xFF6B7280)),
-                      ),
-                    ),
-                  )
-                : isDesktop
-                    ? GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          crossAxisSpacing: 20,
-                          mainAxisSpacing: 20,
-                          childAspectRatio: 0.85,
-                        ),
-                        itemCount: _exams.length,
-                        itemBuilder: (context, index) {
-                          return _buildExamCard(_exams[index]);
-                        },
-                      )
-                    : SizedBox(
-                        height: 250,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _exams.length,
-                          itemBuilder: (context, index) {
-                            return Container(
-                              width: 250,
-                              margin: const EdgeInsets.only(right: 16),
-                              child: _buildExamCard(_exams[index]),
-                            );
-                          },
-                        ),
-                      ),
+            ? const SizedBox(
+                height: 220,
+                child: Center(
+                  child: Text(
+                    'No exams available in this category.',
+                    style: TextStyle(color: Color(0xFF6B7280)),
+                  ),
+                ),
+              )
+            : isDesktop
+            ? GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 0.85,
+                ),
+                itemCount: _exams.length,
+                itemBuilder: (context, index) {
+                  return _buildExamCard(_exams[index]);
+                },
+              )
+            : SizedBox(
+                height: 250,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _exams.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      width: 250,
+                      margin: const EdgeInsets.only(right: 16),
+                      child: _buildExamCard(_exams[index]),
+                    );
+                  },
+                ),
+              ),
       ],
     );
   }
@@ -743,7 +821,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     ),
                   ),
                 ),
-                
+
                 // Mortarboard watermark icon
                 Positioned(
                   bottom: -10,
@@ -757,7 +835,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               ],
             ),
           ),
-          
+
           // Card Body
           Expanded(
             child: Padding(
@@ -784,27 +862,41 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     ),
                   ),
                   const Spacer(),
-                  
+
                   // Question / Sentence count & time duration details
                   Row(
                     children: [
-                      const Icon(Icons.menu_book_outlined, size: 13, color: Color(0xFF6B7280)),
+                      const Icon(
+                        Icons.menu_book_outlined,
+                        size: 13,
+                        color: Color(0xFF6B7280),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${exam.questionCount} sentences',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                        ),
                       ),
                       const Spacer(),
-                      const Icon(Icons.timer_outlined, size: 13, color: Color(0xFF6B7280)),
+                      const Icon(
+                        Icons.timer_outlined,
+                        size: 13,
+                        color: Color(0xFF6B7280),
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${exam.durationMinutes} minute',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Stars and learner count
                   Row(
                     children: [
@@ -812,8 +904,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         return Icon(
                           Icons.star,
                           size: 12,
-                          color: index < (exam.rating).floor() 
-                              ? const Color(0xFFFBBF24) 
+                          color: index < (exam.rating).floor()
+                              ? const Color(0xFFFBBF24)
                               : Colors.grey.shade300,
                         );
                       }),
@@ -837,7 +929,11 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   }
 
   // Tab Header Selector Widget
-  Widget _buildTabSelector(String title, {required bool active, required VoidCallback onTap}) {
+  Widget _buildTabSelector(
+    String title, {
+    required bool active,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -884,7 +980,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           ),
         ),
         const SizedBox(height: 32),
-        
+
         // Features list
         isDesktop
             ? Row(
@@ -964,12 +1060,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: const Color(0xFFE6FFFA),
-                  child: const Icon(Icons.image_outlined, size: 50, color: Color(0xFF28B79B)),
+                  child: const Icon(
+                    Icons.image_outlined,
+                    size: 50,
+                    color: Color(0xFF28B79B),
+                  ),
                 ),
               ),
             ),
           ),
-          
+
           // Text Details
           Padding(
             padding: const EdgeInsets.all(20.0),
@@ -996,197 +1096,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 ),
               ],
             ),
-          )
+          ),
         ],
-      ),
-    );
-  }
-
-  // ----------------------------------------------------
-  // Footer Section
-  // ----------------------------------------------------
-  Widget _buildFooter(bool isDesktop) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6FFFA).withOpacity(0.3),
-        border: const Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          child: Column(
-            children: [
-              // Column structures
-              isDesktop
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Logo & Statement
-                        Expanded(
-                          flex: 2,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Image.network(
-                                'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                                height: 36,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) => const Text(
-                                  'HanGo',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1F2937),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'The leading digital coaching platform for high school students aiming for distinction in the THPTQG English National Exam.',
-                                style: TextStyle(
-                                  color: Color(0xFF6B7280),
-                                  fontSize: 13,
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildSocialRow(),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 48),
-                        
-                        // Learning Column
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'LEARNING',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildFooterLink('Mock Tests'),
-                              _buildFooterLink('Vocabulary Sets'),
-                              _buildFooterLink('Grammar Courses'),
-                            ],
-                          ),
-                        ),
-                        
-                        // Support Column
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'SUPPORT',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildFooterLink('Learner FAQ'),
-                              _buildFooterLink('Privacy Policy'),
-                              _buildFooterLink('Terms of Service'),
-                            ],
-                          ),
-                        )
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Image.network(
-                          'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                          height: 36,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'The leading digital coaching platform for high school students aiming for distinction in the THPTQG English National Exam.',
-                          style: TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildSocialRow(),
-                        const SizedBox(height: 32),
-                        const Text(
-                          'LEARNING',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
-                        ),
-                        const Divider(),
-                        _buildFooterLink('Mock Tests'),
-                        _buildFooterLink('Vocabulary Sets'),
-                        _buildFooterLink('Grammar Courses'),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'SUPPORT',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
-                        ),
-                        const Divider(),
-                        _buildFooterLink('Learner FAQ'),
-                        _buildFooterLink('Privacy Policy'),
-                        _buildFooterLink('Terms of Service'),
-                      ],
-                    ),
-              
-              const SizedBox(height: 32),
-              const Divider(color: Color(0xFFE5E7EB)),
-              const SizedBox(height: 16),
-              const Text(
-                '© 2026 HanGo Platform. All rights reserved.',
-                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFooterLink(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: () {},
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSocialRow() {
-    return Row(
-      children: [
-        _buildSocialIcon(Icons.language),
-        const SizedBox(width: 8),
-        _buildSocialIcon(Icons.share),
-      ],
-    );
-  }
-
-  Widget _buildSocialIcon(IconData icon) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Center(
-        child: Icon(
-          icon,
-          size: 16,
-          color: const Color(0xFF28B79B),
-        ),
       ),
     );
   }
@@ -1223,11 +1134,11 @@ class HeroIllustrationWidget extends StatelessWidget {
                   color: const Color(0xFFE6FFFA).withOpacity(0.2),
                   blurRadius: 40,
                   spreadRadius: 20,
-                )
-              ]
+                ),
+              ],
             ),
           ),
-          
+
           // Laptop structure
           Positioned(
             bottom: 40,
@@ -1240,7 +1151,10 @@ class HeroIllustrationWidget extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF475569), width: 3),
+                    border: Border.all(
+                      color: const Color(0xFF475569),
+                      width: 3,
+                    ),
                   ),
                   child: Center(
                     child: Container(
@@ -1253,7 +1167,11 @@ class HeroIllustrationWidget extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.code, color: Color(0xFF28B79B), size: 18),
+                          const Icon(
+                            Icons.code,
+                            color: Color(0xFF28B79B),
+                            size: 18,
+                          ),
                           const SizedBox(height: 4),
                           Container(
                             width: 50,
@@ -1271,7 +1189,7 @@ class HeroIllustrationWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 // Keyboard Base
                 Container(
                   width: 154,
@@ -1315,11 +1233,13 @@ class HeroIllustrationWidget extends StatelessWidget {
                       height: 12,
                       decoration: const BoxDecoration(
                         color: Color(0xFFF59E0B),
-                        borderRadius: BorderRadius.all(Radius.elliptical(11, 6)),
+                        borderRadius: BorderRadius.all(
+                          Radius.elliptical(11, 6),
+                        ),
                       ),
                     ),
                   ),
-                  
+
                   // Cap Top diamond
                   Transform(
                     transform: Matrix4.identity()
@@ -1336,12 +1256,12 @@ class HeroIllustrationWidget extends StatelessWidget {
                             color: Colors.black26,
                             blurRadius: 4,
                             offset: Offset(0, 2),
-                          )
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  
+
                   // Tassel
                   Positioned(
                     right: 4,
@@ -1403,24 +1323,28 @@ class _HoverableCardState extends State<HoverableCard> {
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        transform: _isHovered 
-            ? (Matrix4.identity()..translate(0, -6, 0)..scale(1.02))
+        transform: _isHovered
+            ? (Matrix4.identity()
+                ..translate(0, -6, 0)
+                ..scale(1.02))
             : Matrix4.identity(),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _isHovered ? const Color(0xFF28B79B) : const Color(0xFFE5E7EB),
+            color: _isHovered
+                ? const Color(0xFF28B79B)
+                : const Color(0xFFE5E7EB),
             width: _isHovered ? 1.5 : 1.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: _isHovered 
-                  ? const Color(0x1A28B79B) 
+              color: _isHovered
+                  ? const Color(0x1A28B79B)
                   : const Color(0x0A000000),
               blurRadius: _isHovered ? 12 : 6,
               offset: _isHovered ? const Offset(0, 8) : const Offset(0, 3),
-            )
+            ),
           ],
         ),
         child: widget.child,

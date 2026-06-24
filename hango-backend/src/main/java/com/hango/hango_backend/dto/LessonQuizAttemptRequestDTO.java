@@ -5,11 +5,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CommentRequestDTO {
-    private String content;
-    private Long parentCommentId;
+public class LessonQuizAttemptRequestDTO {
+    private Double score;
+    private String state;
+    private Map<String, Integer> answers;
 }

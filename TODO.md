@@ -13,20 +13,20 @@
 
 ### 🎨 Phase 1: Frontend UI & Mock Data _(Assigned to: Frontend Agent)_
 
-- [ ] Build Login/Register screens (Material Design) at `lib/presentation/pages/auth/`.
-- [ ] Create Mock Auth Repository simulating JWT generation and Google OAuth2 flow.
+- [x] Build Login/Register screens (Material Design) at `lib/presentation/pages/auth/`.
+- [x] Create Mock Auth Repository simulating JWT generation and Google OAuth2 flow.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
-- [ ] Set up `spring-boot-starter-security` and JWT (`jjwt`) dependencies.
-- [ ] Analyze and map `users`, `roles` Entities in MySQL.
-- [ ] Write `AuthService`: BCrypt hashing, JWT generation, Google OAuth2 integration.
-- [ ] Configure `SecurityFilterChain` and create `AuthController` returning agreed JSON.
+- [x] Set up `spring-boot-starter-security` and JWT (`jjwt`) dependencies.
+- [x] Analyze and map `users`, `roles` Entities in MySQL.
+- [x] Write `AuthService`: BCrypt hashing, JWT generation, Google OAuth2 integration.
+- [x] Configure `SecurityFilterChain` and create `AuthController` returning agreed JSON.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Integrate `google_sign_in` library to get Identity Token.
-- [ ] Call real REST APIs via `dio`, securely save JWT into `shared_preferences` and navigate to Dashboard using `go_router`.
+- [x] Integrate `google_sign_in` library to get Identity Token.
+- [x] Call real REST APIs via `dio`, securely save JWT into `shared_preferences` and navigate to Dashboard using `go_router`.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 
@@ -40,19 +40,19 @@
 
 ### 🎨 Phase 1: Frontend UI & Mock Data _(Assigned to: Frontend Agent)_
 
-- [ ] Build Profile view/edit UI for Learner/Trainer.
-- [ ] Build User Management `DataTable` for Admin. Add Image Picker for Avatar.
-- [ ] Render "Lock Account" button based on internal Role. Create Mock User Repository.
+- [x] Build Profile view/edit UI for Learner/Trainer.
+- [x] Build User Management `DataTable` for Admin. Add Image Picker for Avatar.
+- [x] Render "Lock Account" button based on internal Role. Create Mock User Repository.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
-- [ ] Create CRUD APIs for Profile (`GET /api/v1/users/me`, `PUT /api/v1/users/me`).
-- [ ] Create Management API for Admin (`GET /api/v1/users`, pagination, `@PreAuthorize`).
-- [ ] Create Lock API (`PUT /api/v1/users/{id}/status`) and integrate Cloudinary for Avatar.
+- [x] Create CRUD APIs for Profile (`GET /api/v1/users/me`, `PUT /api/v1/users/me`).
+- [x] Create Management API for Admin (`GET /api/v1/users`, pagination, `@PreAuthorize`).
+- [x] Create Lock API (`PUT /api/v1/users/{id}/status`) and integrate Cloudinary for Avatar.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Replace mock data with real APIs. Implement image compression and Cloudinary upload flow.
+- [x] Replace mock data with real APIs. Implement image compression and Cloudinary upload flow.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 
@@ -65,18 +65,18 @@
 
 ### 🎨 Phase 1: Frontend UI & Mock Data _(Assigned to: Frontend Agent)_
 
-- [ ] Build dynamic Course creation form allowing addition of multiple Sections/Lessons.
-- [ ] Build Course listing UI. Use Mock Course Repository for visual validation.
+- [x] Build dynamic Course creation form allowing addition of multiple Sections/Lessons.
+- [x] Build Course listing UI. Use Mock Course Repository for visual validation.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
 - [ ] Initialize `courses`, `sections`, `lessons` tables with `ON DELETE CASCADE` configuration.
 - [ ] Write `CourseService` combined with `@Transactional`.
-- [ ] Build `POST /api/v1/courses` API and integrate Course Thumbnail upload to Cloudinary.
+- [x] Build `POST /api/v1/courses` API and integrate Course Thumbnail upload to Cloudinary.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Integrate image picker library and call real `POST /api/v1/courses` API via `dio`.
+- [x] Integrate image picker library and call real `POST /api/v1/courses` API via `dio`.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 
@@ -211,17 +211,17 @@
 
 ### 🎨 Phase 1: Frontend UI & Mock Data _(Assigned to: Frontend Agent)_
 
-- [ ] Render Progress bar in "My Courses" list.
-- [ ] "Mark as Completed" button UI and Mock Progress Repository.
+- [x] Render Progress bar in "My Courses" list.
+- [x] "Mark as Completed" button UI and Mock Progress Repository.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
-- [ ] Write Enroll API and "Complete Lesson" API.
-- [ ] Use `@Lock` in the course progress percentage calculation function to prevent Race Conditions.
+- [x] Write Enroll API and "Complete Lesson" API.
+- [x] Use `@Lock` in the course progress percentage calculation function to prevent Race Conditions.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Call real API and auto-navigate to the next lesson upon success.
+- [x] Call real API and auto-navigate to the next lesson upon success.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 
@@ -302,21 +302,21 @@
 
 ### 🎨 Phase 1: Frontend UI & Mock Data _(Assigned to: Frontend Agent)_
 
-- [ ] Build Bar, Pie charts using `fl_chart` library.
-- [ ] Add date filter UI. Supply mock stats to charts.
+- [x] Build Bar, Pie charts using `fl_chart` library.
+- [x] Add date filter UI. Supply mock stats to charts.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
-- [ ] Write optimized Native Queries for totals (`COUNT`, `GROUP BY`).
+- [x] Write optimized Native Queries for totals (`COUNT`, `GROUP BY`).
 - [ ] Potentially move heavy aggregations to a `@Scheduled` Job.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Fetch actual dashboard metrics.
+- [x] Fetch actual dashboard metrics.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 
-- [ ] UI properly handles Empty Data state (Does not display distorted charts).
+- [x] UI properly handles Empty Data state (Does not display distorted charts).
 
 ---
 

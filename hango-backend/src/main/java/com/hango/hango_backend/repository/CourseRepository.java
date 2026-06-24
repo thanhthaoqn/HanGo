@@ -15,7 +15,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("SELECT new com.hango.hango_backend.dto.CourseSummaryDTO(" +
            "c.id, cat.paramValue, c.title, u.fullName, " +
            "CAST(COALESCE(AVG(cr.rating), 0.0) AS double), " +
-           "COUNT(DISTINCT e.id), diff.paramKey, c.thumbnailUrl) " +
+           "COUNT(DISTINCT e.id), diff.paramKey, c.thumbnailUrl, " +
+           "(SELECT e2.progressPercentage FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId)) " +
            "FROM Course c " +
            "LEFT JOIN c.category cat " +
            "LEFT JOIN c.difficulty diff " +
@@ -25,11 +26,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
            "WHERE c.status != 'DRAFT' " +
            "AND (:search IS NULL OR LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:difficulty IS NULL OR diff.paramKey = :difficulty) " +
-           "AND (:enrolledUserId IS NULL OR EXISTS (SELECT 1 FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId)) " +
+           "AND (:enrolledUserId IS NULL OR EXISTS (SELECT 1 FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId AND (:enrollmentStatus IS NULL OR e2.status = :enrollmentStatus))) " +
            "GROUP BY c.id, cat.paramValue, c.title, u.fullName, diff.paramKey, c.thumbnailUrl")
     List<CourseSummaryDTO> findCoursesWithFilters(@Param("search") String search,
                                                   @Param("difficulty") String difficulty,
-                                                  @Param("enrolledUserId") Long enrolledUserId);
+                                                  @Param("enrolledUserId") Long enrolledUserId,
+                                                  @Param("enrollmentStatus") String enrollmentStatus);
 
     @Query("SELECT COUNT(c) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
     long countByCreatorIdAndDeletedAtIsNull(@Param("creatorId") Long creatorId);

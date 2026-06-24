@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 @Builder
 public class CourseReviewDTO {
     private Long id;
+    private Long userId;
     private String userName; // e.g. nguyenth*********@gmail.com
     private String userInitial; // e.g. N
     private Short rating;

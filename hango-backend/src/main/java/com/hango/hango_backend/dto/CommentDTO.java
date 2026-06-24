@@ -18,4 +18,7 @@ public class CommentDTO {
     private String userAvatar;
     private String content;
     private LocalDateTime createdAt;
+    private Long parentCommentId;
+    private Integer likeCount;
+    private Boolean isLiked;
 }

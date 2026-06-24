@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface CourseRatingRepository extends JpaRepository<CourseRating, Long> {
     List<CourseRating> findByCourseIdOrderByCreatedAtDesc(Long courseId);
+    java.util.Optional<CourseRating> findByCourseIdAndStudentId(Long courseId, Long studentId);
 }
