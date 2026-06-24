@@ -5,11 +5,8 @@ import com.hango.hango_backend.dto.TaskRequestDTO;
 import com.hango.hango_backend.dto.TaskStatusUpdateRequest;
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.Task;
-import com.hango.hango_backend.entity.TaskActivity;
 import com.hango.hango_backend.entity.TaskStatus;
-import com.hango.hango_backend.entity.TaskType;
 import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.repository.TaskActivityRepository;
 import com.hango.hango_backend.repository.TaskRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
@@ -27,69 +26,43 @@ public class TaskService {
     private TaskRepository taskRepository;
 
     @Autowired
-    private TaskActivityRepository taskActivityRepository;
-
-    @Autowired
     private UserRepository userRepository;
 
-    public Page<TaskDTO> getTasks(Long assignedById, Long assignedToId, TaskType type, 
-                                  LocalDateTime fromDate, LocalDateTime toDate, 
-                                  String search, Pageable pageable) {
-        Page<Task> tasks = taskRepository.findTasksWithFilters(assignedById, assignedToId, type, fromDate, toDate, search, pageable);
+    public Page<TaskDTO> getTasks(Long leadId, Long creatorId,
+            LocalDateTime fromDate, LocalDateTime toDate,
+            String search, Pageable pageable) {
+        Page<Task> tasks = taskRepository.findTasksWithFilters(leadId, creatorId, fromDate, toDate, search, pageable);
         return tasks.map(this::mapToDTO);
     }
 
     @Transactional
     public TaskDTO createTask(TaskRequestDTO request, User currentUser) {
-        User assignee = userRepository.findById(request.getAssignedToId())
-                .orElseThrow(() -> new RuntimeException("Assignee not found"));
+        User reviewer = userRepository.findById(request.getReviewerId())
+                .orElseThrow(() -> new RuntimeException("Reviewer not found: " + request.getReviewerId()));
 
-        boolean isTrainerOrLead = assignee.getRoles().stream()
+        User assignee = userRepository.findById(request.getAssigneeId())
+                .orElseThrow(() -> new RuntimeException("Assignee not found: " + request.getAssigneeId()));
+
+        boolean isTrainer = assignee.getRoles().stream()
                 .map(Role::getRoleName)
-                .anyMatch(role -> role.equals("ROLE_TRAINER") || role.equals("ROLE_TRAINER_LEAD"));
-                
-        if (!isTrainerOrLead) {
-            throw new RuntimeException("Assignee must be a Trainer or Lead");
-        }
+                .anyMatch(role -> role.equals("TRAINER") || role.equals("ROLE_TRAINER"));
 
-        User assigner = currentUser;
-        if (request.getAssignedById() != null) {
-            assigner = userRepository.findById(request.getAssignedById())
-                    .orElse(currentUser);
+        if (!isTrainer) {
+            throw new RuntimeException("Assignee must be a Trainer. Invalid user ID: " + request.getAssigneeId());
         }
 
         Task task = Task.builder()
-                .content(request.getContent())
-                .assignedBy(assigner)
-                .assignedTo(assignee)
+                .title(request.getTitle())
+                .description(request.getDescription())
                 .type(request.getType())
+                .lead(currentUser)
+                .dueDate(request.getDueDate())
+                .assignee(assignee)
+                .reviewer(reviewer)
                 .status(TaskStatus.ASSIGNED)
-                .deadline(request.getDeadline())
                 .build();
-
-        if (request.getImageBase64() != null && !request.getImageBase64().isEmpty()) {
-            try {
-                String base64Data = request.getImageBase64();
-                if (base64Data.contains(",")) {
-                    base64Data = base64Data.split(",")[1];
-                }
-                byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Data);
-                task.setImage(imageBytes);
-            } catch (Exception e) {
-                // Ignore if invalid base64
-            }
-        }
 
         Task savedTask = taskRepository.save(task);
-
-        TaskActivity activity = TaskActivity.builder()
-                .task(savedTask)
-                .changedBy(currentUser)
-                .oldStatus(null)
-                .newStatus(TaskStatus.ASSIGNED)
-                .note("Task created and assigned")
-                .build();
-        taskActivityRepository.save(activity);
 
         return mapToDTO(savedTask);
     }
@@ -99,20 +72,29 @@ public class TaskService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
-        TaskStatus oldStatus = task.getStatus();
-        task.setStatus(request.getStatus());
-        Task savedTask = taskRepository.save(task);
+        Long targetCreatorId = request.getCreatorId() != null ? request.getCreatorId() : currentUser.getId();
 
-        TaskActivity activity = TaskActivity.builder()
-                .task(savedTask)
-                .changedBy(currentUser)
-                .oldStatus(oldStatus)
-                .newStatus(request.getStatus())
-                .note(request.getNote())
-                .build();
-        taskActivityRepository.save(activity);
+        if (!task.getAssignee().getId().equals(targetCreatorId) && !task.getReviewer().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Assignee task not found or you don't have permission");
+        }
 
-        return mapToDTO(savedTask);
+        task.setStatus(TaskStatus.valueOf(request.getStatus()));
+
+        if (request.getStatus().equals("SUBMITTED")) {
+            task.setSubmittedAt(LocalDateTime.now());
+            if (request.getSubmissionNotes() != null) {
+                task.setSubmissionNotes(request.getSubmissionNotes());
+            }
+        } else if (request.getStatus().equals("APPROVED") || request.getStatus().equals("REJECTED")) {
+            task.setReviewedAt(LocalDateTime.now());
+            if (request.getReviewComment() != null) {
+                task.setReviewComment(request.getReviewComment());
+            }
+        }
+
+        taskRepository.save(task);
+
+        return mapToDTO(task);
     }
 
     @Transactional
@@ -120,24 +102,24 @@ public class TaskService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
-        User assignee = userRepository.findById(request.getAssignedToId())
-                .orElseThrow(() -> new RuntimeException("Assignee not found"));
+        if (!task.getLead().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Only the lead who created the task can update it");
+        }
 
-        task.setContent(request.getContent());
-        task.setAssignedTo(assignee);
+        User assignee = userRepository.findById(request.getAssigneeId())
+                .orElseThrow(() -> new RuntimeException("Assignee not found: " + request.getAssigneeId()));
+        
+        User reviewer = userRepository.findById(request.getReviewerId())
+                .orElseThrow(() -> new RuntimeException("Reviewer not found: " + request.getReviewerId()));
+
+        task.setTitle(request.getTitle());
+        task.setDescription(request.getDescription());
         task.setType(request.getType());
-        task.setDeadline(request.getDeadline());
-
+        task.setDueDate(request.getDueDate());
+        task.setAssignee(assignee);
+        task.setReviewer(reviewer);
+        
         Task savedTask = taskRepository.save(task);
-
-        TaskActivity activity = TaskActivity.builder()
-                .task(savedTask)
-                .changedBy(currentUser)
-                .oldStatus(task.getStatus())
-                .newStatus(task.getStatus())
-                .note("Task details updated")
-                .build();
-        taskActivityRepository.save(activity);
 
         return mapToDTO(savedTask);
     }
@@ -146,23 +128,63 @@ public class TaskService {
     public void deleteTask(Long taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
-        taskActivityRepository.deleteAll(taskActivityRepository.findByTaskIdOrderByCreatedAtDesc(taskId));
         taskRepository.delete(task);
     }
 
     private TaskDTO mapToDTO(Task task) {
+        String creatorName = "Unknown";
+        Long creatorId = null;
+        if (task.getAssignee() != null) {
+            try {
+                creatorId = task.getAssignee().getId();
+                creatorName = task.getAssignee().getFullName();
+            } catch (Exception e) {}
+        }
+        
+        String reviewerName = "Unknown";
+        Long reviewerId = null;
+        if (task.getReviewer() != null) {
+            try {
+                reviewerId = task.getReviewer().getId();
+                reviewerName = task.getReviewer().getFullName();
+            } catch (Exception e) {}
+        }
+
+        TaskDTO.CreatorTaskDTO assigneeDTO = TaskDTO.CreatorTaskDTO.builder()
+                .creatorTaskId(task.getId())
+                .creatorId(creatorId)
+                .creatorName(creatorName)
+                .status(task.getStatus() != null ? task.getStatus().name() : "ASSIGNED")
+                .reviewerId(reviewerId)
+                .reviewerName(reviewerName)
+                .reviewComment(task.getReviewComment())
+                .reviewedAt(task.getReviewedAt())
+                .submissionNotes(task.getSubmissionNotes())
+                .submittedAt(task.getSubmittedAt())
+                .build();
+
+        List<TaskDTO.CreatorTaskDTO> assigneeDTOs = List.of(assigneeDTO);
+
+        String leadName = "Unknown";
+        Long leadId = null;
+        if (task.getLead() != null) {
+            try {
+                leadId = task.getLead().getId();
+                leadName = task.getLead().getFullName();
+            } catch (Exception e) {
+            }
+        }
+
         return TaskDTO.builder()
                 .id(task.getId())
-                .content(task.getContent())
-                .assignedById(task.getAssignedBy().getId())
-                .assignedByName(task.getAssignedBy().getFullName())
-                .assignedToId(task.getAssignedTo().getId())
-                .assignedToName(task.getAssignedTo().getFullName())
+                .leadId(leadId)
+                .leadName(leadName)
+                .title(task.getTitle())
+                .description(task.getDescription())
                 .type(task.getType())
-                .status(task.getStatus())
-                .deadline(task.getDeadline())
+                .dueDate(task.getDueDate())
                 .createdAt(task.getCreatedAt())
-                .updatedAt(task.getUpdatedAt())
+                .assignees(assigneeDTOs)
                 .build();
     }
 }

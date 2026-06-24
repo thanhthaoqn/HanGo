@@ -3,7 +3,6 @@ package com.hango.hango_backend.controller;
 import com.hango.hango_backend.dto.TaskDTO;
 import com.hango.hango_backend.dto.TaskRequestDTO;
 import com.hango.hango_backend.dto.TaskStatusUpdateRequest;
-import com.hango.hango_backend.entity.TaskType;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.sercurity.UserDetailsImpl;
@@ -36,9 +35,8 @@ public class TaskController {
     @GetMapping
     @PreAuthorize("hasAnyRole('TRAINER', 'TRAINER_LEAD', 'ADMINISTRATOR')")
     public ResponseEntity<Page<TaskDTO>> getTasks(
-            @RequestParam(required = false) Long assignedById,
-            @RequestParam(required = false) Long assignedToId,
-            @RequestParam(required = false) TaskType type,
+            @RequestParam(required = false) Long leadId,
+            @RequestParam(required = false) Long creatorId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
             @RequestParam(required = false) String search,
@@ -50,7 +48,7 @@ public class TaskController {
         Sort.Direction sortDirection = sort[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortField));
 
-        Page<TaskDTO> tasks = taskService.getTasks(assignedById, assignedToId, type, fromDate, toDate, search, pageable);
+        Page<TaskDTO> tasks = taskService.getTasks(leadId, creatorId, fromDate, toDate, search, pageable);
         return ResponseEntity.ok(tasks);
     }
 

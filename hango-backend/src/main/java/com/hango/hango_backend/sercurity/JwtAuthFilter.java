@@ -40,6 +40,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                // DEBUG: Log the roles for diagnosis
+                logger.info("=== JWT AUTH DEBUG === User: {} | Authorities: {} | Request: {}",
+                        username, userDetails.getAuthorities(), request.getRequestURI());
+            } else if (jwt != null) {
+                logger.warn("=== JWT INVALID === Token present but invalid for request: {}", request.getRequestURI());
+            } else {
+                logger.warn("=== NO JWT === No token for request: {}", request.getRequestURI());
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e);

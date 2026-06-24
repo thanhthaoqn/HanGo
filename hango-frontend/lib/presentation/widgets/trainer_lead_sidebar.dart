@@ -98,43 +98,7 @@ class TrainerLeadSidebar extends StatelessWidget {
                     title: 'Task',
                     menuKey: 'Task',
                   ),
-                  const SizedBox(height: 8),
-                  _buildSidebarMenuItem(
-                    context,
-                    index: 3,
-                    icon: Icons.chat_bubble_outline,
-                    title: 'Comment',
-                    menuKey: 'Comment',
-                  ),
-
                   const Spacer(),
-                  const Divider(color: Color(0xFFE5E7EB)),
-                  const SizedBox(height: 12),
-
-                  // ── Bottom Items ──────────────────────────────────────
-                  _buildSidebarBottomItem(
-                    context,
-                    icon: Icons.help_outline,
-                    title: 'Help Center',
-                    onTap: () {
-                      if (isMobileDrawer) Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Opening Help Center...')),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _buildSidebarBottomItem(
-                    context,
-                    icon: Icons.logout,
-                    title: 'Logout',
-                    isDestructive: true,
-                    onTap: () {
-                      if (isMobileDrawer) Navigator.pop(context);
-                      onLogout?.call();
-                    },
-                  ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),

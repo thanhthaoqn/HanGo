@@ -14,22 +14,19 @@ class TaskService {
   Future<Map<String, dynamic>> getTasks({
     int page = 0,
     int size = 10,
-    String? type,
+    int? leadId,
+    int? creatorId,
     String? search,
     String? fromDate,
     String? toDate,
   }) async {
     try {
       final token = await _getToken();
-      
-      final Map<String, dynamic> queryParams = {
-        'page': page,
-        'size': size,
-      };
-      
-      if (type != null && type.isNotEmpty && type != 'All type') {
-        queryParams['type'] = type.toUpperCase();
-      }
+
+      final Map<String, dynamic> queryParams = {'page': page, 'size': size};
+
+      if (leadId != null) queryParams['leadId'] = leadId;
+      if (creatorId != null) queryParams['creatorId'] = creatorId;
       if (search != null && search.isNotEmpty) {
         queryParams['search'] = search;
       }
@@ -43,11 +40,7 @@ class TaskService {
       final response = await _dio.get(
         baseUrl,
         queryParameters: queryParams,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       if (response.statusCode == 200) {
@@ -71,11 +64,7 @@ class TaskService {
       final token = await _getToken();
       final response = await _dio.get(
         'http://localhost:8080/api/v1/trainer-lead/trainers',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       if (response.statusCode == 200) {
@@ -93,11 +82,7 @@ class TaskService {
       final response = await _dio.post(
         baseUrl,
         data: data,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       if (response.statusCode == 200) {
@@ -105,23 +90,32 @@ class TaskService {
       }
       return {'success': false, 'message': 'Failed to create task'};
     } on DioException catch (e) {
-      return {'success': false, 'message': e.response?.data?.toString() ?? e.toString()};
+      return {
+        'success': false,
+        'message': e.response?.data?.toString() ?? e.toString(),
+      };
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }
   }
 
-  Future<Map<String, dynamic>> updateTaskStatus(int taskId, String status) async {
+  Future<Map<String, dynamic>> updateTaskStatus(
+    int taskId,
+    String status,
+    {int? creatorId, String? submissionNotes, String? reviewComment}
+  ) async {
     try {
       final token = await _getToken();
+      
+      Map<String, dynamic> data = {'status': status};
+      if (creatorId != null) data['creatorId'] = creatorId;
+      if (submissionNotes != null) data['submissionNotes'] = submissionNotes;
+      if (reviewComment != null) data['reviewComment'] = reviewComment;
+
       final response = await _dio.put(
         '$baseUrl/$taskId/status',
-        data: {'status': status, 'note': 'Status updated via UI'},
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        data: data,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       if (response.statusCode == 200) {
@@ -129,7 +123,10 @@ class TaskService {
       }
       return {'success': false, 'message': 'Failed to update task status'};
     } on DioException catch (e) {
-      return {'success': false, 'message': e.response?.data?.toString() ?? e.toString()};
+      return {
+        'success': false,
+        'message': e.response?.data?.toString() ?? e.toString(),
+      };
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }
@@ -140,11 +137,7 @@ class TaskService {
       final token = await _getToken();
       final response = await _dio.delete(
         '$baseUrl/$taskId',
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       if (response.statusCode == 200) {
@@ -152,7 +145,10 @@ class TaskService {
       }
       return {'success': false, 'message': 'Failed to delete task'};
     } on DioException catch (e) {
-      return {'success': false, 'message': e.response?.data?.toString() ?? e.toString()};
+      return {
+        'success': false,
+        'message': e.response?.data?.toString() ?? e.toString(),
+      };
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }

@@ -1,13 +1,16 @@
 package com.hango.hango_backend.dto;
 
-import com.hango.hango_backend.entity.TaskStatus;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
 public class TaskStatusUpdateRequest {
-    @NotNull(message = "Status is required")
-    private TaskStatus status;
+    @NotBlank(message = "Status is required")
+    private String status;
+    private String submissionNotes;
+    private String reviewComment;
     
-    private String note;
+    // If a Trainer Lead is updating the status for a specific trainer, they provide this ID.
+    // If a Trainer is updating their own status, this can be null.
+    private Long creatorId;
 }

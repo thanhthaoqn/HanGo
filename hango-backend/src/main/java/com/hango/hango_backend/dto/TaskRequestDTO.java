@@ -1,29 +1,29 @@
 package com.hango.hango_backend.dto;
 
-import com.hango.hango_backend.entity.TaskType;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class TaskRequestDTO {
-    @NotBlank(message = "Task content is required")
-    private String content;
+    @NotBlank(message = "Title is required")
+    private String title;
 
-    @NotNull(message = "Assignee ID is required")
-    private Long assignedToId;
+    private String description;
+    
+    private String type;
 
-    @NotNull(message = "Task type is required")
-    private TaskType type;
+    @NotNull(message = "Due date is required")
+    @Future(message = "Due date must be in the future")
+    private LocalDateTime dueDate;
 
-    private Long assignedById;
+    @NotNull(message = "Assignee is required")
+    private Long assigneeId;
 
-    private String imageBase64;
-
-    @NotNull(message = "Deadline is required")
-    @Future(message = "Deadline must be in the future")
-    private LocalDateTime deadline;
+    @NotNull(message = "Reviewer is required")
+    private Long reviewerId;
 }
