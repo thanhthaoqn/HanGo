@@ -1,12 +1,21 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'create_lesson_page.dart';
 
 class CreateSectionPage extends StatefulWidget {
+  final int courseId;
+  final String courseTitle;
+  final String trainerName;
+  final String trainerInitials;
   final List<dynamic> sections;
   final ValueChanged<List<dynamic>> onSectionsChanged;
 
   const CreateSectionPage({
     super.key,
+    required this.courseId,
+    required this.courseTitle,
+    required this.trainerName,
+    required this.trainerInitials,
     required this.sections,
     required this.onSectionsChanged,
   });
@@ -86,14 +95,6 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
         backgroundColor: Color(0xFF20B486),
       ),
     );
-  }
-
-  void _startEditing(int index) {
-    setState(() {
-      _editingIndex = index;
-      _nameController.text = _localSections[index]['title'] ?? '';
-      _descController.text = _localSections[index]['description'] ?? '';
-    });
   }
 
   void _updateSection() {
@@ -695,7 +696,27 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                         IconButton(
                           icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
                           tooltip: 'Edit Section',
-                          onPressed: () => _startEditing(index),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CreateLessonPage(
+                                  courseId: widget.courseId,
+                                  courseTitle: widget.courseTitle,
+                                  trainerName: widget.trainerName,
+                                  trainerInitials: widget.trainerInitials,
+                                  sections: _localSections,
+                                  selectedSectionIndex: index,
+                                  onSectionsChanged: (updatedSections) {
+                                    setState(() {
+                                      _localSections = updatedSections;
+                                    });
+                                    _notifyParent();
+                                  },
+                                ),
+                              ),
+                            );
+                          },
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
