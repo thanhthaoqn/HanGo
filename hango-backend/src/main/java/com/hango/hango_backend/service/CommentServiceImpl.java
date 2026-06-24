@@ -22,18 +22,26 @@ public class CommentServiceImpl implements CommentService {
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
 
+    private CommentDTO convertToDTO(Comment comment, Long currentUserId) {
+        return CommentDTO.builder()
+                .id(comment.getId())
+                .userId(comment.getUser().getId())
+                .userName(comment.getUser().getFullName())
+                .userAvatar(comment.getUser().getAvatarUrl())
+                .content(comment.getContent())
+                .createdAt(comment.getCreatedAt() != null ? comment.getCreatedAt() : java.time.LocalDateTime.now())
+                .parentCommentId(comment.getParentComment() != null ? comment.getParentComment().getId() : null)
+                .likeCount(comment.getLikedUsers() != null ? comment.getLikedUsers().size() : 0)
+                .isLiked(currentUserId != null && comment.getLikedUsers() != null &&
+                        comment.getLikedUsers().stream().anyMatch(u -> u.getId().equals(currentUserId)))
+                .build();
+    }
+
     @Override
-    public List<CommentDTO> getCommentsByLesson(Long lessonId) {
+    public List<CommentDTO> getCommentsByLesson(Long lessonId, Long currentUserId) {
         return commentRepository.findByLessonIdOrderByCreatedAtDesc(lessonId)
                 .stream()
-                .map(comment -> CommentDTO.builder()
-                        .id(comment.getId())
-                        .userId(comment.getUser().getId())
-                        .userName(comment.getUser().getFullName()) // Assuming User has getFullName()
-                        .userAvatar(comment.getUser().getAvatarUrl()) // Assuming User has getAvatarUrl()
-                        .content(comment.getContent())
-                        .createdAt(comment.getCreatedAt())
-                        .build())
+                .map(comment -> convertToDTO(comment, currentUserId))
                 .collect(Collectors.toList());
     }
 
@@ -44,23 +52,22 @@ public class CommentServiceImpl implements CommentService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        Comment parent = null;
+        if (request.getParentCommentId() != null) {
+            parent = commentRepository.findById(request.getParentCommentId())
+                    .orElseThrow(() -> new RuntimeException("Parent comment not found"));
+        }
+
         Comment comment = Comment.builder()
                 .lesson(lesson)
                 .user(user)
                 .content(request.getContent())
+                .parentComment(parent)
                 .status("APPROVED")
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
-
-        return CommentDTO.builder()
-                .id(savedComment.getId())
-                .userId(savedComment.getUser().getId())
-                .userName(savedComment.getUser().getFullName())
-                .userAvatar(savedComment.getUser().getAvatarUrl())
-                .content(savedComment.getContent())
-                .createdAt(savedComment.getCreatedAt() != null ? savedComment.getCreatedAt() : java.time.LocalDateTime.now())
-                .build();
+        return convertToDTO(savedComment, userId);
     }
 
     @Override
@@ -74,15 +81,7 @@ public class CommentServiceImpl implements CommentService {
 
         comment.setContent(request.getContent());
         Comment savedComment = commentRepository.save(comment);
-
-        return CommentDTO.builder()
-                .id(savedComment.getId())
-                .userId(savedComment.getUser().getId())
-                .userName(savedComment.getUser().getFullName())
-                .userAvatar(savedComment.getUser().getAvatarUrl())
-                .content(savedComment.getContent())
-                .createdAt(savedComment.getCreatedAt())
-                .build();
+        return convertToDTO(savedComment, userId);
     }
 
     @Override
@@ -95,5 +94,31 @@ public class CommentServiceImpl implements CommentService {
         }
 
         commentRepository.delete(comment);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public CommentDTO likeComment(Long commentId, Long userId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("Comment not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        comment.getLikedUsers().add(user);
+        Comment savedComment = commentRepository.save(comment);
+        return convertToDTO(savedComment, userId);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public CommentDTO unlikeComment(Long commentId, Long userId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("Comment not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        comment.getLikedUsers().remove(user);
+        Comment savedComment = commentRepository.save(comment);
+        return convertToDTO(savedComment, userId);
     }
 }

@@ -5,6 +5,9 @@ class LessonComment {
   final String? userAvatar;
   final String content;
   final String createdAt;
+  final int? parentCommentId;
+  final int likeCount;
+  final bool isLiked;
 
   LessonComment({
     required this.id,
@@ -13,6 +16,9 @@ class LessonComment {
     this.userAvatar,
     required this.content,
     required this.createdAt,
+    this.parentCommentId,
+    this.likeCount = 0,
+    this.isLiked = false,
   });
 
   factory LessonComment.fromJson(Map<String, dynamic> json) {
@@ -23,6 +29,9 @@ class LessonComment {
       userAvatar: json['userAvatar'],
       content: json['content'] ?? '',
       createdAt: json['createdAt'] ?? '',
+      parentCommentId: json['parentCommentId'],
+      likeCount: json['likeCount'] ?? 0,
+      isLiked: json['isLiked'] as bool? ?? false,
     );
   }
 }
@@ -65,6 +74,7 @@ class LessonDetail {
   final int? courseId;
   final List<LessonComment> comments;
   final List<QuizQuestion> questions;
+  final bool isCompleted;
 
   LessonDetail({
     required this.id,
@@ -74,6 +84,7 @@ class LessonDetail {
     this.courseId,
     required this.comments,
     required this.questions,
+    this.isCompleted = false,
   });
 
   factory LessonDetail.fromJson(Map<String, dynamic> json) {
@@ -91,6 +102,7 @@ class LessonDetail {
       courseId: json['courseId'],
       comments: comments,
       questions: questions,
+      isCompleted: json['isCompleted'] as bool? ?? false,
     );
   }
 }

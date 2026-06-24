@@ -12,4 +12,5 @@ public class CourseLessonDTO {
     private String itemType;
     private Long examId;
     private Integer questionCount;
+    private Boolean isCompleted;
 }

@@ -19,4 +19,5 @@ public class LessonDetailDTO {
     private Long courseId;
     private List<CommentDTO> comments;
     private List<QuizQuestionDTO> questions;
+    private Boolean isCompleted;
 }

@@ -12,17 +12,20 @@ import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.entity.CourseRating;
+import com.hango.hango_backend.repository.CourseRatingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -33,27 +36,37 @@ public class CourseServiceImpl implements CourseService {
     private final LessonRepository lessonRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
+    private final LessonProgressRepository lessonProgressRepository;
+    private final CourseRatingRepository courseRatingRepository;
 
     @Override
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
         Long enrolledUserId = null;
+        String enrollmentStatus = null;
         
-        if ("ENROLLED".equalsIgnoreCase(filterType)) {
+        if ("ENROLLED".equalsIgnoreCase(filterType) || "IN_PROGRESS".equalsIgnoreCase(filterType)) {
             org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
                 enrolledUserId = ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+                if ("IN_PROGRESS".equalsIgnoreCase(filterType)) {
+                    enrollmentStatus = "ENROLLED";
+                }
+            }
+        } else if ("COMPLETED".equalsIgnoreCase(filterType)) {
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
+                enrolledUserId = ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+                enrollmentStatus = "COMPLETED";
             }
         }
 
         // Difficulty: "ALL" means no filter. Otherwise "EASY", "MEDIUM", "HARD" etc.
         String diffFilter = null;
         if (difficulty != null && !difficulty.equalsIgnoreCase("ALL")) {
-            // Frontend might send "Beginner", we map it if needed, or frontend sends "EASY"
-            // Assuming frontend sends "EASY", "MEDIUM", "HARD" matching the DB paramKey
             diffFilter = difficulty.toUpperCase();
         }
 
-        return courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId);
+        return courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId, enrollmentStatus);
     }
 
     @Override
@@ -65,6 +78,11 @@ public class CourseServiceImpl implements CourseService {
         boolean isEnrolled = false;
         if (currentUserId != null) {
             isEnrolled = enrollmentRepository.existsByUserIdAndCourseId(currentUserId, id);
+        }
+
+        Set<Long> completedLessonIds = new HashSet<>();
+        if (currentUserId != null) {
+            completedLessonIds.addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
         }
 
         List<Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(id);
@@ -84,6 +102,7 @@ public class CourseServiceImpl implements CourseService {
                     .itemType(lesson.getLessonType())
                     .examId(examId)
                     .questionCount(qCount)
+                    .isCompleted(completedLessonIds.contains(lesson.getId()))
                     .build();
             }).collect(Collectors.toList());
 
@@ -116,12 +135,25 @@ public class CourseServiceImpl implements CourseService {
             // Ignore
         }
 
+        // Calculate average rating dynamically from DB reviews/ratings
+        double averageRating = 0.0;
+        List<CourseRating> ratings = courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(id);
+        if (!ratings.isEmpty()) {
+            double sum = 0;
+            for (CourseRating r : ratings) {
+                sum += (r.getRating() != null ? r.getRating() : 0);
+            }
+            averageRating = sum / ratings.size();
+            // Round to 1 decimal place
+            averageRating = Math.round(averageRating * 10.0) / 10.0;
+        }
+
         return CourseDetailDTO.builder()
                 .id(course.getId())
                 .title(course.getTitle())
                 .creatorName(creatorName)
                 .difficultyName(difficultyName)
-                .rating(4.3) // Keeping mock rating until Review system is fully implemented
+                .rating(averageRating)
                 .learnersCount(learnersCount)
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
