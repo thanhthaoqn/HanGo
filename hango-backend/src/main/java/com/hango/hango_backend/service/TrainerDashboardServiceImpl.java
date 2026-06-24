@@ -23,6 +23,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final ExamRepository examRepository;
+    private final SystemParameterRepository systemParameterRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -135,5 +136,94 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .pendingCount(pendingCount)
                 .courses(courses)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void createTrainerCourse(String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+
+        String catKey = request.getCategoryKey().toUpperCase();
+        if ("READING".equals(catKey)) {
+            catKey = "READING_COMPREHENSION";
+        } else if ("PRONUNCIATION".equals(catKey) || "SPEAKING".equals(catKey)) {
+            catKey = "PRONUNCIATION";
+        } else if ("WRITING".equals(catKey)) {
+            catKey = "GRAMMAR";
+        }
+
+        String diffKey = request.getDifficultyKey().toUpperCase();
+        if ("BEGINNER".equals(diffKey)) {
+            diffKey = "BASIC";
+        }
+
+        com.hango.hango_backend.entity.SystemParameter category = systemParameterRepository
+                .findByParamTypeAndParamKey("COURSE_CATEGORY", catKey)
+                .orElseThrow(() -> new RuntimeException("Category not found: " + request.getCategoryKey()));
+
+        com.hango.hango_backend.entity.SystemParameter difficulty = systemParameterRepository
+                .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
+                .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
+
+        com.hango.hango_backend.entity.Course course = com.hango.hango_backend.entity.Course.builder()
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .creator(user)
+                .category(category)
+                .difficulty(difficulty)
+                .thumbnailUrl(request.getThumbnailUrl())
+                .status("DRAFT")
+                .build();
+
+        courseRepository.save(course);
+    }
+
+    @Override
+    public java.util.List<com.hango.hango_backend.entity.SystemParameter> getSystemParametersByType(String paramType) {
+        return systemParameterRepository.findByParamTypeAndIsActiveTrue(paramType.toUpperCase());
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void updateTrainerCourse(Long id, String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
+        com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+
+        if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
+            throw new RuntimeException("You are not authorized to edit this course");
+        }
+
+        String catKey = request.getCategoryKey().toUpperCase();
+        if ("READING".equals(catKey)) {
+            catKey = "READING_COMPREHENSION";
+        } else if ("PRONUNCIATION".equals(catKey) || "SPEAKING".equals(catKey)) {
+            catKey = "PRONUNCIATION";
+        } else if ("WRITING".equals(catKey)) {
+            catKey = "GRAMMAR";
+        }
+
+        String diffKey = request.getDifficultyKey().toUpperCase();
+        if ("BEGINNER".equals(diffKey)) {
+            diffKey = "BASIC";
+        }
+
+        com.hango.hango_backend.entity.SystemParameter category = systemParameterRepository
+                .findByParamTypeAndParamKey("COURSE_CATEGORY", catKey)
+                .orElseThrow(() -> new RuntimeException("Category not found: " + request.getCategoryKey()));
+
+        com.hango.hango_backend.entity.SystemParameter difficulty = systemParameterRepository
+                .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
+                .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
+
+        course.setTitle(request.getTitle());
+        course.setDescription(request.getDescription());
+        course.setCategory(category);
+        course.setDifficulty(difficulty);
+        if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isEmpty()) {
+            course.setThumbnailUrl(request.getThumbnailUrl());
+        }
+
+        courseRepository.save(course);
     }
 }

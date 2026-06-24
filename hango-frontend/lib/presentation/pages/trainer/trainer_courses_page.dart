@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
+import 'create_course_page.dart';
+import 'edit_course_page.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
   const TrainerCoursesPage({super.key});
@@ -443,9 +445,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         ),
         ElevatedButton.icon(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Create Course is under construction')),
-            );
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CreateCoursePage()),
+            ).then((_) => _fetchCoursesData());
           },
           icon: const Icon(Icons.add, color: Colors.white, size: 18),
           label: const Text(
@@ -880,9 +883,13 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               _buildActionButton(
                 icon: Icons.edit_outlined,
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Edit course $title is under construction')),
-                  );
+                  final courseId = course['id'] is int ? course['id'] as int : int.parse(course['id'].toString());
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditCoursePage(courseId: courseId),
+                    ),
+                  ).then((_) => _fetchCoursesData());
                 },
               ),
               const SizedBox(height: 12),
@@ -921,7 +928,15 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   children: [
                     _buildActionButton(
                       icon: Icons.edit_outlined,
-                      onTap: () {},
+                      onTap: () {
+                        final courseId = course['id'] is int ? course['id'] as int : int.parse(course['id'].toString());
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditCoursePage(courseId: courseId),
+                          ),
+                        ).then((_) => _fetchCoursesData());
+                      },
                     ),
                     const SizedBox(width: 12),
                     _buildActionButton(
