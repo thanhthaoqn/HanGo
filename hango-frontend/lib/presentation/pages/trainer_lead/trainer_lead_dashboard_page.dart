@@ -27,12 +27,34 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
   String _userName = '';
   String _userEmail = '';
   String _userInitials = 'T';
+  String _userAvatarUrl = '';
+
+  // ── Profile tab state ──────────────────────────────────────────────────────
+  bool _isLoadingProfile = false;
+  final _profileNameController = TextEditingController();
+  final _profileEmailController = TextEditingController();
+  final _profileUsernameController = TextEditingController();
+  final _profilePhoneController = TextEditingController();
+  final _profileAvatarController = TextEditingController();
+  String _profileGender = 'Male';
+  final _profileDobController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     _fetchDashboardStats();
+  }
+
+  @override
+  void dispose() {
+    _profileNameController.dispose();
+    _profileEmailController.dispose();
+    _profileUsernameController.dispose();
+    _profilePhoneController.dispose();
+    _profileAvatarController.dispose();
+    _profileDobController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserInfo() async {
@@ -54,6 +76,172 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
       });
     }
   }
+
+  // ── Profile methods ──────────────────────────────────────────────────────
+
+  void _initProfileFields() {
+    _profileNameController.text = _userName;
+    _profileEmailController.text = _userEmail;
+    _profileUsernameController.text = _userEmail.split('@').first;
+    _profilePhoneController.text = '';
+    _profileAvatarController.text = _userAvatarUrl;
+    _profileGender = 'Male';
+    _profileDobController.text = '';
+    _fetchUserProfile();
+  }
+
+  Future<void> _fetchUserProfile() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      final res = await _authService.getProfile();
+      if (res['success'] == true) {
+        final data = res['data'];
+        if (mounted) {
+          setState(() {
+            _userName = data['fullName'] ?? _userName;
+            _userEmail = data['email'] ?? _userEmail;
+            _userAvatarUrl = data['avatarUrl'] ?? '';
+
+            _profileNameController.text = _userName;
+            _profileEmailController.text = _userEmail;
+            _profileUsernameController.text = _userEmail.split('@').first;
+            _profilePhoneController.text = data['phoneNumber'] ?? '';
+            _profileAvatarController.text = _userAvatarUrl;
+            _profileGender = data['gender'] ?? 'Male';
+
+            if (data['dateOfBirth'] != null) {
+              try {
+                final parts = data['dateOfBirth'].toString().split('-');
+                if (parts.length == 3) {
+                  _profileDobController.text = '${parts[2]}/${parts[1]}/${parts[0]}';
+                }
+              } catch (_) {
+                _profileDobController.text = '';
+              }
+            } else {
+              _profileDobController.text = '';
+            }
+
+            if (_userName.trim().isNotEmpty) {
+              final parts = _userName.trim().split(' ');
+              if (parts.isNotEmpty) {
+                _userInitials = parts.last[0].toUpperCase();
+              }
+            }
+            _isLoadingProfile = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingProfile = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
+  }
+
+  Future<void> _saveProfileChanges() async {
+    setState(() => _isLoadingProfile = true);
+    try {
+      String? formattedDob;
+      if (_profileDobController.text.isNotEmpty) {
+        final parts = _profileDobController.text.split('/');
+        if (parts.length == 3) {
+          formattedDob = '${parts[2]}-${parts[1]}-${parts[0]}';
+        }
+      }
+
+      final profileData = {
+        'fullName': _profileNameController.text.trim(),
+        'email': _profileEmailController.text.trim(),
+        'phoneNumber': _profilePhoneController.text.trim(),
+        'avatarUrl': _profileAvatarController.text.trim(),
+        'gender': _profileGender,
+        if (formattedDob != null) 'dateOfBirth': formattedDob,
+      };
+
+      final res = await _authService.updateProfile(profileData);
+      if (res['success'] == true) {
+        final data = res['data'];
+        if (mounted) {
+          setState(() {
+            _userName = data['fullName'] ?? _userName;
+            _userEmail = data['email'] ?? _userEmail;
+            _userAvatarUrl = data['avatarUrl'] ?? '';
+            if (_userName.trim().isNotEmpty) {
+              final parts = _userName.trim().split(' ');
+              if (parts.isNotEmpty) {
+                _userInitials = parts.last[0].toUpperCase();
+              }
+            }
+            _isLoadingProfile = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile updated successfully!'),
+              backgroundColor: Color(0xFF28B79B),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoadingProfile = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update profile: ${res['message']}'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAvatarEditDialog() {
+    final controller = TextEditingController(text: _profileAvatarController.text);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Avatar URL',
+            style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter image URL',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _profileAvatarController.text = controller.text;
+              });
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Dashboard stats ─────────────────────────────────────────────────────────
 
   Future<void> _fetchDashboardStats() async {
     try {
@@ -161,7 +349,7 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
   }
 
   // ─────────────────────────────────────────────
-  // HEADER
+  // HEADER (Admin-style)
   // ─────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, bool isDesktop) {
     return Container(
@@ -201,10 +389,10 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
               ],
             ),
 
-          // Right: Notification + User profile
+          // Right: Notification Bell + Profile Dropdown
           Row(
             children: [
-              // Notification Bell
+              // Notification Bell with Badge
               Stack(
                 alignment: Alignment.center,
                 children: [
@@ -236,10 +424,15 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
               ),
               const SizedBox(width: 16),
 
-              // Profile Dropdown
+              // Profile Avatar and Name Dropdown
               PopupMenuButton<String>(
                 onSelected: (val) {
-                  if (val == 'logout') _handleLogout();
+                  if (val == 'logout') {
+                    _handleLogout();
+                  } else if (val == 'profile') {
+                    _initProfileFields();
+                    setState(() => _activeMenu = 'Profile');
+                  }
                 },
                 offset: const Offset(0, 52),
                 shape: RoundedRectangleBorder(
@@ -339,6 +532,7 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
                   ),
                 ),
                 itemBuilder: (context) => [
+                  // ── User info header (disabled) ──────────────────────
                   PopupMenuItem(
                     enabled: false,
                     child: Padding(
@@ -402,6 +596,40 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
                       ),
                     ),
                   ),
+                  // ── Profile Settings ─────────────────────────────────
+                  PopupMenuItem(
+                    value: 'profile',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6FFFA),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.person_outline_rounded,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Profile Settings',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // ── Log Out ──────────────────────────────────────────
                   PopupMenuItem(
                     value: 'logout',
                     child: Container(
@@ -450,6 +678,8 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
     switch (_activeMenu) {
       case 'Dashboard':
         return _buildDashboardTab(isDesktop);
+      case 'Profile':
+        return _buildProfileTab(isDesktop);
       default:
         return Center(
           child: Text(
@@ -754,6 +984,543 @@ class _TrainerLeadDashboardPageState extends State<TrainerLeadDashboardPage> {
             fontSize: 13,
             fontWeight: FontWeight.w500,
             fontFamily: 'Consolas',
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // PROFILE TAB
+  // ─────────────────────────────────────────────
+  Widget _buildProfileTab(bool isDesktop) {
+    if (_isLoadingProfile) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Breadcrumb
+        Row(
+          children: const [
+            Icon(Icons.chevron_right, size: 16, color: Color(0xFF28B79B)),
+            SizedBox(width: 4),
+            Text(
+              'Profile',
+              style: TextStyle(
+                color: Color(0xFF28B79B),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Title
+        const Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Main Card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Avatar & Name ────────────────────────────────────────
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    children: [
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF1F2937), width: 2),
+                        ),
+                        child: _profileAvatarController.text.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(45),
+                                child: Image.network(
+                                  _profileAvatarController.text,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Center(
+                                    child: Text(
+                                      _userInitials,
+                                      style: const TextStyle(
+                                        color: Color(0xFF28B79B),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 32,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  _userInitials,
+                                  style: const TextStyle(
+                                    color: Color(0xFF28B79B),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 32,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ),
+                      ),
+                      // Edit button overlay
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _showAvatarEditDialog,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF28B79B),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _userName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6FFFA),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Trainer Lead',
+                            style: TextStyle(
+                              color: Color(0xFF1F9E84),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // ── Form Grid ────────────────────────────────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 600;
+                  return Column(
+                    children: [
+                      // Row 1: FullName & Username
+                      _buildFormRow(
+                        isWide,
+                        _buildTextFieldNoIcon('Full Name', _profileNameController),
+                        _buildTextFieldNoIcon(
+                          'Username',
+                          _profileUsernameController,
+                          onChanged: (val) {
+                            final emailVal = _profileEmailController.text.trim();
+                            final parts = emailVal.split('@');
+                            final domain = parts.length > 1 ? parts.last : 'hango.edu.vn';
+                            _profileEmailController.text = '${val.trim()}@$domain';
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Row 2: Email & Phone
+                      _buildFormRow(
+                        isWide,
+                        _buildTextFieldWithEmailIcon(
+                          'Email',
+                          _profileEmailController,
+                          onChanged: (val) {
+                            final parts = val.trim().split('@');
+                            if (parts.isNotEmpty) {
+                              _profileUsernameController.text = parts.first;
+                            }
+                          },
+                        ),
+                        _buildTextFieldNoIcon('Phone Number', _profilePhoneController),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Row 3: Date of Birth & Gender
+                      _buildFormRow(
+                        isWide,
+                        _buildDatePickerField(context),
+                        _buildGenderRadioGroup(),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Row 4: Role display
+                      _buildFormRow(
+                        isWide,
+                        _buildRoleDisplayBox('Role', 'Trainer Lead'),
+                        const SizedBox(),
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 40),
+              const Divider(color: Color(0xFFE5E7EB)),
+              const SizedBox(height: 24),
+
+              // ── Action Buttons ───────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: _saveProfileChanges,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                      side: const BorderSide(color: Color(0xFF28B79B)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text(
+                      'Update',
+                      style: TextStyle(
+                        color: Color(0xFF28B79B),
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    onPressed: () => setState(() => _activeMenu = 'Dashboard'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28B79B),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Back',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Form helper widgets ──────────────────────────────────────────────────
+
+  Widget _buildFormRow(bool isWide, Widget left, Widget right) {
+    if (isWide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 24),
+          Expanded(child: right),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [left, const SizedBox(height: 20), right],
+    );
+  }
+
+  Widget _buildTextFieldNoIcon(
+    String label,
+    TextEditingController controller, {
+    bool enabled = true,
+    ValueChanged<String>? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+                fontFamily: 'Outfit')),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          onChanged: onChanged,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: enabled ? Colors.white : const Color(0xFFF3F4F6),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextFieldWithEmailIcon(
+    String label,
+    TextEditingController controller, {
+    bool enabled = true,
+    ValueChanged<String>? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+                fontFamily: 'Outfit')),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          onChanged: onChanged,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF9CA3AF), size: 20),
+            filled: true,
+            fillColor: enabled ? Colors.white : const Color(0xFFF3F4F6),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleDisplayBox(String label, String roleName) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+                fontFamily: 'Outfit')),
+        const SizedBox(height: 8),
+        Container(
+          height: 48,
+          width: double.infinity,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF2FF),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+          ),
+          child: Text(
+            roleName,
+            style: const TextStyle(
+                color: Color(0xFF3F51B5),
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                fontFamily: 'Outfit'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderRadioGroup() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Gender',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+                fontFamily: 'Outfit')),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: () => setState(() => _profileGender = 'Female'),
+              child: Row(
+                children: [
+                  Radio<String>(
+                    value: 'Female',
+                    groupValue: _profileGender,
+                    activeColor: const Color(0xFF28B79B),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _profileGender = val);
+                    },
+                  ),
+                  const Text('Female', style: TextStyle(fontFamily: 'Outfit', fontSize: 15)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 24),
+            GestureDetector(
+              onTap: () => setState(() => _profileGender = 'Male'),
+              child: Row(
+                children: [
+                  Radio<String>(
+                    value: 'Male',
+                    groupValue: _profileGender,
+                    activeColor: const Color(0xFF28B79B),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _profileGender = val);
+                    },
+                  ),
+                  const Text('Male', style: TextStyle(fontFamily: 'Outfit', fontSize: 15)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePickerField(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Date of Birth',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+                fontFamily: 'Outfit')),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _profileDobController,
+          readOnly: true,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 15),
+          onTap: () async {
+            DateTime? initialDate;
+            try {
+              final parts = _profileDobController.text.split('/');
+              if (parts.length == 3) {
+                initialDate = DateTime(
+                    int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+              }
+            } catch (_) {
+              initialDate = null;
+            }
+
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: initialDate ?? DateTime(2000, 1, 1),
+              firstDate: DateTime(1900),
+              lastDate: DateTime.now(),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: Color(0xFF28B79B),
+                      onPrimary: Colors.white,
+                      onSurface: Color(0xFF1F2937),
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null && mounted) {
+              setState(() {
+                final d = picked.day.toString().padLeft(2, '0');
+                final m = picked.month.toString().padLeft(2, '0');
+                _profileDobController.text = '$d/$m/${picked.year}';
+              });
+            }
+          },
+          decoration: InputDecoration(
+            suffixIcon: const Icon(Icons.calendar_today_outlined,
+                color: Color(0xFF9CA3AF), size: 18),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5)),
+            hintText: 'DD/MM/YYYY',
+            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontFamily: 'Outfit'),
           ),
         ),
       ],

@@ -22,18 +22,17 @@ class TrainerLeadSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Logo Section
+          // ── Logo Section (giống Admin) ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
-            child: Row(
-              children: [
-                Image.network(
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                  height: 40,
-                  width: 40,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
+            child: Image.network(
+              'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+              height: 48,
+              alignment: Alignment.centerLeft,
+              errorBuilder: (context, error, stackTrace) {
+                return Row(
+                  children: [
+                    Container(
                       width: 36,
                       height: 36,
                       decoration: const BoxDecoration(
@@ -41,64 +40,68 @@ class TrainerLeadSidebar extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.school, size: 20, color: Color(0xFF28B79B)),
-                    );
-                  },
-                ),
-                const SizedBox(width: 10),
-                RichText(
-                  text: const TextSpan(
-                    text: 'Han',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                      fontFamily: 'Outfit',
                     ),
-                    children: [
-                      TextSpan(
-                        text: 'Go',
+                    const SizedBox(width: 10),
+                    RichText(
+                      text: const TextSpan(
+                        text: 'Han',
                         style: TextStyle(
-                          color: Color(0xFF28B79B),
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                          fontFamily: 'Outfit',
                         ),
+                        children: [
+                          TextSpan(
+                            text: 'Go',
+                            style: TextStyle(
+                              color: Color(0xFF28B79B),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
           const SizedBox(height: 10),
 
-          // Menu Items
+          // ── Menu Items ─────────────────────────────────────────────────
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  _buildMenuItem(
+                  _buildSidebarMenuItem(
                     context,
+                    index: 0,
                     icon: Icons.grid_view_outlined,
                     title: 'Dashboard',
                     menuKey: 'Dashboard',
                   ),
                   const SizedBox(height: 8),
-                  _buildMenuItem(
+                  _buildSidebarMenuItem(
                     context,
+                    index: 1,
                     icon: Icons.menu_book_outlined,
                     title: 'Courses',
                     menuKey: 'Courses',
                   ),
                   const SizedBox(height: 8),
-                  _buildMenuItem(
+                  _buildSidebarMenuItem(
                     context,
+                    index: 2,
                     icon: Icons.assignment_outlined,
                     title: 'Task',
                     menuKey: 'Task',
                   ),
                   const SizedBox(height: 8),
-                  _buildMenuItem(
+                  _buildSidebarMenuItem(
                     context,
+                    index: 3,
                     icon: Icons.chat_bubble_outline,
                     title: 'Comment',
                     menuKey: 'Comment',
@@ -108,8 +111,8 @@ class TrainerLeadSidebar extends StatelessWidget {
                   const Divider(color: Color(0xFFE5E7EB)),
                   const SizedBox(height: 12),
 
-                  // Bottom Items
-                  _buildBottomItem(
+                  // ── Bottom Items ──────────────────────────────────────
+                  _buildSidebarBottomItem(
                     context,
                     icon: Icons.help_outline,
                     title: 'Help Center',
@@ -121,10 +124,11 @@ class TrainerLeadSidebar extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 8),
-                  _buildBottomItem(
+                  _buildSidebarBottomItem(
                     context,
                     icon: Icons.logout,
                     title: 'Logout',
+                    isDestructive: true,
                     onTap: () {
                       if (isMobileDrawer) Navigator.pop(context);
                       onLogout?.call();
@@ -140,8 +144,9 @@ class TrainerLeadSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(
+  Widget _buildSidebarMenuItem(
     BuildContext context, {
+    required int index,
     required IconData icon,
     required String title,
     required String menuKey,
@@ -155,13 +160,30 @@ class TrainerLeadSidebar extends StatelessWidget {
           if (isMobileDrawer) Navigator.pop(context);
           onMenuChanged?.call(menuKey);
         },
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF28B79B) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            gradient: isSelected
+                ? const LinearGradient(
+                    colors: [Color(0xFF28B79B), Color(0xFF1F9E84)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  )
+                : null,
+            color: isSelected ? null : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF28B79B).withOpacity(0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             children: [
@@ -187,32 +209,30 @@ class TrainerLeadSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomItem(
+  Widget _buildSidebarBottomItem(
     BuildContext context, {
     required IconData icon,
     required String title,
     required VoidCallback onTap,
+    bool isDestructive = false,
   }) {
+    final color = isDestructive ? const Color(0xFFEF4444) : const Color(0xFF4B5563);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
           height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              Icon(
-                icon,
-                color: const Color(0xFF4B5563),
-                size: 20,
-              ),
+              Icon(icon, color: color, size: 20),
               const SizedBox(width: 12),
               Text(
                 title,
-                style: const TextStyle(
-                  color: Color(0xFF4B5563),
+                style: TextStyle(
+                  color: color,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   fontFamily: 'Outfit',
