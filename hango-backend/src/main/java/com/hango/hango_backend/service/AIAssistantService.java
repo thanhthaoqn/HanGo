@@ -75,7 +75,7 @@ public class AIAssistantService {
 
                 // Lấy practice questions để nhúng vào scope + prompt
                 // Practice data được trả về trong LessonDetailDTO.questions (từ LessonServiceImpl).
-                com.hango.hango_backend.dto.LessonDetailDTO lessonDetail = lessonService.getLessonDetail(request.getLessonId());
+com.hango.hango_backend.dto.LessonDetailDTO lessonDetail = lessonService.getLessonDetail(request.getLessonId(), learnerId);
                 java.util.List<com.hango.hango_backend.dto.QuizQuestionDTO> practiceQuestions =
                                 (lessonDetail != null && lessonDetail.getQuestions() != null)
                                                 ? lessonDetail.getQuestions()
