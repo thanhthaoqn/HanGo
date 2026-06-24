@@ -10,3 +10,7 @@ class PickedFile {
 Future<PickedFile?> pickImage() async {
   return impl.pickImageFile();
 }
+
+Future<PickedFile?> pickPdf() async {
+  return impl.pickPdfFile();
+}

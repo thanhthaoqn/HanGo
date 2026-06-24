@@ -42,7 +42,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
 
   String? _uploadedPdfName;
   bool _isUploadingPdf = false;
-  String _pdfUploadStatusText = '';
+  double _pdfUploadProgress = 0.0;
+  String? _pdfFileSizeStr;
 
   @override
   void initState() {
@@ -107,24 +108,53 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     }
   }
 
-  void _simulatePdfUpload() async {
-    setState(() {
-      _isUploadingPdf = true;
-      _pdfUploadStatusText = 'Selecting document...';
-    });
+  void _pickAndUploadPdf() async {
+    try {
+      final picked = await pickPdf();
+      if (picked == null) return;
 
-    await Future.delayed(const Duration(milliseconds: 800));
+      final int sizeInBytes = picked.bytes.length;
+      final double sizeInMb = sizeInBytes / (1024 * 1024);
+      if (sizeInMb > 50.0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size exceeds 50MB limit!'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
+      }
 
-    setState(() {
-      _pdfUploadStatusText = 'Uploading PDF...';
-    });
+      setState(() {
+        _isUploadingPdf = true;
+        _uploadedPdfName = picked.name;
+        _pdfFileSizeStr = '${sizeInMb.toStringAsFixed(2)} MB';
+        _pdfUploadProgress = 0.0;
+      });
 
-    await Future.delayed(const Duration(seconds: 1500 ~/ 1000));
+      // Simulate a progress bar from 0.0 to 1.0
+      const int totalSteps = 20;
+      for (int i = 1; i <= totalSteps; i++) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (!mounted) return;
+        setState(() {
+          _pdfUploadProgress = i / totalSteps;
+        });
+      }
 
-    setState(() {
-      _uploadedPdfName = 'English_Grammar_Fundamentals.pdf';
-      _isUploadingPdf = false;
-    });
+      setState(() {
+        _isUploadingPdf = false;
+      });
+    } catch (e) {
+      debugPrint('Error picking or uploading PDF: $e');
+      setState(() {
+        _isUploadingPdf = false;
+        _uploadedPdfName = null;
+        _pdfFileSizeStr = null;
+      });
+    }
   }
 
   void _addMarkdownTag(String tagOpen, String tagClose) {
@@ -888,94 +918,130 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      InkWell(
-                        onTap: _isUploadingImage ? null : _pickAndUploadImage,
-                        borderRadius: BorderRadius.circular(12),
-                        child: CustomPaint(
-                          painter: DashedRoundedBorderPainter(
-                            color: const Color(0xFFCBD5E1),
-                            borderRadius: 12,
-                          ),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                            alignment: Alignment.center,
-                            child: _isUploadingImage
-                                ? Column(
-                                    children: [
-                                      const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
-                                        ),
+                      if (_uploadedImageUrl != null)
+                        Stack(
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              height: 180,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  _uploadedImageUrl!,
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _uploadedImageUrl = null;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFEF4444),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black12,
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
                                       ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        _imageUploadStatusText,
-                                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontFamily: 'Outfit'),
-                                      )
                                     ],
-                                  )
-                                : _uploadedImageUrl != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Column(
-                                          children: [
-                                            Image.network(
-                                              _uploadedImageUrl!,
-                                              height: 120,
-                                              fit: BoxFit.contain,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            const Text(
-                                              'Image uploaded successfully',
-                                              style: TextStyle(color: Color(0xFF20B486), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                                            ),
-                                          ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        InkWell(
+                          onTap: _isUploadingImage ? null : _pickAndUploadImage,
+                          borderRadius: BorderRadius.circular(12),
+                          child: CustomPaint(
+                            painter: DashedRoundedBorderPainter(
+                              color: const Color(0xFFCBD5E1),
+                              borderRadius: 12,
+                            ),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                              alignment: Alignment.center,
+                              child: _isUploadingImage
+                                  ? Column(
+                                      children: [
+                                        const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                                          ),
                                         ),
-                                      )
-                                    : Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.cloud_upload_outlined, color: Color(0xFF64748B), size: 36),
-                                          const SizedBox(height: 8),
-                                          const Text(
-                                            'Click to upload or drag & drop',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF475569),
-                                              fontFamily: 'Outfit',
-                                            ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          _imageUploadStatusText,
+                                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontFamily: 'Outfit'),
+                                        )
+                                      ],
+                                    )
+                                  : Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.cloud_upload_outlined, color: Color(0xFF64748B), size: 36),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Click to upload or drag & drop',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF475569),
+                                            fontFamily: 'Outfit',
                                           ),
-                                          const SizedBox(height: 4),
-                                          const Text(
-                                            'SVG, PNG, JPG or GIF (max. 800x400px)',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Color(0xFF94A3B8),
-                                              fontFamily: 'Outfit',
-                                            ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'SVG, PNG, JPG or GIF (max. 800x400px)',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF94A3B8),
+                                            fontFamily: 'Outfit',
                                           ),
-                                          const SizedBox(height: 12),
-                                          ElevatedButton(
-                                            onPressed: _pickAndUploadImage,
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF20B486),
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                            ),
-                                            child: const Text('Upload Image', style: TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        ElevatedButton(
+                                          onPressed: _pickAndUploadImage,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF20B486),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                           ),
-                                        ],
-                                      ),
+                                          child: const Text('Upload Image', style: TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ],
+                                    ),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -994,90 +1060,170 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             ),
           ),
           const SizedBox(height: 8),
-          InkWell(
-            onTap: _isUploadingPdf ? null : _simulatePdfUpload,
-            borderRadius: BorderRadius.circular(12),
-            child: CustomPaint(
-              painter: DashedRoundedBorderPainter(
-                color: const Color(0xFFCBD5E1),
-                borderRadius: 12,
+          if (_uploadedPdfName == null)
+            InkWell(
+              onTap: _pickAndUploadPdf,
+              borderRadius: BorderRadius.circular(12),
+              child: CustomPaint(
+                painter: DashedRoundedBorderPainter(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: 12,
+                ),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.description_outlined, color: Color(0xFF64748B), size: 36),
+                      SizedBox(height: 8),
+                      Text(
+                        'Upload PDF Document',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Drag & drop or click to browse (Max 50MB)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                alignment: Alignment.center,
-                child: _isUploadingPdf
-                    ? Column(
-                        children: [
-                          const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
-                            ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color.fromRGBO(0, 0, 0, 0.01),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.picture_as_pdf,
+                      color: Color(0xFFEF4444),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _uploadedPdfName!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _pdfUploadStatusText,
-                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontFamily: 'Outfit'),
-                          )
-                        ],
-                      )
-                    : _uploadedPdfName != null
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.picture_as_pdf, color: Colors.redAccent, size: 24),
-                              const SizedBox(width: 8),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (_pdfFileSizeStr != null) ...[
                               Text(
-                                _uploadedPdfName!,
+                                _pdfFileSizeStr!,
                                 style: const TextStyle(
                                   fontFamily: 'Outfit',
-                                  fontSize: 13,
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            if (_isUploadingPdf)
+                              Text(
+                                'Uploading... ${(_pdfUploadProgress * 100).toInt()}%',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 12,
+                                  color: Color(0xFF20B486),
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              IconButton(
-                                icon: const Icon(Icons.close, color: Color(0xFFEF4444), size: 16),
-                                onPressed: () {
-                                  setState(() {
-                                    _uploadedPdfName = null;
-                                  });
-                                },
                               )
-                            ],
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.description_outlined, color: Color(0xFF64748B), size: 36),
-                              SizedBox(height: 8),
-                              Text(
-                                'Upload PDF Document',
+                            else
+                              const Text(
+                                'Uploaded successfully',
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF475569),
                                   fontFamily: 'Outfit',
+                                  fontSize: 12,
+                                  color: Color(0xFF20B486),
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Drag & drop or click to browse (Max 50MB)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF94A3B8),
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
-                            ],
+                          ],
+                        ),
+                        if (_isUploadingPdf) ...[
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: _pdfUploadProgress,
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                              minHeight: 4,
+                            ),
                           ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFEF2F2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Color(0xFFEF4444),
+                        size: 16,
+                      ),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _uploadedPdfName = null;
+                        _pdfFileSizeStr = null;
+                        _isUploadingPdf = false;
+                      });
+                    },
+                  ),
+                ],
               ),
             ),
-          ),
         ],
       ),
     );
