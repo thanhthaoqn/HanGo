@@ -99,6 +99,29 @@ class TaskService {
     }
   }
 
+  Future<Map<String, dynamic>> updateTask(int taskId, Map<String, dynamic> data) async {
+    try {
+      final token = await _getToken();
+      final response = await _dio.put(
+        '$baseUrl/$taskId',
+        data: data,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.data};
+      }
+      return {'success': false, 'message': 'Failed to update task'};
+    } on DioException catch (e) {
+      return {
+        'success': false,
+        'message': e.response?.data?.toString() ?? e.toString(),
+      };
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> updateTaskStatus(
     int taskId,
     String status,
@@ -149,6 +172,23 @@ class TaskService {
         'success': false,
         'message': e.response?.data?.toString() ?? e.toString(),
       };
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getTaskActivities(int taskId) async {
+    try {
+      final token = await _getToken();
+      final response = await _dio.get(
+        '$baseUrl/$taskId/activities',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'activities': response.data};
+      }
+      return {'success': false, 'message': 'Failed to load activities'};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }

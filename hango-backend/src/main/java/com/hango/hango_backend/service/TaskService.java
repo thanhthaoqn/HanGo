@@ -3,11 +3,14 @@ package com.hango.hango_backend.service;
 import com.hango.hango_backend.dto.TaskDTO;
 import com.hango.hango_backend.dto.TaskRequestDTO;
 import com.hango.hango_backend.dto.TaskStatusUpdateRequest;
+import com.hango.hango_backend.dto.TaskActivityDTO;
+import com.hango.hango_backend.entity.TaskActivity;
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.Task;
 import com.hango.hango_backend.entity.TaskStatus;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.TaskRepository;
+import com.hango.hango_backend.repository.TaskActivityRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -27,6 +30,9 @@ public class TaskService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TaskActivityRepository taskActivityRepository;
 
     public Page<TaskDTO> getTasks(Long leadId, Long creatorId,
             LocalDateTime fromDate, LocalDateTime toDate,
@@ -64,6 +70,8 @@ public class TaskService {
 
         Task savedTask = taskRepository.save(task);
 
+        logActivity(savedTask, currentUser, "Task Initiated", "Assigned task to " + assignee.getFullName());
+
         return mapToDTO(savedTask);
     }
 
@@ -74,7 +82,8 @@ public class TaskService {
 
         Long targetCreatorId = request.getCreatorId() != null ? request.getCreatorId() : currentUser.getId();
 
-        if (!task.getAssignee().getId().equals(targetCreatorId) && !task.getReviewer().getId().equals(currentUser.getId())) {
+        if (!task.getAssignee().getId().equals(targetCreatorId)
+                && !task.getReviewer().getId().equals(currentUser.getId())) {
             throw new RuntimeException("Assignee task not found or you don't have permission");
         }
 
@@ -94,6 +103,16 @@ public class TaskService {
 
         taskRepository.save(task);
 
+        String actionDetails = "Status updated to " + request.getStatus();
+        if (request.getStatus().equals("SUBMITTED") && request.getSubmissionNotes() != null) {
+            actionDetails += " with notes: " + request.getSubmissionNotes();
+        } else if ((request.getStatus().equals("APPROVED") || request.getStatus().equals("REJECTED"))
+                && request.getReviewComment() != null) {
+            actionDetails += " with comment: " + request.getReviewComment();
+        }
+
+        logActivity(task, currentUser, "Status Updated", actionDetails);
+
         return mapToDTO(task);
     }
 
@@ -108,7 +127,7 @@ public class TaskService {
 
         User assignee = userRepository.findById(request.getAssigneeId())
                 .orElseThrow(() -> new RuntimeException("Assignee not found: " + request.getAssigneeId()));
-        
+
         User reviewer = userRepository.findById(request.getReviewerId())
                 .orElseThrow(() -> new RuntimeException("Reviewer not found: " + request.getReviewerId()));
 
@@ -118,7 +137,7 @@ public class TaskService {
         task.setDueDate(request.getDueDate());
         task.setAssignee(assignee);
         task.setReviewer(reviewer);
-        
+
         Task savedTask = taskRepository.save(task);
 
         return mapToDTO(savedTask);
@@ -131,6 +150,30 @@ public class TaskService {
         taskRepository.delete(task);
     }
 
+    public List<TaskActivityDTO> getTaskActivities(Long taskId) {
+        return taskActivityRepository.findByTaskIdOrderByTimestampDesc(taskId).stream()
+                .map(activity -> TaskActivityDTO.builder()
+                        .id(activity.getId())
+                        .taskId(activity.getTask().getId())
+                        .userId(activity.getUser().getId())
+                        .userName(activity.getUser().getFullName())
+                        .action(activity.getAction())
+                        .details(activity.getDetails())
+                        .timestamp(activity.getTimestamp())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private void logActivity(Task task, User user, String action, String details) {
+        TaskActivity activity = TaskActivity.builder()
+                .task(task)
+                .user(user)
+                .action(action)
+                .details(details)
+                .build();
+        taskActivityRepository.save(activity);
+    }
+
     private TaskDTO mapToDTO(Task task) {
         String creatorName = "Unknown";
         Long creatorId = null;
@@ -138,16 +181,18 @@ public class TaskService {
             try {
                 creatorId = task.getAssignee().getId();
                 creatorName = task.getAssignee().getFullName();
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
-        
+
         String reviewerName = "Unknown";
         Long reviewerId = null;
         if (task.getReviewer() != null) {
             try {
                 reviewerId = task.getReviewer().getId();
                 reviewerName = task.getReviewer().getFullName();
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
 
         TaskDTO.CreatorTaskDTO assigneeDTO = TaskDTO.CreatorTaskDTO.builder()

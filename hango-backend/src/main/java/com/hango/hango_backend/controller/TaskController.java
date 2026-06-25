@@ -54,8 +54,8 @@ public class TaskController {
 
     @PostMapping
     @PreAuthorize("hasRole('TRAINER_LEAD')")
-    public ResponseEntity<?> createTask(@Valid @RequestBody TaskRequestDTO request, 
-                                        @AuthenticationPrincipal UserDetailsImpl userDetails) {
+    public ResponseEntity<?> createTask(@Valid @RequestBody TaskRequestDTO request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
         User currentUser = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new RuntimeException("Current user not found"));
         TaskDTO taskDTO = taskService.createTask(request, currentUser);
@@ -64,9 +64,9 @@ public class TaskController {
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('TRAINER', 'TRAINER_LEAD')")
-    public ResponseEntity<?> updateTaskStatus(@PathVariable Long id, 
-                                              @Valid @RequestBody TaskStatusUpdateRequest request,
-                                              @AuthenticationPrincipal UserDetailsImpl userDetails) {
+    public ResponseEntity<?> updateTaskStatus(@PathVariable Long id,
+            @Valid @RequestBody TaskStatusUpdateRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
         User currentUser = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new RuntimeException("Current user not found"));
         TaskDTO taskDTO = taskService.updateTaskStatus(id, request, currentUser);
@@ -75,9 +75,9 @@ public class TaskController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('TRAINER_LEAD')")
-    public ResponseEntity<?> updateTask(@PathVariable Long id, 
-                                        @Valid @RequestBody TaskRequestDTO request,
-                                        @AuthenticationPrincipal UserDetailsImpl userDetails) {
+    public ResponseEntity<?> updateTask(@PathVariable Long id,
+            @Valid @RequestBody TaskRequestDTO request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
         User currentUser = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new RuntimeException("Current user not found"));
         TaskDTO taskDTO = taskService.updateTask(id, request, currentUser);
@@ -89,5 +89,11 @@ public class TaskController {
     public ResponseEntity<?> deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
         return ResponseEntity.ok().body("Task deleted successfully");
+    }
+
+    @GetMapping("/{id}/activities")
+    @PreAuthorize("hasAnyRole('TRAINER', 'TRAINER_LEAD', 'ADMINISTRATOR')")
+    public ResponseEntity<?> getTaskActivities(@PathVariable Long id) {
+        return ResponseEntity.ok(taskService.getTaskActivities(id));
     }
 }
