@@ -10,6 +10,7 @@ import '../domain/model/course.dart'; // Sử dụng duy nhất model Course nà
 import '../domain/model/exam_models.dart';
 import '../domain/model/recommendation.dart';
 import '../domain/model/ai_pathway_models.dart';
+import '../presentation/pages/trainer/question_bank/models/trainer_question.dart';
 
 class ApiFailure implements Exception {
   const ApiFailure(this.message, {this.statusCode});
@@ -221,5 +222,33 @@ class HangoApi {
       ),
     );
     return SendMessageResponse.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<List<TrainerQuestion>> getTrainerQuestions({
+    required String type,
+    String? search,
+    String? sortBy,
+  }) async {
+    final queryParams = <String, String>{
+      'type': type,
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
+    };
+    
+    // Build URL with query params
+    final baseUri = _uri('/api/v1/trainer/questions');
+    final uri = Uri(
+      scheme: baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.port,
+      path: baseUri.path,
+      queryParameters: queryParams,
+    );
+
+    final body = await _send(http.get(uri, headers: _headers));
+    return (body as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(TrainerQuestion.fromJson)
+        .toList();
   }
 }
