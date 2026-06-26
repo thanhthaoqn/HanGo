@@ -9,6 +9,7 @@ import 'trainer_dashboard_page.dart';
 
 import 'create_course_page.dart';
 import 'edit_course_page.dart';
+import 'question_bank/trainer_question_bank_page.dart';
 
 
 class TrainerCoursesPage extends StatefulWidget {
@@ -290,7 +291,14 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank'),
+          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerQuestionBankPage(),
+              ),
+            );
+          }),
           _buildSidebarItem(Icons.task_alt_outlined, 'Task'),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
