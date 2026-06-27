@@ -2,7 +2,6 @@ package com.hango.hango_backend.service;
 
 import com.hango.hango_backend.dto.TrainerDashboardSummaryDTO;
 import com.hango.hango_backend.dto.TrainerCoursesResponseDTO;
-
 import java.util.List;
 import com.hango.hango_backend.entity.SystemParameter;
 
