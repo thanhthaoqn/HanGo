@@ -280,6 +280,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _isSaving = false;
           _lastSavedText = 'Last saved: Just now';
         });
+        await _refreshCourseDetail();
         if (mounted) {
           ToastHelper.showSuccess(context, 'Course updated successfully!');
         }
@@ -294,6 +295,33 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _isSaving = false;
         });
       }
+    }
+  }
+
+  Future<void> _refreshCourseDetail() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final uri = Uri.parse('$apiBaseUrl/courses/${widget.courseId}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        setState(() {
+          if (data['sessions'] != null) {
+            _sections = List.from(data['sessions']);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error refreshing course details: $e');
     }
   }
 
@@ -334,6 +362,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         setState(() {
           _lastSavedText = 'Draft saved automatically just now';
         });
+        await _refreshCourseDetail();
       } else {
         setState(() {
           _lastSavedText = 'Failed to auto-save';
