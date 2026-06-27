@@ -250,6 +250,19 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        // Sync local cache
+        final prefs = await SharedPreferences.getInstance();
+        if (data['fullName'] != null) {
+          await prefs.setString(_userFullNameKey, data['fullName']);
+        }
+        if (data['email'] != null) {
+          await prefs.setString(_userEmailKey, data['email']);
+        }
+        if (data['avatarUrl'] != null) {
+          await prefs.setString(_userAvatarUrlKey, data['avatarUrl']);
+        } else {
+          await prefs.remove(_userAvatarUrlKey);
+        }
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': response.body};

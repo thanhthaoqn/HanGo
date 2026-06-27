@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
+import '../../../utils/toast_helper.dart';
 
 import 'create_section_page.dart';
 
@@ -24,6 +25,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
   bool _isLoadingCourse = true;
   bool _isSaving = false;
   String _lastSavedText = 'Last saved: Just now';
@@ -81,6 +83,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -91,6 +94,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
+      _trainerAvatarUrl = avatarUrl;
     });
   }
 
@@ -188,14 +192,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
       setState(() {
         _isLoadingCourse = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading course details: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+        ToastHelper.showError(context, 'Error loading course details: $e');
     }
   }
 
@@ -239,9 +236,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         _uploadStatusText = 'Upload failed';
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
+        ToastHelper.showError(context, 'Error uploading image: $e');
       }
     }
   }
@@ -286,12 +281,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _lastSavedText = 'Last saved: Just now';
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Course updated successfully!'),
-              backgroundColor: Color(0xFF20B486),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'Course updated successfully!');
         }
       } else {
         throw Exception('Failed to update course: ${response.body}');
@@ -299,12 +289,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     } catch (e) {
       debugPrint('Error updating course: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving course: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Error saving course: $e');
         setState(() {
           _isSaving = false;
         });
@@ -471,9 +456,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   size: 24,
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No new notifications')),
-                  );
+                  ToastHelper.show(context, 'No new notifications');
                 },
               ),
               Positioned(
@@ -512,15 +495,33 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  _trainerInitials,
-                  style: const TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
+                child: _trainerAvatarUrl.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _trainerAvatarUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            _trainerInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF20B486),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _trainerInitials,
+                        style: const TextStyle(
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
               ),
               const SizedBox(width: 4),
               Container(

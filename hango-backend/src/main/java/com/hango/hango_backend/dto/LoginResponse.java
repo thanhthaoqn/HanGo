@@ -12,4 +12,5 @@ public class LoginResponse {
     private String email;
     private String fullName;
     private List<String> roles;
+    private String avatarUrl;
 }

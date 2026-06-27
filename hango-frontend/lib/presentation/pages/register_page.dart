@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
+import '../../utils/toast_helper.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -40,12 +41,7 @@ class _RegisterPageState extends State<RegisterPage> {
   void _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You must agree to the Terms of Service and Privacy Policy'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'You must agree to the Terms of Service and Privacy Policy');
       return;
     }
 
@@ -65,23 +61,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (mounted) {
       if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Registration successful! Please check your email.'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'Registration successful! Please check your email.');
         setState(() {
           _showCheckEmailScreen = true;
         });
         _startVerificationPolling();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Registration failed. Please try again.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, result['message'] ?? 'Registration failed. Please try again.');
       }
     }
   }
@@ -95,12 +81,7 @@ class _RegisterPageState extends State<RegisterPage> {
       final isVerified = await _authService.checkVerificationStatus(email);
       if (isVerified && mounted) {
         timer.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account verified successfully! Please sign in.'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
         Navigator.pop(context);
       }
     });
@@ -121,20 +102,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (isVerified) {
         _verificationTimer?.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account verified successfully! Please sign in.'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account is not verified yet. Please check your email and click the verification link.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Account is not verified yet. Please check your email and click the verification link.');
       }
     }
   }
@@ -155,23 +126,13 @@ class _RegisterPageState extends State<RegisterPage> {
       });
 
       if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification link has been resent! Please check your email.'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'Verification link has been resent! Please check your email.');
       } else {
         String errMsg = result['message'] ?? 'Failed to resend verification link.';
         if (errMsg.startsWith('Error: ')) {
           errMsg = errMsg.substring(7);
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to resend link: $errMsg'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Failed to resend link: $errMsg');
       }
     }
   }
@@ -881,12 +842,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   baseline: TextBaseline.alphabetic,
                   child: GestureDetector(
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Contact support at support@hango.com'),
-                          backgroundColor: Color(0xFF28B79B),
-                        ),
-                      );
+                      ToastHelper.showSuccess(context, 'Contact support at support@hango.com');
                     },
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,

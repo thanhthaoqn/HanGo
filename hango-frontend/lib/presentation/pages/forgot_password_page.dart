@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
+import '../../utils/toast_helper.dart';
 import 'verify_otp_page.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
@@ -37,12 +38,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
     if (mounted) {
       if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('OTP code sent successfully! Please check your email.'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'OTP code sent successfully! Please check your email.');
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -50,12 +46,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to send OTP code.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, result['message'] ?? 'Failed to send OTP code.');
       }
     }
   }

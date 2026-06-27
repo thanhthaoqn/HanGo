@@ -72,6 +72,7 @@ public class CourseRatingServiceImpl implements CourseRatingService {
                     .userId(r.getStudent() != null ? r.getStudent().getId() : null)
                     .userName(maskEmail(email))
                     .userInitial(email.substring(0, 1).toUpperCase())
+                    .userAvatar(r.getStudent() != null ? r.getStudent().getAvatarUrl() : null)
                     .rating(r.getRating())
                     .content(r.getReviewContent())
                     .createdAt(r.getCreatedAt())

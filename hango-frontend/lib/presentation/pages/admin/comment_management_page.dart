@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
+import '../../../utils/toast_helper.dart';
 
 class CommentManagementPage extends StatefulWidget {
   final Function(String) onTabChanged;
@@ -144,23 +145,12 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
 
       if (response.statusCode == 200) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Comment status updated to $newStatus'),
-              backgroundColor: const Color(0xFF14B8A6),
-              duration: const Duration(seconds: 1),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'Comment status updated to $newStatus');
         }
       } else {
         debugPrint('Failed to update status on server: ${response.statusCode} - ${response.body}');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update status: ${response.body}'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, 'Failed to update status: ${response.body}');
         }
         _fetchComments();
       }
