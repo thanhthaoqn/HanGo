@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_courses_page.dart';
+import '../../../utils/toast_helper.dart';
 
 class TrainerDashboardPage extends StatefulWidget {
   const TrainerDashboardPage({super.key});
@@ -18,6 +19,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   final _authService = AuthService();
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -44,6 +46,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -54,6 +57,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
+      _trainerAvatarUrl = avatarUrl;
     });
   }
 
@@ -233,9 +237,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
           _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Help Center is under construction')),
-            );
+            ToastHelper.show(context, 'Help Center is under construction');
           }),
           _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
         ],
@@ -322,9 +324,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                   size: 24,
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No new notifications')),
-                  );
+                  ToastHelper.show(context, 'No new notifications');
                 },
               ),
               Positioned(
@@ -363,15 +363,33 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  _trainerInitials,
-                  style: const TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
+                child: _trainerAvatarUrl.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _trainerAvatarUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            _trainerInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF20B486),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _trainerInitials,
+                        style: const TextStyle(
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
               ),
               const SizedBox(width: 4),
               Container(

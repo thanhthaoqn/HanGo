@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../utils/file_picker_helper.dart';
+import '../../../utils/toast_helper.dart';
 
 class CreateLessonTextPage extends StatefulWidget {
   final int courseId;
@@ -101,9 +102,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         _imageUploadStatusText = 'Upload failed';
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
+        ToastHelper.showError(context, 'Error uploading image: $e');
       }
     }
   }
@@ -117,12 +116,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       final double sizeInMb = sizeInBytes / (1024 * 1024);
       if (sizeInMb > 50.0) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('File size exceeds 50MB limit!'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, 'File size exceeds 50MB limit!');
         }
         return;
       }
@@ -177,22 +171,12 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     final question = _questionController.text.trim();
 
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a lesson title'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please enter a lesson title');
       return;
     }
 
     if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the question'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please enter the question');
       return;
     }
 
@@ -212,12 +196,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     });
 
     _notifyParent();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Lesson added successfully'),
-        backgroundColor: Color(0xFF20B486),
-      ),
-    );
+    ToastHelper.showSuccess(context, 'Lesson added successfully');
     
     // Pop back to CreateLessonPage
     Navigator.pop(context);

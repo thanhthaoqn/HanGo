@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
+import '../../../utils/toast_helper.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'learner_home_page.dart';
@@ -97,37 +98,11 @@ class _MyInformationPageState extends State<MyInformationPage> {
   }
 
   void _showSuccessSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Text(msg, style: const TextStyle(fontFamily: 'Outfit')),
-          ],
-        ),
-        backgroundColor: const Color(0xFF28B79B),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    ToastHelper.showSuccess(context, msg);
   }
 
   void _showErrorSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(msg, style: const TextStyle(fontFamily: 'Outfit'))),
-          ],
-        ),
-        backgroundColor: const Color(0xFFEF4444),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    ToastHelper.showError(context, msg);
   }
 
   @override
@@ -695,27 +670,12 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         setState(() {
           _avatarUrl = secureUrl ?? '';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Avatar uploaded successfully!'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'Avatar uploaded successfully!');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Avatar upload failed: Cloudinary returned status ${response.statusCode}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Avatar upload failed: Cloudinary returned status ${response.statusCode}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error uploading avatar: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Error uploading avatar: $e');
     } finally {
       setState(() {
         _isUploading = false;
@@ -883,16 +843,12 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                           label: 'Address',
                           controller: _addressController,
                         ),
-                        _buildDropdownField(
-                          label: 'Gender',
+                        _buildGenderToggle(
                           value: ['Male', 'Female'].contains(_gender) ? _gender : 'Male',
-                          options: ['Male', 'Female'],
                           onChanged: (newVal) {
-                            if (newVal != null) {
-                              setState(() {
-                                _gender = newVal;
-                              });
-                            }
+                            setState(() {
+                              _gender = newVal;
+                            });
                           },
                         ),
                       ]),
@@ -1026,18 +982,16 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
     );
   }
 
-  Widget _buildDropdownField({
-    required String label,
+  Widget _buildGenderToggle({
     required String value,
-    required List<String> options,
-    required ValueChanged<String?> onChanged,
+    required ValueChanged<String> onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
+        const Text(
+          'Gender',
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
             color: Color(0xFF64748B),
@@ -1045,34 +999,72 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
           ),
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: value,
-          onChanged: onChanged,
-          items: options
-              .map((o) => DropdownMenuItem(
-                    value: o,
-                    child: Text(o, style: const TextStyle(fontFamily: 'Outfit', fontSize: 14)),
-                  ))
-              .toList(),
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-            ),
-            filled: true,
-            fillColor: Colors.white,
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              _buildGenderOption('Male', Icons.male_rounded, value, onChanged),
+              _buildGenderOption('Female', Icons.female_rounded, value, onChanged),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGenderOption(
+    String label,
+    IconData icon,
+    String selected,
+    ValueChanged<String> onChanged,
+  ) {
+    final isSelected = selected == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF28B79B).withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1303,11 +1295,7 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
             if (showForgetPass)
               TextButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please use OTP verification to recover password.'),
-                    ),
-                  );
+                  ToastHelper.showSuccess(context, 'Please use OTP verification to recover password.');
                 },
                 style: TextButton.styleFrom(
                   minimumSize: Size.zero,

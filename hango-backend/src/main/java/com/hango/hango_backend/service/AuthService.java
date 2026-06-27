@@ -100,7 +100,8 @@ public class AuthService {
                 userDetails.getId(),
                 userDetails.getUsername(),
                 userDetails.getFullName(),
-                roles
+                roles,
+                user.getAvatarUrl()
         );
     }
 
@@ -248,7 +249,8 @@ public class AuthService {
                         savedUser.getId(),
                         savedUser.getEmail(),
                         savedUser.getFullName(),
-                        roles
+                        roles,
+                        savedUser.getAvatarUrl()
                 );
             } else {
                 throw new IllegalArgumentException("Invalid ID Token");

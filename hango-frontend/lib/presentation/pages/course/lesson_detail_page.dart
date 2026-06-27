@@ -9,6 +9,7 @@ import '../../../utils/string_utils.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/ai_assistant_drawer.dart';
 import '../../../utils/fullscreen_helper.dart';
+import '../../../utils/toast_helper.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
@@ -39,6 +40,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   late int _currentLessonId;
 
   int _currentUserId = 1; // Default
+  String _currentUserAvatar = '';
+  String _currentUserInitials = '';
   int? _editingCommentId;
   final TextEditingController _editCommentController = TextEditingController();
   int? _replyingToCommentId;
@@ -138,12 +141,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         _isNavigatingLesson = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load lesson: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastHelper.showError(context, 'Failed to load lesson: $e');
     }
   }
 
@@ -164,8 +162,19 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   Future<void> _loadCurrentUserId() async {
     final prefs = await SharedPreferences.getInstance();
+    final avatar = prefs.getString('user_avatar_url') ?? '';
+    final fullName = prefs.getString('user_fullname') ?? '';
+    String initials = 'U';
+    if (fullName.trim().isNotEmpty) {
+      final parts = fullName.trim().split(' ');
+      if (parts.isNotEmpty) {
+        initials = parts.last[0].toUpperCase();
+      }
+    }
     setState(() {
       _currentUserId = prefs.getInt('user_id') ?? 1;
+      _currentUserAvatar = avatar;
+      _currentUserInitials = initials;
     });
   }
 
@@ -202,12 +211,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _lessonDetail = updatedLesson;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to post comment: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastHelper.showError(context, 'Failed to post comment: $e');
     } finally {
       setState(() {
         _isPostingComment = false;
@@ -230,12 +234,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _lessonDetail = updatedLesson;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update comment: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastHelper.showError(context, 'Failed to update comment: $e');
     }
   }
 
@@ -247,12 +246,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _lessonDetail = updatedLesson;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete comment: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastHelper.showError(context, 'Failed to delete comment: $e');
     }
   }
 
@@ -268,12 +262,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _lessonDetail = updatedLesson;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update like: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastHelper.showError(context, 'Failed to update like: $e');
     }
   }
 
@@ -300,12 +289,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _lessonDetail = updatedLesson;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to post reply: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastHelper.showError(context, 'Failed to post reply: $e');
     } finally {
       setState(() {
         _isPostingReply = false;
@@ -1705,15 +1689,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     toggleFullscreen(false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: const Color(0xFF28B79B),
-      ),
-    );
+    ToastHelper.showSuccess(context, 'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0');
   }
 
   Widget _buildQuizRightSidebarPane(List<QuizQuestion> activeQuestions) {
@@ -2527,10 +2503,31 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               CircleAvatar(
                 backgroundColor: const Color(0xFFE2E8F0),
                 radius: 20,
-                child: const Icon(
-                  Icons.person_outline,
-                  color: Color(0xFF64748B),
-                ),
+                child: _currentUserAvatar.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _currentUserAvatar,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            _currentUserInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _currentUserInitials,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -2664,7 +2661,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                             backgroundColor: isOwnComment
                                 ? const Color(0xFF28B79B)
                                 : const Color(0xFFE2E8F0),
-                            child: comment.userAvatar != null
+                            child: comment.userAvatar != null && comment.userAvatar!.isNotEmpty
                                 ? ClipOval(
                                     child: Image.network(
                                       comment.userAvatar!,
@@ -3033,7 +3030,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                 backgroundColor: isOwnReply
                                     ? const Color(0xFF28B79B)
                                     : const Color(0xFFE2E8F0),
-                                child: reply.userAvatar != null
+                                child: reply.userAvatar != null && reply.userAvatar!.isNotEmpty
                                     ? ClipOval(
                                         child: Image.network(
                                           reply.userAvatar!,
@@ -3357,12 +3354,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
       // Show success snackbar
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lesson marked as completed!'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'Lesson marked as completed!');
       }
 
       // Auto-navigate to next lesson if available
@@ -3378,12 +3370,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _isMarkingCompleted = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to complete lesson: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastHelper.showError(context, 'Failed to complete lesson: $e');
       }
     }
   }

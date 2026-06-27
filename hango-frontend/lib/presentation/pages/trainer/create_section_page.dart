@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../../utils/toast_helper.dart';
 import 'create_lesson_page.dart';
 
 class CreateSectionPage extends StatefulWidget {
@@ -65,12 +66,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     final name = _nameController.text.trim();
     final desc = _descController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a section name'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please enter a section name');
       return;
     }
 
@@ -89,24 +85,14 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       _descController.clear();
     });
     _notifyParent();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Section added successfully'),
-        backgroundColor: Color(0xFF20B486),
-      ),
-    );
+    ToastHelper.showSuccess(context, 'Section added successfully');
   }
 
   void _updateSection() {
     final name = _nameController.text.trim();
     final desc = _descController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a section name'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please enter a section name');
       return;
     }
 
@@ -119,12 +105,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
         _descController.clear();
       });
       _notifyParent();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Section updated successfully'),
-          backgroundColor: Color(0xFF20B486),
-        ),
-      );
+      ToastHelper.showSuccess(context, 'Section updated successfully');
     }
   }
 
@@ -160,12 +141,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       _expandedIndices.addAll(updatedExpanded);
     });
     _notifyParent();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Section deleted'),
-        backgroundColor: Color(0xFF64748B),
-      ),
-    );
+    ToastHelper.showError(context, 'Section deleted');
   }
 
   void _toggleExpanded(int index) {
@@ -399,12 +375,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       _localSections[sectionIndex]['lessons'] = lessons;
     });
     _notifyParent();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Lesson deleted'),
-        backgroundColor: Color(0xFF64748B),
-      ),
-    );
+    ToastHelper.showSuccess(context, 'Lesson deleted');
   }
 
   @override

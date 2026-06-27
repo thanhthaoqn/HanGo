@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'comment_management_page.dart';
+import '../../../utils/toast_helper.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -109,6 +110,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thao';
     final email = prefs.getString('user_email') ?? 'thao@hango.edu';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
@@ -122,6 +124,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _adminName = fullName;
       _adminEmail = email;
       _adminInitials = initials;
+      _adminAvatarUrl = avatarUrl;
     });
 
     _fetchAdminProfile();
@@ -254,23 +257,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           }
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('User status updated to $statusStr'),
-              backgroundColor: const Color(0xFF28B79B),
-              duration: const Duration(seconds: 1),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'User status updated to $statusStr');
         }
       } else {
         debugPrint('Failed to update status: ${response.statusCode} - ${response.body}');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update status: ${response.body}'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, 'Failed to update status: ${response.body}');
         }
       }
     } catch (e) {
@@ -323,12 +315,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       if (response.statusCode == 200) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('User details updated successfully!'),
-              backgroundColor: Color(0xFF28B79B),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'User details updated successfully!');
         }
         _fetchAccounts();
         setState(() {
@@ -337,12 +324,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       } else {
         debugPrint('Failed to update user details: ${response.statusCode} - ${response.body}');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update details: ${response.body}'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, 'Failed to update details: ${response.body}');
         }
       }
     } catch (e) {
@@ -398,13 +380,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 setState(() {
                   _editStatus = targetStatus;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Status changed to $targetStatus. Click Update to save changes.'),
-                    backgroundColor: const Color(0xFF28B79B),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                ToastHelper.showSuccess(context, 'Status changed to $targetStatus. Click Update to save changes.');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
@@ -734,12 +710,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   IconButton(
                     icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF4B5563), size: 26),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No new notifications'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
+                      ToastHelper.show(context, 'No new notifications');
                     },
                   ),
                   Positioned(
@@ -1095,9 +1066,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   title: 'Help Center',
                   onTap: () {
                     if (isMobileDrawer) Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Opening Help Center...')),
-                    );
+                    ToastHelper.showSuccess(context, 'Opening Help Center...');
                   },
                 ),
                 const SizedBox(height: 8),
@@ -3489,27 +3458,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final email = _createEmailController.text.trim();
     
     if (firstName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('First Name is required')),
-      );
+      ToastHelper.showError(context, 'First Name is required');
       return;
     }
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name is required')),
-      );
+      ToastHelper.showError(context, 'Name is required');
       return;
     }
     if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid email address')),
-      );
+      ToastHelper.showError(context, 'Please enter a valid email address');
       return;
     }
     if (_createRole == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a user role')),
-      );
+      ToastHelper.showError(context, 'Please select a user role');
       return;
     }
 
@@ -3557,12 +3518,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       if (response.statusCode == 200) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Account created successfully!'),
-              backgroundColor: Color(0xFF28B79B),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'Account created successfully!');
           setState(() {
             _showCreateNewAccountView = false;
             _resetCreateForm();
@@ -3581,12 +3537,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         errMsg = errMsg.substring(7);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create account: $errMsg'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Failed to create account: $errMsg');
       }
     } finally {
       if (mounted) {
@@ -3914,24 +3865,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         });
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile updated successfully!'),
-              backgroundColor: Color(0xFF28B79B),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'Profile updated successfully!');
         }
       } else {
         setState(() {
           _isLoadingProfile = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update profile: ${res['message']}'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, 'Failed to update profile: ${res['message']}');
         }
       }
     } catch (e) {
@@ -3939,12 +3880,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _isLoadingProfile = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Error: $e');
       }
     }
   }

@@ -8,6 +8,8 @@ import '../pages/course/list_courses_page.dart';
 import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/my_information_page.dart';
 
+import '../../utils/toast_helper.dart';
+
 class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isDesktop;
   final String activeTab;
@@ -38,6 +40,12 @@ class _SharedHeaderState extends State<SharedHeader> {
   @override
   void initState() {
     super.initState();
+    _loadUserInfo();
+  }
+
+  @override
+  void didUpdateWidget(covariant SharedHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
     _loadUserInfo();
   }
 
@@ -262,12 +270,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                     onPressed: widget.hideNavLinks
                         ? null
                         : () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('No new notifications'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
+                            ToastHelper.show(context, 'No new notifications');
                           },
                   ),
                   Positioned(

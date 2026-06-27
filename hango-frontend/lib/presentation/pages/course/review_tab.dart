@@ -237,7 +237,23 @@ class _ReviewTabState extends State<ReviewTab> {
         CircleAvatar(
           backgroundColor: const Color(0xFF9FA8DA),
           foregroundColor: Colors.white,
-          child: Text(getInitial(formatDisplayName(review.userName))),
+          child: review.userAvatar != null && review.userAvatar!.isNotEmpty
+              ? ClipOval(
+                  child: Image.network(
+                    review.userAvatar!,
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Text(
+                      getInitial(formatDisplayName(review.userName)),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                )
+              : Text(getInitial(formatDisplayName(review.userName))),
         ),
         const SizedBox(width: 16),
         Expanded(

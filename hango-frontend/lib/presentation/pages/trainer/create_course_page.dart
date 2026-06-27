@@ -6,8 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
-
-
+import '../../../utils/toast_helper.dart';
 
 class CreateCoursePage extends StatefulWidget {
   const CreateCoursePage({super.key});
@@ -22,6 +21,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
 
   // Form values
   final TextEditingController _titleController = TextEditingController();
@@ -74,6 +74,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -84,6 +85,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
+      _trainerAvatarUrl = avatarUrl;
     });
   }
 
@@ -171,9 +173,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
         _uploadStatusText = 'Upload failed';
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
+        ToastHelper.showError(context, 'Error uploading image: $e');
       }
     }
   }
@@ -213,12 +213,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Course created successfully as DRAFT!'),
-              backgroundColor: Color(0xFF20B486),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'Course created successfully as DRAFT!');
           Navigator.pop(context, true); // Return true to refresh list
         }
       } else {
@@ -227,12 +222,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     } catch (e) {
       debugPrint('Error saving course: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving course: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Error saving course: $e');
         setState(() {
           _isSaving = false;
         });
@@ -350,9 +340,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                   size: 24,
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No new notifications')),
-                  );
+                  ToastHelper.show(context, 'No new notifications');
                 },
               ),
               Positioned(
@@ -391,15 +379,33 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  _trainerInitials,
-                  style: const TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
+                child: _trainerAvatarUrl.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _trainerAvatarUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            _trainerInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF20B486),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _trainerInitials,
+                        style: const TextStyle(
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
               ),
               const SizedBox(width: 4),
               Container(
