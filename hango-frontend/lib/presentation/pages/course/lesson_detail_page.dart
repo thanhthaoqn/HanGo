@@ -750,6 +750,13 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                               : FontWeight.w500,
                         ),
                       ),
+                      trailing: l.isCompleted
+                          ? const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF28B79B),
+                              size: 16,
+                            )
+                          : null,
                       onTap: () {
                         _navigateToLesson(l.id);
                       },
