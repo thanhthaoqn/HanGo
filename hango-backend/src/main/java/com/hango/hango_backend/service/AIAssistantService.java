@@ -51,7 +51,6 @@ public class AIAssistantService {
         private final GeminiClientService geminiClientService;
         private final LessonService lessonService;
 
-        @Transactional
         public SendMessageResponse sendMessage(Long learnerId, SendMessageRequest request) {
                 // Kiểm tra an toàn chặn null learnerId
                 if (learnerId == null) {
