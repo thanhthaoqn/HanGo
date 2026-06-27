@@ -109,6 +109,7 @@ public class CourseServiceImpl implements CourseService {
             return CourseSessionDTO.builder()
                     .id(section.getId())
                     .title(section.getTitle())
+                    .description(section.getDescription())
                     .orderIndex(section.getDisplayOrder())
                     .lessons(lessonDTOs)
                     .build();
