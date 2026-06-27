@@ -8,12 +8,10 @@ import '../../../domain/model/lesson_detail.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/ai_assistant_drawer.dart';
 import '../../../utils/fullscreen_helper.dart';
-<<<<<<< HEAD
 import '../../../utils/toast_helper.dart';
-=======
+import '../../../utils/string_utils.dart';
 import '../../widgets/lesson_ai_chatbox.dart';
 import 'package:provider/provider.dart';
->>>>>>> origin/dev
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
@@ -40,6 +38,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   String? _errorMessage;
   bool _isLoading = true;
   bool _isNavigatingLesson = false;
+  bool _isMarkingCompleted = false;
   late int _currentLessonId;
 
   int _currentUserId = 1; // Default
@@ -47,6 +46,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   String _currentUserInitials = '';
   int? _editingCommentId;
   final TextEditingController _editCommentController = TextEditingController();
+  int? _replyingToCommentId;
+  final TextEditingController _replyCommentController = TextEditingController();
+  bool _isPostingReply = false;
 
   bool _isAIAssistantOpen = false;
   final TextEditingController _commentController = TextEditingController();
@@ -250,7 +252,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     }
   }
 
-<<<<<<< HEAD
   Future<void> _toggleLikeComment(LessonComment comment) async {
     try {
       if (comment.isLiked) {
@@ -297,9 +298,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       });
     }
   }
-
-=======
->>>>>>> origin/dev
   void _showModernConfirmDialog({
     required String title,
     required Widget content,
@@ -2535,17 +2533,20 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 ),
               ),
             )
-          else
-            ListView.separated(
+          else () {
+            final parentComments = lesson.comments.where((c) => c.parentCommentId == null).toList();
+            return ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: lesson.comments.length,
+              itemCount: parentComments.length,
               separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
-                final comment = lesson.comments[index];
+                final comment = parentComments[index];
                 final isOwnComment = comment.userId == _currentUserId;
+                final replies = lesson.comments.where((c) => c.parentCommentId == comment.id).toList();
+                // Sort replies chronologically (oldest first)
+                replies.sort((a, b) => a.id.compareTo(b.id));
 
-<<<<<<< HEAD
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2574,35 +2575,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) => Text(
                                         getInitial(formatDisplayName(comment.userName)),
-=======
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFF1F5F9)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: isOwnComment
-                            ? const Color(0xFF28B79B)
-                            : const Color(0xFFE2E8F0),
-                        child: comment.userAvatar != null
-                            ? ClipOval(
-                                child: Image.network(
-                                  comment.userAvatar!,
-                                  width: 36,
-                                  height: 36,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Text(
-                                        comment.userName.isNotEmpty
-                                            ? comment.userName[0].toUpperCase()
-                                            : '?',
->>>>>>> origin/dev
                                         style: TextStyle(
                                           color: isOwnComment
                                               ? Colors.white
@@ -2611,132 +2583,255 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                           fontSize: 13,
                                         ),
                                       ),
-                                ),
-                              )
-                            : Text(
-                                comment.userName.isNotEmpty
-                                    ? comment.userName[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  color: isOwnComment
-                                      ? Colors.white
-                                      : const Color(0xFF64748B),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                                    ),
+                                  )
+                                : Text(
+                                    getInitial(formatDisplayName(comment.userName)),
+                                    style: TextStyle(
+                                      color: isOwnComment
+                                          ? Colors.white
+                                          : const Color(0xFF64748B),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  comment.userName,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: isOwnComment
-                                        ? const Color(0xFF28B79B)
-                                        : const Color(0xFF1E293B),
-                                  ),
-                                ),
-                                if (isOwnComment) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 1.5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE6F7F4),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      'You',
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      formatDisplayName(comment.userName),
                                       style: TextStyle(
-                                        fontSize: 9,
-                                        color: Color(0xFF28B79B),
                                         fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: isOwnComment
+                                            ? const Color(0xFF28B79B)
+                                            : const Color(0xFF1E293B),
                                       ),
+                                    ),
+                                    if (isOwnComment) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE6F7F4),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'You',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: Color(0xFF28B79B),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const Spacer(),
+                                    if (isOwnComment)
+                                      PopupMenuButton<String>(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+                                        ),
+                                        color: Colors.white,
+                                        elevation: 4,
+                                        shadowColor: Colors.black.withOpacity(0.08),
+                                        offset: const Offset(0, 24),
+                                        icon: const Icon(
+                                          Icons.more_horiz,
+                                          size: 18,
+                                          color: Color(0xFF94A3B8),
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        onSelected: (value) {
+                                          if (value == 'edit') {
+                                            setState(() {
+                                              _editingCommentId = comment.id;
+                                              _editCommentController.text =
+                                                  comment.content;
+                                            });
+                                          } else if (value == 'delete') {
+                                            _showDeleteConfirmation(comment.id);
+                                          }
+                                        },
+                                        itemBuilder: (context) => [
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            height: 38,
+                                            child: Row(
+                                              children: const [
+                                                Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 16,
+                                                  color: Color(0xFF2563EB),
+                                                ),
+                                                SizedBox(width: 10),
+                                                Text(
+                                                  'Edit',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: Color(0xFF334155),
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            height: 38,
+                                            child: Row(
+                                              children: const [
+                                                Icon(
+                                                  Icons.delete_outline,
+                                                  size: 16,
+                                                  color: Color(0xFFEF4444),
+                                                ),
+                                                SizedBox(width: 10),
+                                                Text(
+                                                  'Delete',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: Color(0xFF334155),
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                if (_editingCommentId == comment.id) ...[
+                                  TextField(
+                                    controller: _editCommentController,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF28B79B),
+                                        ),
+                                      ),
+                                      contentPadding: const EdgeInsets.all(12),
+                                    ),
+                                    maxLines: null,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _editingCommentId = null;
+                                          });
+                                        },
+                                        child: const Text(
+                                          'Cancel',
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton(
+                                        onPressed: () => _updateComment(comment.id),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF28B79B),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Save',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ] else ...[
+                                  Text(
+                                    comment.content,
+                                    style: const TextStyle(
+                                      color: Color(0xFF334155),
+                                      fontSize: 13.5,
+                                      height: 1.4,
                                     ),
                                   ),
-                                ],
-                                const Spacer(),
-                                if (isOwnComment)
-                                  PopupMenuButton<String>(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: const BorderSide(
-                                        color: Color(0xFFF1F5F9),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    color: Colors.white,
-                                    elevation: 4,
-                                    shadowColor: Colors.black.withOpacity(0.08),
-                                    offset: const Offset(0, 24),
-                                    icon: const Icon(
-                                      Icons.more_horiz,
-                                      size: 18,
-                                      color: Color(0xFF94A3B8),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onSelected: (value) {
-                                      if (value == 'edit') {
-                                        setState(() {
-                                          _editingCommentId = comment.id;
-                                          _editCommentController.text =
-                                              comment.content;
-                                        });
-                                      } else if (value == 'delete') {
-                                        _showDeleteConfirmation(comment.id);
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        value: 'edit',
-                                        height: 38,
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () => _toggleLikeComment(comment),
                                         child: Row(
-                                          children: const [
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
                                             Icon(
-                                              Icons.edit_outlined,
-                                              size: 16,
-                                              color: Color(0xFF2563EB),
+                                              comment.isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                                              size: 14,
+                                              color: comment.isLiked ? const Color(0xFF28B79B) : const Color(0xFF64748B),
                                             ),
-                                            SizedBox(width: 10),
+                                            const SizedBox(width: 4),
                                             Text(
-                                              'Edit',
+                                              '${comment.likeCount}',
                                               style: TextStyle(
-                                                fontSize: 13,
-                                                color: Color(0xFF334155),
-                                                fontWeight: FontWeight.w500,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: comment.isLiked ? const Color(0xFF28B79B) : const Color(0xFF64748B),
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        height: 38,
+                                      const SizedBox(width: 16),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            if (_replyingToCommentId == comment.id) {
+                                              _replyingToCommentId = null;
+                                            } else {
+                                              _replyingToCommentId = comment.id;
+                                              _replyCommentController.clear();
+                                            }
+                                          });
+                                        },
                                         child: Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: const [
                                             Icon(
-                                              Icons.delete_outline,
-                                              size: 16,
-                                              color: Color(0xFFEF4444),
+                                              Icons.reply_outlined,
+                                              size: 14,
+                                              color: Color(0xFF28B79B),
                                             ),
-                                            SizedBox(width: 10),
+                                            SizedBox(width: 4),
                                             Text(
-                                              'Delete',
+                                              'Reply',
                                               style: TextStyle(
-                                                fontSize: 13,
-                                                color: Color(0xFF334155),
-                                                fontWeight: FontWeight.w500,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF28B79B),
                                               ),
                                             ),
                                           ],
@@ -2744,9 +2839,77 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                       ),
                                     ],
                                   ),
+                                ],
+                                if (_replyingToCommentId == comment.id) ...[
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _replyCommentController,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      hintText: 'Write a reply...',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF28B79B),
+                                        ),
+                                      ),
+                                      contentPadding: const EdgeInsets.all(12),
+                                    ),
+                                    maxLines: null,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _replyingToCommentId = null;
+                                          });
+                                        },
+                                        child: const Text(
+                                          'Cancel',
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton(
+                                        onPressed: () => _postReply(comment.id),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF28B79B),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                        child: _isPostingReply
+                                            ? const SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                ),
+                                              )
+                                            : const Text(
+                                                'Reply',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
-<<<<<<< HEAD
                           ),
                         ],
                       ),
@@ -2882,82 +3045,98 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                             constraints: const BoxConstraints(),
                                           ),
                                       ],
-=======
-                            const SizedBox(height: 6),
-                            if (_editingCommentId == comment.id) ...[
-                              TextField(
-                                controller: _editCommentController,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFF28B79B),
->>>>>>> origin/dev
                                     ),
-                                  ),
-                                  contentPadding: const EdgeInsets.all(12),
+                                    const SizedBox(height: 4),
+                                    if (_editingCommentId == reply.id) ...[
+                                      TextField(
+                                        controller: _editCommentController,
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: const BorderSide(
+                                              color: Color(0xFF28B79B),
+                                            ),
+                                          ),
+                                          contentPadding: const EdgeInsets.all(10),
+                                        ),
+                                        maxLines: null,
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          TextButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                _editingCommentId = null;
+                                              });
+                                            },
+                                            child: const Text('Cancel', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () => _updateComment(reply.id),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF28B79B),
+                                              elevation: 0,
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            ),
+                                            child: const Text('Save', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                          ),
+                                        ],
+                                      ),
+                                    ] else
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            reply.content,
+                                            style: const TextStyle(
+                                              color: Color(0xFF334155),
+                                              fontSize: 12.5,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          GestureDetector(
+                                            onTap: () => _toggleLikeComment(reply),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  reply.isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                                                  size: 13,
+                                                  color: reply.isLiked ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${reply.likeCount}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: reply.isLiked ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
                                 ),
-                                maxLines: null,
-                                style: const TextStyle(fontSize: 13),
                               ),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _editingCommentId = null;
-                                      });
-                                    },
-                                    child: const Text(
-                                      'Cancel',
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: () => _updateComment(comment.id),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF28B79B),
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'Save',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ] else
-                              Text(
-                                comment.content,
-                                style: const TextStyle(
-                                  color: Color(0xFF334155),
-                                  fontSize: 13.5,
-                                  height: 1.4,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ],
-                  ),
+                  ],
                 );
               },
-            ),
+            );
+          }(),
         ],
       ),
     );
