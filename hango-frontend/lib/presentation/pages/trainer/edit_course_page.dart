@@ -303,7 +303,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      final uri = Uri.parse('$apiBaseUrl/courses/${widget.courseId}');
+      final uri = Uri.parse('$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}');
       final response = await http.get(
         uri,
         headers: {
@@ -325,7 +325,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
   }
 
-  void _autoSaveCourse() async {
+  Future<void> _autoSaveCourse() async {
     setState(() {
       _lastSavedText = 'Saving draft...';
     });
@@ -424,11 +424,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                 trainerName: _trainerName,
                                                 trainerInitials: _trainerInitials,
                                                 sections: _sections,
-                                                onSectionsChanged: (updatedSections) {
+                                                onSectionsChanged: (updatedSections) async {
                                                   setState(() {
                                                     _sections = updatedSections;
                                                   });
-                                                  _autoSaveCourse();
+                                                  await _autoSaveCourse();
                                                 },
                                                 onStepChanged: (step) {
                                                   setState(() {
@@ -461,12 +461,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                           trainerName: _trainerName,
                                           trainerInitials: _trainerInitials,
                                           sections: _sections,
-                                          onSectionsChanged: (updatedSections) {
-                                            setState(() {
-                                              _sections = updatedSections;
-                                            });
-                                            _autoSaveCourse();
-                                          },
+                                          onSectionsChanged: (updatedSections) async {
+                                             setState(() {
+                                               _sections = updatedSections;
+                                             });
+                                             await _autoSaveCourse();
+                                           },
                                           onStepChanged: (step) {
                                             setState(() {
                                               _activeStep = step;
