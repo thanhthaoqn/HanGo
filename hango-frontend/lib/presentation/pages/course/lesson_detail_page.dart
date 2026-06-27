@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
@@ -865,8 +865,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
                 if (isQuizOrPractice)
                   _buildQuizContent(lesson, currentCourseLesson)
-                else
+                else ...[
                   _buildHtmlContent(lesson),
+                  const SizedBox(height: 32),
+                  _buildMarkAsCompletedButton(lesson, nextLessonId, course),
+                ],
 
                 if (nextLessonId != null &&
                     !_isDoingQuiz &&
