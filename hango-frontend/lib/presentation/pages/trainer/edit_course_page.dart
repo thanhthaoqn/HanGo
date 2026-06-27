@@ -297,6 +297,56 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
   }
 
+  void _autoSaveCourse() async {
+    setState(() {
+      _lastSavedText = 'Saving draft...';
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _lastSavedText = 'Failed to auto-save';
+        });
+        return;
+      }
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/courses/${widget.courseId}');
+      final body = jsonEncode({
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'categoryKey': _selectedCategoryKey,
+        'difficultyKey': _selectedLevelKey,
+        'thumbnailUrl': _uploadedImageUrl ?? '',
+        'sessions': _sections,
+      });
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _lastSavedText = 'Draft saved automatically just now';
+        });
+      } else {
+        setState(() {
+          _lastSavedText = 'Failed to auto-save';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error auto-saving course: $e');
+      setState(() {
+        _lastSavedText = 'Failed to auto-save';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -349,6 +399,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                   setState(() {
                                                     _sections = updatedSections;
                                                   });
+                                                  _autoSaveCourse();
+                                                },
+                                                onStepChanged: (step) {
+                                                  setState(() {
+                                                    _activeStep = step;
+                                                  });
                                                 },
                                               ),
                                             ],
@@ -379,6 +435,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                           onSectionsChanged: (updatedSections) {
                                             setState(() {
                                               _sections = updatedSections;
+                                            });
+                                            _autoSaveCourse();
+                                          },
+                                          onStepChanged: (step) {
+                                            setState(() {
+                                              _activeStep = step;
                                             });
                                           },
                                         ),
