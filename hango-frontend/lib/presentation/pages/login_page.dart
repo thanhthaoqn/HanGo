@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
@@ -78,6 +79,17 @@ class _LoginPageState extends State<LoginPage> {
         final isAdmin = roles.any((r) => r.contains('ADMIN'));
         final isTrainer = roles.any((r) => r.contains('TRAINER'));
         debugPrint('Sign in success! Navigating. Admin: $isAdmin, Trainer: $isTrainer. Data: ${result['data']}');
+        
+        // Check if this was a new email registration to set the onboarding flag
+        SharedPreferences.getInstance().then((prefs) async {
+          final isNewReg = prefs.getBool('is_new_registration_$email') ?? false;
+          if (isNewReg) {
+            final userId = result['data']['id'];
+            await prefs.setBool('show_onboarding_for_$userId', true);
+            await prefs.remove('is_new_registration_$email');
+          }
+        });
+
         ToastHelper.showSuccess(context, 'Sign in successful!');
         Widget destination;
         if (isAdmin) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 
@@ -81,6 +82,10 @@ class _RegisterPageState extends State<RegisterPage> {
       final isVerified = await _authService.checkVerificationStatus(email);
       if (isVerified && mounted) {
         timer.cancel();
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_new_registration_$email', true);
+
         ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
         Navigator.pop(context);
       }
@@ -102,6 +107,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (isVerified) {
         _verificationTimer?.cancel();
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_new_registration_$email', true);
+
         ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
         Navigator.pop(context);
       } else {

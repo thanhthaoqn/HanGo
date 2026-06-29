@@ -57,7 +57,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
           children: [
             Center(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 1200),
+                constraints: const BoxConstraints(maxWidth: 1440),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,6 +283,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
   }
 
   Widget _buildGrid() {
+    final isDesktop = MediaQuery.of(context).size.width > 900;
     return FutureBuilder<List<Course>>(
       future: _coursesFuture,
       builder: (context, snapshot) {
@@ -311,9 +312,9 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: courses.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
-              childAspectRatio: 0.85,
+              childAspectRatio: isDesktop ? 1.25 : 0.85,
               crossAxisSpacing: 20,
               mainAxisSpacing: 20,
             ),
