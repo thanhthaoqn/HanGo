@@ -145,6 +145,17 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     _currentLessonId = widget.lessonId;
     _isDoingQuiz = widget.startQuizImmediately;
     _isQuizMaximized = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final totalWidth = MediaQuery.of(context).size.width;
+      final availableWidth = totalWidth - 320; // Trừ đi 320px của Left Sidebar
+      setState(() {
+        // Cho phần bài học bên trái chiếm 65% không gian khả dụng, chatbox chiếm 35% còn lại
+        _leftPaneWidth = availableWidth * 0.65;
+        _hasInitializedSplit = true;
+      });
+    });
+
     _loadCurrentUserId();
     _loadData();
     if (widget.startQuizImmediately) {
@@ -402,6 +413,12 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   int get _answeredCount => _selectedAnswers.length;
 
+  // Resizable split between lesson and AI chat
+  double _leftPaneWidth = 0; // computed on first layout
+  bool _hasInitializedSplit = false;
+  static const double _minLeftPaneWidth = 520;
+  static const double _minRightPaneWidth = 320;
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
@@ -476,144 +493,186 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
     }
 
-    return Stack(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // TẦNG 1: Toàn bộ nội dung chính của trang bài học (Giữ nguyên)
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Left Sidebar
-            if (isDesktop)
-              Material(
-                // Đổi từ Container thành Material
-                color: Colors.white, // Giữ nguyên màu nền trắng
-                child: Container(
-                  width: 320,
-                  decoration: BoxDecoration(
-                    border: Border(
-                      right: BorderSide(color: Colors.grey.shade200),
-                    ),
-                  ),
-                  child: _buildSidebar(course),
-                ),
+        // Left Sidebar (desktop only)
+        if (isDesktop)
+          Material(
+            color: Colors.white,
+            child: Container(
+              width: 320,
+              decoration: BoxDecoration(
+                border: Border(right: BorderSide(color: Colors.grey.shade200)),
               ),
+              child: _buildSidebar(course),
+            ),
+          ),
 
-            // Main Content
-            Expanded(
-              child: Column(
-                children: [
-                  if (_isNavigatingLesson)
-                    const LinearProgressIndicator(
-                      color: Color(0xFF28B79B),
-                      backgroundColor: Color(0xFFE6F7F4),
-                      minHeight: 3,
-                    ),
-                  // Sub-header Breadcrumb
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFE2E8F0)),
+        // Main Content
+        Expanded(
+          child: Column(
+            children: [
+              if (_isNavigatingLesson)
+                const LinearProgressIndicator(
+                  color: Color(0xFF28B79B),
+                  backgroundColor: Color(0xFFE6F7F4),
+                  minHeight: 3,
+                ),
+
+              // Sub-header Breadcrumb
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          size: 16,
+                          color: Color(0xFF475569),
+                        ),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        InkWell(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back,
-                              size: 16,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${course.title}  /  ${sessionTitle ?? "Section"}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                lesson.title,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Scrollable Content
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Row(
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLessonContent(course, lesson),
-                                if (!_isDoingQuiz) ...[
-                                  const SizedBox(height: 32),
-                                  _buildCommentsSection(lesson),
-                                ],
-                              ],
+                          Text(
+                            '${course.title}  /  ${sessionTitle ?? "Section"}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            lesson.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
 
-        // TẦNG 2: AI CHATBOX MỚI (Được đưa xuống dưới cùng danh sách children để nổi lên trên hết)
-        // Lưu ý: Đảm bảo điều kiện ẩn Chatbox khi đang làm bài Quiz (nếu muốn) giống code cũ
-        // SỬA THÀNH NHƯ THẾ NÀY:
-        if (!_isDoingQuiz)
-          LessonAiChatbox(
-            lessonId: _currentLessonId,
-            lessonTitle: lesson.title,
+              // Content (lesson left scrolls, AI chat stays fixed)
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left column: scrollable only
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(10.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLessonContent(course, lesson),
+                            if (!_isDoingQuiz) ...[
+                              const SizedBox(height: 32),
+                              _buildCommentsSection(lesson),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Right column: resizable AI chat (no scrolling with lesson)
+                    if (!_isDoingQuiz) ...[
+                      const SizedBox(width: 12),
+
+                      // Divider draggable between lesson and chat
+                      MouseRegion(
+                        cursor: SystemMouseCursors.resizeLeftRight,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onHorizontalDragUpdate: (details) {
+                            if (!isDesktop) return;
+                            final totalWidth = MediaQuery.of(
+                              context,
+                            ).size.width;
+                            // subtract left sidebar width (320) if present
+                            final availableWidth =
+                                totalWidth - (isDesktop ? 320 : 0);
+                            // also subtract breadcrumb padding-ish: we only approximate with availableWidth
+                            // Clamp within min widths.
+                            final dx = details.delta.dx;
+                            setState(() {
+                              _leftPaneWidth = (_leftPaneWidth + dx).clamp(
+                                _minLeftPaneWidth,
+                                availableWidth - _minRightPaneWidth,
+                              );
+                              _hasInitializedSplit = true;
+                            });
+                          },
+                          child: Container(
+                            width: 10,
+                            height: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              border: Border(
+                                left: BorderSide(color: Colors.grey.shade200),
+                                right: BorderSide(color: Colors.grey.shade200),
+                              ),
+                            ),
+                            child: const Align(
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.drag_handle,
+                                size: 18,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Chat width driven by _leftPaneWidth
+                      SizedBox(
+                        width: isDesktop
+                            ? (MediaQuery.of(context).size.width -
+                                      320 -
+                                      _leftPaneWidth -
+                                      12)
+                                  .clamp(_minRightPaneWidth, 800)
+                            : 320,
+                        child: LessonAiChatbox(
+                          lessonId: _currentLessonId,
+                          lessonTitle: lesson.title,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-
-        // ====================================================================
-        // KHÔNG ĐƯỢC ĐỂ ĐOẠN CODE "Floating AI Button" VÀ "Overlay AI Drawer" CŨ Ở ĐÂY NỮA.
-        // TÔI ĐÃ XÓA CHÚNG ĐỂ TRÁNH XUNG ĐỘT CHẶN CẢM ỨNG CỦA CHATBOX MỚI.
-        // ====================================================================
+        ),
       ],
     );
   }

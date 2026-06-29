@@ -26,29 +26,21 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
   final List<AiMessage> _messages = [];
   Future<AiHealth>? _health;
   int? _conversationId;
-  bool _open = false;
   bool _sending = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mở luôn ngay khi vào bài học
+    _health = context.read<AppState>().checkAiStatus();
+  }
 
   @override
   void dispose() {
     _message.dispose();
     _scroll.dispose();
     super.dispose();
-  }
-
-  void _toggle() {
-    debugPrint(
-      '[LessonAiChatbox] toggle pressed. lessonId=${widget.lessonId} open=${_open}',
-    );
-    setState(() {
-      _open = !_open;
-      _error = null;
-      // Chỉ khi mở box VÀ _health chưa từng được gọi thì mới kích hoạt API status
-      if (_open && _health == null) {
-        _health = context.read<AppState>().checkAiStatus();
-      }
-    });
   }
 
   Future<void> _send() async {
@@ -105,58 +97,30 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final panelWidth = size.width < 520 ? size.width - 32 : 420.0;
-    final panelHeight = size.height < 680 ? size.height - 128 : 540.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelWidth = constraints.maxWidth;
+        final panelHeight = MediaQuery.sizeOf(context).height;
 
-    return Positioned(
-      right: 18,
-      bottom: 18,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          AnimatedScale(
-            duration: const Duration(milliseconds: 180),
-            scale: _open ? 1 : .96,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: _open
-                  ? _ChatPanel(
-                      key: const ValueKey('chat-panel'),
-                      width: panelWidth,
-                      height: panelHeight,
-                      lessonTitle: widget.lessonTitle,
-                      messages: _messages,
-                      error: _error,
-                      sending: _sending,
-                      message: _message,
-                      scroll: _scroll,
-                      health:
-                          _health ?? context.read<AppState>().checkAiStatus(),
-
-                      onSend: _send,
-                      onClose: _toggle,
-                    )
-                  : const SizedBox.shrink(key: ValueKey('closed-panel')),
-            ),
+        return SizedBox(
+          width: panelWidth,
+          height: panelHeight,
+          child: _ChatPanel(
+            key: const ValueKey('chat-panel'),
+            width: panelWidth,
+            height: panelHeight,
+            lessonTitle: widget.lessonTitle,
+            messages: _messages,
+            error: _error,
+            sending: _sending,
+            message: _message,
+            scroll: _scroll,
+            health: _health ?? context.read<AppState>().checkAiStatus(),
+            onSend: _send,
+            onClose: () {},
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 62,
-            height: 62,
-            child: FloatingActionButton(
-              heroTag: 'lesson-ai-${widget.lessonId}',
-              shape: const CircleBorder(),
-              tooltip: _open ? 'Đóng AI' : 'Mở AI',
-              onPressed: _toggle,
-              child: Icon(
-                _open ? Icons.close_rounded : Icons.psychology_alt_rounded,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -274,11 +238,6 @@ class _ChatPanel extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Đóng',
-                    onPressed: onClose,
-                    icon: const Icon(Icons.close_rounded),
-                  ),
                 ],
               ),
             ),
@@ -320,6 +279,23 @@ class _ChatPanel extends StatelessWidget {
                       decoration: const InputDecoration(
                         hintText: 'Nhập câu hỏi trong bài học...',
                         counterText: '',
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFFCBD5E1)),
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: Color(0xFF28B79B),
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                        ),
                       ),
                     ),
                   ),
@@ -356,7 +332,7 @@ class _ChatBubble extends StatelessWidget {
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 320),
+        constraints: const BoxConstraints(maxWidth: 1e9),
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
