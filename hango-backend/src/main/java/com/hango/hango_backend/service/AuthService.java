@@ -30,6 +30,7 @@ import com.hango.hango_backend.dto.ForgotPasswordRequest;
 import com.hango.hango_backend.dto.VerifyOtpRequest;
 import com.hango.hango_backend.dto.ResetPasswordRequest;
 import com.hango.hango_backend.dto.ProfileUpdateRequest;
+import com.hango.hango_backend.dto.ChangePasswordRequest;
 import com.hango.hango_backend.entity.PasswordResetOtp;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
 import java.io.IOException;
@@ -99,7 +100,8 @@ public class AuthService {
                 userDetails.getId(),
                 userDetails.getUsername(),
                 userDetails.getFullName(),
-                roles
+                roles,
+                user.getAvatarUrl()
         );
     }
 
@@ -247,7 +249,8 @@ public class AuthService {
                         savedUser.getId(),
                         savedUser.getEmail(),
                         savedUser.getFullName(),
-                        roles
+                        roles,
+                        savedUser.getAvatarUrl()
                 );
             } else {
                 throw new IllegalArgumentException("Invalid ID Token");
@@ -367,6 +370,15 @@ public class AuthService {
         if (request.getAvatarUrl() != null) {
             user.setAvatarUrl(request.getAvatarUrl());
         }
+        if (request.getUsername() != null && !request.getUsername().equalsIgnoreCase(user.getUsername())) {
+            if (userRepository.existsByUsername(request.getUsername())) {
+                throw new IllegalArgumentException("Error: Username is already in use!");
+            }
+            user.setUsername(request.getUsername());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress());
+        }
 
         if (request.getEmail() != null && !request.getEmail().equalsIgnoreCase(user.getEmail())) {
             if (userRepository.existsByEmail(request.getEmail())) {
@@ -391,11 +403,26 @@ public class AuthService {
                 .phoneNumber(user.getPhoneNumber())
                 .gender(user.getGender())
                 .avatarUrl(user.getAvatarUrl())
+                .username(user.getUsername())
+                .address(user.getAddress())
                 .roles(roles)
                 .dateOfBirth(user.getDateOfBirth())
                 .status(user.getStatus())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+
+        if (!encoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("Incorrect current password!");
+        }
+
+        user.setPasswordHash(encoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 }

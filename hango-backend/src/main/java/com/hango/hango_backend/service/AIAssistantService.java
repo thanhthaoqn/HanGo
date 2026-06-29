@@ -15,8 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-import com.hango.hango_backend.service.LessonService; 
-
+import com.hango.hango_backend.service.LessonService;
 
 /**
  * AI Learning Assistant (FT-08 / UC-31) - service điều phối chính.
@@ -55,9 +54,10 @@ public class AIAssistantService {
         public SendMessageResponse sendMessage(Long learnerId, SendMessageRequest request) {
                 // Kiểm tra an toàn chặn null learnerId
                 if (learnerId == null) {
-                        throw new ApiException("Người dùng chưa đăng nhập hoặc Token không hợp lệ", HttpStatus.UNAUTHORIZED);
+                        throw new ApiException("Người dùng chưa đăng nhập hoặc Token không hợp lệ",
+                                        HttpStatus.UNAUTHORIZED);
                 }
-                
+
                 // LỚP 2: Lesson phải tồn tại thật - đây là "phạm vi" mà mọi guardrail khác dựa
                 // vào.
                 Lesson lesson = lessonRepository.findById(request.getLessonId())
@@ -74,10 +74,12 @@ public class AIAssistantService {
                                 .build();
 
                 // Lấy practice questions để nhúng vào scope + prompt
-                // Practice data được trả về trong LessonDetailDTO.questions (từ LessonServiceImpl).
-com.hango.hango_backend.dto.LessonDetailDTO lessonDetail = lessonService.getLessonDetail(request.getLessonId(), learnerId);
-                java.util.List<com.hango.hango_backend.dto.QuizQuestionDTO> practiceQuestions =
-                                (lessonDetail != null && lessonDetail.getQuestions() != null)
+                // Practice data được trả về trong LessonDetailDTO.questions (từ
+                // LessonServiceImpl).
+                com.hango.hango_backend.dto.LessonDetailDTO lessonDetail = lessonService
+                                .getLessonDetail(request.getLessonId(), learnerId);
+                java.util.List<com.hango.hango_backend.dto.QuizQuestionDTO> practiceQuestions = (lessonDetail != null
+                                && lessonDetail.getQuestions() != null)
                                                 ? lessonDetail.getQuestions()
                                                 : java.util.List.of();
 
@@ -158,13 +160,22 @@ com.hango.hango_backend.dto.LessonDetailDTO lessonDetail = lessonService.getLess
         }
 
         private AIConversation getOrCreateConversation(Long learnerId, SendMessageRequest request, Lesson lesson) {
-                // 1. Kiểm tra an toàn: Chỉ tìm kiếm nếu conversationId thực sự tồn tại và hợp lệ (> 0)
+                // 1. Kiểm tra an toàn: Chỉ tìm kiếm nếu conversationId thực sự tồn tại và hợp
+                // lệ (> 0)
                 if (request.getConversationId() != null && request.getConversationId() > 0) {
                         try {
-                                return conversationRepository.findByIdAndLearnerIdWithMessages(request.getConversationId(), learnerId)
-                                                .orElseGet(() -> createNewConversation(learnerId, lesson)); // Fallback: Nếu không thấy ID này, tự tạo mới luôn
+                                return conversationRepository
+                                                .findByIdAndLearnerIdWithMessages(request.getConversationId(),
+                                                                learnerId)
+                                                .orElseGet(() -> createNewConversation(learnerId, lesson)); // Fallback:
+                                                                                                            // Nếu không
+                                                                                                            // thấy ID
+                                                                                                            // này, tự
+                                                                                                            // tạo mới
+                                                                                                            // luôn
                         } catch (Exception e) {
-                                log.warn("Lỗi khi truy vấn cuộc hội thoại id={}, tự động fallback tạo cuộc hội thoại mới", request.getConversationId());
+                                log.warn("Lỗi khi truy vấn cuộc hội thoại id={}, tự động fallback tạo cuộc hội thoại mới",
+                                                request.getConversationId());
                                 return createNewConversation(learnerId, lesson);
                         }
                 }
@@ -181,7 +192,8 @@ com.hango.hango_backend.dto.LessonDetailDTO lessonDetail = lessonService.getLess
                 AIConversation newConversation = AIConversation.builder()
                                 .learner(learner)
                                 .lesson(lesson)
-                                .messages(new java.util.ArrayList<>()) // Khởi tạo danh sách rỗng tránh lỗi NullPointer sau này
+                                .messages(new java.util.ArrayList<>()) // Khởi tạo danh sách rỗng tránh lỗi NullPointer
+                                                                       // sau này
                                 .build();
 
                 return conversationRepository.save(newConversation);

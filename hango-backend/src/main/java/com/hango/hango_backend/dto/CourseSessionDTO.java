@@ -11,6 +11,7 @@ import java.util.List;
 public class CourseSessionDTO {
     private Long id;
     private String title;
+    private String description;
     private Integer orderIndex;
     private List<CourseLessonDTO> lessons;
 }

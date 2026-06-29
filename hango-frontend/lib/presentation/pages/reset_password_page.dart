@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
+import '../../utils/toast_helper.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   final String email;
@@ -57,12 +58,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   void _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_isPasswordValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please meet all password requirements.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please meet all password requirements.');
       return;
     }
 
@@ -78,21 +74,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
     if (mounted) {
       if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password updated successfully! Please sign in with your new password.'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'Password updated successfully! Please sign in with your new password.');
         // Pop all routes and return to login page
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to update password. Please try again.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, result['message'] ?? 'Failed to update password. Please try again.');
       }
     }
   }

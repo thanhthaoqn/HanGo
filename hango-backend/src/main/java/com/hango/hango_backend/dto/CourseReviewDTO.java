@@ -12,6 +12,7 @@ public class CourseReviewDTO {
     private Long userId;
     private String userName; // e.g. nguyenth*********@gmail.com
     private String userInitial; // e.g. N
+    private String userAvatar;
     private Short rating;
     private String content;
     private LocalDateTime createdAt;

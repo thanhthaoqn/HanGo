@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../../../utils/file_picker_helper.dart';
+import '../../../utils/toast_helper.dart';
 
 class CreateLessonTextPage extends StatefulWidget {
   final int courseId;
@@ -11,7 +10,7 @@ class CreateLessonTextPage extends StatefulWidget {
   final String trainerInitials;
   final List<dynamic> sections;
   final int sectionIndex;
-  final ValueChanged<List<dynamic>> onSectionsChanged;
+  final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
 
   const CreateLessonTextPage({
     super.key,
@@ -37,8 +36,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
 
   // Upload states
   String? _uploadedImageUrl;
-  bool _isUploadingImage = false;
-  String _imageUploadStatusText = '';
 
   String? _uploadedPdfName;
   bool _isUploadingPdf = false;
@@ -59,54 +56,10 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     super.dispose();
   }
 
-  void _notifyParent() {
-    widget.onSectionsChanged(_localSections);
+  Future<void> _notifyParent() async {
+    await widget.onSectionsChanged(_localSections);
   }
 
-  Future<void> _pickAndUploadImage() async {
-    try {
-      final picked = await pickImage();
-      if (picked == null) return;
-
-      setState(() {
-        _isUploadingImage = true;
-        _imageUploadStatusText = 'Uploading...';
-      });
-
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          picked.bytes,
-          filename: picked.name,
-        ));
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
-        setState(() {
-          _uploadedImageUrl = data['secure_url'] ?? data['url'];
-          _isUploadingImage = false;
-        });
-      } else {
-        throw Exception('Upload failed');
-      }
-    } catch (e) {
-      debugPrint('Error uploading image: $e');
-      setState(() {
-        _isUploadingImage = false;
-        _imageUploadStatusText = 'Upload failed';
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
-      }
-    }
-  }
 
   void _pickAndUploadPdf() async {
     try {
@@ -117,12 +70,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       final double sizeInMb = sizeInBytes / (1024 * 1024);
       if (sizeInMb > 50.0) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('File size exceeds 50MB limit!'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, 'File size exceeds 50MB limit!');
         }
         return;
       }
@@ -171,28 +119,18 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     }
   }
 
-  void _saveLesson() {
+  void _saveLesson() async {
     final title = _titleController.text.trim();
     final desc = _descController.text.trim();
     final question = _questionController.text.trim();
 
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a lesson title'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please enter a lesson title');
       return;
     }
 
     if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the question'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please enter the question');
       return;
     }
 
@@ -211,13 +149,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       _localSections[widget.sectionIndex]['lessons'] = lessons;
     });
 
-    _notifyParent();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Lesson added successfully'),
-        backgroundColor: Color(0xFF20B486),
-      ),
-    );
+    await _notifyParent();
+    ToastHelper.showSuccess(context, 'Lesson added successfully');
     
     // Pop back to CreateLessonPage
     Navigator.pop(context);
@@ -675,7 +608,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFEDF5FF),
+              color: const Color(0xFFE6FFFA),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -686,12 +619,12 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                   height: 32,
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFD0E7FF),
+                    color: Color(0xFF20B486),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.folder_open,
-                    color: Color(0xFF0369A1),
+                    color: Colors.white,
                     size: 18,
                   ),
                 ),
@@ -834,11 +767,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Question Header Label
+                // Text Header Label
                 const Padding(
                   padding: EdgeInsets.only(left: 16, right: 16, top: 16),
                   child: Text(
-                    'Question *',
+                    'Text *',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -911,150 +844,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                       contentPadding: EdgeInsets.zero,
                     ),
                     style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
-                  ),
-                ),
-                const Divider(color: Color(0xFFE2E8F0), height: 1),
-                // Question Image (Optional)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Question Image (Optional)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF64748B),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (_uploadedImageUrl != null)
-                        Stack(
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              height: 180,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  _uploadedImageUrl!,
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: InkWell(
-                                onTap: () {
-                                  setState(() {
-                                    _uploadedImageUrl = null;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFEF4444),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black12,
-                                        blurRadius: 4,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      else
-                        InkWell(
-                          onTap: _isUploadingImage ? null : _pickAndUploadImage,
-                          borderRadius: BorderRadius.circular(12),
-                          child: CustomPaint(
-                            painter: DashedRoundedBorderPainter(
-                              color: const Color(0xFFCBD5E1),
-                              borderRadius: 12,
-                            ),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                              alignment: Alignment.center,
-                              child: _isUploadingImage
-                                  ? Column(
-                                      children: [
-                                        const SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          _imageUploadStatusText,
-                                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontFamily: 'Outfit'),
-                                        )
-                                      ],
-                                    )
-                                  : Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.cloud_upload_outlined, color: Color(0xFF64748B), size: 36),
-                                        const SizedBox(height: 8),
-                                        const Text(
-                                          'Click to upload or drag & drop',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF475569),
-                                            fontFamily: 'Outfit',
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        const Text(
-                                          'SVG, PNG, JPG or GIF (max. 800x400px)',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF94A3B8),
-                                            fontFamily: 'Outfit',
-                                          ),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        ElevatedButton(
-                                          onPressed: _pickAndUploadImage,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF20B486),
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
-                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                          ),
-                                          child: const Text('Upload Image', style: TextStyle(fontFamily: 'Outfit', fontSize: 12, fontWeight: FontWeight.bold)),
-                                        ),
-                                      ],
-                                    ),
-                            ),
-                          ),
-                        ),
-                    ],
                   ),
                 ),
               ],

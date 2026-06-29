@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/file_picker_helper.dart';
 
 class AuthService {
   // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
@@ -20,6 +21,7 @@ class AuthService {
   static const String _userEmailKey = 'user_email';
   static const String _userFullNameKey = 'user_fullname';
   static const String _userRolesKey = 'user_roles';
+  static const String _userAvatarUrlKey = 'user_avatar_url';
 
   // Perform login request
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -56,6 +58,11 @@ class AuthService {
     await prefs.setString(_userEmailKey, data['email']);
     await prefs.setString(_userFullNameKey, data['fullName']);
     await prefs.setStringList(_userRolesKey, List<String>.from(data['roles']));
+    if (data['avatarUrl'] != null) {
+      await prefs.setString(_userAvatarUrlKey, data['avatarUrl']);
+    } else {
+      await prefs.remove(_userAvatarUrlKey);
+    }
   }
 
   // Retrieve token
@@ -78,6 +85,7 @@ class AuthService {
     await prefs.remove(_userEmailKey);
     await prefs.remove(_userFullNameKey);
     await prefs.remove(_userRolesKey);
+    await prefs.remove(_userAvatarUrlKey);
   }
 
   // Perform registration request
@@ -253,6 +261,19 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        // Sync local cache
+        final prefs = await SharedPreferences.getInstance();
+        if (data['fullName'] != null) {
+          await prefs.setString(_userFullNameKey, data['fullName']);
+        }
+        if (data['email'] != null) {
+          await prefs.setString(_userEmailKey, data['email']);
+        }
+        if (data['avatarUrl'] != null) {
+          await prefs.setString(_userAvatarUrlKey, data['avatarUrl']);
+        } else {
+          await prefs.remove(_userAvatarUrlKey);
+        }
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': response.body};
@@ -290,9 +311,90 @@ class AuthService {
         if (updatedData['email'] != null) {
           await prefs.setString(_userEmailKey, updatedData['email']);
         }
+        if (updatedData['avatarUrl'] != null) {
+          await prefs.setString(_userAvatarUrlKey, updatedData['avatarUrl']);
+        } else {
+          await prefs.remove(_userAvatarUrlKey);
+        }
         return {'success': true, 'data': updatedData};
       } else {
         return {'success': false, 'message': response.body};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Change password for logged-in user
+  Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'No auth token found.'};
+      }
+
+      final url = baseUrl.replaceAll('/auth', '/v1/users/change-password');
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': 'Password updated successfully!'};
+      } else {
+        try {
+          final errBody = jsonDecode(response.body);
+          return {'success': false, 'message': errBody['error'] ?? errBody['message'] ?? response.body};
+        } catch (_) {
+          return {'success': false, 'message': response.body};
+        }
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Upload profile avatar
+  Future<Map<String, dynamic>> uploadAvatar(PickedFile file) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'No auth token found.'};
+      }
+
+      final url = baseUrl + '/profile/avatar';
+      final request = http.MultipartRequest('POST', Uri.parse(url))
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          file.bytes,
+          filename: file.name,
+        ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final updatedData = jsonDecode(responseBody);
+        final prefs = await SharedPreferences.getInstance();
+        if (updatedData['avatarUrl'] != null) {
+          await prefs.setString(_userAvatarUrlKey, updatedData['avatarUrl']);
+        }
+        return {'success': true, 'data': updatedData};
+      } else {
+        try {
+          final errBody = jsonDecode(responseBody);
+          return {'success': false, 'message': errBody['error'] ?? errBody['message'] ?? responseBody};
+        } catch (_) {
+          return {'success': false, 'message': responseBody};
+        }
       }
     } catch (e) {
       return {'success': false, 'message': e.toString()};
