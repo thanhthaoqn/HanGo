@@ -50,6 +50,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   ];
   String _selectedCategoryKey = 'GRAMMAR';
   String _selectedLevelKey = 'BASIC';
+  String? _selectedVersion = 'v1.0';
 
   // Image Upload state variables
   String? _uploadedImageUrl;
@@ -514,21 +515,47 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 child: const Text(
                   'Courses',
                   style: TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w500,
                     fontSize: 14,
                     fontFamily: 'Outfit',
                   ),
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
+              const Text(
+                ' › ',
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 16,
+                  fontFamily: 'Outfit',
+                ),
+              ),
               const SizedBox(width: 4),
               Text(
                 _titleController.text.isNotEmpty ? _titleController.text : 'Course Details',
                 style: const TextStyle(
-                  color: Color(0xFF94A3B8),
+                  color: Color(0xFF475569),
                   fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                ' › ',
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 16,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                _activeStep == 1 ? 'Introduction' : 'Create New Sction',
+                style: const TextStyle(
+                  color: Color(0xFF20B486),
+                  fontWeight: FontWeight.bold,
                   fontSize: 14,
                   fontFamily: 'Outfit',
                 ),
@@ -785,7 +812,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Item 2: Curriculum
+              // Item 2: Syllabus
               InkWell(
                 onTap: () {
                   setState(() {
@@ -842,7 +869,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Curriculum',
+                                    'Syllabus',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: _activeStep == 2 ? FontWeight.bold : FontWeight.w500,
@@ -1133,6 +1160,60 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 20),
+          // Version
+          const Text(
+            'Version',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4B5563),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _selectedVersion,
+            hint: const Text(
+              'Enter version...',
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
+            ),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF20B486)),
+              ),
+            ),
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+            items: const [
+              DropdownMenuItem<String>(
+                value: 'v1.0',
+                child: Text('v1.0'),
+              ),
+              DropdownMenuItem<String>(
+                value: 'v2.0',
+                child: Text('v2.0'),
+              ),
+              DropdownMenuItem<String>(
+                value: 'v3.0',
+                child: Text('v3.0'),
+              ),
+            ],
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedVersion = newValue;
+              });
+            },
           ),
           const SizedBox(height: 20),
           // Course Description
