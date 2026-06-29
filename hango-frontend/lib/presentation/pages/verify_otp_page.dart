@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../data/services/auth_service.dart';
+import '../../utils/toast_helper.dart';
 import 'reset_password_page.dart';
 
 class VerifyOtpPage extends StatefulWidget {
@@ -31,12 +32,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   void _handleVerify() async {
     String otp = _controllers.map((c) => c.text).join();
     if (otp.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter all 6 digits of the OTP code.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      ToastHelper.showError(context, 'Please enter all 6 digits of the OTP code.');
       return;
     }
 
@@ -52,12 +48,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
 
     if (mounted) {
       if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('OTP Verified successfully! Please set your new password.'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        ToastHelper.showSuccess(context, 'OTP Verified successfully! Please set your new password.');
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -65,23 +56,13 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'OTP verification failed.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, result['message'] ?? 'OTP verification failed.');
       }
     }
   }
 
   void _handleResend() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Resending OTP code to ${widget.email}...'),
-        backgroundColor: const Color(0xFF28B79B),
-      ),
-    );
+    ToastHelper.showSuccess(context, 'Resending OTP code to ${widget.email}...');
     await _authService.forgotPassword(widget.email);
   }
 

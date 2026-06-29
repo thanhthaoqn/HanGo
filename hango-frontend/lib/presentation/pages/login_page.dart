@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
 import 'package:google_sign_in_web/google_sign_in_web.dart' as web;
 import '../../data/services/auth_service.dart';
+import '../../utils/toast_helper.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
 import 'learner/learner_home_page.dart';
@@ -77,12 +79,18 @@ class _LoginPageState extends State<LoginPage> {
         final isAdmin = roles.any((r) => r.contains('ADMIN'));
         final isTrainer = roles.any((r) => r.contains('TRAINER'));
         debugPrint('Sign in success! Navigating. Admin: $isAdmin, Trainer: $isTrainer. Data: ${result['data']}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sign in successful!'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
+        
+        // Check if this was a new email registration to set the onboarding flag
+        SharedPreferences.getInstance().then((prefs) async {
+          final isNewReg = prefs.getBool('is_new_registration_$email') ?? false;
+          if (isNewReg) {
+            final userId = result['data']['id'];
+            await prefs.setBool('show_onboarding_for_$userId', true);
+            await prefs.remove('is_new_registration_$email');
+          }
+        });
+
+        ToastHelper.showSuccess(context, 'Sign in successful!');
         Widget destination;
         if (isAdmin) {
           destination = const AdminDashboardPage();
@@ -99,12 +107,7 @@ class _LoginPageState extends State<LoginPage> {
         );
       } else {
         debugPrint('Sign in failed! Error: ${result['message']}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Sign in failed. Please try again.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, result['message'] ?? 'Sign in failed. Please try again.');
       }
     }
   }
@@ -123,12 +126,7 @@ class _LoginPageState extends State<LoginPage> {
           _isLoading = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to retrieve ID Token from Google.'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, 'Failed to retrieve ID Token from Google.');
         }
         return;
       }
@@ -145,12 +143,7 @@ class _LoginPageState extends State<LoginPage> {
           final roles = List<String>.from(result['data']['roles'] ?? []);
           final isAdmin = roles.any((r) => r.contains('ADMIN'));
           final isTrainer = roles.any((r) => r.contains('TRAINER'));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Sign in successful: Welcome, $name!'),
-              backgroundColor: const Color(0xFF28B79B),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'Sign in successful: Welcome, $name!');
           Widget destination;
           if (isAdmin) {
             destination = const AdminDashboardPage();
@@ -166,12 +159,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? 'Google Sign In failed.'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          ToastHelper.showError(context, result['message'] ?? 'Google Sign In failed.');
         }
       }
     } catch (e) {
@@ -179,12 +167,7 @@ class _LoginPageState extends State<LoginPage> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google Sign In failed: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Google Sign In failed: ${e.toString()}');
       }
     }
   }

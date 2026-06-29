@@ -16,7 +16,7 @@ class SharedFooter extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
       child: Center(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: const BoxConstraints(maxWidth: 1440),
           child: Column(
             children: [
               isDesktop

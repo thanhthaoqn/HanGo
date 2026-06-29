@@ -9,7 +9,8 @@ import 'trainer_dashboard_page.dart';
 
 import 'create_course_page.dart';
 import 'edit_course_page.dart';
-
+import '../../../utils/toast_helper.dart';
+import 'question_bank/trainer_question_bank_page.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
   const TrainerCoursesPage({super.key});
@@ -22,6 +23,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   final _authService = AuthService();
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -67,6 +69,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -77,6 +80,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
+      _trainerAvatarUrl = avatarUrl;
     });
   }
 
@@ -290,28 +294,22 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank'),
+          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerQuestionBankPage(),
+              ),
+            );
+          }),
           _buildSidebarItem(Icons.task_alt_outlined, 'Task'),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(
-            Icons.help_outline,
-            'Help Center',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Help Center is under construction'),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.logout,
-            'Logout',
-            color: Colors.redAccent,
-            onTap: _handleLogout,
-          ),
+          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
+            ToastHelper.show(context, 'Help Center is under construction');
+          }),
+          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
         ],
       ),
     );
@@ -406,9 +404,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   size: 24,
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No new notifications')),
-                  );
+                  ToastHelper.show(context, 'No new notifications');
                 },
               ),
               Positioned(
@@ -447,15 +443,33 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  _trainerInitials,
-                  style: const TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
+                child: _trainerAvatarUrl.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _trainerAvatarUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            _trainerInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF20B486),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _trainerInitials,
+                        style: const TextStyle(
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
               ),
               const SizedBox(width: 4),
               Container(
@@ -1011,13 +1025,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               _buildActionButton(
                 icon: Icons.remove_red_eye_outlined,
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'View course $title details is under construction',
-                      ),
-                    ),
-                  );
+                  ToastHelper.show(context, 'View course $title details is under construction');
                 },
               ),
             ],

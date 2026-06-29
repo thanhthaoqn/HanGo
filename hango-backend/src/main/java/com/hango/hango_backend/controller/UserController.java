@@ -2,6 +2,7 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.ProfileUpdateRequest;
 import com.hango.hango_backend.dto.UserResponse;
+import com.hango.hango_backend.dto.ChangePasswordRequest;
 import com.hango.hango_backend.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,21 @@ public class UserController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordRequest changePasswordRequest) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("Error: Unauthorized");
+            }
+            authService.changePassword(userDetails.getUsername(), changePasswordRequest);
+            return ResponseEntity.ok("{\"message\": \"Password changed successfully!\"}");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
 }

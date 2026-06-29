@@ -32,10 +32,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   bool _isEnrolling = false;
   bool _isUnenrolling = false;
 
-  final GlobalKey _introduceKey = GlobalKey();
-  final GlobalKey _syllabusKey = GlobalKey();
-  final GlobalKey _reviewKey = GlobalKey();
-  bool _isScrollingToTab = false;
+
 
   int _currentUserId = 1;
 
@@ -45,15 +42,18 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     _loadCurrentUserId();
     _loadCourseDetail();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
     _reviewsFuture = _repository.fetchCourseReviews(widget.courseId);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
@@ -67,68 +67,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     }
   }
 
-  void _onScroll() {
-    if (_isScrollingToTab) return;
-    if (!mounted) return;
 
-    final introduceContext = _introduceKey.currentContext;
-    final syllabusContext = _syllabusKey.currentContext;
-    final reviewContext = _reviewKey.currentContext;
-
-    if (introduceContext == null || syllabusContext == null || reviewContext == null) return;
-
-    final introduceBox = introduceContext.findRenderObject() as RenderBox?;
-    final syllabusBox = syllabusContext.findRenderObject() as RenderBox?;
-    final reviewBox = reviewContext.findRenderObject() as RenderBox?;
-
-    if (introduceBox == null || syllabusBox == null || reviewBox == null) return;
-
-    final introduceY = introduceBox.localToGlobal(Offset.zero).dy;
-    final syllabusY = syllabusBox.localToGlobal(Offset.zero).dy;
-    final reviewY = reviewBox.localToGlobal(Offset.zero).dy;
-
-    const double threshold = 200.0;
-
-    int targetIndex = 0;
-    if (_scrollController.hasClients &&
-        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
-      targetIndex = 2;
-    } else if (reviewY <= threshold) {
-      targetIndex = 2;
-    } else if (syllabusY <= threshold) {
-      targetIndex = 1;
-    } else {
-      targetIndex = 0;
-    }
-
-    if (_tabController.index != targetIndex) {
-      setState(() {
-        _tabController.index = targetIndex;
-      });
-    }
-  }
-
-  void _scrollToSection(GlobalKey key, int tabIndex) async {
-    final context = key.currentContext;
-    if (context != null) {
-      setState(() {
-        _isScrollingToTab = true;
-        _tabController.index = tabIndex;
-      });
-
-      await Scrollable.ensureVisible(
-        context,
-        duration: const Duration(milliseconds: 300),
-        alignment: 0.0,
-        curve: Curves.easeInOut,
-      );
-
-      await Future.delayed(const Duration(milliseconds: 100));
-      setState(() {
-        _isScrollingToTab = false;
-      });
-    }
-  }
 
   Future<void> _loadCourseDetail() async {
     try {
@@ -498,7 +437,113 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       );
       return;
     }
+    _showEnrollConfirmDialog(course);
+  }
 
+  void _showEnrollConfirmDialog(CourseDetail course) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 10,
+          backgroundColor: Colors.white,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE6F4EA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.help_outline_rounded,
+                    color: Color(0xFF28B79B),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Confirm Enrollment',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Would you like to enroll in "${course.title}" and start learning?',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _proceedWithEnrollment(course);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Yes, Enroll',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _proceedWithEnrollment(CourseDetail course) async {
     setState(() {
       _isEnrolling = true;
       // Optimistic update to immediately reflect the state in UI without visual jumps
@@ -698,7 +743,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                         children: [
                           Center(
                             child: Container(
-                              constraints: const BoxConstraints(maxWidth: 1200),
+                              constraints: const BoxConstraints(maxWidth: 1440),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 20,
                                 vertical: 24,
@@ -874,7 +919,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       ),
     );
   }
-
   Widget _buildMainContent(CourseDetail course) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -894,77 +938,52 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           ),
           indicatorWeight: 3,
           isScrollable: true,
+          tabAlignment: TabAlignment.center,
           tabs: const [
-            Tab(text: 'Introduce'),
+            Tab(text: 'Introduction'),
             Tab(text: 'Syllabus'),
             Tab(text: 'Review'),
           ],
           onTap: (index) {
-            if (index == 0) {
-              _scrollToSection(_introduceKey, 0);
-            } else if (index == 1) {
-              _scrollToSection(_syllabusKey, 1);
-            } else if (index == 2) {
-              _scrollToSection(_reviewKey, 2);
-            }
+            setState(() {
+              _tabController.index = index;
+            });
           },
         ),
         const SizedBox(height: 24),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Introduce section
-            Container(
-              key: _introduceKey,
-              child: _buildIntroduceTab(course),
-            ),
-            const SizedBox(height: 32),
-            const Divider(color: Color(0xFFE2E8F0)),
-            const SizedBox(height: 32),
-            
-            // Syllabus section
-            Container(
-              key: _syllabusKey,
-              child: _buildSyllabusTab(course),
-            ),
-            const SizedBox(height: 32),
-            const Divider(color: Color(0xFFE2E8F0)),
-            const SizedBox(height: 32),
-            
-            // Review section
-            Container(
-              key: _reviewKey,
-              child: FutureBuilder<CourseReviewSummary>(
-                future: _reviewsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF28B79B),
-                      ),
-                    );
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData) {
-                    return const Center(child: Text('No reviews available.'));
-                  }
-                  final reviews = snapshot.data!.reviews;
-                  final hasReviewed = reviews.any((r) => r.userId == _currentUserId);
-                  return ReviewTab(
-                    summary: snapshot.data!,
-                    showWriteReviewButton: course.isEnrolled && !hasReviewed,
-                    onWriteReview: _showWriteReviewDialog,
-                    currentUserId: _currentUserId,
-                    onDeleteReview: _deleteReview,
-                    onEditReview: (rating, content) =>
-                        _showWriteReviewDialog(rating: rating, content: content),
-                    isEnrolled: course.isEnrolled,
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+        if (_tabController.index == 0)
+          _buildIntroduceTab(course)
+        else if (_tabController.index == 1)
+          _buildSyllabusTab(course)
+        else
+          FutureBuilder<CourseReviewSummary>(
+            future: _reviewsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF28B79B),
+                  ),
+                );
+              } else if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              } else if (!snapshot.hasData) {
+                return const Center(child: Text('No reviews available.'));
+              }
+              final reviews = snapshot.data!.reviews;
+              final hasReviewed = reviews.any((r) => r.userId == _currentUserId);
+              return ReviewTab(
+                summary: snapshot.data!,
+                showWriteReviewButton: course.isEnrolled && !hasReviewed,
+                onWriteReview: _showWriteReviewDialog,
+                currentUserId: _currentUserId,
+                onDeleteReview: _deleteReview,
+                onEditReview: (rating, content) =>
+                    _showWriteReviewDialog(rating: rating, content: content),
+                isEnrolled: course.isEnrolled,
+              );
+            },
+          ),
       ],
     );
   }
@@ -1065,7 +1084,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Course content',
+              'Syllabus',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,

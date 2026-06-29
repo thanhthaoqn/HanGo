@@ -259,6 +259,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             }
             section.setCourse(savedCourse);
             section.setTitle(sDto.getTitle());
+            section.setDescription(sDto.getDescription());
             section.setDisplayOrder(sIdx + 1);
 
             final com.hango.hango_backend.entity.Section savedSection = sectionRepository.save(section);

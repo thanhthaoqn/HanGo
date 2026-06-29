@@ -37,6 +37,7 @@ class CourseReview {
   final int? userId;
   final String userName;
   final String userInitial;
+  final String? userAvatar;
   final int rating;
   final String content;
   final String? createdAt; // ISO string
@@ -46,6 +47,7 @@ class CourseReview {
     this.userId,
     required this.userName,
     required this.userInitial,
+    this.userAvatar,
     required this.rating,
     required this.content,
     this.createdAt,
@@ -57,6 +59,7 @@ class CourseReview {
       userId: json['userId'],
       userName: json['userName'] ?? 'unknown',
       userInitial: json['userInitial'] ?? 'U',
+      userAvatar: json['userAvatar'],
       rating: json['rating'] ?? 0,
       content: json['content'] ?? '',
       createdAt: json['createdAt'],

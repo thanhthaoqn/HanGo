@@ -1,5 +1,9 @@
+import 'dart:convert';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../../data/services/auth_service.dart';
 import 'create_lesson_text_page.dart';
 
 class CreateLessonPage extends StatefulWidget {
@@ -9,7 +13,7 @@ class CreateLessonPage extends StatefulWidget {
   final String trainerInitials;
   final List<dynamic> sections;
   final int selectedSectionIndex;
-  final ValueChanged<List<dynamic>> onSectionsChanged;
+  final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
 
   const CreateLessonPage({
     super.key,
@@ -39,8 +43,47 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
     _expandedIndices.add(widget.selectedSectionIndex);
   }
 
-  void _notifyParent() {
-    widget.onSectionsChanged(_localSections);
+  final _authService = AuthService();
+
+  String get apiBaseUrl {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080/api/v1';
+    }
+    return 'http://localhost:8080/api/v1';
+  }
+
+  Future<void> _refreshCourseDetail() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final uri = Uri.parse('$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        debugPrint("REFRESH COURSE DETAIL RESPONSE: $data");
+        setState(() {
+          if (data['sessions'] != null) {
+            _localSections = List.from(data['sessions']);
+            debugPrint("UPDATED LOCAL SECTIONS: $_localSections");
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error refreshing course details in CreateLessonPage: $e');
+    }
+  }
+
+  Future<void> _notifyParent() async {
+    await widget.onSectionsChanged(_localSections);
+    await _refreshCourseDetail();
   }
 
   void _showAddLessonDialog(int sectionIndex, String type) {
@@ -99,10 +142,8 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                     });
                     _localSections[sectionIndex]['lessons'] = lessons;
                   });
-                  _notifyParent();
-                  Navigator.pop(context);
-                  // Go back to create section page after adding
-                  Navigator.pop(context);
+                   _notifyParent();
+                   Navigator.pop(context);
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -118,13 +159,13 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
     );
   }
 
-  void _deleteLesson(int sectionIndex, int lessonIndex) {
+  void _deleteLesson(int sectionIndex, int lessonIndex) async {
     setState(() {
       final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
       lessons.removeAt(lessonIndex);
       _localSections[sectionIndex]['lessons'] = lessons;
     });
-    _notifyParent();
+    await _notifyParent();
   }
 
   void _showEditLessonDialog(int sectionIndex, int lessonIndex) {
@@ -656,6 +697,453 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
   }
 
   Widget _buildMainContentCard() {
+    if (_activeSectionIndex != null) {
+      final section = _localSections[_activeSectionIndex!];
+      final lessons = section['lessons'] as List<dynamic>? ?? [];
+      debugPrint("BUILD MAIN CONTENT CARD: activeIndex = $_activeSectionIndex, section = $section, lessons length = ${lessons.length}, lessons = $lessons");
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFEFF2F5)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(0, 0, 0, 0.01),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Section Header Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    section['title'] ?? 'Untitled Section',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        // Handle edit section title if needed
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          _localSections.removeAt(_activeSectionIndex!);
+                          _activeSectionIndex = null;
+                        });
+                        _notifyParent();
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFFEFF2F5), height: 1),
+            const SizedBox(height: 24),
+            // Select content type container
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF20B486).withAlpha(51), width: 1.5),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Select content type:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CreateLessonTextPage(
+                                  courseId: widget.courseId,
+                                  courseTitle: widget.courseTitle,
+                                  trainerName: widget.trainerName,
+                                  trainerInitials: widget.trainerInitials,
+                                  sections: _localSections,
+                                  sectionIndex: _activeSectionIndex!,
+                                  onSectionsChanged: (updatedSections) async {
+                                    setState(() {
+                                      _localSections = updatedSections;
+                                    });
+                                    await _notifyParent();
+                                  },
+                                ),
+                              ),
+                            );
+                            if (result == 'goToIntroduction' && mounted) {
+                              if (context.mounted) {
+                                Navigator.pop(context, 'goToIntroduction');
+                              }
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE6FFFA),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.description_outlined,
+                                    color: Color(0xFF20B486),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: const [
+                                    Text(
+                                      'Lesson',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E293B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Text',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _showAddLessonDialog(_activeSectionIndex!, 'quiz'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE6FFFA),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.help_outline,
+                                    color: Color(0xFF20B486),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: const [
+                                    Text(
+                                      'Quiz',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E293B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Test',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _activeSectionIndex = null;
+                        });
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.close, size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (lessons.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CustomPaint(
+                    painter: DashedRoundedBorderPainter(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: 12,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 16),
+                      child: Column(
+                        children: [
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: lessons.length,
+                            itemBuilder: (context, lessonIndex) {
+                              final lesson = lessons[lessonIndex];
+                              IconData lessonIcon = Icons.description_outlined;
+                              if (lesson['itemType'] == 'quiz' || lesson['itemType'] == 'practice') {
+                                lessonIcon = Icons.help_outline;
+                              }
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: const Border(
+                                    left: BorderSide(color: Color(0xFF20B486), width: 4),
+                                    top: BorderSide(color: Color(0xFFE2E8F0)),
+                                    right: BorderSide(color: Color(0xFFE2E8F0)),
+                                    bottom: BorderSide(color: Color(0xFFE2E8F0)),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Icon(
+                                        lessonIcon,
+                                        color: const Color(0xFF64748B),
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                lesson['title'] ?? 'Untitled Lesson',
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF1E293B),
+                                                  fontFamily: 'Outfit',
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE2E8F0),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  (lesson['itemType'] as String? ?? 'text').toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF475569),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (lesson['description'] != null && (lesson['description'] as String).isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              lesson['description'],
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF64748B),
+                                                fontFamily: 'Outfit',
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 18),
+                                      onPressed: () => _showEditLessonDialog(_activeSectionIndex!, lessonIndex),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                                      onPressed: () => _deleteLesson(_activeSectionIndex!, lessonIndex),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          // Pagination Control
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6FFFA),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                const Icon(Icons.chevron_left, color: Color(0xFF94A3B8), size: 18),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF20B486),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    '1',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.chevron_right, color: Color(0xFF94A3B8), size: 18),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 24,
+                    top: -12,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF20B486),
+                          width: 1.5,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: const Text(
+                        'LESSON LIST',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF20B486),
+                          letterSpacing: 1.0,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1077,11 +1565,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                         trainerInitials: widget.trainerInitials,
                                         sections: _localSections,
                                         sectionIndex: index,
-                                        onSectionsChanged: (updatedSections) {
+                                        onSectionsChanged: (updatedSections) async {
                                           setState(() {
                                             _localSections = updatedSections;
                                           });
-                                          _notifyParent();
+                                          await _notifyParent();
                                         },
                                       ),
                                     ),

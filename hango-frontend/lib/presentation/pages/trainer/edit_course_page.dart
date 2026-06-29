@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
+import '../../../utils/toast_helper.dart';
 
 import 'create_section_page.dart';
 
@@ -24,6 +25,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
   bool _isLoadingCourse = true;
   bool _isSaving = false;
   String _lastSavedText = 'Last saved: Just now';
@@ -81,6 +83,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -91,6 +94,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
+      _trainerAvatarUrl = avatarUrl;
     });
   }
 
@@ -188,14 +192,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
       setState(() {
         _isLoadingCourse = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading course details: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+        ToastHelper.showError(context, 'Error loading course details: $e');
     }
   }
 
@@ -239,9 +236,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         _uploadStatusText = 'Upload failed';
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
+        ToastHelper.showError(context, 'Error uploading image: $e');
       }
     }
   }
@@ -285,13 +280,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _isSaving = false;
           _lastSavedText = 'Last saved: Just now';
         });
+        await _refreshCourseDetail();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Course updated successfully!'),
-              backgroundColor: Color(0xFF20B486),
-            ),
-          );
+          ToastHelper.showSuccess(context, 'Course updated successfully!');
         }
       } else {
         throw Exception('Failed to update course: ${response.body}');
@@ -299,12 +290,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     } catch (e) {
       debugPrint('Error updating course: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving course: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ToastHelper.showError(context, 'Error saving course: $e');
         setState(() {
           _isSaving = false;
         });
@@ -312,7 +298,34 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
   }
 
-  void _autoSaveCourse() async {
+  Future<void> _refreshCourseDetail() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final uri = Uri.parse('$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        setState(() {
+          if (data['sessions'] != null) {
+            _sections = List.from(data['sessions']);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error refreshing course details: $e');
+    }
+  }
+
+  Future<void> _autoSaveCourse() async {
     setState(() {
       _lastSavedText = 'Saving draft...';
     });
@@ -349,6 +362,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         setState(() {
           _lastSavedText = 'Draft saved automatically just now';
         });
+        await _refreshCourseDetail();
       } else {
         setState(() {
           _lastSavedText = 'Failed to auto-save';
@@ -410,11 +424,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                 trainerName: _trainerName,
                                                 trainerInitials: _trainerInitials,
                                                 sections: _sections,
-                                                onSectionsChanged: (updatedSections) {
+                                                onSectionsChanged: (updatedSections) async {
                                                   setState(() {
                                                     _sections = updatedSections;
                                                   });
-                                                  _autoSaveCourse();
+                                                  await _autoSaveCourse();
                                                 },
                                                 onStepChanged: (step) {
                                                   setState(() {
@@ -447,12 +461,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                           trainerName: _trainerName,
                                           trainerInitials: _trainerInitials,
                                           sections: _sections,
-                                          onSectionsChanged: (updatedSections) {
-                                            setState(() {
-                                              _sections = updatedSections;
-                                            });
-                                            _autoSaveCourse();
-                                          },
+                                          onSectionsChanged: (updatedSections) async {
+                                             setState(() {
+                                               _sections = updatedSections;
+                                             });
+                                             await _autoSaveCourse();
+                                           },
                                           onStepChanged: (step) {
                                             setState(() {
                                               _activeStep = step;
@@ -533,9 +547,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   size: 24,
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No new notifications')),
-                  );
+                  ToastHelper.show(context, 'No new notifications');
                 },
               ),
               Positioned(
@@ -574,15 +586,33 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  _trainerInitials,
-                  style: const TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
+                child: _trainerAvatarUrl.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _trainerAvatarUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            _trainerInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF20B486),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _trainerInitials,
+                        style: const TextStyle(
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
               ),
               const SizedBox(width: 4),
               Container(

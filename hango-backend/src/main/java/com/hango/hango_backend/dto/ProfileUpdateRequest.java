@@ -10,5 +10,7 @@ public class ProfileUpdateRequest {
     private String gender;
     private String phoneNumber;
     private String avatarUrl;
+    private String username;
+    private String address;
     private LocalDate dateOfBirth;
 }
