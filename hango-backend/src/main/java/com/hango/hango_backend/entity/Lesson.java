@@ -46,6 +46,15 @@ public class Lesson {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "description", length = 500)
+    private String description;
+
+    @Column(name = "pdf_name")
+    private String pdfName;
+
+    @Column(name = "question_image_url")
+    private String questionImageUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "exam_id")
     private Exam exam;
