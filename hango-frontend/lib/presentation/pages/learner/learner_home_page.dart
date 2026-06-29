@@ -51,6 +51,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Learner';
     final email = prefs.getString('user_email') ?? '';
+    final userId = prefs.getInt('user_id') ?? 0;
 
     String initials = 'L';
     if (fullName.trim().isNotEmpty) {
@@ -65,6 +66,196 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       _userEmail = email;
       _userInitials = initials;
     });
+
+    if (userId != 0) {
+      final showOnboardingKey = 'show_onboarding_for_$userId';
+      final showOnboarding = prefs.getBool(showOnboardingKey) ?? false;
+      if (showOnboarding) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showOnboardingPopup(userId, showOnboardingKey);
+        });
+      }
+    }
+  }
+
+  void _showOnboardingPopup(int userId, String showOnboardingKey) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent dismissing by tapping outside
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 12,
+          backgroundColor: Colors.white,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 500),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Celebration Icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE6F4EA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.celebration_rounded,
+                    color: Color(0xFF28B79B),
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Chào mừng đến với HanGo!',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Vì đây là lần đầu tiên bạn đăng nhập, bạn muốn bắt đầu với hoạt động nào hôm nay?',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                
+                // Two Option Cards
+                Row(
+                  children: [
+                    // Option 1: Practice Test (Thi thử)
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool(showOnboardingKey, false);
+                          if (!mounted) return;
+                          Navigator.pop(ctx); // Close dialog
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            borderRadius: BorderRadius.circular(16),
+                            color: const Color(0xFFF8FAFC),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEFF6FF),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.assignment_outlined,
+                                  color: Colors.blueAccent,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Luyện thi thử',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Thi thử theo đề chuẩn cấu trúc Bộ GD&ĐT',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Option 2: Courses (Học khóa học)
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool(showOnboardingKey, false);
+                          if (!mounted) return;
+                          Navigator.pop(ctx); // Close dialog
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ListCoursesPage()),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            borderRadius: BorderRadius.circular(16),
+                            color: const Color(0xFFF8FAFC),
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFECFDF5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.school_outlined,
+                                  color: Color(0xFF10B981),
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Học khóa học',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Học kiến thức bài bản và làm bài tập',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Load courses depending on selected tab
@@ -139,7 +330,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             // Main Content Area (centered with max width for clean desktop layouts)
             Center(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 1200),
+                constraints: const BoxConstraints(maxWidth: 1440),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 24,
@@ -443,12 +634,12 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             ? GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 0.85,
-                ),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 20,
+                mainAxisSpacing: 20,
+                childAspectRatio: isDesktop ? 1.25 : 0.85,
+              ),
                 itemCount: _courses.length,
                 itemBuilder: (context, index) {
                   return _buildCourseCard(_courses[index]);
@@ -472,6 +663,42 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     );
   }
 
+  Widget _buildCardPlaceholder(Course course) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF28B79B), Color(0xFF1E8D77)],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text(
+              course.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -10,
+            right: -10,
+            child: Icon(
+              Icons.school,
+              size: 68,
+              color: Colors.white.withOpacity(0.12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Course Card Builder
   Widget _buildCourseCard(Course course) {
     return MouseRegion(
@@ -489,46 +716,71 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top Colored Section
+              // Top Colored Section / Image
               Container(
                 height: 100,
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF28B79B), Color(0xFF1E8D77)],
-                  ),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(12),
                     topRight: Radius.circular(12),
                   ),
                 ),
-                child: Stack(
-                  children: [
-                    // Text category watermark/title
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Text(
-                        course.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-
-                    // Mortarboard watermark icon on bottom right
-                    Positioned(
-                      bottom: -10,
-                      right: -10,
-                      child: Icon(
-                        Icons.school,
-                        size: 68,
-                        color: Colors.white.withOpacity(0.12),
-                      ),
-                    ),
-                  ],
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                  child: course.thumbnailUrl.isNotEmpty
+                      ? Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Image.network(
+                                course.thumbnailUrl,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    color: Colors.grey.shade100,
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF28B79B),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return _buildCardPlaceholder(course);
+                                },
+                              ),
+                            ),
+                            if (course.category.isNotEmpty)
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.65),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    course.category,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        )
+                      : _buildCardPlaceholder(course),
                 ),
               ),
 
@@ -758,12 +1010,12 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             ? GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 0.85,
-                ),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 20,
+                mainAxisSpacing: 20,
+                childAspectRatio: isDesktop ? 1.25 : 0.85,
+              ),
                 itemCount: _exams.length,
                 itemBuilder: (context, index) {
                   return _buildExamCard(_exams[index]);
@@ -808,16 +1060,38 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             child: Stack(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.only(left: 12.0, right: 12.0, top: 28.0, bottom: 12.0),
                   child: Text(
                     exam.title,
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                       height: 1.3,
+                    ),
+                  ),
+                ),
+
+                // EXAM Badge
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'EXAM',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ),

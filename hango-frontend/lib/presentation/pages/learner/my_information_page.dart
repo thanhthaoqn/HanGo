@@ -114,7 +114,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
           backgroundColor: const Color(0xFFF8FAFC),
           appBar: SharedHeader(
             isDesktop: isDesktop,
-            activeTab: '',
+            activeTab: 'Profile',
           ),
           body: _isLoading
               ? const Center(
@@ -132,7 +132,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
                         ),
                         child: Center(
                           child: Container(
-                            constraints: const BoxConstraints(maxWidth: 1200),
+                            constraints: const BoxConstraints(maxWidth: 1440),
                             child: isDesktop
                                 ? Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
