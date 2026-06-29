@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hango/domain/model/ai_health.dart';
 import 'package:hango/domain/model/ai_models.dart';
@@ -21,6 +24,19 @@ class LessonAiChatbox extends StatefulWidget {
 }
 
 class _LessonAiChatboxState extends State<LessonAiChatbox> {
+  @override
+  void didUpdateWidget(covariant LessonAiChatbox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lessonId != widget.lessonId) {
+      setState(() {
+        _conversationId = null;
+        _messages.clear();
+        _error = null;
+      });
+      _loadFromCache();
+    }
+  }
+
   final _message = TextEditingController();
   final _scroll = ScrollController();
   final List<AiMessage> _messages = [];
@@ -29,11 +45,76 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
   bool _sending = false;
   String? _error;
 
+  static const int _maxCacheMessages = 200;
+
+  String get _cacheKey => 'ai_chat_lesson_${widget.lessonId}';
+
+  Future<void> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey);
+      if (raw == null || raw.trim().isEmpty) return;
+
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final conversationId = (data['conversationId'] as num?)?.toInt();
+      final messagesJson = (data['messages'] as List?) ?? const [];
+
+      final loadedMessages = messagesJson
+          .whereType<Map<String, dynamic>>()
+          .map(AiMessage.fromJson)
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _conversationId = conversationId;
+        _messages
+          ..clear()
+          ..addAll(loadedMessages);
+      });
+
+      _scrollToEnd();
+      _saveToCache();
+    } catch (_) {
+      // ignore cache errors
+    }
+  }
+
+  Future<void> _saveToCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final trimmed = _messages.length <= _maxCacheMessages
+          ? _messages
+          : _messages.sublist(_messages.length - _maxCacheMessages);
+
+      final payload = {
+        'conversationId': _conversationId,
+        'messages': trimmed
+            .map(
+              (m) => {
+                'role': m.role,
+                'content': m.content,
+                'createdAt': m.createdAt?.toIso8601String(),
+                'wasOutOfScope': m.wasOutOfScope,
+              },
+            )
+            .toList(),
+      };
+
+      await prefs.setString(_cacheKey, jsonEncode(payload));
+    } catch (_) {
+      // ignore cache errors
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     // Mở luôn ngay khi vào bài học
     _health = context.read<AppState>().checkAiStatus();
+
+    // Load cache chat theo lessonId
+    _loadFromCache();
   }
 
   @override
@@ -45,6 +126,7 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
 
   Future<void> _send() async {
     final text = _message.text.trim();
+    if (text.isEmpty || _sending) return;
     if (text.isEmpty || _sending) return;
 
     setState(() {
@@ -72,6 +154,7 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
         );
       });
       _scrollToEnd();
+      _saveToCache();
     } catch (error) {
       setState(() {
         _error = error.toString();
@@ -106,7 +189,7 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
           width: panelWidth,
           height: panelHeight,
           child: _ChatPanel(
-            key: const ValueKey('chat-panel'),
+            key: ValueKey<int>(widget.lessonId),
             width: panelWidth,
             height: panelHeight,
             lessonTitle: widget.lessonTitle,

@@ -712,6 +712,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                   .clamp(_minRightPaneWidth, 800)
                             : 320,
                         child: LessonAiChatbox(
+                          key: ValueKey<int>(_currentLessonId),
                           lessonId: _currentLessonId,
                           lessonTitle: lesson.title,
                         ),
