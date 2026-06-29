@@ -14,4 +14,8 @@ public class CourseLessonDTO {
     private Long examId;
     private Integer questionCount;
     private Boolean isCompleted;
+    private String description;
+    private String questionText;
+    private String pdfName;
+    private String questionImageUrl;
 }

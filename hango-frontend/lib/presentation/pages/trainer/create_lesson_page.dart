@@ -1032,7 +1032,31 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                   });
                 },
                 onEditLessonPressed: (lessonIndex) {
-                  _showEditLessonDialog(_activeSectionIndex!, lessonIndex);
+                  final lesson = lessons[lessonIndex];
+                  if (lesson['itemType'] == 'quiz') {
+                    _showEditLessonDialog(_activeSectionIndex!, lessonIndex);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreateLessonTextPage(
+                          courseId: widget.courseId,
+                          courseTitle: widget.courseTitle,
+                          trainerName: widget.trainerName,
+                          trainerInitials: widget.trainerInitials,
+                          sections: _localSections,
+                          sectionIndex: _activeSectionIndex!,
+                          onSectionsChanged: (updatedSections) async {
+                            setState(() {
+                              _localSections = updatedSections;
+                            });
+                            await _notifyParent();
+                          },
+                          lessonIndex: lessonIndex,
+                        ),
+                      ),
+                    );
+                  }
                 },
                 onDeleteLessonPressed: (lessonIndex) {
                   _deleteLesson(_activeSectionIndex!, lessonIndex);

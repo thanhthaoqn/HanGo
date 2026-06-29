@@ -297,6 +297,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setTitle(lDto.getTitle());
                 lesson.setLessonType(lDto.getItemType() != null ? lDto.getItemType() : "video");
                 lesson.setDisplayOrder(lIdx + 1);
+                lesson.setDescription(lDto.getDescription());
+                lesson.setContent(lDto.getQuestionText());
+                lesson.setPdfName(lDto.getPdfName());
+                lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
                 
                 // Set mandatory fields using Course category and difficulty parameters
                 lesson.setSkill(savedCourse.getCategory());

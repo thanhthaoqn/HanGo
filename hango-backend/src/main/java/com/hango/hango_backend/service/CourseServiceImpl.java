@@ -103,6 +103,10 @@ public class CourseServiceImpl implements CourseService {
                     .examId(examId)
                     .questionCount(qCount)
                     .isCompleted(completedLessonIds.contains(lesson.getId()))
+                    .description(lesson.getDescription())
+                    .questionText(lesson.getContent())
+                    .pdfName(lesson.getPdfName())
+                    .questionImageUrl(lesson.getQuestionImageUrl())
                     .build();
             }).collect(Collectors.toList());
 

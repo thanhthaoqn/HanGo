@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../../data/repositories/lesson_repository.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -11,6 +12,7 @@ class CreateLessonTextPage extends StatefulWidget {
   final List<dynamic> sections;
   final int sectionIndex;
   final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
+  final int? lessonIndex;
 
   const CreateLessonTextPage({
     super.key,
@@ -21,6 +23,7 @@ class CreateLessonTextPage extends StatefulWidget {
     required this.sections,
     required this.sectionIndex,
     required this.onSectionsChanged,
+    this.lessonIndex,
   });
 
   @override
@@ -46,6 +49,38 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   void initState() {
     super.initState();
     _localSections = List.from(widget.sections);
+    
+    if (widget.lessonIndex != null && widget.lessonIndex! < (_localSections[widget.sectionIndex]['lessons'] ?? []).length) {
+      final lesson = _localSections[widget.sectionIndex]['lessons'][widget.lessonIndex!];
+      _titleController.text = lesson['title'] ?? '';
+      _descController.text = lesson['description'] ?? '';
+      _questionController.text = lesson['questionText'] ?? '';
+      _uploadedPdfName = (lesson['pdfName'] as String?)?.isNotEmpty == true ? lesson['pdfName'] : null;
+      _uploadedImageUrl = (lesson['questionImageUrl'] as String?)?.isNotEmpty == true ? lesson['questionImageUrl'] : null;
+      if (_uploadedPdfName != null && _uploadedPdfName!.isNotEmpty) {
+        _pdfFileSizeStr = 'Attached';
+      }
+
+      final lessonId = lesson['id'];
+      if (lessonId is num && lessonId < 1000000000000) {
+        _loadLessonDetailFromApi(lessonId.toInt());
+      }
+    }
+  }
+
+  void _loadLessonDetailFromApi(int lessonId) async {
+    try {
+      final repo = LessonRepository();
+      final detail = await repo.fetchLessonDetail(lessonId);
+      if (mounted) {
+        setState(() {
+          _titleController.text = detail.title;
+          _questionController.text = detail.content;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading lesson detail from API in CreateLessonTextPage: $e');
+    }
   }
 
   @override
@@ -136,21 +171,31 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
 
     setState(() {
       final lessons = List.from(_localSections[widget.sectionIndex]['lessons'] ?? []);
-      lessons.add({
-        'id': DateTime.now().millisecondsSinceEpoch,
+      final lessonData = {
+        'id': widget.lessonIndex != null ? lessons[widget.lessonIndex!]['id'] : DateTime.now().millisecondsSinceEpoch,
         'title': title,
         'description': desc,
         'itemType': 'text',
         'questionText': question,
         'questionImageUrl': _uploadedImageUrl ?? '',
         'pdfName': _uploadedPdfName ?? '',
-        'displayOrder': lessons.length + 1,
-      });
+        'displayOrder': widget.lessonIndex != null ? lessons[widget.lessonIndex!]['displayOrder'] : (lessons.length + 1),
+      };
+
+      if (widget.lessonIndex != null) {
+        lessons[widget.lessonIndex!] = lessonData;
+      } else {
+        lessons.add(lessonData);
+      }
       _localSections[widget.sectionIndex]['lessons'] = lessons;
     });
 
     await _notifyParent();
-    ToastHelper.showSuccess(context, 'Lesson added successfully');
+    if (!mounted) return;
+    ToastHelper.showSuccess(
+      context, 
+      widget.lessonIndex != null ? 'Lesson updated successfully' : 'Lesson added successfully'
+    );
     
     // Pop back to CreateLessonPage
     Navigator.pop(context);
@@ -892,7 +937,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             ),
           ),
           const SizedBox(height: 8),
-          if (_uploadedPdfName == null)
+          if (_uploadedPdfName == null || _uploadedPdfName!.isEmpty)
             InkWell(
               onTap: _pickAndUploadPdf,
               borderRadius: BorderRadius.circular(12),
@@ -1106,9 +1151,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             ),
             elevation: 0,
           ),
-          child: const Text(
-            'Add Lesson +',
-            style: TextStyle(
+          child: Text(
+            widget.lessonIndex != null ? 'Save Changes' : 'Add Lesson +',
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 14,
