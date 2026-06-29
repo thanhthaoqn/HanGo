@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import 'create_lesson_text_page.dart';
+import 'create_quiz_page.dart';
 import 'lesson_list_widget.dart';
 
 class CreateLessonPage extends StatefulWidget {
@@ -272,7 +273,28 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: InkWell(
-                  onTap: () => _showAddLessonDialog(widget.selectedSectionIndex, 'quiz'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreateQuizPage(
+                          courseId: widget.courseId,
+                          courseTitle: widget.courseTitle,
+                          trainerName: widget.trainerName,
+                          trainerInitials: widget.trainerInitials,
+                          sections: _localSections,
+                          sectionIndex: widget.selectedSectionIndex,
+                          onSectionsChanged: (updatedSections) async {
+                            setState(() {
+                              _localSections = updatedSections;
+                              _showTypeSelection = false;
+                            });
+                            await _notifyParent();
+                          },
+                        ),
+                      ),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.all(20),
