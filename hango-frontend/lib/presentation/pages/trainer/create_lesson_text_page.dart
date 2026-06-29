@@ -233,21 +233,52 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 child: const Text(
                   'Courses',
                   style: TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w500,
                     fontSize: 14,
                     fontFamily: 'Outfit',
                   ),
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
-              const SizedBox(width: 4),
-              Text(
-                widget.courseTitle,
-                style: const TextStyle(
+              const Text(
+                ' › ',
+                style: TextStyle(
                   color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  widget.courseTitle,
+                  style: const TextStyle(
+                    color: Color(0xFF20B486),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                ' › ',
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 16,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                'Create New Lesson',
+                style: TextStyle(
+                  color: Color(0xFF20B486),
+                  fontWeight: FontWeight.bold,
                   fontSize: 14,
                   fontFamily: 'Outfit',
                 ),
@@ -431,10 +462,10 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Step 2: Curriculum
+              // Step 2: Syllabus
               InkWell(
                 onTap: () {
-                  Navigator.pop(context); // Pops back to CreateLessonPage (Curriculum)
+                  Navigator.pop(context); // Pops back to CreateLessonPage (Syllabus)
                 },
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
@@ -484,7 +515,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Curriculum',
+                                  'Syllabus',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
