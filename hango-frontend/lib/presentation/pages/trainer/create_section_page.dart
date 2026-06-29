@@ -35,6 +35,9 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
   final TextEditingController _descController = TextEditingController();
   final Set<int> _expandedIndices = {};
 
+  int _currentSectionPage = 0;
+  static const int _sectionPageSize = 5;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +53,10 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.sections != oldWidget.sections) {
       _localSections = List.from(widget.sections);
+      final totalPages = (_localSections.length / _sectionPageSize).ceil();
+      if (_currentSectionPage >= totalPages && totalPages > 0) {
+        _currentSectionPage = totalPages - 1;
+      }
     }
   }
 
@@ -361,176 +368,241 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
         ),
       );
     } else {
+      final totalPages = (_localSections.length / _sectionPageSize).ceil();
+      final startIndex = _currentSectionPage * _sectionPageSize;
+      final endIndex = (startIndex + _sectionPageSize < _localSections.length)
+          ? startIndex + _sectionPageSize
+          : _localSections.length;
+      final paginatedSections = _localSections.sublist(startIndex, endIndex);
+
       innerContent = Container(
         padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 16),
-        child: ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _localSections.length,
-          itemBuilder: (context, index) {
-            final section = _localSections[index];
-            final lessons = section['lessons'] as List<dynamic>? ?? [];
-            final isExpanded = _expandedIndices.contains(index);
+        child: Column(
+          children: [
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: paginatedSections.length,
+              itemBuilder: (context, index) {
+                final originalIndex = startIndex + index;
+                final section = paginatedSections[index];
+                final lessons = section['lessons'] as List<dynamic>? ?? [];
+                final isExpanded = _expandedIndices.contains(originalIndex);
 
-            return Container(
-              margin: EdgeInsets.only(bottom: index == _localSections.length - 1 ? 0 : 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEDF5FF), // premium light blue bg
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        // Circle Index Badge
-                        Container(
-                          width: 32,
-                          height: 32,
-                          alignment: Alignment.center,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFD0E7FF),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${index + 1}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0369A1),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Title and count
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      section['title'] ?? 'Untitled Section',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: Color(0xFF1E293B),
-                                        fontFamily: 'Outfit',
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${lessons.length} ${lessons.length == 1 ? "item" : "items"}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF64748B),
-                                        fontFamily: 'Outfit',
-                                      ),
-                                    ),
-                                  ],
+                return Container(
+                  margin: EdgeInsets.only(bottom: index == paginatedSections.length - 1 ? 0 : 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF5FF), // premium light blue bg
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            // Circle Index Badge
+                            Container(
+                              width: 32,
+                              height: 32,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFD0E7FF),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${originalIndex + 1}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0369A1),
+                                  fontFamily: 'Outfit',
                                 ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.edit_note, color: Color(0xFF64748B), size: 22),
-                                tooltip: 'Edit Section Info',
-                                onPressed: () {
-                                  setState(() {
-                                    _editingIndex = index;
-                                    _nameController.text = section['title'] ?? '';
-                                    _descController.text = section['description'] ?? '';
-                                  });
-                                },
+                            ),
+                            const SizedBox(width: 12),
+                            // Title and count
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          section['title'] ?? 'Untitled Section',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: Color(0xFF1E293B),
+                                            fontFamily: 'Outfit',
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${lessons.length} ${lessons.length == 1 ? "item" : "items"}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF64748B),
+                                            fontFamily: 'Outfit',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_note, color: Color(0xFF64748B), size: 22),
+                                    tooltip: 'Edit Section Info',
+                                    onPressed: () {
+                                      setState(() {
+                                        _editingIndex = originalIndex;
+                                        _nameController.text = section['title'] ?? '';
+                                        _descController.text = section['description'] ?? '';
+                                      });
+                                    },
+                                  ),
+                                ],
                               ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Action buttons
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
+                              tooltip: 'Edit Section',
+                              onPressed: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => CreateLessonPage(
+                                      courseId: widget.courseId,
+                                      courseTitle: widget.courseTitle,
+                                      trainerName: widget.trainerName,
+                                      trainerInitials: widget.trainerInitials,
+                                      sections: _localSections,
+                                      selectedSectionIndex: originalIndex,
+                                      onSectionsChanged: (updatedSections) async {
+                                        setState(() {
+                                          _localSections = updatedSections;
+                                        });
+                                        await _notifyParent();
+                                      },
+                                    ),
+                                  ),
+                                );
+                                if (result == 'goToIntroduction' && widget.onStepChanged != null) {
+                                  widget.onStepChanged!(1);
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                              tooltip: 'Delete Section',
+                              onPressed: () => _deleteSection(originalIndex),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                color: const Color(0xFF64748B),
+                                size: 22,
+                              ),
+                              tooltip: isExpanded ? 'Collapse' : 'Expand',
+                              onPressed: () => _toggleExpanded(originalIndex),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isExpanded) ...[
+                        const Divider(color: Color(0xFFD0E7FF), height: 1),
+                        Container(
+                          color: Colors.white.withAlpha(102),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (section['description'] != null && section['description'].toString().trim().isNotEmpty)
+                                Text(
+                                  section['description'],
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF475569),
+                                    fontFamily: 'Outfit',
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                )
+                              else
+                                const Text(
+                                  'No description provided for this section.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF94A3B8),
+                                    fontFamily: 'Outfit',
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        // Action buttons
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
-                          tooltip: 'Edit Section',
-                          onPressed: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CreateLessonPage(
-                                  courseId: widget.courseId,
-                                  courseTitle: widget.courseTitle,
-                                  trainerName: widget.trainerName,
-                                  trainerInitials: widget.trainerInitials,
-                                  sections: _localSections,
-                                  selectedSectionIndex: index,
-                                  onSectionsChanged: (updatedSections) async {
-                                    setState(() {
-                                      _localSections = updatedSections;
-                                    });
-                                    await _notifyParent();
-                                  },
-                                ),
-                              ),
-                            );
-                            if (result == 'goToIntroduction' && widget.onStepChanged != null) {
-                              widget.onStepChanged!(1);
-                            }
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
-                          tooltip: 'Delete Section',
-                          onPressed: () => _deleteSection(index),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                            color: const Color(0xFF64748B),
-                            size: 22,
-                          ),
-                          tooltip: isExpanded ? 'Collapse' : 'Expand',
-                          onPressed: () => _toggleExpanded(index),
-                        ),
                       ],
-                    ),
+                    ],
                   ),
-                  if (isExpanded) ...[
-                    const Divider(color: Color(0xFFD0E7FF), height: 1),
-                    Container(
-                      color: Colors.white.withAlpha(102),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (section['description'] != null && section['description'].toString().trim().isNotEmpty)
-                            Text(
-                              section['description'],
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF475569),
-                                fontFamily: 'Outfit',
-                                fontStyle: FontStyle.italic,
-                              ),
-                            )
-                          else
-                            const Text(
-                              'No description provided for this section.',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF94A3B8),
-                                  fontFamily: 'Outfit',
-                                  fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                        ],
+                );
+              },
+            ),
+            if (totalPages > 1) ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.chevron_left,
+                      color: _currentSectionPage > 0 ? const Color(0xFF20B486) : const Color(0xFF94A3B8),
+                      size: 18,
+                    ),
+                    onPressed: _currentSectionPage > 0
+                        ? () => setState(() => _currentSectionPage--)
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  for (int i = 0; i < totalPages; i++) ...[
+                    GestureDetector(
+                      onTap: () => setState(() => _currentSectionPage = i),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: _currentSectionPage == i ? const Color(0xFF20B486) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                          border: _currentSectionPage == i ? null : Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Text(
+                          '${i + 1}',
+                          style: TextStyle(
+                            color: _currentSectionPage == i ? Colors.white : const Color(0xFF475569),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                       ),
                     ),
                   ],
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(
+                      Icons.chevron_right,
+                      color: _currentSectionPage < totalPages - 1 ? const Color(0xFF20B486) : const Color(0xFF94A3B8),
+                      size: 18,
+                    ),
+                    onPressed: _currentSectionPage < totalPages - 1
+                        ? () => setState(() => _currentSectionPage++)
+                        : null,
+                  ),
                 ],
               ),
-            );
-          },
+            ],
+          ],
         ),
       );
     }
