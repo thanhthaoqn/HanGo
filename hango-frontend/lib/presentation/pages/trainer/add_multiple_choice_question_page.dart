@@ -14,7 +14,7 @@ class AddMultipleChoiceQuestionPage extends StatefulWidget {
   final int sectionIndex;
   final int sectionId;
   final String sectionTitle;
-  final Function(int newQuestionId) onQuestionCreated;
+  final Function(List<int> newQuestionIds) onQuestionCreated;
 
   const AddMultipleChoiceQuestionPage({
     super.key,
@@ -272,9 +272,10 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
 
       if (response.statusCode == 200) {
         final resData = jsonDecode(response.body);
-        final parentId = resData['id'] as int;
+        final List<dynamic> idsList = resData['questionIds'] as List<dynamic>? ?? [];
+        final List<int> questionIds = idsList.map((id) => id as int).toList();
         ToastHelper.showSuccess(context, 'Group question created successfully!');
-        widget.onQuestionCreated(parentId);
+        widget.onQuestionCreated(questionIds);
         Navigator.pop(context);
       } else {
         final errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to save group question';
