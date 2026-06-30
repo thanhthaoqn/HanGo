@@ -6,14 +6,15 @@ import 'widgets/trainer_lead_sidebar.dart';
 import 'widgets/trainer_lead_header.dart';
 import 'trainer_lead_tasks_page.dart';
 
-class TrainerLeadAssignTaskPage extends StatefulWidget {
-  const TrainerLeadAssignTaskPage({super.key});
+class TrainerLeadTaskDetailPage extends StatefulWidget {
+  final int taskId;
+  const TrainerLeadTaskDetailPage({super.key, required this.taskId});
 
   @override
-  State<TrainerLeadAssignTaskPage> createState() => _TrainerLeadAssignTaskPageState();
+  State<TrainerLeadTaskDetailPage> createState() => _TrainerLeadTaskDetailPageState();
 }
 
-class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
+class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
   final TrainerLeadRepository _repository = TrainerLeadRepository();
   
   String _userName = 'Thảo';
@@ -28,18 +29,19 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
   int? _selectedReviewer;
   String? _selectedType;
   DateTime? _reviewDeadline;
-  
-  final DateTime _creationDate = DateTime.now();
+  String? _selectedStatus;
 
   final List<String> _types = ['Quiz', 'Lesson', 'Exam', 'Course', 'Section'];
-  bool _isLoadingTrainers = true;
+  final List<String> _statuses = ['ASSIGNED', 'IN_PROGRESS', 'PENDING', 'REJECTED', 'COMPLETED'];
+  
+  bool _isLoading = true;
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
-    _fetchTrainers();
+    _fetchData();
   }
 
   Future<void> _loadUserInfo() async {
@@ -58,28 +60,52 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
     });
   }
 
-  Future<void> _fetchTrainers() async {
+  Future<void> _fetchData() async {
     try {
       final trainers = await _repository.getTrainers();
       final reviewers = await _repository.getReviewers();
+      final taskDetail = await _repository.getTaskDetail(widget.taskId);
+      
       setState(() {
         _trainers = trainers;
         _reviewers = reviewers;
-        _isLoadingTrainers = false;
+        
+        _titleController.text = taskDetail['title'] ?? '';
+        _descController.text = taskDetail['description'] ?? '';
+        _selectedType = taskDetail['type'];
+        if (_selectedType != null && !_types.contains(_selectedType)) {
+          _types.add(_selectedType!);
+        }
+        
+        _selectedAssignee = taskDetail['assigneeId'];
+        _selectedReviewer = taskDetail['reviewerId'];
+        
+        _selectedStatus = taskDetail['status'];
+        if (_selectedStatus != null && !_statuses.contains(_selectedStatus)) {
+          _statuses.add(_selectedStatus!);
+        }
+        
+        if (taskDetail['deadline'] != null) {
+          _reviewDeadline = DateTime.parse(taskDetail['deadline']);
+        }
+
+        _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _isLoadingTrainers = false;
+        _isLoading = false;
       });
-      // Handle error natively
+      if (mounted) {
+        ToastHelper.showError(context, 'Error loading task details: $e');
+      }
     }
   }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
+      initialDate: _reviewDeadline ?? DateTime.now(),
+      firstDate: DateTime(2000),
       lastDate: DateTime(2030),
     );
     if (picked != null) {
@@ -91,12 +117,12 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
 
   void _showConfirmationDialog() {
     if (_titleController.text.trim().isEmpty || _descController.text.trim().isEmpty || 
-        _selectedAssignee == null || _selectedReviewer == null || _reviewDeadline == null || _selectedType == null) {
+        _selectedAssignee == null || _reviewDeadline == null || _selectedType == null || _selectedStatus == null) {
       ToastHelper.showError(context, 'Please fill all fields');
       return;
     }
 
-    if (_selectedAssignee == _selectedReviewer) {
+    if (_selectedReviewer != null && _selectedAssignee == _selectedReviewer) {
       ToastHelper.showError(context, 'Assignee cannot be the same as Reviewer');
       return;
     }
@@ -105,8 +131,8 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirm Assign Task'),
-          content: const Text('Are you sure you want to assign this task?'),
+          title: const Text('Confirm Update'),
+          content: const Text('Are you sure you want to update this task?'),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
@@ -134,17 +160,18 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
     });
 
     try {
-      await _repository.createTask({
+      await _repository.updateTask(widget.taskId, {
         'title': _titleController.text,
         'description': _descController.text,
         'type': _selectedType,
         'assigneeId': _selectedAssignee,
         'reviewerId': _selectedReviewer,
-        'reviewDeadline': _reviewDeadline!.toIso8601String(),
+        'deadline': _reviewDeadline!.toIso8601String(),
+        'status': _selectedStatus,
       });
       
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Task assigned successfully');
+        ToastHelper.showSuccess(context, 'Task updated successfully');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const TrainerLeadTasksPage()),
@@ -175,20 +202,22 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
               children: [
                 // Header
                 TrainerLeadHeader(
-                  title: 'Task > Assign Task',
+                  title: 'Task > Task Detail',
                   userName: _userName,
                   userInitial: _userInitial,
                 ),
                 
                 // Content
                 Expanded(
-                  child: Padding(
+                  child: _isLoading 
+                    ? const Center(child: CircularProgressIndicator())
+                    : Padding(
                     padding: const EdgeInsets.all(30),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Assign Task',
+                          'Task Detail',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -205,7 +234,7 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: Colors.grey.shade200),
                             ),
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(16),
                             child: SingleChildScrollView(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,13 +243,13 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                                   _buildLabel('Task Title'),
                                   _buildTextField(_titleController, 'Enter task title...'),
                                   
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 12),
 
                                   // Task Description
                                   _buildLabel('Task Description'),
-                                  _buildTextField(_descController, 'Enter task content here...', maxLines: 4),
+                                  _buildTextField(_descController, 'Enter task content here...', maxLines: 3),
 
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 12),
 
                                   // Row 1: Task Type, Deadline
                                   Row(
@@ -244,7 +273,7 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                                     ],
                                   ),
 
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: 12),
 
                                   // Row 2: Assignee, Reviewer
                                   Row(
@@ -253,7 +282,7 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                                         child: _buildDropdown(
                                           'Assignee',
                                           _selectedAssignee,
-                                          _isLoadingTrainers ? [] : _trainers.map((e) => DropdownMenuItem(value: e['id'], child: Text(e['fullName']))).toList(),
+                                          _trainers.map((e) => DropdownMenuItem(value: e['id'], child: Text(e['fullName']))).toList(),
                                           (val) => setState(() => _selectedAssignee = val),
                                         ),
                                       ),
@@ -262,12 +291,14 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                                         child: _buildDropdown(
                                           'Reviewer',
                                           _selectedReviewer,
-                                          _isLoadingTrainers ? [] : _reviewers.map((e) => DropdownMenuItem(value: e['id'], child: Text(e['fullName']))).toList(),
+                                          _reviewers.map((e) => DropdownMenuItem(value: e['id'], child: Text(e['fullName']))).toList(),
                                           (val) => setState(() => _selectedReviewer = val),
                                         ),
                                       ),
                                     ],
                                   ),
+
+                                  // Removed Status row
                                 ],
                               ),
                             ),
@@ -278,8 +309,20 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                         Padding(
                           padding: const EdgeInsets.only(top: 20),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
+                              SizedBox(
+                                width: 250,
+                                child: _buildDropdown(
+                                  'Status',
+                                  _selectedStatus,
+                                  _statuses.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                                  (val) => setState(() => _selectedStatus = val),
+                                ),
+                              ),
+                              Row(
+                                children: [
                               OutlinedButton(
                                 onPressed: () {
                                   Navigator.pushReplacement(
@@ -306,7 +349,9 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                                 ),
                                 child: _isSubmitting 
                                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                    : const Text('ASSIGN TASK', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    : const Text('UPDATE', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
