@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
+import 'add_new_question_page.dart';
 
 class SelectQuizQuestionsPage extends StatefulWidget {
   final int courseId;
@@ -1418,7 +1419,31 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
             padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
             child: OutlinedButton.icon(
               onPressed: () {
-                ToastHelper.showSuccess(context, 'Custom manual question editor coming soon!');
+                if (_currentSectionId == null) {
+                  ToastHelper.showError(context, 'Please select a section first.');
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddNewQuestionPage(
+                      courseId: widget.courseId,
+                      courseTitle: widget.courseTitle,
+                      trainerName: widget.trainerName,
+                      trainerInitials: widget.trainerInitials,
+                      sections: widget.sections,
+                      sectionIndex: widget.sectionIndex,
+                      sectionId: _currentSectionId!,
+                      sectionTitle: _currentSectionTitle,
+                      onQuestionCreated: (newQuestionId) {
+                        setState(() {
+                          _selectedQuestionIds.add(newQuestionId);
+                        });
+                        _loadSectionQuestions(_currentPage, search: _searchQuery);
+                      },
+                    ),
+                  ),
+                );
               },
               icon: const Icon(Icons.add, size: 16),
               label: const Text(

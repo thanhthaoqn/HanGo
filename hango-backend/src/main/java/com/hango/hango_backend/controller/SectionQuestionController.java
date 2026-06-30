@@ -2,6 +2,8 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.SectionQuestionCountDTO;
 import com.hango.hango_backend.dto.QuizQuestionSelectionRequestDTO;
+import com.hango.hango_backend.dto.CreateQuestionRequestDTO;
+import com.hango.hango_backend.dto.CreateOptionDTO;
 import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.repository.SectionRepository;
 import lombok.RequiredArgsConstructor;
@@ -178,5 +180,79 @@ public class SectionQuestionController {
         }
 
         return ResponseEntity.ok("{\"message\": \"Questions saved to quiz successfully\"}");
+    }
+
+    @PostMapping("/questions")
+    @Transactional
+    public ResponseEntity<?> createQuestion(@RequestBody CreateQuestionRequestDTO request) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+        }
+
+        // Default category & difficulty if null
+        Long categoryId = request.getCategoryId() != null ? request.getCategoryId() : 1L;
+        Long difficultyId = request.getDifficultyId() != null ? request.getDifficultyId() : 14L;
+
+        Long questionId = null;
+        try {
+            org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
+            jdbcTemplate.update(connection -> {
+                java.sql.PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        java.sql.Statement.RETURN_GENERATED_KEYS
+                );
+                ps.setLong(1, currentUserId);
+                ps.setLong(2, categoryId);
+                ps.setString(3, request.getQuestionText());
+                ps.setString(4, request.getExplanation());
+                ps.setLong(5, difficultyId);
+                ps.setString(6, "APPROVED");
+                if (request.getSectionId() != null) {
+                    ps.setLong(7, request.getSectionId());
+                } else {
+                    ps.setNull(7, java.sql.Types.BIGINT);
+                }
+                return ps;
+            }, keyHolder);
+
+            Number key = keyHolder.getKey();
+            if (key != null) {
+                questionId = key.longValue();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+
+        if (questionId == null) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Failed to save question\"}");
+        }
+
+        // Insert options
+        List<CreateOptionDTO> options = request.getOptions();
+        if (options != null && !options.isEmpty()) {
+            for (CreateOptionDTO opt : options) {
+                jdbcTemplate.update(
+                        "INSERT INTO question_options (question_id, option_text, is_correct) VALUES (?, ?, ?)",
+                        questionId,
+                        opt.getOptionText(),
+                        opt.getIsCorrect() != null && opt.getIsCorrect() ? 1 : 0
+                );
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Question created successfully");
+        response.put("id", questionId);
+        return ResponseEntity.ok(response);
+    }
+
+    private Long getCurrentUserId() {
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
+            return ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+        }
+        return null;
     }
 }
