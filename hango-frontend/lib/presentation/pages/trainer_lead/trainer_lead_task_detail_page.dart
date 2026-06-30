@@ -166,7 +166,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
         'type': _selectedType,
         'assigneeId': _selectedAssignee,
         'reviewerId': _selectedReviewer,
-        'deadline': _reviewDeadline!.toIso8601String(),
+        'deadline': _reviewDeadline!.toIso8601String().split('.')[0],
         'status': _selectedStatus,
       });
       
@@ -235,8 +235,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                               border: Border.all(color: Colors.grey.shade200),
                             ),
                             padding: const EdgeInsets.all(16),
-                            child: SingleChildScrollView(
-                              child: Column(
+                            child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // Task Title
@@ -300,7 +299,6 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
 
                                   // Removed Status row
                                 ],
-                              ),
                             ),
                           ),
                         ),
