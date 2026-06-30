@@ -81,6 +81,47 @@ public class SectionQuestionControllerTest {
 
         ResponseEntity<?> response = sectionQuestionController.saveQuizQuestions(1L, request);
         Assertions.assertNotNull(response);
+    }
+
+    @Test
+    public void testCreateQuestionUnauthorized() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+
+        com.hango.hango_backend.dto.CreateQuestionRequestDTO request = com.hango.hango_backend.dto.CreateQuestionRequestDTO.builder()
+                .sectionId(1L)
+                .questionText("Sample Question")
+                .options(Arrays.asList(com.hango.hango_backend.dto.CreateOptionDTO.builder().optionText("Opt 1").isCorrect(true).build()))
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.createQuestion(request);
+        Assertions.assertEquals(401, response.getStatusCode().value());
+    }
+
+    @Test
+    public void testCreateQuestionSuccess() {
+        org.springframework.security.core.Authentication auth = Mockito.mock(org.springframework.security.core.Authentication.class);
+        com.hango.hango_backend.sercurity.UserDetailsImpl userDetails = Mockito.mock(com.hango.hango_backend.sercurity.UserDetailsImpl.class);
+        Mockito.when(userDetails.getId()).thenReturn(1L);
+        Mockito.when(auth.getPrincipal()).thenReturn(userDetails);
+        
+        org.springframework.security.core.context.SecurityContext securityContext = Mockito.mock(org.springframework.security.core.context.SecurityContext.class);
+        Mockito.when(securityContext.getAuthentication()).thenReturn(auth);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(securityContext);
+
+        Mockito.when(jdbcTemplate.update(Mockito.any(org.springframework.jdbc.core.PreparedStatementCreator.class), Mockito.any(org.springframework.jdbc.support.KeyHolder.class)))
+                .thenAnswer(invocation -> {
+                    org.springframework.jdbc.support.KeyHolder kh = invocation.getArgument(1);
+                    kh.getKeyList().add(java.util.Collections.singletonMap("id", 123L));
+                    return 1;
+                });
+
+        com.hango.hango_backend.dto.CreateQuestionRequestDTO request = com.hango.hango_backend.dto.CreateQuestionRequestDTO.builder()
+                .sectionId(1L)
+                .questionText("Sample Question")
+                .options(Arrays.asList(com.hango.hango_backend.dto.CreateOptionDTO.builder().optionText("Opt 1").isCorrect(true).build()))
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.createQuestion(request);
         Assertions.assertEquals(200, response.getStatusCode().value());
     }
 }
