@@ -1,5 +1,11 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
+import 'select_quiz_questions_page.dart';
+
 
 class CreateQuizPage extends StatefulWidget {
   final int courseId;
@@ -76,10 +82,81 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
       _localSections[widget.sectionIndex]['lessons'] = lessons;
     });
 
+    final _authService = AuthService();
+    
+    // 1. Notify parent (saves the course including this new quiz lesson to backend)
     await _notifyParent();
     if (!mounted) return;
-    ToastHelper.showSuccess(context, 'Quiz created successfully');
-    Navigator.pop(context);
+    
+    // 2. Fetch updated course details to discover the database ID assigned to our new quiz
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        ToastHelper.showError(context, 'Authentication required');
+        return;
+      }
+      
+      String baseUrl = 'http://localhost:8080/api/v1';
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        baseUrl = 'http://10.0.2.2:8080/api/v1';
+      }
+
+      final uri = Uri.parse('$baseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}');
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final updatedSections = data['sessions'] as List<dynamic>;
+        
+        // Find the quiz lesson in updatedSections by title
+        dynamic newQuizLesson;
+        for (var section in updatedSections) {
+          final lessons = section['lessons'] as List<dynamic>? ?? [];
+          for (var lesson in lessons) {
+            if (lesson['itemType'] == 'quiz' && lesson['title'] == title) {
+              newQuizLesson = lesson;
+              break;
+            }
+          }
+        }
+        
+        if (newQuizLesson != null) {
+          final newQuizId = newQuizLesson['id'] as int;
+          ToastHelper.showSuccess(context, 'Quiz created successfully');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SelectQuizQuestionsPage(
+                courseId: widget.courseId,
+                courseTitle: widget.courseTitle,
+                trainerName: widget.trainerName,
+                trainerInitials: widget.trainerInitials,
+                sections: updatedSections,
+                sectionIndex: widget.sectionIndex,
+                lessonId: newQuizId,
+                onSectionsChanged: widget.onSectionsChanged,
+              ),
+            ),
+          );
+        } else {
+          ToastHelper.showError(context, 'Failed to find created quiz database ID');
+          Navigator.pop(context);
+        }
+      } else {
+        ToastHelper.showError(context, 'Failed to sync quiz with server');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      debugPrint('Error syncing created quiz details: $e');
+      ToastHelper.showError(context, 'Sync error: $e');
+      Navigator.pop(context);
+    }
   }
 
   @override
