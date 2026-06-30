@@ -14,7 +14,7 @@ class AddNewQuestionPage extends StatefulWidget {
   final int sectionIndex;
   final int sectionId;
   final String sectionTitle;
-  final Function(int newQuestionId) onQuestionCreated;
+  final Function(List<int> newQuestionIds) onQuestionCreated;
 
   const AddNewQuestionPage({
     super.key,
@@ -180,7 +180,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
         final resData = jsonDecode(response.body);
         final newId = resData['id'] as int;
         ToastHelper.showSuccess(context, 'Question created successfully!');
-        widget.onQuestionCreated(newId);
+        widget.onQuestionCreated([newId]);
         Navigator.pop(context);
       } else {
         final errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to save question';
