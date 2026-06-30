@@ -588,7 +588,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Curriculum',
+                            'Syllabus',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -1245,7 +1245,6 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                 final opt = options[optIdx];
                                 final bool isCorrect = opt['isCorrect'] as bool;
                                 final textCtrl = opt['textController'] as TextEditingController;
-                                final String letter = String.fromCharCode(65 + optIdx); // A, B, C, D...
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 12),
@@ -1260,27 +1259,18 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                   ),
                                   child: Row(
                                     children: [
-                                      // Choice circular badge (A, B, C, D)
+                                      // Choice circular radio button
                                       InkWell(
                                         onTap: () => _handleOptionSelect(setIdx, optIdx),
                                         child: Container(
-                                          width: 24,
-                                          height: 24,
+                                          width: 20,
+                                          height: 20,
                                           decoration: BoxDecoration(
                                             color: isCorrect ? const Color(0xFF20B486) : Colors.white,
                                             shape: BoxShape.circle,
                                             border: Border.all(
                                               color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFCBD5E1),
-                                            ),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            letter,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: isCorrect ? Colors.white : const Color(0xFF64748B),
-                                              fontFamily: 'Outfit',
+                                              width: 1.5,
                                             ),
                                           ),
                                         ),
@@ -1299,11 +1289,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                         ),
                                       ),
                                       if (isCorrect) ...[
-                                        const Icon(Icons.check_circle, color: Color(0xFF20B486), size: 16),
+                                        const Icon(Icons.check_circle, color: Color(0xFF20B486), size: 18),
                                         const SizedBox(width: 8),
                                       ],
                                       IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
                                         onPressed: () => _removeOptionFromSet(setIdx, optIdx),
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(),
