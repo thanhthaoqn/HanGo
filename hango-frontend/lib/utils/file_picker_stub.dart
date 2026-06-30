@@ -7,3 +7,6 @@ Future<PickedFile?> pickImageFile() async {
 Future<PickedFile?> pickPdfFile() async {
   return null;
 }
+
+void setupDragDrop(Function(double clientX, double clientY, PickedFile file) onFileDropped) {}
+void cancelDragDrop() {}
