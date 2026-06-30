@@ -37,12 +37,10 @@ class TrainerLeadSidebar extends StatelessWidget {
           _buildMenuItem(context, 'Dashboard', Icons.dashboard, 'Dashboard'),
           _buildMenuItem(context, 'Courses', Icons.book, 'Courses'),
           _buildMenuItem(context, 'Task', Icons.task, 'Task'),
-          _buildMenuItem(context, 'Comment', Icons.comment, 'Comment'),
           
           const Spacer(),
           
           const Divider(height: 1),
-          _buildMenuItem(context, 'Help Center', Icons.help_outline, 'Help Center'),
           _buildMenuItem(context, 'Logout', Icons.logout, 'Logout'),
           const SizedBox(height: 20),
         ],

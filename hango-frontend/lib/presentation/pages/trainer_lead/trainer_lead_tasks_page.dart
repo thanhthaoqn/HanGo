@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/trainer_lead_repository.dart';
 import '../../../domain/model/trainer_lead_task_model.dart';
+import '../../../utils/toast_helper.dart';
 import 'widgets/trainer_lead_sidebar.dart';
 import 'widgets/trainer_lead_header.dart';
 import 'trainer_lead_assign_task_page.dart';
+import 'trainer_lead_task_detail_page.dart';
 
 class TrainerLeadTasksPage extends StatefulWidget {
   const TrainerLeadTasksPage({super.key});
@@ -445,15 +447,23 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
           Expanded(flex: 2, child: Text(task.assigneeName ?? 'N/A', style: const TextStyle(fontSize: 13, color: Colors.black54))),
           Expanded(flex: 2, child: Text(task.reviewerName ?? 'N/A', style: const TextStyle(fontSize: 13, color: Colors.black54))),
           Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _buildTypeBadge(task.type ?? 'Unknown'))),
-          Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _buildStatusBadge(task.status ?? 'Unknown'))),
+          Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _buildStatusBadge(task.status ?? 'Unknown', task.id))),
           Expanded(
             flex: 1,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                InkWell(child: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2ec4b6)), onTap: () {}),
-                const SizedBox(width: 12),
-                InkWell(child: const Icon(Icons.delete_outline, size: 16, color: Colors.red), onTap: () {}),
+                InkWell(
+                  child: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2ec4b6)),
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TrainerLeadTaskDetailPage(taskId: task.id),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -480,27 +490,51 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String status, int taskId) {
+    final List<String> statuses = ['ASSIGNED', 'IN_PROGRESS', 'PENDING', 'SUBMITTED', 'REJECTED', 'COMPLETED'];
+    if (!statuses.contains(status)) {
+      statuses.add(status);
+    }
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.grey.shade200,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            status,
-            style: TextStyle(
-              color: Colors.grey.shade800,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: status,
+          isDense: true,
+          icon: Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.grey.shade700),
+          style: TextStyle(
+            color: Colors.grey.shade800,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(width: 4),
-          Icon(Icons.keyboard_arrow_down, size: 12, color: Colors.grey.shade700),
-        ],
+          onChanged: (String? newValue) async {
+            if (newValue != null && newValue != status) {
+              try {
+                await _repository.updateTaskStatus(taskId, newValue);
+                _fetchTasks();
+                if (mounted) {
+                  ToastHelper.showSuccess(context, 'Status updated successfully');
+                }
+              } catch (e) {
+                if (mounted) {
+                  ToastHelper.showError(context, 'Failed to update status: $e');
+                }
+              }
+            }
+          },
+          items: statuses.map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

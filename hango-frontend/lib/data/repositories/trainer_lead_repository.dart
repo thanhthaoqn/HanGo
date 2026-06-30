@@ -143,5 +143,75 @@ class TrainerLeadRepository {
       throw Exception('Error creating task: $e');
     }
   }
+
+  Future<Map<String, dynamic>> getTaskDetail(int id) async {
+    try {
+      final uri = Uri.parse('$baseUrl/trainer-lead/tasks/$id');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        return data;
+      } else {
+        throw Exception('Failed to load task details: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching task details: $e');
+    }
+  }
+
+  Future<void> updateTask(int id, Map<String, dynamic> data) async {
+    try {
+      final uri = Uri.parse('$baseUrl/trainer-lead/tasks/$id');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: json.encode(data),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update task: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating task: $e');
+    }
+  }
+
+  Future<void> updateTaskStatus(int id, String status) async {
+    try {
+      final uri = Uri.parse('$baseUrl/trainer-lead/tasks/$id/status');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'status': status}),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update task status: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error updating task status: $e');
+    }
+  }
 }
 

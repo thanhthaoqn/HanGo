@@ -10,8 +10,11 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 
+import java.util.Optional;
+
 @Repository
 public interface CreatorTaskRepository extends JpaRepository<CreatorTask, Long> {
+    Optional<CreatorTask> findByTaskId(Long taskId);
 
     @Query("SELECT ct FROM CreatorTask ct " +
            "JOIN FETCH ct.task t " +
