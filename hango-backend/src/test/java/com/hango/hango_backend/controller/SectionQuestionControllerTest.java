@@ -124,4 +124,39 @@ public class SectionQuestionControllerTest {
         ResponseEntity<?> response = sectionQuestionController.createQuestion(request);
         Assertions.assertEquals(200, response.getStatusCode().value());
     }
+
+    @Test
+    public void testCreateGroupQuestionSuccess() {
+        org.springframework.security.core.Authentication auth = Mockito.mock(org.springframework.security.core.Authentication.class);
+        com.hango.hango_backend.sercurity.UserDetailsImpl userDetails = Mockito.mock(com.hango.hango_backend.sercurity.UserDetailsImpl.class);
+        Mockito.when(userDetails.getId()).thenReturn(1L);
+        Mockito.when(auth.getPrincipal()).thenReturn(userDetails);
+        
+        org.springframework.security.core.context.SecurityContext securityContext = Mockito.mock(org.springframework.security.core.context.SecurityContext.class);
+        Mockito.when(securityContext.getAuthentication()).thenReturn(auth);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(securityContext);
+
+        Mockito.when(jdbcTemplate.update(Mockito.any(org.springframework.jdbc.core.PreparedStatementCreator.class), Mockito.any(org.springframework.jdbc.support.KeyHolder.class)))
+                .thenAnswer(invocation -> {
+                    org.springframework.jdbc.support.KeyHolder kh = invocation.getArgument(1);
+                    kh.getKeyList().add(java.util.Collections.singletonMap("id", 123L));
+                    return 1;
+                });
+
+        com.hango.hango_backend.dto.CreateSubQuestionDTO subQ = com.hango.hango_backend.dto.CreateSubQuestionDTO.builder()
+                .questionText("Sub Q1")
+                .explanation("Exp")
+                .options(Arrays.asList(com.hango.hango_backend.dto.CreateOptionDTO.builder().optionText("A").isCorrect(true).build()))
+                .build();
+
+        com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO request = com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO.builder()
+                .sectionId(1L)
+                .passageText("Sample Passage")
+                .subQuestions(Arrays.asList(subQ))
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.createGroupQuestion(request);
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(200, response.getStatusCode().value());
+    }
 }
