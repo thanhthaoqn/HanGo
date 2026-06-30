@@ -173,4 +173,37 @@ public class TaskManagementService {
         creatorTask.setStatus(status);
         creatorTaskRepository.save(creatorTask);
     }
+
+    public Page<com.hango.hango_backend.dto.TrainerTaskDto> getTasksForTrainer(
+            Long trainerId, LocalDateTime fromDate, LocalDateTime toDate, String type, String search, int page, int size
+    ) {
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by("task.dueDate").ascending());
+        Page<CreatorTask> tasks = creatorTaskRepository.findTasksForTrainer(trainerId, fromDate, toDate, type, search, pageable);
+
+        return tasks.map(ct -> com.hango.hango_backend.dto.TrainerTaskDto.builder()
+                .id(ct.getId())
+                .taskId(ct.getTask().getId())
+                .taskContent(ct.getTask().getTitle())
+                .deadline(ct.getTask().getDueDate())
+                .type(ct.getTask().getType())
+                .status(ct.getStatus())
+                .build());
+    }
+
+    public void acceptTaskByTrainer(Long creatorTaskId, Long trainerId) {
+        CreatorTask creatorTask = creatorTaskRepository.findById(creatorTaskId)
+                .orElseThrow(() -> new RuntimeException("Creator task not found"));
+
+        if (!creatorTask.getCreator().getId().equals(trainerId)) {
+            throw new RuntimeException("Unauthorized to accept this task");
+        }
+
+        if ("ASSIGNED".equals(creatorTask.getStatus())) {
+            creatorTask.setStatus("IN_PROGRESS");
+            creatorTaskRepository.save(creatorTask);
+            // logActivity(creatorTask.getTask().getId(), trainerId, "IN_PROGRESS", "Task accepted by trainer."); // Will be added when merged with lead-task-manage
+        } else {
+            throw new RuntimeException("Task cannot be accepted from status: " + creatorTask.getStatus());
+        }
+    }
 }
