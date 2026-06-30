@@ -159,4 +159,28 @@ public class SectionQuestionControllerTest {
         Assertions.assertNotNull(response);
         Assertions.assertEquals(200, response.getStatusCode().value());
     }
+
+    @Test
+    public void testGetLessonQuestions() {
+        Mockito.when(jdbcTemplate.queryForObject(Mockito.anyString(), Mockito.eq(Integer.class), Mockito.any(Object[].class)))
+                .thenReturn(10);
+
+        List<Map<String, Object>> mockQuestions = new ArrayList<>();
+        Map<String, Object> qMap = new java.util.HashMap<>();
+        qMap.put("id", 1L);
+        qMap.put("question_text", "Q1");
+        qMap.put("explanation", "Exp1");
+        qMap.put("category_name", "Single Choice");
+        qMap.put("difficulty_name", "EASY");
+        mockQuestions.add(qMap);
+
+        Mockito.when(jdbcTemplate.query(Mockito.anyString(), Mockito.any(org.springframework.jdbc.core.RowMapper.class), Mockito.any(Object[].class)))
+                .thenReturn(mockQuestions);
+
+        ResponseEntity<Map<String, Object>> response = sectionQuestionController.getLessonQuestions(1L, 0, 10);
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(200, response.getStatusCode().value());
+        Assertions.assertNotNull(response.getBody());
+        Assertions.assertEquals(10, response.getBody().get("totalElements"));
+    }
 }
