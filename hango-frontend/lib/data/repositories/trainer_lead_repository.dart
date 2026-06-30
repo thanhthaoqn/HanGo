@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/model/trainer_lead_dashboard_stats_model.dart';
+import 'package:hango/domain/model/task_activity_model.dart';
 
 class TrainerLeadRepository {
   final String baseUrl = 'http://localhost:8080/api/v1';
@@ -211,6 +212,31 @@ class TrainerLeadRepository {
       }
     } catch (e) {
       throw Exception('Error updating task status: $e');
+    }
+  }
+
+  Future<List<TaskActivityModel>> getTaskActivities(int id) async {
+    try {
+      final uri = Uri.parse('$baseUrl/trainer-lead/tasks/$id/activities');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => TaskActivityModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load task activities');
+      }
+    } catch (e) {
+      throw Exception('Error fetching task activities: $e');
     }
   }
 }
