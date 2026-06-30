@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
-import 'add_multiple_choice_question_page.dart';
+import 'add_new_question_page.dart';
 
-class AddNewQuestionPage extends StatefulWidget {
+class AddMultipleChoiceQuestionPage extends StatefulWidget {
   final int courseId;
   final String courseTitle;
   final String trainerName;
@@ -16,7 +16,7 @@ class AddNewQuestionPage extends StatefulWidget {
   final String sectionTitle;
   final Function(int newQuestionId) onQuestionCreated;
 
-  const AddNewQuestionPage({
+  const AddMultipleChoiceQuestionPage({
     super.key,
     required this.courseId,
     required this.courseTitle,
@@ -30,77 +30,154 @@ class AddNewQuestionPage extends StatefulWidget {
   });
 
   @override
-  State<AddNewQuestionPage> createState() => _AddNewQuestionPageState();
+  State<AddMultipleChoiceQuestionPage> createState() => _AddMultipleChoiceQuestionPageState();
 }
 
-class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
+class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestionPage> {
   final AuthService _authService = AuthService();
 
   // Text inputs
-  final TextEditingController _questionController = TextEditingController();
+  final TextEditingController _passageController = TextEditingController(
+    text: ""
+  );
   final TextEditingController _hintController = TextEditingController();
 
-  // Question details
-  String _questionType = 'SINGLE'; // 'SINGLE' or 'MULTIPLE'
   String? _pdfName;
   String? _pdfSize;
 
-  // Options list state
-  final List<Map<String, dynamic>> _options = [];
+  // Answer sets for sub-questions
+  final List<Map<String, dynamic>> _answerSets = [];
 
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with 2 options
-    _addOption(text: '', isCorrect: true);
-    _addOption(text: '', isCorrect: false);
+    // Initialize with 2 empty answer sets matching mockup
+    _addAnswerSet(
+      questionText: 'Question 1',
+      optionsData: [
+        {'text': '', 'isCorrect': false},
+        {'text': '', 'isCorrect': false},
+        {'text': '', 'isCorrect': false},
+        {'text': '', 'isCorrect': true},
+      ],
+      explanation: '',
+      isExpanded: true,
+    );
+
+    _addAnswerSet(
+      questionText: 'Question 2',
+      optionsData: [
+        {'text': '', 'isCorrect': true},
+        {'text': '', 'isCorrect': false},
+        {'text': '', 'isCorrect': false},
+        {'text': '', 'isCorrect': false},
+      ],
+      explanation: '',
+      isExpanded: true,
+    );
   }
 
-  void _addOption({String text = '', bool isCorrect = false}) {
-    final textCtrl = TextEditingController(text: text);
-    final expCtrl = TextEditingController();
+  void _addAnswerSet({
+    required String questionText,
+    required List<Map<String, dynamic>> optionsData,
+    String explanation = '',
+    bool isExpanded = false,
+  }) {
+    final expCtrl = TextEditingController(text: explanation);
+    final List<Map<String, dynamic>> options = [];
+
+    for (var opt in optionsData) {
+      options.add({
+        'textController': TextEditingController(text: opt['text']),
+        'isCorrect': opt['isCorrect'],
+      });
+    }
+
     setState(() {
-      _options.add({
-        'textController': textCtrl,
-        'isCorrect': isCorrect,
+      _answerSets.add({
+        'questionText': questionText,
+        'isExpanded': isExpanded,
         'explanationController': expCtrl,
+        'options': options,
       });
     });
   }
 
-  void _removeOption(int index) {
-    if (_options.length <= 1) {
-      ToastHelper.showError(context, 'Questions must have at least one option.');
-      return;
-    }
+  void _addNewAnswerSetClick() {
+    int nextNum = _answerSets.length + 1;
+    _addAnswerSet(
+      questionText: 'Question $nextNum',
+      optionsData: [
+        {'text': '', 'isCorrect': true},
+        {'text': '', 'isCorrect': false},
+        {'text': '', 'isCorrect': false},
+        {'text': '', 'isCorrect': false},
+      ],
+      explanation: '',
+      isExpanded: true,
+    );
+    // Collapse others
     setState(() {
-      _options[index]['textController'].dispose();
-      _options[index]['explanationController'].dispose();
-      _options.removeAt(index);
+      for (int i = 0; i < _answerSets.length - 1; i++) {
+        _answerSets[i]['isExpanded'] = false;
+      }
     });
   }
 
-  void _handleOptionSelect(int index) {
+  void _removeAnswerSet(int index) {
     setState(() {
-      if (_questionType == 'SINGLE') {
-        // Deselect all others
-        for (int i = 0; i < _options.length; i++) {
-          _options[i]['isCorrect'] = (i == index);
-        }
-      } else {
-        // Toggle checkbox
-        _options[index]['isCorrect'] = !_options[index]['isCorrect'];
+      final set = _answerSets[index];
+      set['explanationController'].dispose();
+      final options = set['options'] as List<Map<String, dynamic>>;
+      for (var opt in options) {
+        opt['textController'].dispose();
+      }
+      _answerSets.removeAt(index);
+      // Normalize titles
+      for (int i = 0; i < _answerSets.length; i++) {
+        _answerSets[i]['questionText'] = 'Question ${i + 1}';
+      }
+    });
+  }
+
+  void _addOptionToSet(int setIndex) {
+    setState(() {
+      final options = _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
+      options.add({
+        'textController': TextEditingController(),
+        'isCorrect': false,
+      });
+    });
+  }
+
+  void _removeOptionFromSet(int setIndex, int optionIndex) {
+    final options = _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
+    if (options.length <= 1) {
+      ToastHelper.showError(context, 'Each question set must have at least one option.');
+      return;
+    }
+    setState(() {
+      options[optionIndex]['textController'].dispose();
+      options.removeAt(optionIndex);
+    });
+  }
+
+  void _handleOptionSelect(int setIndex, int optionIndex) {
+    setState(() {
+      final options = _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
+      // Single choice per sub-question set
+      for (int i = 0; i < options.length; i++) {
+        options[i]['isCorrect'] = (i == optionIndex);
       }
     });
   }
 
   Future<void> _handlePdfUpload() async {
-    // Simulated upload for premium UX
     setState(() {
-      _pdfName = 'Grammar_Rules_Reference.pdf';
-      _pdfSize = '4.2 MB';
+      _pdfName = 'Vietnam_Art_Exhibition_Doc.pdf';
+      _pdfSize = '5.8 MB';
     });
     ToastHelper.showSuccess(context, 'PDF document uploaded successfully.');
   }
@@ -112,35 +189,53 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     });
   }
 
-  Future<void> _saveQuestion() async {
-    final questionText = _questionController.text.trim();
-    if (questionText.isEmpty) {
-      ToastHelper.showError(context, 'Please enter the question text.');
+  Future<void> _saveGroupQuestion() async {
+    final passageText = _passageController.text.trim();
+    if (passageText.isEmpty) {
+      ToastHelper.showError(context, 'Please enter the passage text.');
       return;
     }
 
-    // Verify option text fields
-    List<Map<String, dynamic>> payloadOptions = [];
-    bool hasCorrectAnswer = false;
-    for (int i = 0; i < _options.length; i++) {
-      final text = _options[i]['textController'].text.trim();
-      if (text.isEmpty) {
-        ToastHelper.showError(context, 'Please fill in all option texts.');
+    if (_answerSets.isEmpty) {
+      ToastHelper.showError(context, 'Please add at least one answer set.');
+      return;
+    }
+
+    List<Map<String, dynamic>> payloadSubQuestions = [];
+    for (int i = 0; i < _answerSets.length; i++) {
+      final set = _answerSets[i];
+      final label = set['questionText'] as String;
+      final exp = set['explanationController'].text.trim();
+      final options = set['options'] as List<Map<String, dynamic>>;
+
+      List<Map<String, dynamic>> payloadOptions = [];
+      bool hasCorrectAnswer = false;
+      for (int j = 0; j < options.length; j++) {
+        final text = options[j]['textController'].text.trim();
+        if (text.isEmpty) {
+          ToastHelper.showError(context, 'Please fill in all option texts for $label.');
+          return;
+        }
+        final bool isCorrect = options[j]['isCorrect'] as bool;
+        if (isCorrect) {
+          hasCorrectAnswer = true;
+        }
+        payloadOptions.add({
+          'optionText': text,
+          'isCorrect': isCorrect,
+        });
+      }
+
+      if (!hasCorrectAnswer) {
+        ToastHelper.showError(context, 'Please select a correct answer for $label.');
         return;
       }
-      final bool isCorrect = _options[i]['isCorrect'] as bool;
-      if (isCorrect) {
-        hasCorrectAnswer = true;
-      }
-      payloadOptions.add({
-        'optionText': text,
-        'isCorrect': isCorrect,
-      });
-    }
 
-    if (!hasCorrectAnswer) {
-      ToastHelper.showError(context, 'Please select at least one correct answer.');
-      return;
+      payloadSubQuestions.add({
+        'questionText': label,
+        'explanation': exp,
+        'options': payloadOptions,
+      });
     }
 
     setState(() {
@@ -157,18 +252,17 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
         return;
       }
 
-      // We determine category dynamically, fallback to 1 (Grammar & Vocabulary)
       final body = {
         'sectionId': widget.sectionId,
-        'questionText': questionText,
+        'passageText': passageText,
         'explanation': _hintController.text.trim(),
         'categoryId': 1,
-        'difficultyId': 14, // Easy by default
-        'options': payloadOptions,
+        'difficultyId': 14,
+        'subQuestions': payloadSubQuestions,
       };
 
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/v1/trainer/questions'),
+        Uri.parse('http://localhost:8080/api/v1/trainer/questions/group'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -178,16 +272,16 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
 
       if (response.statusCode == 200) {
         final resData = jsonDecode(response.body);
-        final newId = resData['id'] as int;
-        ToastHelper.showSuccess(context, 'Question created successfully!');
-        widget.onQuestionCreated(newId);
+        final parentId = resData['id'] as int;
+        ToastHelper.showSuccess(context, 'Group question created successfully!');
+        widget.onQuestionCreated(parentId);
         Navigator.pop(context);
       } else {
-        final errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to save question';
+        final errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to save group question';
         ToastHelper.showError(context, errorMsg);
       }
     } catch (e) {
-      debugPrint('Error saving question: $e');
+      debugPrint('Error saving group question: $e');
       ToastHelper.showError(context, 'Connection error. Please try again.');
     } finally {
       setState(() {
@@ -198,11 +292,14 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
 
   @override
   void dispose() {
-    _questionController.dispose();
+    _passageController.dispose();
     _hintController.dispose();
-    for (var opt in _options) {
-      opt['textController'].dispose();
-      opt['explanationController'].dispose();
+    for (var set in _answerSets) {
+      set['explanationController'].dispose();
+      final options = set['options'] as List<Map<String, dynamic>>;
+      for (var opt in options) {
+        opt['textController'].dispose();
+      }
     }
     super.dispose();
   }
@@ -213,7 +310,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
       backgroundColor: const Color(0xFFF8FAFC),
       body: Column(
         children: [
-          // Header Row matching select_quiz_questions_page and create_lesson_page
+          // Top Header Row
           _buildHeader(context),
           // Main Body
           Expanded(
@@ -391,7 +488,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // Step 1: Introduction
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -445,7 +541,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             ),
           ),
           const SizedBox(height: 12),
-          // Step 2: Syllabus
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -493,7 +588,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Syllabus',
+                            'Curriculum',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -519,7 +614,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             ),
           ),
           const Spacer(),
-          // Progress Overview Box
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -584,7 +678,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Navigation header with save draft
         Row(
           children: [
             IconButton(
@@ -639,11 +732,10 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           ],
         ),
         const SizedBox(height: 24),
-        // Layout columns
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left Column: Inputs & PDF Upload
+            // Left Column: Passage Text & PDF
             Expanded(
               flex: 3,
               child: Container(
@@ -656,7 +748,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Question text field with formatting bar
                     const Text(
                       'Question *',
                       style: TextStyle(
@@ -674,7 +765,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                       ),
                       child: Column(
                         children: [
-                          // Format bar
                           Container(
                             color: const Color(0xFFF8FAFC),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -690,23 +780,21 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                             ),
                           ),
                           const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                          // Field
                           TextField(
-                            controller: _questionController,
-                            maxLines: 5,
+                            controller: _passageController,
+                            maxLines: 12,
                             decoration: const InputDecoration(
-                              hintText: 'Enter your question here...',
+                              hintText: 'Enter your passage here...',
                               hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontFamily: 'Outfit'),
                               contentPadding: EdgeInsets.all(12),
                               border: InputBorder.none,
                             ),
-                            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), height: 1.5, fontFamily: 'Outfit'),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // PDF Attachment
                     const Text(
                       'PDF Attachment (Optional)',
                       style: TextStyle(
@@ -759,7 +847,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                             ),
                           ),
                     const SizedBox(height: 24),
-                    // Description / Hint
                     const Text(
                       'Description / Hint (Optional)',
                       style: TextStyle(
@@ -797,24 +884,21 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
               ),
             ),
             const SizedBox(width: 24),
-            // Right Column: Type selection & options list
+            // Right Column: Question Type & Answer Details dropdowns
             Expanded(
               flex: 2,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Question Type Selection
                   _buildQuestionTypeSelector(),
                   const SizedBox(height: 24),
-                  // Answers Options list
-                  _buildAnswersPanel(),
+                  _buildAnswerDetailsPanel(),
                 ],
               ),
             ),
           ],
         ),
         const SizedBox(height: 32),
-        // Action Buttons Row
         const Divider(height: 1, color: Color(0xFFEFF2F5)),
         const SizedBox(height: 16),
         Row(
@@ -839,7 +923,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             ),
             const SizedBox(width: 12),
             ElevatedButton(
-              onPressed: _isSaving ? null : _saveQuestion,
+              onPressed: _isSaving ? null : _saveGroupQuestion,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF20B486),
                 foregroundColor: Colors.white,
@@ -976,14 +1060,42 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           const SizedBox(height: 12),
           Row(
             children: [
-              // Multiple Choice
+              // Multiple Choice (active)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF20B486),
+                    border: Border.all(color: const Color(0xFF20B486)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_box_outlined, size: 16, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        'Multiple Choice',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Single Choice (goes back to AddNewQuestionPage)
               Expanded(
                 child: InkWell(
                   onTap: () {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AddMultipleChoiceQuestionPage(
+                        builder: (context) => AddNewQuestionPage(
                           courseId: widget.courseId,
                           courseTitle: widget.courseTitle,
                           trainerName: widget.trainerName,
@@ -1001,78 +1113,21 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: _questionType == 'MULTIPLE' ? const Color(0xFF20B486) : Colors.white,
-                      border: Border.all(
-                        color: _questionType == 'MULTIPLE' ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
-                      ),
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.check_box_outlined,
-                          size: 16,
-                          color: _questionType == 'MULTIPLE' ? Colors.white : const Color(0xFF64748B),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Multiple Choice',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _questionType == 'MULTIPLE' ? Colors.white : const Color(0xFF64748B),
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Single Choice
-              Expanded(
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _questionType = 'SINGLE';
-                      // Clear extra correct options to keep single selection
-                      int firstCorrectIdx = _options.indexWhere((opt) => opt['isCorrect'] == true);
-                      if (firstCorrectIdx == -1 && _options.isNotEmpty) {
-                        _options[0]['isCorrect'] = true;
-                      } else {
-                        for (int i = 0; i < _options.length; i++) {
-                          _options[i]['isCorrect'] = (i == firstCorrectIdx);
-                        }
-                      }
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _questionType == 'SINGLE' ? const Color(0xFF20B486) : Colors.white,
-                      border: Border.all(
-                        color: _questionType == 'SINGLE' ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.edit_square,
-                          size: 16,
-                          color: _questionType == 'SINGLE' ? Colors.white : const Color(0xFF64748B),
-                        ),
-                        const SizedBox(width: 6),
+                        Icon(Icons.edit_square, size: 16, color: Color(0xFF64748B)),
+                        SizedBox(width: 6),
                         Text(
                           'Single Choice',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: _questionType == 'SINGLE' ? Colors.white : const Color(0xFF64748B),
+                            color: Color(0xFF64748B),
                             fontFamily: 'Outfit',
                           ),
                         ),
@@ -1088,7 +1143,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     );
   }
 
-  Widget _buildAnswersPanel() {
+  Widget _buildAnswerDetailsPanel() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1100,143 +1155,233 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'ANSWERS *',
+            'ANSWER DETAILS',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF20B486),
+              color: Color(0xFF475569),
               letterSpacing: 0.5,
               fontFamily: 'Outfit',
             ),
           ),
           const SizedBox(height: 16),
-          // List builder
+          // Sub-questions sets
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _options.length,
-            itemBuilder: (context, index) {
-              final opt = _options[index];
-              final bool isCorrect = opt['isCorrect'] as bool;
-              final TextEditingController textCtrl = opt['textController'] as TextEditingController;
-              final TextEditingController expCtrl = opt['explanationController'] as TextEditingController;
+            itemCount: _answerSets.length,
+            itemBuilder: (context, setIdx) {
+              final set = _answerSets[setIdx];
+              final bool isExpanded = set['isExpanded'] as bool;
+              final String title = set['questionText'] as String;
+              final options = set['options'] as List<Map<String, dynamic>>;
+              final TextEditingController expCtrl = set['explanationController'] as TextEditingController;
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
-                    width: isCorrect ? 1.5 : 1,
+                    color: isExpanded ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
+                    width: isExpanded ? 1.5 : 1,
                   ),
                 ),
                 child: Column(
                   children: [
-                    Row(
-                      children: [
-                        // Radio / Checkbox indicator
-                        InkWell(
-                          onTap: () => _handleOptionSelect(index),
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFCBD5E1),
-                                width: 1.5,
+                    // Expand/Collapse Header Row
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _answerSets[setIdx]['isExpanded'] = !isExpanded;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: isExpanded ? const Color(0xFF20B486) : const Color(0xFF1E293B),
+                                fontFamily: 'Outfit',
                               ),
                             ),
-                            child: isCorrect
-                                ? Center(
-                                    child: Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF20B486),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  )
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Option input field
-                        Expanded(
-                          child: TextField(
-                            controller: textCtrl,
-                            decoration: const InputDecoration(
-                              hintText: 'Enter option text...',
-                              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontFamily: 'Outfit'),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
+                            const Spacer(),
+                            if (_answerSets.length > 1) ...[
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                                onPressed: () => _removeAnswerSet(setIdx),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Icon(
+                              isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                              color: const Color(0xFF64748B),
+                              size: 18,
                             ),
-                            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
-                          ),
-                        ),
-                        // Actions
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Color(0xFF64748B), size: 16),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () {},
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => _removeOption(index),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Explanation field
-                    TextField(
-                      controller: expCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Explanation (Optional): Explain why this answer is correct or incorrect...',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontFamily: 'Outfit'),
-                        fillColor: const Color(0xFFF8FAFC),
-                        filled: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: const BorderSide(color: Color(0xFF20B486), width: 1),
+                          ],
                         ),
                       ),
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontFamily: 'Outfit'),
                     ),
+                    if (isExpanded) ...[
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Options builder for this question set
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: options.length,
+                              itemBuilder: (context, optIdx) {
+                                final opt = options[optIdx];
+                                final bool isCorrect = opt['isCorrect'] as bool;
+                                final textCtrl = opt['textController'] as TextEditingController;
+                                final String letter = String.fromCharCode(65 + optIdx); // A, B, C, D...
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isCorrect ? const Color(0xFFE2F9F3) : Colors.white,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
+                                      width: isCorrect ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // Choice circular badge (A, B, C, D)
+                                      InkWell(
+                                        onTap: () => _handleOptionSelect(setIdx, optIdx),
+                                        child: Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: isCorrect ? const Color(0xFF20B486) : Colors.white,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFCBD5E1),
+                                            ),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            letter,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: isCorrect ? Colors.white : const Color(0xFF64748B),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: textCtrl,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Enter option text...',
+                                            hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontFamily: 'Outfit'),
+                                            border: InputBorder.none,
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                          style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+                                        ),
+                                      ),
+                                      if (isCorrect) ...[
+                                        const Icon(Icons.check_circle, color: Color(0xFF20B486), size: 16),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                                        onPressed: () => _removeOptionFromSet(setIdx, optIdx),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            // Add option to set button
+                            TextButton.icon(
+                              onPressed: () => _addOptionToSet(setIdx),
+                              icon: const Icon(Icons.add, size: 14, color: Color(0xFF20B486)),
+                              label: const Text(
+                                'Add Option',
+                                style: TextStyle(color: Color(0xFF20B486), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            // Explanation
+                            const Text(
+                              'EXPLANATION',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF64748B),
+                                letterSpacing: 0.5,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: expCtrl,
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                hintText: 'Explain why this correct answer is selected...',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontFamily: 'Outfit'),
+                                fillColor: const Color(0xFFF8FAFC),
+                                filled: true,
+                                contentPadding: const EdgeInsets.all(10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: const BorderSide(color: Color(0xFF20B486), width: 1),
+                                ),
+                              ),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.4, fontFamily: 'Outfit'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
             },
           ),
-          const SizedBox(height: 8),
-          // Add Answer button
+          const SizedBox(height: 12),
+          // Add Answer Set Button
           OutlinedButton.icon(
-            onPressed: () => _addOption(text: '', isCorrect: false),
+            onPressed: _addNewAnswerSetClick,
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFF20B486)),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
-            icon: const Icon(Icons.add, size: 14, color: Color(0xFF20B486)),
+            icon: const Icon(Icons.add, size: 14, color: Color(0xFF475569)),
             label: const Text(
-              'Add Answer',
+              'Add Answer Set',
               style: TextStyle(
-                color: Color(0xFF20B486),
+                color: Color(0xFF475569),
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
                 fontFamily: 'Outfit',
