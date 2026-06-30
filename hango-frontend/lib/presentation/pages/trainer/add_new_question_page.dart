@@ -737,7 +737,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                       child: Column(
                         children: [
                           // Format bar
-                          Container(
+                           Container(
                             color: const Color(0xFFF8FAFC),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             child: Row(
@@ -748,6 +748,9 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                                 const SizedBox(width: 12),
                                 _buildFormatIconButton(Icons.link),
                                 _buildFormatButton('Σ'),
+                                const SizedBox(width: 12),
+                                _buildFormatIconButton(Icons.chat_bubble_outline),
+                                _buildFormatIconButton(Icons.format_clear),
                               ],
                             ),
                           ),
@@ -931,11 +934,66 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     );
   }
 
+  void _addMarkdownTag(String tagOpen, String tagClose) {
+    final text = _questionController.text;
+    final selection = _questionController.selection;
+    if (selection.start >= 0 && selection.end >= 0) {
+      final selectedText = text.substring(selection.start, selection.end);
+      final newText = text.replaceRange(selection.start, selection.end, '$tagOpen$selectedText$tagClose');
+      _questionController.text = newText;
+      _questionController.selection = TextSelection.collapsed(
+        offset: selection.start + tagOpen.length + selectedText.length,
+      );
+    } else {
+      _questionController.text = '$text$tagOpen$tagClose';
+    }
+  }
+
+  void _clearMarkdownFormatting() {
+    final text = _questionController.text;
+    final selection = _questionController.selection;
+    if (selection.start >= 0 && selection.end >= 0) {
+      final selectedText = text.substring(selection.start, selection.end);
+      var cleared = selectedText
+          .replaceAll('**', '')
+          .replaceAll('*', '')
+          .replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1');
+      
+      final newText = text.replaceRange(selection.start, selection.end, cleared);
+      _questionController.text = newText;
+      _questionController.selection = TextSelection.collapsed(
+        offset: selection.start + cleared.length,
+      );
+    }
+  }
+
+  void _handleFormatAction(String tag) {
+    if (tag == 'B') {
+      _addMarkdownTag('**', '**');
+    } else if (tag == 'I') {
+      _addMarkdownTag('*', '*');
+    } else if (tag == '1.') {
+      _addMarkdownTag('1. ', '');
+    } else if (tag == 'Σ') {
+      _addMarkdownTag('[.....]', '');
+    }
+  }
+
+  void _handleFormatIconAction(IconData icon) {
+    if (icon == Icons.link) {
+      _addMarkdownTag('[', '](url)');
+    } else if (icon == Icons.chat_bubble_outline) {
+      _addMarkdownTag('Speaker A: ', '\nSpeaker B: ');
+    } else if (icon == Icons.format_clear) {
+      _clearMarkdownFormatting();
+    }
+  }
+
   Widget _buildFormatButton(String text) {
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: InkWell(
-        onTap: () {},
+        onTap: () => _handleFormatAction(text),
         borderRadius: BorderRadius.circular(4),
         child: Padding(
           padding: const EdgeInsets.all(4.0),
@@ -957,7 +1015,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: InkWell(
-        onTap: () {},
+        onTap: () => _handleFormatIconAction(icon),
         borderRadius: BorderRadius.circular(4),
         child: Padding(
           padding: const EdgeInsets.all(4.0),

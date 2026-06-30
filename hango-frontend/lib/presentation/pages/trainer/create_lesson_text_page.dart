@@ -927,9 +927,37 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                       ),
                       const SizedBox(width: 16),
                       IconButton(
+                        icon: const Text('[..]', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit')),
+                        onPressed: () => _addMarkdownTag('[.....]', ''),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: const Icon(Icons.chat_bubble_outline, size: 18, color: Color(0xFF475569)),
+                        onPressed: () => _addMarkdownTag('Speaker A: ', '\nSpeaker B: '),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
                         icon: const Icon(Icons.format_clear, size: 18, color: Color(0xFF475569)),
                         onPressed: () {
-                          // Clear formats/remove selected markdown helper
+                          final text = _questionController.text;
+                          final selection = _questionController.selection;
+                          if (selection.start >= 0 && selection.end >= 0) {
+                            final selectedText = text.substring(selection.start, selection.end);
+                            var cleared = selectedText
+                                .replaceAll('**', '')
+                                .replaceAll('*', '')
+                                .replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1');
+                            
+                            final newText = text.replaceRange(selection.start, selection.end, cleared);
+                            _questionController.text = newText;
+                            _questionController.selection = TextSelection.collapsed(
+                              offset: selection.start + cleared.length,
+                            );
+                          }
                         },
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
