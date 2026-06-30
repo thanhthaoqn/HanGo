@@ -99,8 +99,93 @@ public class SectionQuestionController {
             for (int i = 0; i < optionsRows.size(); i++) {
                 Map<String, Object> row = optionsRows.get(i);
                 options.add((String) row.get("option_text"));
-                Number isCorrectNum = (Number) row.get("is_correct");
-                boolean isCorrect = isCorrectNum != null && isCorrectNum.intValue() == 1;
+                Object isCorrectObj = row.get("is_correct");
+                boolean isCorrect = false;
+                if (isCorrectObj instanceof Boolean) {
+                    isCorrect = (Boolean) isCorrectObj;
+                } else if (isCorrectObj instanceof Number) {
+                    isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                }
+                if (isCorrect) {
+                    correctIndex = i;
+                }
+            }
+
+            Map<String, Object> qMap = new HashMap<>();
+            qMap.put("id", qId);
+            qMap.put("questionText", questionText);
+            qMap.put("explanation", explanation);
+            qMap.put("categoryName", categoryName);
+            qMap.put("difficultyName", difficultyName);
+            qMap.put("options", options);
+            qMap.put("correctIndex", correctIndex);
+            return qMap;
+        }, params.toArray());
+
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", content);
+        response.put("totalElements", totalElements);
+        response.put("totalPages", totalPages);
+        response.put("size", size);
+        response.put("number", page);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/lessons/{lessonId}/questions")
+    public ResponseEntity<Map<String, Object>> getLessonQuestions(
+            @PathVariable Long lessonId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT q.id, q.question_text, q.explanation, qc.name as category_name, sp.param_value as difficulty_name ")
+           .append("FROM questions q ")
+           .append("JOIN lesson_quizzes lq ON q.id = lq.question_id ")
+           .append("JOIN question_categories qc ON q.category_id = qc.id ")
+           .append("JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
+           .append("WHERE lq.lesson_id = ? ");
+
+        List<Object> params = new ArrayList<>();
+        params.add(lessonId);
+
+        // Fetch total elements
+        String countSql = "SELECT COUNT(*) FROM (" + sql.toString() + ") AS count_tbl";
+        Integer totalElements = jdbcTemplate.queryForObject(countSql, Integer.class, params.toArray());
+        if (totalElements == null) totalElements = 0;
+
+        // Apply pagination
+        sql.append("ORDER BY lq.display_order ASC LIMIT ? OFFSET ?");
+        params.add(size);
+        params.add(page * size);
+
+        List<Map<String, Object>> content = jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+            Long qId = rs.getLong("id");
+            String questionText = rs.getString("question_text");
+            String explanation = rs.getString("explanation");
+            String categoryName = rs.getString("category_name");
+            String difficultyName = rs.getString("difficulty_name");
+
+            // Fetch options
+            List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
+                    "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                    qId
+            );
+
+            List<String> options = new ArrayList<>();
+            int correctIndex = 0;
+            for (int i = 0; i < optionsRows.size(); i++) {
+                Map<String, Object> row = optionsRows.get(i);
+                options.add((String) row.get("option_text"));
+                Object isCorrectObj = row.get("is_correct");
+                boolean isCorrect = false;
+                if (isCorrectObj instanceof Boolean) {
+                    isCorrect = (Boolean) isCorrectObj;
+                } else if (isCorrectObj instanceof Number) {
+                    isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                }
                 if (isCorrect) {
                     correctIndex = i;
                 }
