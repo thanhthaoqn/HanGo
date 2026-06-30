@@ -469,7 +469,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Curriculum',
+                            'Syllabus',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,

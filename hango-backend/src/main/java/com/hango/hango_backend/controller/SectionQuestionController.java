@@ -168,26 +168,48 @@ public class SectionQuestionController {
             String categoryName = rs.getString("category_name");
             String difficultyName = rs.getString("difficulty_name");
 
-            // Fetch options
-            List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
-                    "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+            // Check if it has sub-questions
+            List<Map<String, Object>> subQuestions = jdbcTemplate.queryForList(
+                    "SELECT id FROM questions WHERE group_id = ?",
                     qId
             );
 
             List<String> options = new ArrayList<>();
             int correctIndex = 0;
-            for (int i = 0; i < optionsRows.size(); i++) {
-                Map<String, Object> row = optionsRows.get(i);
-                options.add((String) row.get("option_text"));
-                Object isCorrectObj = row.get("is_correct");
-                boolean isCorrect = false;
-                if (isCorrectObj instanceof Boolean) {
-                    isCorrect = (Boolean) isCorrectObj;
-                } else if (isCorrectObj instanceof Number) {
-                    isCorrect = ((Number) isCorrectObj).intValue() == 1;
+
+            if (subQuestions != null && !subQuestions.isEmpty()) {
+                categoryName = "Multiple Choice";
+                // Get options of all sub-questions to count them
+                for (Map<String, Object> subQ : subQuestions) {
+                    Long subQId = ((Number) subQ.get("id")).longValue();
+                    List<Map<String, Object>> subOpts = jdbcTemplate.queryForList(
+                            "SELECT option_text FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                            subQId
+                    );
+                    for (Map<String, Object> opt : subOpts) {
+                        options.add((String) opt.get("option_text"));
+                    }
                 }
-                if (isCorrect) {
-                    correctIndex = i;
+            } else {
+                // Fetch options
+                List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
+                        "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                        qId
+                );
+
+                for (int i = 0; i < optionsRows.size(); i++) {
+                    Map<String, Object> row = optionsRows.get(i);
+                    options.add((String) row.get("option_text"));
+                    Object isCorrectObj = row.get("is_correct");
+                    boolean isCorrect = false;
+                    if (isCorrectObj instanceof Boolean) {
+                        isCorrect = (Boolean) isCorrectObj;
+                    } else if (isCorrectObj instanceof Number) {
+                        isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                    }
+                    if (isCorrect) {
+                        correctIndex = i;
+                    }
                 }
             }
 
