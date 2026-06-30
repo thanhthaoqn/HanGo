@@ -7,6 +7,7 @@ import '../../../data/services/auth_service.dart';
 import 'create_lesson_text_page.dart';
 import 'create_quiz_page.dart';
 import 'lesson_list_widget.dart';
+import 'select_quiz_questions_page.dart';
 
 class CreateLessonPage extends StatefulWidget {
   final int courseId;
@@ -1034,7 +1035,26 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 onEditLessonPressed: (lessonIndex) {
                   final lesson = lessons[lessonIndex];
                   if (lesson['itemType'] == 'quiz') {
-                    _showEditLessonDialog(_activeSectionIndex!, lessonIndex);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SelectQuizQuestionsPage(
+                          courseId: widget.courseId,
+                          courseTitle: widget.courseTitle,
+                          trainerName: widget.trainerName,
+                          trainerInitials: widget.trainerInitials,
+                          sections: _localSections,
+                          sectionIndex: _activeSectionIndex!,
+                          lessonId: (lesson['id'] as num).toInt(),
+                          onSectionsChanged: (updatedSections) async {
+                            setState(() {
+                              _localSections = updatedSections;
+                            });
+                            await _notifyParent();
+                          },
+                        ),
+                      ),
+                    );
                   } else {
                     Navigator.push(
                       context,
