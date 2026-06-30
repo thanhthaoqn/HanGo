@@ -37,6 +37,10 @@ public class Question {
 
     private String status;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id", referencedColumnName = "id", nullable = true)
+    private Section section;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
     private LocalDateTime createdAt;
