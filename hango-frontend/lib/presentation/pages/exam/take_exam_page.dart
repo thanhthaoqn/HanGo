@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
+import '../../../utils/fullscreen_helper.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
@@ -112,6 +113,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    toggleFullscreen(true);
     
     // Generate questions matching exam's question count (defaulting to base size if invalid)
     int targetCount = widget.exam.questionCount > 0 ? widget.exam.questionCount : 10;
@@ -148,6 +150,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    toggleFullscreen(false);
     _timer?.cancel();
     _timerAnimationController?.dispose();
     _gridScrollController.dispose();
@@ -230,7 +233,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     _saveAnswersToCache();
   }
 
-  void _autoSubmit() {
+  void _autoSubmit() async {
     if (_isSubmitted) return;
     _clearCache();
     setState(() {
@@ -246,27 +249,44 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     }
     double score = (correctCount / _examQuestions.length) * 10;
     
-    _saveAttemptToHistory(score);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ExamResultPage(
-          exam: widget.exam,
-          score: score,
-          correctCount: correctCount,
-          totalQuestions: _examQuestions.length,
-          userAnswers: _userAnswers,
-          attempt: {
-            "attemptNumber": 1,
-            "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
-            "score": score,
-            "status": score >= 5.0 ? "PASSED" : "FAILED",
-            "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
-          },
-        ),
+    // Show a loading overlay/spinner
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color(0xFF28B79B))),
       ),
     );
+
+    final apiAttempt = await _saveAttemptToHistory(score);
+    
+    if (mounted) {
+      Navigator.pop(context); // Pop loading dialog
+    }
+
+    final attemptData = apiAttempt ?? {
+      "attemptNumber": 1,
+      "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
+      "score": score,
+      "status": score >= 5.0 ? "PASSED" : "FAILED",
+      "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
+    };
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ExamResultPage(
+            exam: widget.exam,
+            score: score,
+            correctCount: correctCount,
+            totalQuestions: _examQuestions.length,
+            userAnswers: _userAnswers,
+            attempt: attemptData,
+          ),
+        ),
+      );
+    }
   }
 
   void _confirmSubmit() {
@@ -305,7 +325,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
               ),
               const SizedBox(height: 12),
               Text(
-                'Are you sure you want to submit your test? You have answered ${_userAnswers.length} of ${_examQuestions.length} questions.',
+                'Are you sure you want to submit your exam? You have answered ${_userAnswers.length} of ${_examQuestions.length} questions.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFF64748B),
@@ -339,7 +359,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context); // Close confirm dialog
                         _clearCache();
                         setState(() {
@@ -356,27 +376,44 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                         }
                         double score = (correctCount / _examQuestions.length) * 10;
                         
-                        _saveAttemptToHistory(score);
-
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ExamResultPage(
-                              exam: widget.exam,
-                              score: score,
-                              correctCount: correctCount,
-                              totalQuestions: _examQuestions.length,
-                              userAnswers: _userAnswers,
-                              attempt: {
-                                "attemptNumber": 1,
-                                "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
-                                "score": score,
-                                "status": score >= 5.0 ? "PASSED" : "FAILED",
-                                "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
-                              },
-                            ),
+                        // Show a loading dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(
+                            child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color(0xFF28B79B))),
                           ),
                         );
+
+                        final apiAttempt = await _saveAttemptToHistory(score);
+                        
+                        if (context.mounted) {
+                          Navigator.pop(context); // Pop loading dialog
+                        }
+
+                        final attemptData = apiAttempt ?? {
+                          "attemptNumber": 1,
+                          "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
+                          "score": score,
+                          "status": score >= 5.0 ? "PASSED" : "FAILED",
+                          "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
+                        };
+
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ExamResultPage(
+                                exam: widget.exam,
+                                score: score,
+                                correctCount: correctCount,
+                                totalQuestions: _examQuestions.length,
+                                userAnswers: _userAnswers,
+                                attempt: attemptData,
+                              ),
+                            ),
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28B79B),
@@ -405,16 +442,17 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     );
   }
 
-  Future<void> _saveAttemptToHistory(double score) async {
+  Future<Map<String, dynamic>?> _saveAttemptToHistory(double score) async {
     try {
       final repository = ExamRepository();
       Map<String, int> answersForSubmit = {};
       _userAnswers.forEach((key, value) {
         answersForSubmit[(key + 1).toString()] = value;
       });
-      await repository.submitExamAttempt(widget.exam.id, score, answersForSubmit);
+      return await repository.submitExamAttempt(widget.exam.id, score, answersForSubmit);
     } catch (e) {
       debugPrint("Error saving attempt to history: $e");
+      return null;
     }
   }
 
@@ -459,7 +497,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Quit Test?',
+                        'Quit Exam?',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
