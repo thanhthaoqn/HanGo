@@ -170,7 +170,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
-                  'PRACTICE TEST',
+                  'PRACTICE EXAM',
                   style: TextStyle(
                     color: Color(0xFF28B79B),
                     fontWeight: FontWeight.bold,
@@ -365,7 +365,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
               },
               icon: const Icon(Icons.play_arrow, color: Colors.white),
               label: Text(
-                _attempts.isEmpty ? 'Start Test' : 'Retake Test',
+                _attempts.isEmpty ? 'Start Exam' : 'Retake Exam',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -436,7 +436,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                             Icon(Icons.history_toggle_off, size: 48, color: Colors.grey.shade300),
                             const SizedBox(height: 12),
                             Text(
-                              "No attempts yet.\nStart the test to see your history.",
+                              "No attempts yet.\nStart the exam to see your history.",
                               textAlign: TextAlign.center,
                               style: TextStyle(color: Colors.grey.shade400, fontSize: 13, height: 1.4),
                             ),

@@ -60,34 +60,45 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   int? _reviewAttemptIndex;
   final Map<int, int> _selectedAnswers = {};
 
-  final List<QuizAttempt> _mockAttempts = [
-    QuizAttempt(
-      attemptNumber: 1,
-      state: 'Finished',
-      grade: '10.0 / 10.0',
-      submittedTime: '2026-06-21 14:32',
-    ),
-    QuizAttempt(
-      attemptNumber: 2,
-      state: 'Finished',
-      grade: '8.8 / 10.0',
-      submittedTime: '2026-06-21 15:10',
-    ),
-  ];
+  List<QuizAttempt> _quizAttempts = [];
+  List<Map<int, int>> _attemptsAnswers = [];
 
-  final List<Map<int, int>> _attemptsAnswers = [
-    {
-      0: 1,
-      1: 1,
-      2: 1,
-      3: 2,
-      4: 2,
-      5: 1,
-      6: 0,
-      7: 1,
-    }, // mock attempt 1 (perfect score!)
-    {0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 1, 6: 0, 7: 1}, // mock attempt 2
-  ];
+  Future<void> _loadQuizAttempts() async {
+    try {
+      final attemptsData = await _lessonRepository.fetchQuizAttempts(_currentLessonId, _currentUserId);
+      final List<QuizAttempt> loadedAttempts = [];
+      final List<Map<int, int>> loadedAnswers = [];
+
+      for (var item in attemptsData) {
+        loadedAttempts.add(QuizAttempt(
+          attemptNumber: item['attemptNumber'] ?? 1,
+          state: item['state'] ?? 'Finished',
+          grade: item['grade'] ?? '0.0 / 10.0',
+          submittedTime: item['submittedTime'] ?? '',
+        ));
+
+        final rawAnswers = item['answers'];
+        final Map<int, int> attemptMap = {};
+        if (rawAnswers is Map) {
+          rawAnswers.forEach((k, v) {
+            final intKey = int.tryParse(k.toString());
+            final intVal = int.tryParse(v.toString());
+            if (intKey != null && intVal != null) {
+              attemptMap[intKey] = intVal;
+            }
+          });
+        }
+        loadedAnswers.add(attemptMap);
+      }
+
+      setState(() {
+        _quizAttempts = loadedAttempts;
+        _attemptsAnswers = loadedAnswers;
+      });
+    } catch (e) {
+      print('Error loading quiz attempts: $e');
+    }
+  }
 
   Future<void> _loadData() async {
     try {
@@ -102,6 +113,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         _courseDetail = course;
         _lessonDetail = lesson;
+      });
+      await _loadQuizAttempts();
+      setState(() {
         _isLoading = false;
       });
     } catch (e) {
@@ -127,6 +141,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         _currentLessonId = lessonId;
         _lessonDetail = newLesson;
+      });
+      await _loadQuizAttempts();
+      setState(() {
         _isNavigatingLesson = false;
       });
       if (startQuiz) {
@@ -140,6 +157,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       });
       ToastHelper.showError(context, 'Failed to load lesson: $e');
     }
+  }
+
+  Future<void> _initData() async {
+    await _loadCurrentUserId();
+    await _loadData();
   }
 
   @override
@@ -159,8 +181,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       });
     });
 
-    _loadCurrentUserId();
-    _loadData();
+    _initData();
     if (widget.startQuizImmediately) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         toggleFullscreen(true);
@@ -1182,7 +1203,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 const Divider(color: Color(0xFFE2E8F0), height: 1),
                 const SizedBox(height: 12),
 
-                if (_mockAttempts.isEmpty)
+                if (_quizAttempts.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Center(
@@ -1199,11 +1220,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _mockAttempts.length,
+                    itemCount: _quizAttempts.length,
                     separatorBuilder: (context, index) =>
                         const Divider(color: Color(0xFFF1F5F9), height: 1),
                     itemBuilder: (context, index) {
-                      final attempt = _mockAttempts[index];
+                      final attempt = _quizAttempts[index];
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Row(
@@ -1643,7 +1664,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
-  void _submitQuiz(List<QuizQuestion> activeQuestions) {
+  Future<void> _submitQuiz(List<QuizQuestion> activeQuestions) async {
     int correctCount = 0;
     for (int i = 0; i < activeQuestions.length; i++) {
       if (_selectedAnswers[i] == activeQuestions[i].correctIndex) {
@@ -1652,26 +1673,30 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     }
     final score = (correctCount / activeQuestions.length) * 10.0;
 
-    setState(() {
-      _attemptsAnswers.add(Map<int, int>.from(_selectedAnswers));
-      _mockAttempts.add(
-        QuizAttempt(
-          attemptNumber: _mockAttempts.length + 1,
-          state: 'Finished',
-          grade: '${score.toStringAsFixed(1)} / 10.0',
-          submittedTime: DateTime.now().toString().substring(0, 16),
-        ),
+    try {
+      await _lessonRepository.postQuizAttempt(
+        _currentLessonId,
+        _currentUserId,
+        score,
+        _selectedAnswers,
       );
-      _isDoingQuiz = false;
-      _reviewAttemptIndex = _mockAttempts.length - 1;
-    });
 
-    toggleFullscreen(false);
+      await _loadQuizAttempts();
 
-    ToastHelper.showSuccess(
-      context,
-      'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0',
-    );
+      setState(() {
+        _isDoingQuiz = false;
+        _reviewAttemptIndex = _quizAttempts.length - 1;
+      });
+
+      toggleFullscreen(false);
+
+      ToastHelper.showSuccess(
+        context,
+        'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0',
+      );
+    } catch (e) {
+      ToastHelper.showError(context, 'Failed to submit quiz attempt: $e');
+    }
   }
 
   Widget _buildQuizRightSidebarPane(List<QuizQuestion> activeQuestions) {
@@ -2127,7 +2152,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   Widget _buildQuizReview(List<QuizQuestion> activeQuestions) {
     final attemptIndex = _reviewAttemptIndex!;
-    final attempt = _mockAttempts[attemptIndex];
+    final attempt = _quizAttempts[attemptIndex];
     final answers = _attemptsAnswers[attemptIndex];
 
     return Column(

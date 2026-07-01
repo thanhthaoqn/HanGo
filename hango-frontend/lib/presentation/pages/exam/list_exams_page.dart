@@ -136,7 +136,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
                   runSpacing: 16,
                   children: [
                     _buildStat('40,000+', 'Students trust and use it'),
-                    _buildStat('50+', 'Awesome practice test'),
+                    _buildStat('50+', 'Awesome practice exams'),
                   ],
                 ),
               ],
