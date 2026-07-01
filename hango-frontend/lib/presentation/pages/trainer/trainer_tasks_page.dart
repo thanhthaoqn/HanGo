@@ -7,6 +7,7 @@ import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
+import 'trainer_task_detail_page.dart';
 import '../../../utils/toast_helper.dart';
 
 class TrainerTasksPage extends StatefulWidget {
@@ -30,7 +31,6 @@ class _TrainerTasksPageState extends State<TrainerTasksPage> {
   List<TrainerTaskModel> _tasks = [];
   int _currentPage = 0;
   int _totalPages = 1;
-  int _totalElements = 0;
   final int _pageSize = 10;
   
   // Filters
@@ -93,7 +93,6 @@ class _TrainerTasksPageState extends State<TrainerTasksPage> {
         setState(() {
           _tasks = response['tasks'];
           _totalPages = response['totalPages'];
-          _totalElements = response['totalElements'];
           _isLoading = false;
         });
       }
@@ -105,16 +104,6 @@ class _TrainerTasksPageState extends State<TrainerTasksPage> {
         });
         ToastHelper.show(context, 'Failed to load tasks: $_errorMessage');
       }
-    }
-  }
-
-  Future<void> _handleAcceptTask(int taskId) async {
-    try {
-      await _taskRepository.acceptTask(taskId);
-      ToastHelper.show(context, 'Task accepted successfully');
-      _fetchTasks();
-    } catch (e) {
-      ToastHelper.show(context, 'Failed to accept task: $e');
     }
   }
 
@@ -623,36 +612,19 @@ class _TrainerTasksPageState extends State<TrainerTasksPage> {
   }
 
   Widget _buildActionButton(TrainerTaskModel task) {
-    if (task.status == 'ASSIGNED') {
-      return ElevatedButton(
-        onPressed: () => _handleAcceptTask(task.id),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF20B486),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: const Text('Accept', style: TextStyle(fontSize: 13)),
-      );
-    } else if (task.status == 'IN_PROGRESS') {
-      return OutlinedButton(
-        onPressed: () {
-          ToastHelper.show(context, 'Redirecting to task (Placeholder)');
-        },
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF20B486),
-          side: const BorderSide(color: Color(0xFF20B486)),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: const Text('Go to Task', style: TextStyle(fontSize: 13)),
-      );
-    } else {
-      return Text(
-        task.status == 'COMPLETED' ? 'Completed' : (task.status == 'REJECTED' ? 'Rejected' : '-'),
-        style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13, fontStyle: FontStyle.italic),
-      );
-    }
+    return IconButton(
+      icon: const Icon(Icons.remove_red_eye, color: Color(0xFF2ec4b6)),
+      tooltip: 'View Detail',
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TrainerTaskDetailPage(taskId: task.id),
+          ),
+        ).then((_) {
+          _fetchTasks();
+        });
+      },
+    );
   }
 }
