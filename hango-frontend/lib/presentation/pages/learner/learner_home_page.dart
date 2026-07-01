@@ -12,6 +12,7 @@ import '../course/list_courses_page.dart';
 import '../course/course_detail_page.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
+import 'learning_pathway_page.dart';
 
 class LearnerHomePage extends StatefulWidget {
   const LearnerHomePage({super.key});
@@ -427,6 +428,19 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             leading: const Icon(Icons.style_outlined),
             title: const Text('Flashcard'),
             onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.route_outlined),
+            title: const Text('Learning Pathway'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LearningPathwayPage(),
+                ),
+              );
+            },
           ),
           const Divider(),
           ListTile(
