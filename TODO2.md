@@ -59,19 +59,19 @@
   - [x] `POST /api/v1/pathways/generate` — Sinh lộ trình mới từ kết quả thi.
   - [x] `GET /api/v1/pathways/{id}` — Lấy lộ trình hiện tại của user.
   - [x] `GET /api/v1/pathways/me` — Lấy lộ trình mới nhất của user đang đăng nhập.
-  - [ ] `PUT /api/v1/pathways/{id}/reroute` — Tính toán lại lộ trình (Dynamic Re-routing) - Pending.
-- [ ] Implement AI Mentor Chat endpoint cho lộ trình:
-  - [ ] `POST /api/v1/pathways/{id}/chat` — Gửi câu hỏi cho AI Mentor về lộ trình.
-  - [ ] Context embedding: truyền roadmap data + exam result vào prompt.
+  - [x] `PUT /api/v1/pathways/{id}/reroute` — Tính toán lại lộ trình (Dynamic Re-routing) - Done.
+- [x] Implement AI Mentor Chat endpoint cho lộ trình:
+  - [x] `POST /api/v1/pathways/{id}/chat` — Gửi câu hỏi cho AI Mentor về lộ trình.
+  - [x] Context embedding: truyền roadmap data + exam result vào prompt.
 - [x] Cấu hình `@PreAuthorize` — chỉ LEARNER mới được gọi API pathway.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
-- [ ] Thay Mock Pathway Repository bằng real `dio` API calls kết nối Backend.
-- [ ] Kết nối AI Mentor Chat với backend AI endpoint (streaming SSE/chunks).
-- [ ] Implement click-to-navigate: từ Node → `CourseDetailPage` / `LessonPage` tương ứng.
-- [ ] Cập nhật trạng thái Node real-time sau khi user hoàn thành bài học.
-- [ ] Trigger Dynamic Re-routing UI khi nhận kết quả quiz kém.
+- [x] Thay Mock Pathway Repository bằng real HTTP API calls kết nối Backend.
+- [x] Kết nối AI Mentor Chat với backend AI endpoint.
+- [x] Implement click-to-navigate: từ Node → `CourseDetailPage` / `LessonPage` tương ứng.
+- [x] Cập nhật trạng thái Node real-time sau khi user hoàn thành bài học.
+- [x] Trigger Dynamic Re-routing UI khi nhận kết quả quiz kém.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA Agent)_
 

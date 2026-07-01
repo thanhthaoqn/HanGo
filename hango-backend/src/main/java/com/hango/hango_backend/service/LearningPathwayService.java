@@ -152,6 +152,7 @@ public class LearningPathwayService {
         learningPathwayRepository.save(newPathway);
 
         // Cập nhật lại DTO để trả về cho Client
+        responseDto.setPathwayId(newPathway.getId());
         responseDto.setRoadmapId("RM_USER_" + studentId + "_" + newPathway.getId());
         
         // Thêm CourseTitle vào DTO để hiển thị
@@ -165,12 +166,73 @@ public class LearningPathwayService {
         return responseDto;
     }
 
+    @Transactional
+    public LearningPathwayResponseDTO reroutePathway(Long pathwayId, Long studentId, int quizScore) {
+        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(studentId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        pathway.setMentorSummary(quizScore < 60
+                ? "Dynamic rerouting triggered because your latest quiz score was low. I am refocusing the roadmap on the foundational skills you need first."
+                : "Your recent quiz performance is acceptable, so the current roadmap remains the best fit.");
+
+        if (pathway.getNodes() != null) {
+            boolean firstNodeSeen = false;
+            for (PathwayNode node : pathway.getNodes()) {
+                if (!firstNodeSeen && node.getStepOrder() != null && node.getStepOrder() == 1) {
+                    node.setStatus("IN_PROGRESS");
+                    node.setProgressPercent(Math.max(node.getProgressPercent(), 25));
+                    firstNodeSeen = true;
+                } else if (!"COMPLETED".equalsIgnoreCase(node.getStatus())) {
+                    node.setStatus("LOCKED");
+                    node.setProgressPercent(0);
+                }
+            }
+        }
+
+        LearningPathway savedPathway = learningPathwayRepository.save(pathway);
+        return LearningPathwayResponseDTO.builder()
+                .pathwayId(savedPathway.getId())
+                .roadmapId("RM_USER_" + studentId + "_" + savedPathway.getId())
+                .mentorSummary(savedPathway.getMentorSummary())
+                .nodes(savedPathway.getNodes().stream().map(node -> PathwayNodeDTO.builder()
+                        .step(node.getStepOrder())
+                        .courseId(node.getCourse().getId())
+                        .courseTitle(node.getCourse().getTitle())
+                        .status(node.getStatus())
+                        .reasonWhy(node.getReasonWhy())
+                        .progressPercent(node.getProgressPercent())
+                        .tags(node.getCourse().getCategory() != null ? List.of("#" + node.getCourse().getCategory().getParamValue()) : java.util.Collections.emptyList())
+                        .build()).toList())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public LearningPathwayResponseDTO getPathwayById(Long pathwayId, Long studentId) {
+        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(studentId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        return toResponseDto(pathway, studentId);
+    }
+
     @Transactional(readOnly = true)
     public LearningPathwayResponseDTO getMyPathway(Long studentId) {
         LearningPathway pathway = learningPathwayRepository.findByStudentIdAndStatus(studentId, "ACTIVE")
                 .orElseThrow(() -> new ApiException("No active learning pathway found", HttpStatus.NOT_FOUND));
 
+        return toResponseDto(pathway, studentId);
+    }
+
+    private LearningPathwayResponseDTO toResponseDto(LearningPathway pathway, Long studentId) {
         return LearningPathwayResponseDTO.builder()
+                .pathwayId(pathway.getId())
                 .roadmapId("RM_USER_" + studentId + "_" + pathway.getId())
                 .mentorSummary(pathway.getMentorSummary())
                 .nodes(pathway.getNodes().stream().map(node -> PathwayNodeDTO.builder()

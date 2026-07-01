@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/entities/learning_pathway.dart';
+import '../../pages/course/course_detail_page.dart';
 
 class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
   final PathwayNode? selectedNode;
+  final ValueChanged<LearningPathway>? onPathwayUpdated;
 
   const AIMentorSidePanel({
-    Key? key,
+    super.key,
     required this.pathway,
     this.selectedNode,
-  }) : super(key: key);
+    this.onPathwayUpdated,
+  });
 
   @override
   State<AIMentorSidePanel> createState() => _AIMentorSidePanelState();
@@ -18,7 +23,9 @@ class AIMentorSidePanel extends StatefulWidget {
 class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   final TextEditingController _chatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final PathwayRepository _repository = PathwayRepository();
   final List<Map<String, String>> _messages = [];
+  bool _isSending = false;
 
   @override
   void initState() {
@@ -57,28 +64,40 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     });
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _chatController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isSending) return;
 
     setState(() {
       _messages.add({'role': 'user', 'content': text});
       _chatController.clear();
+      _isSending = true;
     });
     _scrollToBottom();
 
-    // Simulate AI response
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      final response = await _repository.chatWithMentor(
+        pathwayId: widget.pathway.pathwayId,
+        message: text,
+      );
+      if (mounted) {
+        setState(() {
+          _messages.add({'role': 'mentor', 'content': response});
+          _isSending = false;
+        });
+      }
+    } catch (_) {
       if (mounted) {
         setState(() {
           _messages.add({
             'role': 'mentor',
-            'content': 'Tính năng Chat chi tiết với AI đang được phát triển. Trong lúc đó, bạn hãy bấm vào nút "Bắt đầu học ngay" nhé!',
+            'content': 'Hiện chưa thể kết nối AI Mentor. Vui lòng thử lại sau.',
           });
+          _isSending = false;
         });
-        _scrollToBottom();
       }
-    });
+    }
+    _scrollToBottom();
   }
 
   @override
@@ -97,10 +116,10 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           left: BorderSide(color: Color(0xFFE2E8F0), width: 1),
         ),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+          const BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.02),
             blurRadius: 10,
-            offset: const Offset(-5, 0),
+            offset: Offset(-5, 0),
           ),
         ],
       ),
@@ -137,7 +156,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF4F46E5).withOpacity(0.3),
+                  color: const Color.fromRGBO(79, 70, 229, 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -228,14 +247,23 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                     ),
                     border: isMentor ? Border.all(color: const Color(0xFFE2E8F0)) : null,
                   ),
-                  child: Text(
-                    message['content'] ?? '',
-                    style: TextStyle(
-                      color: isMentor ? const Color(0xFF334155) : Colors.white,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
-                  ),
+                  child: isMentor
+                      ? MarkdownBody(
+                          data: message['content'] ?? '',
+                          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                            p: const TextStyle(color: Color(0xFF334155), fontSize: 14, height: 1.5),
+                            strong: const TextStyle(color: Color(0xFF334155), fontWeight: FontWeight.bold),
+                            code: const TextStyle(color: Color(0xFF4F46E5), fontSize: 13),
+                          ),
+                        )
+                      : Text(
+                          message['content'] ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
+                        ),
                 ),
               ),
               if (!isMentor) const SizedBox(width: 40),
@@ -251,33 +279,86 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     return Container(
       padding: const EdgeInsets.all(20),
       color: const Color(0xFFF8FAFC),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () {
-            // TODO: Navigate to lesson
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF10B981),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 0,
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Bắt đầu học ngay',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                if (widget.selectedNode != null && widget.selectedNode!.courseId > 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CourseDetailPage(courseId: widget.selectedNode!.courseId),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
               ),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_forward_rounded, size: 20),
-            ],
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Bắt đầu học ngay',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded, size: 20),
+                ],
+              ),
+            ),
           ),
-        ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  final updatedPathway = await _repository.reroutePathway(
+                    pathwayId: widget.pathway.pathwayId,
+                    quizScore: 42,
+                  );
+                  widget.onPathwayUpdated?.call(updatedPathway);
+                  if (mounted) {
+                    setState(() {
+                      _messages.add({
+                        'role': 'mentor',
+                        'content': 'Đã kích hoạt Dynamic Re-routing vì điểm quiz gần đây thấp. Lộ trình mới đã được cập nhật.',
+                      });
+                    });
+                    _scrollToBottom();
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    setState(() {
+                      _messages.add({
+                        'role': 'mentor',
+                        'content': 'Không thể tái lập lộ trình lúc này. Vui lòng thử lại sau.',
+                      });
+                    });
+                    _scrollToBottom();
+                  }
+                }
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Tái lập lộ trình'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4F46E5),
+                side: const BorderSide(color: Color(0xFF4F46E5)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -308,13 +389,15 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           ),
           const SizedBox(width: 12),
           Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF4F46E5),
+            decoration: BoxDecoration(
+              color: _isSending ? const Color(0xFF94A3B8) : const Color(0xFF4F46E5),
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-              onPressed: _sendMessage,
+              icon: _isSending
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              onPressed: _isSending ? null : _sendMessage,
             ),
           ),
         ],

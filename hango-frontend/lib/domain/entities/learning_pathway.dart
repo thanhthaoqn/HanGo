@@ -6,7 +6,7 @@ enum NodeStatus {
 
 class PathwayNode {
   final int step;
-  final String courseId;
+  final int courseId;
   final String courseTitle;
   final List<String> tags;
   final NodeStatus status;
@@ -36,35 +36,42 @@ class PathwayNode {
       }
     }
 
+    final rawCourseId = json['course_id'] ?? json['courseId'];
+
     return PathwayNode(
-      step: json['step'],
-      courseId: json['course_id'],
-      courseTitle: json['course_title'] ?? 'Course Title',
+      step: json['step'] is int ? json['step'] as int : int.tryParse('${json['step']}') ?? 0,
+      courseId: rawCourseId is int ? rawCourseId : int.tryParse('$rawCourseId') ?? 0,
+      courseTitle: json['course_title'] ?? json['courseTitle'] ?? 'Course Title',
       tags: List<String>.from(json['tags'] ?? []),
-      status: parseStatus(json['status']),
-      reasonWhy: json['reason_why'],
-      progressPercent: json['progress_percent'] ?? 0,
+      status: parseStatus('${json['status']}'),
+      reasonWhy: json['reason_why'] ?? json['reasonWhy'] ?? '',
+      progressPercent: json['progress_percent'] ?? json['progressPercent'] ?? 0,
     );
   }
 }
 
 class LearningPathway {
+  final int pathwayId;
   final String roadmapId;
   final String mentorSummary;
   final List<PathwayNode> nodes;
 
   LearningPathway({
+    required this.pathwayId,
     required this.roadmapId,
     required this.mentorSummary,
     required this.nodes,
   });
 
   factory LearningPathway.fromJson(Map<String, dynamic> json) {
+    final rawPathwayId = json['pathway_id'] ?? json['pathwayId'];
+
     return LearningPathway(
-      roadmapId: json['roadmap_id'],
-      mentorSummary: json['mentor_summary'],
+      pathwayId: rawPathwayId is int ? rawPathwayId : int.tryParse('$rawPathwayId') ?? 0,
+      roadmapId: json['roadmap_id'] ?? json['roadmapId'] ?? '',
+      mentorSummary: json['mentor_summary'] ?? json['mentorSummary'] ?? '',
       nodes: (json['nodes'] as List)
-          .map((nodeJson) => PathwayNode.fromJson(nodeJson))
+          .map((nodeJson) => PathwayNode.fromJson(nodeJson as Map<String, dynamic>))
           .toList(),
     );
   }
