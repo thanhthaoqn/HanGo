@@ -99,8 +99,8 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
   }
 
-  // Associate new question to this quiz
-  Future<void> _associateQuestionToQuiz(int questionId) async {
+  // Associate new questions to this quiz
+  Future<void> _associateQuestionsToQuiz(List<int> questionIds) async {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
@@ -122,8 +122,10 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         currentIds = list.map((q) => q['id'] as int).toList();
       }
 
-      if (!currentIds.contains(questionId)) {
-        currentIds.add(questionId);
+      for (var id in questionIds) {
+        if (!currentIds.contains(id)) {
+          currentIds.add(id);
+        }
       }
 
       // 2. Save the updated list back to the lesson
@@ -142,10 +144,10 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
       if (postRes.statusCode == 200) {
         _loadQuizQuestions(0);
       } else {
-        ToastHelper.showError(context, 'Failed to associate new question to quiz.');
+        ToastHelper.showError(context, 'Failed to associate new questions to quiz.');
       }
     } catch (e) {
-      debugPrint('Error associating question: $e');
+      debugPrint('Error associating questions: $e');
     }
   }
 
@@ -469,7 +471,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Curriculum',
+                            'Syllabus',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -824,8 +826,8 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                           sectionIndex: widget.sectionIndex,
                           sectionId: widget.sections[widget.sectionIndex]['id'] as int,
                           sectionTitle: widget.sections[widget.sectionIndex]['title'] as String,
-                          onQuestionCreated: (newQuestionId) {
-                            _associateQuestionToQuiz(newQuestionId);
+                          onQuestionCreated: (newQuestionIds) {
+                            _associateQuestionsToQuiz(newQuestionIds);
                           },
                         ),
                       ),

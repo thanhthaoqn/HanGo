@@ -28,4 +28,7 @@ public class ExamAttempt {
 
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
+
+    @Column(name = "answers_json", columnDefinition = "TEXT")
+    private String answersJson;
 }

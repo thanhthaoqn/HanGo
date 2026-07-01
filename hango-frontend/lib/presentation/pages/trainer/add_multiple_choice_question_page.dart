@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../utils/file_picker_helper.dart';
 import 'add_new_question_page.dart';
 
 class AddMultipleChoiceQuestionPage extends StatefulWidget {
@@ -14,7 +17,7 @@ class AddMultipleChoiceQuestionPage extends StatefulWidget {
   final int sectionIndex;
   final int sectionId;
   final String sectionTitle;
-  final Function(int newQuestionId) onQuestionCreated;
+  final Function(List<int> newQuestionIds) onQuestionCreated;
 
   const AddMultipleChoiceQuestionPage({
     super.key,
@@ -44,6 +47,9 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
 
   String? _pdfName;
   String? _pdfSize;
+  bool _isUploadingPdf = false;
+  double _pdfUploadProgress = 0.0;
+  final GlobalKey _dropZoneKey = GlobalKey();
 
   // Answer sets for sub-questions
   final List<Map<String, dynamic>> _answerSets = [];
@@ -77,6 +83,21 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
       explanation: '',
       isExpanded: true,
     );
+
+    if (kIsWeb) {
+      registerDragDrop((clientX, clientY, pickedFile) {
+        if (_dropZoneKey.currentContext == null) return;
+        final RenderBox renderBox = _dropZoneKey.currentContext!.findRenderObject() as RenderBox;
+        final position = renderBox.localToGlobal(Offset.zero);
+        final size = renderBox.size;
+        if (clientX >= position.dx &&
+            clientX <= position.dx + size.width &&
+            clientY >= position.dy &&
+            clientY <= position.dy + size.height) {
+          _processPdfFile(pickedFile);
+        }
+      });
+    }
   }
 
   void _addAnswerSet({
@@ -174,18 +195,57 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
     });
   }
 
-  Future<void> _handlePdfUpload() async {
+  Future<void> _processPdfFile(PickedFile file) async {
+    final double sizeInMb = file.bytes.length / (1024 * 1024);
+    if (sizeInMb > 50.0) {
+      ToastHelper.showError(context, 'File size exceeds 50MB limit.');
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      ToastHelper.showError(context, 'Only PDF files are accepted.');
+      return;
+    }
+
     setState(() {
-      _pdfName = 'Vietnam_Art_Exhibition_Doc.pdf';
-      _pdfSize = '5.8 MB';
+      _isUploadingPdf = true;
+      _pdfName = file.name;
+      _pdfSize = '${sizeInMb.toStringAsFixed(2)} MB';
+      _pdfUploadProgress = 0.0;
+    });
+
+    const int totalSteps = 20;
+    for (int i = 1; i <= totalSteps; i++) {
+      await Future.delayed(const Duration(milliseconds: 50));
+      if (!mounted) return;
+      setState(() {
+        _pdfUploadProgress = i / totalSteps;
+      });
+    }
+
+    setState(() {
+      _isUploadingPdf = false;
     });
     ToastHelper.showSuccess(context, 'PDF document uploaded successfully.');
+  }
+
+  Future<void> _handlePdfUpload() async {
+    try {
+      final file = await pickPdf();
+      if (file != null) {
+        await _processPdfFile(file);
+      }
+    } catch (e) {
+      debugPrint('Error picking PDF: $e');
+      ToastHelper.showError(context, 'Failed to pick file.');
+    }
   }
 
   void _removePdf() {
     setState(() {
       _pdfName = null;
       _pdfSize = null;
+      _isUploadingPdf = false;
+      _pdfUploadProgress = 0.0;
     });
   }
 
@@ -272,9 +332,10 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
 
       if (response.statusCode == 200) {
         final resData = jsonDecode(response.body);
-        final parentId = resData['id'] as int;
+        final List<dynamic> idsList = resData['questionIds'] as List<dynamic>? ?? [];
+        final List<int> questionIds = idsList.map((id) => id as int).toList();
         ToastHelper.showSuccess(context, 'Group question created successfully!');
-        widget.onQuestionCreated(parentId);
+        widget.onQuestionCreated(questionIds);
         Navigator.pop(context);
       } else {
         final errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to save group question';
@@ -292,6 +353,9 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
 
   @override
   void dispose() {
+    if (kIsWeb) {
+      unregisterDragDrop();
+    }
     _passageController.dispose();
     _hintController.dispose();
     for (var set in _answerSets) {
@@ -588,7 +652,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Curriculum',
+                            'Syllabus',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -805,9 +869,10 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _pdfName != null
+                    (_pdfName != null || _isUploadingPdf)
                         ? _buildPdfAttachedCard()
                         : InkWell(
+                            key: _dropZoneKey,
                             onTap: _handlePdfUpload,
                             child: Container(
                               height: 110,
@@ -1009,7 +1074,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _pdfName!,
+                  _pdfName ?? 'Uploading PDF...',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -1020,16 +1085,59 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  _pdfSize!,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                Row(
+                  children: [
+                    if (_pdfSize != null) ...[
+                      Text(
+                        _pdfSize!,
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (_isUploadingPdf)
+                      Text(
+                        'Uploading... ${(_pdfUploadProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 11,
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    else
+                      const Text(
+                        'Uploaded successfully',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 11,
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
                 ),
+                if (_isUploadingPdf) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: _pdfUploadProgress,
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                      minHeight: 4,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
-            onPressed: _removePdf,
+            onPressed: _isUploadingPdf ? null : _removePdf,
           ),
         ],
       ),
@@ -1245,7 +1353,6 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                 final opt = options[optIdx];
                                 final bool isCorrect = opt['isCorrect'] as bool;
                                 final textCtrl = opt['textController'] as TextEditingController;
-                                final String letter = String.fromCharCode(65 + optIdx); // A, B, C, D...
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 12),
@@ -1260,27 +1367,18 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                   ),
                                   child: Row(
                                     children: [
-                                      // Choice circular badge (A, B, C, D)
+                                      // Choice circular radio button
                                       InkWell(
                                         onTap: () => _handleOptionSelect(setIdx, optIdx),
                                         child: Container(
-                                          width: 24,
-                                          height: 24,
+                                          width: 20,
+                                          height: 20,
                                           decoration: BoxDecoration(
                                             color: isCorrect ? const Color(0xFF20B486) : Colors.white,
                                             shape: BoxShape.circle,
                                             border: Border.all(
                                               color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFCBD5E1),
-                                            ),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            letter,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: isCorrect ? Colors.white : const Color(0xFF64748B),
-                                              fontFamily: 'Outfit',
+                                              width: 1.5,
                                             ),
                                           ),
                                         ),
@@ -1299,11 +1397,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                         ),
                                       ),
                                       if (isCorrect) ...[
-                                        const Icon(Icons.check_circle, color: Color(0xFF20B486), size: 16),
+                                        const Icon(Icons.check_circle, color: Color(0xFF20B486), size: 18),
                                         const SizedBox(width: 8),
                                       ],
                                       IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
                                         onPressed: () => _removeOptionFromSet(setIdx, optIdx),
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(),
