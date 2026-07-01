@@ -5,16 +5,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TaskManagementDto {
+public class ExamAttemptResponseDTO {
     private Long id;
-    private String taskContent;
-    private String assigneeName;
-    private String reviewerName;
-    private String type;
+    private Long examId;
+    private BigDecimal score;
+    private Integer attemptNumber;
+    private String date;
     private String status;
-    private java.time.LocalDateTime deadline;
+    private Map<String, Integer> answers;
 }

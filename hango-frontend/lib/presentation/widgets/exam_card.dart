@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../domain/entities/exam.dart';
+import '../pages/exam/exam_detail_history_page.dart';
 
 class ExamCard extends StatefulWidget {
   final Exam exam;
@@ -17,7 +18,16 @@ class _ExamCardState extends State<ExamCard> {
     return MouseRegion(
       onEnter: (_) => setState(() => isHovered = true),
       onExit: (_) => setState(() => isHovered = false),
-      child: AnimatedContainer(
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ExamDetailHistoryPage(exam: widget.exam),
+            ),
+          );
+        },
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         transform: Matrix4.translationValues(0, isHovered ? -8 : 0, 0),
         decoration: BoxDecoration(
@@ -178,6 +188,7 @@ class _ExamCardState extends State<ExamCard> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

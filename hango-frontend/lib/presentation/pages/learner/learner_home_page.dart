@@ -7,6 +7,7 @@ import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../login_page.dart';
 import '../exam/list_exams_page.dart';
+import '../exam/exam_detail_history_page.dart';
 import '../course/list_courses_page.dart';
 import '../course/course_detail_page.dart';
 import '../../widgets/shared_header.dart';
@@ -108,7 +109,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Chào mừng đến với HanGo!',
+                  'Welcome to HanGo!',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -118,7 +119,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Vì đây là lần đầu tiên bạn đăng nhập, bạn muốn bắt đầu với hoạt động nào hôm nay?',
+                  'Since this is your first time logging in, what activity would you like to start with today?',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF64748B),
@@ -129,126 +130,133 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 const SizedBox(height: 28),
                 
                 // Two Option Cards
-                Row(
-                  children: [
-                    // Option 1: Practice Test (Thi thử)
-                    Expanded(
-                      child: InkWell(
-                        onTap: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool(showOnboardingKey, false);
-                          if (!mounted) return;
-                          Navigator.pop(ctx); // Close dialog
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const ListExamsPage()),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            borderRadius: BorderRadius.circular(16),
-                            color: const Color(0xFFF8FAFC),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFEFF6FF),
-                                  shape: BoxShape.circle,
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Option 1: Practice Test (Thi thử)
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool(showOnboardingKey, false);
+                            if (!mounted) return;
+                            Navigator.pop(ctx); // Close dialog
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(16),
+                              color: const Color(0xFFF8FAFC),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFEFF6FF),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.assignment_outlined,
+                                    color: Colors.blueAccent,
+                                    size: 28,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.assignment_outlined,
-                                  color: Colors.blueAccent,
-                                  size: 28,
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Practice Exams',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Luyện thi thử',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Take mock exams designed to match the official exam structure',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Thi thử theo đề chuẩn cấu trúc Bộ GD&ĐT',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF64748B),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Option 2: Courses (Học khóa học)
-                    Expanded(
-                      child: InkWell(
-                        onTap: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool(showOnboardingKey, false);
-                          if (!mounted) return;
-                          Navigator.pop(ctx); // Close dialog
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const ListCoursesPage()),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            borderRadius: BorderRadius.circular(16),
-                            color: const Color(0xFFF8FAFC),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFECFDF5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.school_outlined,
-                                  color: Color(0xFF10B981),
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Học khóa học',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Học kiến thức bài bản và làm bài tập',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF64748B),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 16),
+                      // Option 2: Courses (Học khóa học)
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool(showOnboardingKey, false);
+                            if (!mounted) return;
+                            Navigator.pop(ctx); // Close dialog
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ListCoursesPage()),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(16),
+                              color: const Color(0xFFF8FAFC),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFECFDF5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.school_outlined,
+                                    color: Color(0xFF10B981),
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Study Courses',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Learn systematic knowledge and practice with exercises',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1041,7 +1049,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   // Exam Card Builder
   Widget _buildExamCard(Exam exam) {
-    return HoverableCard(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ExamDetailHistoryPage(exam: exam),
+          ),
+        );
+      },
+      child: HoverableCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1198,6 +1215,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
