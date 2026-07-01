@@ -28,12 +28,33 @@ public class LearningPathwayController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('LEARNER')")
+    public ResponseEntity<LearningPathwayResponseDTO> getPathwayById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        LearningPathwayResponseDTO response = learningPathwayService.getPathwayById(id, userDetails.getId());
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/me")
     @PreAuthorize("hasRole('LEARNER')")
     public ResponseEntity<LearningPathwayResponseDTO> getMyPathway(
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         
         LearningPathwayResponseDTO response = learningPathwayService.getMyPathway(userDetails.getId());
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/reroute")
+    @PreAuthorize("hasRole('LEARNER')")
+    public ResponseEntity<LearningPathwayResponseDTO> reroutePathway(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestParam(defaultValue = "0") int quizScore) {
+
+        LearningPathwayResponseDTO response = learningPathwayService.reroutePathway(id, userDetails.getId(), quizScore);
         return ResponseEntity.ok(response);
     }
 

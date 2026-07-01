@@ -7,6 +7,7 @@ import java.util.List;
 @Data
 @Builder
 public class LearningPathwayResponseDTO {
+    private Long pathwayId;
     private String roadmapId;
     private String mentorSummary;
     private List<PathwayNodeDTO> nodes;
