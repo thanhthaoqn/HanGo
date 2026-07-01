@@ -58,6 +58,17 @@ public class TaskManagementService {
         taskActivityRepository.save(activity);
     }
 
+    private void checkAutoReject(CreatorTask ct) {
+        if ("ASSIGNED".equals(ct.getStatus()) && ct.getTask().getCreatedAt() != null) {
+            if (ct.getTask().getCreatedAt().plusHours(8).isBefore(LocalDateTime.now())) {
+                ct.setStatus("REJECTED");
+                creatorTaskRepository.save(ct);
+                // System auto-reject, userId can be null or a system ID, here we use the creator's ID for simplicity or leave it out
+                logActivity(ct.getTask().getId(), ct.getCreator().getId(), "REJECTED", "System: Auto-rejected because it was not accepted within 8 hours");
+            }
+        }
+    }
+
     public Page<TaskManagementDto> getTasksForLead(
             Long leadId,
             LocalDateTime fromDate,
@@ -228,14 +239,17 @@ public class TaskManagementService {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by("task.dueDate").ascending());
         Page<CreatorTask> tasks = creatorTaskRepository.findTasksForTrainer(trainerId, fromDate, toDate, type, search, pageable);
 
-        return tasks.map(ct -> com.hango.hango_backend.dto.TrainerTaskDto.builder()
-                .id(ct.getId())
-                .taskId(ct.getTask().getId())
-                .taskContent(ct.getTask().getTitle())
-                .deadline(ct.getTask().getDueDate())
-                .type(ct.getTask().getType())
-                .status(ct.getStatus())
-                .build());
+        return tasks.map(ct -> {
+            checkAutoReject(ct);
+            return com.hango.hango_backend.dto.TrainerTaskDto.builder()
+                    .id(ct.getId())
+                    .taskId(ct.getTask().getId())
+                    .taskContent(ct.getTask().getTitle())
+                    .deadline(ct.getTask().getDueDate())
+                    .type(ct.getTask().getType())
+                    .status(ct.getStatus())
+                    .build();
+        });
     }
 
     public void acceptTaskByTrainer(Long creatorTaskId, Long trainerId) {
@@ -246,12 +260,62 @@ public class TaskManagementService {
             throw new RuntimeException("Unauthorized to accept this task");
         }
 
+        checkAutoReject(creatorTask);
+
         if ("ASSIGNED".equals(creatorTask.getStatus())) {
             creatorTask.setStatus("IN_PROGRESS");
             creatorTaskRepository.save(creatorTask);
-            // logActivity(creatorTask.getTask().getId(), trainerId, "IN_PROGRESS", "Task accepted by trainer."); // Will be added when merged with lead-task-manage
+            logActivity(creatorTask.getTask().getId(), trainerId, "IN_PROGRESS", "Task accepted by trainer.");
         } else {
             throw new RuntimeException("Task cannot be accepted from status: " + creatorTask.getStatus());
         }
+    }
+
+    public TaskDetailDto getTaskDetailForTrainer(Long creatorTaskId, Long trainerId) {
+        CreatorTask ct = creatorTaskRepository.findById(creatorTaskId)
+                .orElseThrow(() -> new RuntimeException("Creator task not found"));
+
+        if (!ct.getCreator().getId().equals(trainerId)) {
+            throw new RuntimeException("Unauthorized to view this task");
+        }
+
+        checkAutoReject(ct);
+
+        return TaskDetailDto.builder()
+                .id(ct.getTask().getId())
+                .title(ct.getTask().getTitle())
+                .description(ct.getTask().getDescription())
+                .type(ct.getTask().getType())
+                .assigneeId(ct.getCreator() != null ? ct.getCreator().getId() : null)
+                .assigneeName(ct.getCreator() != null ? ct.getCreator().getFullName() : null)
+                .reviewerId(ct.getReviewer() != null ? ct.getReviewer().getId() : null)
+                .reviewerName(ct.getReviewer() != null ? ct.getReviewer().getFullName() : null)
+                .deadline(ct.getTask().getDueDate())
+                .status(ct.getStatus())
+                .build();
+    }
+
+    public List<TaskActivityDto> getTaskActivitiesForTrainer(Long creatorTaskId, Long trainerId) {
+        CreatorTask ct = creatorTaskRepository.findById(creatorTaskId)
+                .orElseThrow(() -> new RuntimeException("Creator task not found"));
+
+        if (!ct.getCreator().getId().equals(trainerId)) {
+            throw new RuntimeException("Unauthorized to view this task activities");
+        }
+
+        List<TaskActivity> activities = taskActivityRepository.findByTaskIdOrderByCreatedAtDesc(ct.getTask().getId());
+        return activities.stream().map(a -> {
+            User u = userRepository.findById(a.getUserId()).orElse(null);
+            String userName = u != null ? u.getFullName() : "System";
+            return TaskActivityDto.builder()
+                    .id(a.getId())
+                    .taskId(a.getTaskId())
+                    .userId(a.getUserId())
+                    .userName(userName)
+                    .actionType(a.getNewStatus())
+                    .description(a.getNote())
+                    .createdAt(a.getCreatedAt())
+                    .build();
+        }).collect(Collectors.toList());
     }
 }

@@ -1,13 +1,11 @@
-import 'package:dio/dio.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../domain/model/trainer_task_model.dart';
+import '../../domain/model/task_activity_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TrainerTaskRepository {
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://localhost:8080/api/v1',
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
-  ));
+  final String _baseUrl = 'http://localhost:8080/api/v1';
 
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,9 +24,9 @@ class TrainerTaskRepository {
       final token = await _getToken();
       if (token == null) throw Exception('No token found');
 
-      final queryParams = <String, dynamic>{
-        'page': page,
-        'size': size,
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'size': size.toString(),
       };
 
       if (fromDate != null) {
@@ -44,16 +42,15 @@ class TrainerTaskRepository {
         queryParams['search'] = search;
       }
 
-      final response = await _dio.get(
-        '/trainer/tasks',
-        queryParameters: queryParams,
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
+      final uri = Uri.parse('$_baseUrl/trainer/tasks').replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
-        final data = response.data;
+        final data = jsonDecode(response.body);
         List<TrainerTaskModel> tasks = (data['content'] as List)
             .map((json) => TrainerTaskModel.fromJson(json))
             .toList();
@@ -71,16 +68,61 @@ class TrainerTaskRepository {
     }
   }
 
+  Future<Map<String, dynamic>> getTaskDetail(int id) async {
+    try {
+      final token = await _getToken();
+      if (token == null) throw Exception('No token found');
+
+      final uri = Uri.parse('$_baseUrl/trainer/tasks/$id');
+
+      final response = await http.get(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to fetch task detail: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching task detail: $e');
+    }
+  }
+
+  Future<List<TaskActivityModel>> getTaskActivities(int id) async {
+    try {
+      final token = await _getToken();
+      if (token == null) throw Exception('No token found');
+
+      final uri = Uri.parse('$_baseUrl/trainer/tasks/$id/activities');
+
+      final response = await http.get(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => TaskActivityModel.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to fetch task activities: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching task activities: $e');
+    }
+  }
+
   Future<void> acceptTask(int id) async {
     try {
       final token = await _getToken();
       if (token == null) throw Exception('No token found');
 
-      final response = await _dio.put(
-        '/trainer/tasks/$id/accept',
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
+      final uri = Uri.parse('$_baseUrl/trainer/tasks/$id/accept');
+
+      final response = await http.put(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode != 200) {

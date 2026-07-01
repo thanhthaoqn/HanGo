@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../trainer_lead_dashboard_page.dart';
 import '../trainer_lead_tasks_page.dart';
+import '../../login_page.dart';
 
 class TrainerLeadSidebar extends StatelessWidget {
   final String activeMenu;
@@ -70,7 +72,21 @@ class TrainerLeadSidebar extends StatelessWidget {
             fontSize: 14,
           ),
         ),
-        onTap: () {
+        onTap: () async {
+          if (menuId == 'Logout') {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('auth_token');
+            await prefs.remove('user_role');
+            await prefs.remove('user_fullname');
+            if (context.mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            }
+            return;
+          }
           if (!isActive) {
             if (menuId == 'Dashboard') {
               Navigator.pushReplacement(

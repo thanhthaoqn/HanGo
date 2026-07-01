@@ -53,4 +53,26 @@ public class TrainerTaskController {
         taskManagementService.acceptTaskByTrainer(id, trainerId);
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ResponseEntity<com.hango.hango_backend.dto.TaskDetailDto> getTaskDetail(@PathVariable Long id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        Long trainerId = userDetails.getId();
+
+        com.hango.hango_backend.dto.TaskDetailDto detail = taskManagementService.getTaskDetailForTrainer(id, trainerId);
+        return ResponseEntity.ok(detail);
+    }
+
+    @GetMapping("/{id}/activities")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ResponseEntity<java.util.List<com.hango.hango_backend.dto.TaskActivityDto>> getTaskActivities(@PathVariable Long id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        Long trainerId = userDetails.getId();
+
+        java.util.List<com.hango.hango_backend.dto.TaskActivityDto> activities = taskManagementService.getTaskActivitiesForTrainer(id, trainerId);
+        return ResponseEntity.ok(activities);
+    }
 }
