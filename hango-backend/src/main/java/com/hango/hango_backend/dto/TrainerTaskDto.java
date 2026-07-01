@@ -11,15 +11,11 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TaskDetailDto {
-    private Long id;
-    private String title;
-    private String description;
-    private String type;
-    private Long assigneeId;
-    private String assigneeName;
-    private Long reviewerId;
-    private String reviewerName;
+public class TrainerTaskDto {
+    private Long id; // CreatorTask id (the id needed to accept the task)
+    private Long taskId; // Actual task id
+    private String taskContent;
     private LocalDateTime deadline;
+    private String type;
     private String status;
 }

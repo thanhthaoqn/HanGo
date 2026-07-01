@@ -6,6 +6,7 @@ import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../login_page.dart';
 import '../trainer_courses_page.dart';
+import '../trainer_tasks_page.dart';
 import '../trainer_dashboard_page.dart';
 import 'models/trainer_question.dart';
 import 'widgets/question_filter_pane.dart';
@@ -432,7 +433,14 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             'Question Bank',
             isActive: true,
           ),
-          _buildSidebarItem(Icons.task_alt_outlined, 'Task'),
+          _buildSidebarItem(Icons.task_alt_outlined, 'Task', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerTasksPage(),
+              ),
+            );
+          }),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
