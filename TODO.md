@@ -147,19 +147,19 @@
 
 - [x] Build List Exams UI (Grid of available exams).
 - [ ] Exam Builder UI (select questions).
-- [ ] Exam Execution UI with countdown timer and Mock Submission logic.
+- [x] Exam Execution UI with countdown timer and Mock Submission logic.
 
 ### ⚙️ Phase 2: Backend Execution & API Design _(Assigned to: Backend Agent)_
 
 - [x] List exams API (`GET /api/v1/exams`).
-- [ ] Exam configuration API (`time_limit`, `passing_score`).
-- [ ] Receive answer API (`POST /api/v1/exams/{id}/submit`), with auto-grading algorithm.
-- [ ] Log results to `exam_attempts` and lock attempt to prevent double submission.
+- [x] Exam configuration API (`time_limit`, `passing_score`).
+- [x] Receive answer API (`POST /api/v1/exams/{id}/submit`), with auto-grading algorithm.
+- [x] Log results to `exam_attempts` and lock attempt to prevent double submission.
 
 ### 🔌 Phase 3: Integration _(Assigned to: Frontend Agent)_
 
 - [x] Integrate `GET /api/v1/exams` API for List Exams UI.
-- [ ] Cache answers locally to `shared_preferences` and integrate real API submission logic.
+- [x] Cache answers locally to `shared_preferences` and integrate real API submission logic.
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA/Testing Agent)_
 

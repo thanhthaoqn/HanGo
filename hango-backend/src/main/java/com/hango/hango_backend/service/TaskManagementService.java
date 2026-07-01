@@ -2,7 +2,9 @@ package com.hango.hango_backend.service;
 
 import com.hango.hango_backend.dto.TaskManagementDto;
 import com.hango.hango_backend.entity.CreatorTask;
+import com.hango.hango_backend.entity.TaskActivity;
 import com.hango.hango_backend.repository.CreatorTaskRepository;
+import com.hango.hango_backend.repository.TaskActivityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,12 +24,16 @@ import com.hango.hango_backend.dto.CreateTaskRequest;
 import com.hango.hango_backend.dto.TaskDetailDto;
 import com.hango.hango_backend.dto.UpdateTaskRequest;
 import com.hango.hango_backend.dto.TrainerDto;
+import com.hango.hango_backend.dto.TaskActivityDto;
 import com.hango.hango_backend.entity.Task;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.TaskRepository;
 import com.hango.hango_backend.repository.UserRepository;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
+@Transactional
 public class TaskManagementService {
 
     @Autowired
@@ -38,6 +44,19 @@ public class TaskManagementService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TaskActivityRepository taskActivityRepository;
+
+    private void logActivity(Long taskId, Long userId, String newStatus, String note) {
+        TaskActivity activity = TaskActivity.builder()
+                .taskId(taskId)
+                .userId(userId)
+                .newStatus(newStatus)
+                .note(note)
+                .build();
+        taskActivityRepository.save(activity);
+    }
 
     public Page<TaskManagementDto> getTasksForLead(
             Long leadId,
@@ -62,6 +81,7 @@ public class TaskManagementService {
                 .reviewerName(creatorTask.getReviewer() != null ? creatorTask.getReviewer().getFullName() : null)
                 .type(creatorTask.getTask().getType())
                 .status(creatorTask.getStatus())
+                .deadline(creatorTask.getTask().getDueDate())
                 .build();
     }
 
@@ -111,6 +131,8 @@ public class TaskManagementService {
                 .build();
 
         creatorTaskRepository.save(creatorTask);
+        
+        logActivity(task.getId(), leadId, "ASSIGNED", "Assigned task to " + assignee.getFullName() + ".");
     }
 
     public TaskDetailDto getTaskDetail(Long taskId, Long leadId) {
@@ -161,6 +183,8 @@ public class TaskManagementService {
             creatorTask.setStatus(request.getStatus());
         }
         creatorTaskRepository.save(creatorTask);
+
+        logActivity(taskId, leadId, creatorTask.getStatus(), "Updated task details.");
     }
 
     public void updateTaskStatus(Long taskId, String status, Long leadId) {
@@ -172,6 +196,30 @@ public class TaskManagementService {
                 .orElseThrow(() -> new RuntimeException("Creator task not found"));
         creatorTask.setStatus(status);
         creatorTaskRepository.save(creatorTask);
+        
+        logActivity(taskId, leadId, status, "Changed status to " + status + ".");
+    }
+
+    public List<TaskActivityDto> getTaskActivities(Long taskId, Long leadId) {
+        Task task = taskRepository.findById(taskId).orElseThrow(() -> new RuntimeException("Task not found"));
+        if (!task.getLead().getId().equals(leadId)) {
+            throw new RuntimeException("Unauthorized to view this task");
+        }
+        
+        List<TaskActivity> activities = taskActivityRepository.findByTaskIdOrderByCreatedAtDesc(taskId);
+        return activities.stream().map(a -> {
+            User u = userRepository.findById(a.getUserId()).orElse(null);
+            String userName = u != null ? u.getFullName() : "Unknown User";
+            return TaskActivityDto.builder()
+                    .id(a.getId())
+                    .taskId(a.getTaskId())
+                    .userId(a.getUserId())
+                    .userName(userName)
+                    .actionType(a.getNewStatus())
+                    .description(a.getNote())
+                    .createdAt(a.getCreatedAt())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     public Page<com.hango.hango_backend.dto.TrainerTaskDto> getTasksForTrainer(

@@ -52,3 +52,43 @@ Future<PickedFile?> pickPdfFile() async {
 
   return completer.future;
 }
+
+StreamSubscription? _dragOverSub;
+StreamSubscription? _dropSub;
+
+void setupDragDrop(Function(double clientX, double clientY, PickedFile file) onFileDropped) {
+  _dragOverSub?.cancel();
+  _dropSub?.cancel();
+
+  _dragOverSub = html.window.onDragOver.listen((event) {
+    event.preventDefault();
+  });
+
+  _dropSub = html.window.onDrop.listen((event) {
+    event.preventDefault();
+    final html.MouseEvent mouseEvent = event;
+    final html.DataTransfer? dt = (event as dynamic).dataTransfer;
+    if (dt != null && dt.files != null && dt.files!.isNotEmpty) {
+      final file = dt.files![0];
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      reader.onLoadEnd.listen((e) {
+        onFileDropped(
+          mouseEvent.client.x.toDouble(),
+          mouseEvent.client.y.toDouble(),
+          PickedFile(
+            name: file.name,
+            bytes: reader.result as List<int>,
+          ),
+        );
+      });
+    }
+  });
+}
+
+void cancelDragDrop() {
+  _dragOverSub?.cancel();
+  _dropSub?.cancel();
+  _dragOverSub = null;
+  _dropSub = null;
+}

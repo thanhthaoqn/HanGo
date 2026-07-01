@@ -292,6 +292,7 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
                                       _buildHeaderCell('ASSIGNEE', flex: 2),
                                       _buildHeaderCell('REVIEWER', flex: 2),
                                       _buildHeaderCell('TYPE', flex: 2),
+                                      _buildHeaderCell('DEADLINE', flex: 2),
                                       _buildHeaderCell('STATUS', flex: 2),
                                       _buildHeaderCell('ACTIONS', flex: 1, align: TextAlign.center),
                                     ],
@@ -447,6 +448,7 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
           Expanded(flex: 2, child: Text(task.assigneeName ?? 'N/A', style: const TextStyle(fontSize: 13, color: Colors.black54))),
           Expanded(flex: 2, child: Text(task.reviewerName ?? 'N/A', style: const TextStyle(fontSize: 13, color: Colors.black54))),
           Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _buildTypeBadge(task.type ?? 'Unknown'))),
+          Expanded(flex: 2, child: Text(task.deadline != null ? '${task.deadline!.day.toString().padLeft(2, '0')}/${task.deadline!.month.toString().padLeft(2, '0')}/${task.deadline!.year}' : 'N/A', style: const TextStyle(fontSize: 13, color: Colors.black54))),
           Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _buildStatusBadge(task.status ?? 'Unknown', task.id))),
           Expanded(
             flex: 1,
@@ -492,6 +494,9 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
 
   Widget _buildStatusBadge(String status, int taskId) {
     final List<String> statuses = ['ASSIGNED', 'IN_PROGRESS', 'PENDING', 'SUBMITTED', 'REJECTED', 'COMPLETED'];
+    if (status != 'ASSIGNED') {
+      statuses.remove('ASSIGNED');
+    }
     if (!statuses.contains(status)) {
       statuses.add(status);
     }

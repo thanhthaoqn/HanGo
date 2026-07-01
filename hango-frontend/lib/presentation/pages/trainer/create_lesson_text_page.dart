@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -44,6 +46,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   bool _isUploadingPdf = false;
   double _pdfUploadProgress = 0.0;
   String? _pdfFileSizeStr;
+  final GlobalKey _dropZoneKey = GlobalKey();
 
   @override
   void initState() {
@@ -66,6 +69,21 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         _loadLessonDetailFromApi(lessonId.toInt());
       }
     }
+
+    if (kIsWeb) {
+      registerDragDrop((clientX, clientY, pickedFile) {
+        if (_dropZoneKey.currentContext == null) return;
+        final RenderBox renderBox = _dropZoneKey.currentContext!.findRenderObject() as RenderBox;
+        final position = renderBox.localToGlobal(Offset.zero);
+        final size = renderBox.size;
+        if (clientX >= position.dx &&
+            clientX <= position.dx + size.width &&
+            clientY >= position.dy &&
+            clientY <= position.dy + size.height) {
+          _processPdfFile(pickedFile);
+        }
+      });
+    }
   }
 
   void _loadLessonDetailFromApi(int lessonId) async {
@@ -85,6 +103,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
 
   @override
   void dispose() {
+    if (kIsWeb) {
+      unregisterDragDrop();
+    }
     _titleController.dispose();
     _descController.dispose();
     _questionController.dispose();
@@ -96,40 +117,49 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   }
 
 
+  Future<void> _processPdfFile(PickedFile file) async {
+    final double sizeInMb = file.bytes.length / (1024 * 1024);
+    if (sizeInMb > 50.0) {
+      if (mounted) {
+        ToastHelper.showError(context, 'File size exceeds 50MB limit!');
+      }
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Only PDF files are accepted.');
+      }
+      return;
+    }
+
+    setState(() {
+      _isUploadingPdf = true;
+      _uploadedPdfName = file.name;
+      _pdfFileSizeStr = '${sizeInMb.toStringAsFixed(2)} MB';
+      _pdfUploadProgress = 0.0;
+    });
+
+    const int totalSteps = 20;
+    for (int i = 1; i <= totalSteps; i++) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+      setState(() {
+        _pdfUploadProgress = i / totalSteps;
+      });
+    }
+
+    setState(() {
+      _isUploadingPdf = false;
+    });
+    ToastHelper.showSuccess(context, 'PDF document uploaded successfully.');
+  }
+
   void _pickAndUploadPdf() async {
     try {
-      final picked = await pickPdf();
-      if (picked == null) return;
-
-      final int sizeInBytes = picked.bytes.length;
-      final double sizeInMb = sizeInBytes / (1024 * 1024);
-      if (sizeInMb > 50.0) {
-        if (mounted) {
-          ToastHelper.showError(context, 'File size exceeds 50MB limit!');
-        }
-        return;
+      final file = await pickPdf();
+      if (file != null) {
+        await _processPdfFile(file);
       }
-
-      setState(() {
-        _isUploadingPdf = true;
-        _uploadedPdfName = picked.name;
-        _pdfFileSizeStr = '${sizeInMb.toStringAsFixed(2)} MB';
-        _pdfUploadProgress = 0.0;
-      });
-
-      // Simulate a progress bar from 0.0 to 1.0
-      const int totalSteps = 20;
-      for (int i = 1; i <= totalSteps; i++) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (!mounted) return;
-        setState(() {
-          _pdfUploadProgress = i / totalSteps;
-        });
-      }
-
-      setState(() {
-        _isUploadingPdf = false;
-      });
     } catch (e) {
       debugPrint('Error picking or uploading PDF: $e');
       setState(() {
@@ -937,8 +967,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             ),
           ),
           const SizedBox(height: 8),
-          if (_uploadedPdfName == null || _uploadedPdfName!.isEmpty)
+          if ((_uploadedPdfName == null || _uploadedPdfName!.isEmpty) && !_isUploadingPdf)
             InkWell(
+              key: _dropZoneKey,
               onTap: _pickAndUploadPdf,
               borderRadius: BorderRadius.circular(12),
               child: CustomPaint(
