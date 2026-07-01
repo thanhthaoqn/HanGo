@@ -81,6 +81,7 @@ public class TaskManagementService {
                 .reviewerName(creatorTask.getReviewer() != null ? creatorTask.getReviewer().getFullName() : null)
                 .type(creatorTask.getTask().getType())
                 .status(creatorTask.getStatus())
+                .deadline(creatorTask.getTask().getDueDate())
                 .build();
     }
 
