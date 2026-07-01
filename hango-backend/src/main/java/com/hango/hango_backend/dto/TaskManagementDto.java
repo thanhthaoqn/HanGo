@@ -16,4 +16,5 @@ public class TaskManagementDto {
     private String reviewerName;
     private String type;
     private String status;
+    private java.time.LocalDateTime deadline;
 }

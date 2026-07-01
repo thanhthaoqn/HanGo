@@ -85,6 +85,9 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
         _selectedReviewer = taskDetail['reviewerId'];
         
         _selectedStatus = taskDetail['status'];
+        if (_selectedStatus != 'ASSIGNED') {
+          _statuses.remove('ASSIGNED');
+        }
         if (_selectedStatus != null && !_statuses.contains(_selectedStatus)) {
           _statuses.add(_selectedStatus!);
         }
