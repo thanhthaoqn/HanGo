@@ -50,7 +50,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   ];
   String _selectedCategoryKey = 'GRAMMAR';
   String _selectedLevelKey = 'BASIC';
-  String? _selectedVersion = 'v1.0';
+  final TextEditingController _versionController = TextEditingController(text: 'v1.0');
 
   // Image Upload state variables
   String? _uploadedImageUrl;
@@ -78,6 +78,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _versionController.dispose();
     super.dispose();
   }
 
@@ -1173,14 +1174,23 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ),
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _selectedVersion,
-            hint: const Text(
-              'Enter version...',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-            ),
+          TextField(
+            controller: _versionController,
             decoration: InputDecoration(
+              hintText: 'Enter version...',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              suffixIcon: PopupMenuButton<String>(
+                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                onSelected: (value) {
+                  _versionController.text = value;
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'v1.0', child: Text('v1.0', style: TextStyle(fontFamily: 'Outfit'))),
+                  const PopupMenuItem(value: 'v2.0', child: Text('v2.0', style: TextStyle(fontFamily: 'Outfit'))),
+                  const PopupMenuItem(value: 'v3.0', child: Text('v3.0', style: TextStyle(fontFamily: 'Outfit'))),
+                ],
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -1195,25 +1205,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ),
             ),
             style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
-            items: const [
-              DropdownMenuItem<String>(
-                value: 'v1.0',
-                child: Text('v1.0'),
-              ),
-              DropdownMenuItem<String>(
-                value: 'v2.0',
-                child: Text('v2.0'),
-              ),
-              DropdownMenuItem<String>(
-                value: 'v3.0',
-                child: Text('v3.0'),
-              ),
-            ],
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedVersion = newValue;
-              });
-            },
           ),
           const SizedBox(height: 20),
           // Course Description

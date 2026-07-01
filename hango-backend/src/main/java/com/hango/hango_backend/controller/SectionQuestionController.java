@@ -168,26 +168,48 @@ public class SectionQuestionController {
             String categoryName = rs.getString("category_name");
             String difficultyName = rs.getString("difficulty_name");
 
-            // Fetch options
-            List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
-                    "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+            // Check if it has sub-questions
+            List<Map<String, Object>> subQuestions = jdbcTemplate.queryForList(
+                    "SELECT id FROM questions WHERE group_id = ?",
                     qId
             );
 
             List<String> options = new ArrayList<>();
             int correctIndex = 0;
-            for (int i = 0; i < optionsRows.size(); i++) {
-                Map<String, Object> row = optionsRows.get(i);
-                options.add((String) row.get("option_text"));
-                Object isCorrectObj = row.get("is_correct");
-                boolean isCorrect = false;
-                if (isCorrectObj instanceof Boolean) {
-                    isCorrect = (Boolean) isCorrectObj;
-                } else if (isCorrectObj instanceof Number) {
-                    isCorrect = ((Number) isCorrectObj).intValue() == 1;
+
+            if (subQuestions != null && !subQuestions.isEmpty()) {
+                categoryName = "Multiple Choice";
+                // Get options of all sub-questions to count them
+                for (Map<String, Object> subQ : subQuestions) {
+                    Long subQId = ((Number) subQ.get("id")).longValue();
+                    List<Map<String, Object>> subOpts = jdbcTemplate.queryForList(
+                            "SELECT option_text FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                            subQId
+                    );
+                    for (Map<String, Object> opt : subOpts) {
+                        options.add((String) opt.get("option_text"));
+                    }
                 }
-                if (isCorrect) {
-                    correctIndex = i;
+            } else {
+                // Fetch options
+                List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
+                        "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                        qId
+                );
+
+                for (int i = 0; i < optionsRows.size(); i++) {
+                    Map<String, Object> row = optionsRows.get(i);
+                    options.add((String) row.get("option_text"));
+                    Object isCorrectObj = row.get("is_correct");
+                    boolean isCorrect = false;
+                    if (isCorrectObj instanceof Boolean) {
+                        isCorrect = (Boolean) isCorrectObj;
+                    } else if (isCorrectObj instanceof Number) {
+                        isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                    }
+                    if (isCorrect) {
+                        correctIndex = i;
+                    }
                 }
             }
 
@@ -347,50 +369,43 @@ public class SectionQuestionController {
         Long categoryId = request.getCategoryId() != null ? request.getCategoryId() : 1L;
         Long difficultyId = request.getDifficultyId() != null ? request.getDifficultyId() : 14L;
 
-        // 1. Insert parent (passage) question
-        Long parentQuestionId = null;
+        // 1. Insert into question_groups
+        Long questionGroupId = null;
         try {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
-                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO question_groups (title, group_type_param_id, context_text) VALUES (?, ?, ?)",
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
-                ps.setLong(1, currentUserId);
-                ps.setLong(2, categoryId);
+                ps.setString(1, "Multiple Choice Group");
+                ps.setLong(2, 17L); // 17 is standard reading comprehension param
                 ps.setString(3, request.getPassageText());
-                ps.setString(4, request.getExplanation());
-                ps.setLong(5, difficultyId);
-                ps.setString(6, "APPROVED");
-                if (request.getSectionId() != null) {
-                    ps.setLong(7, request.getSectionId());
-                } else {
-                    ps.setNull(7, java.sql.Types.BIGINT);
-                }
                 return ps;
             }, keyHolder);
 
             Number key = keyHolder.getKey();
             if (key != null) {
-                parentQuestionId = key.longValue();
+                questionGroupId = key.longValue();
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+            return ResponseEntity.badRequest().body("{\"error\": \"Failed to create question group: " + e.getMessage() + "\"}");
         }
 
-        if (parentQuestionId == null) {
-            return ResponseEntity.badRequest().body("{\"error\": \"Failed to save passage parent question\"}");
+        if (questionGroupId == null) {
+            return ResponseEntity.badRequest().body("{\"error\": \"Failed to save question group context\"}");
         }
 
         // 2. Insert sub-questions
+        List<Long> subQuestionIds = new ArrayList<>();
         List<CreateSubQuestionDTO> subQuestions = request.getSubQuestions();
         if (subQuestions != null && !subQuestions.isEmpty()) {
             for (CreateSubQuestionDTO subQ : subQuestions) {
                 Long subQuestionId = null;
                 try {
                     org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
-                    final Long finalParentId = parentQuestionId;
+                    final Long finalGroupId = questionGroupId;
                     jdbcTemplate.update(connection -> {
                         java.sql.PreparedStatement ps = connection.prepareStatement(
                                 "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -407,13 +422,14 @@ public class SectionQuestionController {
                         } else {
                             ps.setNull(7, java.sql.Types.BIGINT);
                         }
-                        ps.setLong(8, finalParentId);
+                        ps.setLong(8, finalGroupId);
                         return ps;
                     }, keyHolder);
 
                     Number key = keyHolder.getKey();
                     if (key != null) {
                         subQuestionId = key.longValue();
+                        subQuestionIds.add(subQuestionId);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -439,7 +455,8 @@ public class SectionQuestionController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Group question created successfully");
-        response.put("id", parentQuestionId);
+        response.put("id", questionGroupId);
+        response.put("questionIds", subQuestionIds);
         return ResponseEntity.ok(response);
     }
 
