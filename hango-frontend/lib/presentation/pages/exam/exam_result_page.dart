@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/course_repository.dart';
+import '../../../data/repositories/exam_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../widgets/shared_footer.dart';
 import '../../widgets/shared_header.dart';
@@ -36,12 +37,33 @@ class _ExamResultPageState extends State<ExamResultPage> {
   bool _isLoadingCourses = true;
   String _weakestSkill = "";
   Map<String, double> _skillAccuracies = {};
+  List<Map<String, dynamic>> _attempts = [];
+  bool _isLoadingAttempts = true;
 
   @override
   void initState() {
     super.initState();
     _analyzeSkills();
     _loadRecommendations();
+    _loadAttempts();
+  }
+
+  Future<void> _loadAttempts() async {
+    try {
+      final repository = ExamRepository();
+      final loadedAttempts = await repository.fetchExamAttempts(widget.exam.id);
+
+      setState(() {
+        _attempts = loadedAttempts;
+        _isLoadingAttempts = false;
+      });
+    } catch (e) {
+      debugPrint("Error loading exam history: $e");
+      setState(() {
+        _attempts = [];
+        _isLoadingAttempts = false;
+      });
+    }
   }
 
   void _analyzeSkills() {
@@ -165,7 +187,16 @@ class _ExamResultPageState extends State<ExamResultPage> {
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(flex: 3, child: _buildResultDetails(isPassed)),
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  children: [
+                                    _buildResultDetails(isPassed),
+                                    const SizedBox(height: 24),
+                                    _buildAttemptHistoryCard(),
+                                  ],
+                                ),
+                              ),
                               const SizedBox(width: 32),
                               Expanded(flex: 2, child: _buildRecommendationsPanel()),
                             ],
@@ -173,6 +204,8 @@ class _ExamResultPageState extends State<ExamResultPage> {
                         : Column(
                             children: [
                               _buildResultDetails(isPassed),
+                              const SizedBox(height: 24),
+                              _buildAttemptHistoryCard(),
                               const SizedBox(height: 32),
                               _buildRecommendationsPanel(),
                             ],
@@ -545,6 +578,183 @@ class _ExamResultPageState extends State<ExamResultPage> {
                           ),
                         );
                       }).toList(),
+                    ),
+        ],
+      ),
+    );
+  }
+
+  // Attempt history card
+  Widget _buildAttemptHistoryCard() {
+    return Container(
+      padding: const EdgeInsets.all(28.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Attempt History',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Total attempts: ${_attempts.length}',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+          const SizedBox(height: 24),
+          
+          _isLoadingAttempts
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40.0),
+                    child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color(0xFF28B79B))),
+                  ),
+                )
+              : _attempts.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 48.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.history_toggle_off, size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 12),
+                            Text(
+                              "No attempts yet.\nStart the exam to see your history.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey.shade400, fontSize: 13, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _attempts.length,
+                      separatorBuilder: (context, index) => const Divider(height: 24),
+                      itemBuilder: (context, index) {
+                        final attempt = _attempts[index];
+                        final attemptNum = attempt['attemptNumber'] ?? (index + 1);
+                        final date = attempt['date'] ?? '';
+                        final score = (attempt['score'] as num?)?.toDouble() ?? 0.0;
+                        final status = attempt['status'] ?? 'PASSED';
+                        
+                        final isPassed = score >= 5.0;
+
+                        return Row(
+                          children: [
+                            // Circular attempt index indicator
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: isPassed ? const Color(0xFFE8F8F5) : const Color(0xFFFEE2E2),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '#$attemptNum',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            
+                            // Date and status
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    date,
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF374151)),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isPassed ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      isPassed ? 'PASSED' : 'FAILED',
+                                      style: TextStyle(
+                                        color: isPassed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  )
+                                ],
+                              ),
+                            ),
+                            
+                            // Score display
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  score.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                                  ),
+                                ),
+                                const Text(
+                                  '/10.0',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                                )
+                              ],
+                            ),
+                            const SizedBox(width: 16),
+                            // Review button
+                            OutlinedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ExamReviewPage(
+                                      exam: widget.exam,
+                                      attempt: attempt,
+                                    ),
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF28B79B),
+                                side: const BorderSide(color: Color(0xFF28B79B)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Review',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
         ],
       ),
