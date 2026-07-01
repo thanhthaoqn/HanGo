@@ -1,29 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../data/repositories/trainer_lead_repository.dart';
-import '../../../domain/model/trainer_lead_task_model.dart';
+import '../../../domain/model/trainer_task_model.dart';
+import '../../../data/repositories/trainer_task_repository.dart';
+import '../../../data/services/auth_service.dart';
+import '../login_page.dart';
+import 'trainer_dashboard_page.dart';
+import 'trainer_courses_page.dart';
+import 'question_bank/trainer_question_bank_page.dart';
+import 'trainer_task_detail_page.dart';
 import '../../../utils/toast_helper.dart';
-import 'widgets/trainer_lead_sidebar.dart';
-import 'widgets/trainer_lead_header.dart';
-import 'trainer_lead_assign_task_page.dart';
-import 'trainer_lead_task_detail_page.dart';
 
-class TrainerLeadTasksPage extends StatefulWidget {
-  const TrainerLeadTasksPage({super.key});
+class TrainerTasksPage extends StatefulWidget {
+  const TrainerTasksPage({super.key});
 
   @override
-  State<TrainerLeadTasksPage> createState() => _TrainerLeadTasksPageState();
+  State<TrainerTasksPage> createState() => _TrainerTasksPageState();
 }
 
-class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
-  final TrainerLeadRepository _repository = TrainerLeadRepository();
+class _TrainerTasksPageState extends State<TrainerTasksPage> {
+  final _authService = AuthService();
+  final _taskRepository = TrainerTaskRepository();
   
-  String _userName = 'Trainer Lead';
-  String _userInitial = 'T';
+  String _trainerName = 'Trainer';
+  String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
+  
   bool _isLoading = true;
   String _errorMessage = '';
   
-  List<TrainerLeadTaskModel> _tasks = [];
+  List<TrainerTaskModel> _tasks = [];
   int _currentPage = 0;
   int _totalPages = 1;
   final int _pageSize = 10;
@@ -31,15 +36,13 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
   // Filters
   DateTime? _fromDate;
   DateTime? _toDate;
-  String _selectedType = 'All type';
   final TextEditingController _searchController = TextEditingController();
-
-  final List<String> _types = ['All type', 'Quiz', 'Lesson', 'Exam', 'Course', 'Section'];
+  String _selectedType = 'All type';
 
   @override
   void initState() {
     super.initState();
-    _loadUserInfo();
+    _loadTrainerInfo();
     _fetchTasks();
   }
   
@@ -49,9 +52,9 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
     super.dispose();
   }
 
-  Future<void> _loadUserInfo() async {
+  Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Trainer Lead';
+    final fullName = prefs.getString('user_fullname') ?? 'Trainer';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -59,10 +62,14 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
         initials = parts.last[0].toUpperCase();
       }
     }
-    setState(() {
-      _userName = fullName;
-      _userInitial = initials;
-    });
+    
+    if (mounted) {
+      setState(() {
+        _trainerName = fullName;
+        _trainerInitials = initials;
+        _trainerAvatarUrl = '';
+      });
+    }
   }
 
   Future<void> _fetchTasks() async {
@@ -71,21 +78,21 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
       _isLoading = true;
       _errorMessage = '';
     });
-    
+
     try {
-      final data = await _repository.getTasks(
-        from: _fromDate,
-        to: _toDate,
+      final response = await _taskRepository.getTrainerTasks(
+        fromDate: _fromDate,
+        toDate: _toDate,
         type: _selectedType == 'All type' ? null : _selectedType,
         search: _searchController.text,
         page: _currentPage,
         size: _pageSize,
       );
-      
+
       if (mounted) {
         setState(() {
-          _tasks = (data['content'] as List).map((e) => TrainerLeadTaskModel.fromJson(e)).toList();
-          _totalPages = data['totalPages'] ?? 1;
+          _tasks = response['tasks'];
+          _totalPages = response['totalPages'];
           _isLoading = false;
         });
       }
@@ -95,40 +102,19 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
           _errorMessage = e.toString();
           _isLoading = false;
         });
-        ToastHelper.showError(context, 'Failed to load tasks: $_errorMessage');
+        ToastHelper.show(context, 'Failed to load tasks: $_errorMessage');
       }
     }
   }
 
-  Future<void> _selectDate(BuildContext context, bool isFromDate) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: isFromDate ? (_fromDate ?? DateTime.now()) : (_toDate ?? DateTime.now()),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF20B486),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF1F2937),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        if (isFromDate) {
-          _fromDate = picked;
-        } else {
-          _toDate = picked;
-        }
-      });
-      _currentPage = 0;
-      _fetchTasks();
+  void _handleLogout() async {
+    await _authService.logout();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
     }
   }
 
@@ -143,19 +129,15 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: TrainerLeadSidebar(activeMenu: 'Task')) : null,
+      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 250, child: TrainerLeadSidebar(activeMenu: 'Task')),
+          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TrainerLeadHeader(
-                  title: 'Task Management',
-                  userName: _userName,
-                  userInitial: _userInitial,
-                ),
+                _buildHeader(context, !isDesktop),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
@@ -177,54 +159,200 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
     );
   }
 
+  Widget _buildSidebar(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE6FFFA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.school, size: 18, color: Color(0xFF20B486)),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'HanGo',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
+          _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', onTap: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerDashboardPage()));
+          }),
+          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()));
+          }),
+          _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
+          _buildSidebarItem(Icons.people_outline, 'Learner'),
+          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()));
+          }),
+          _buildSidebarItem(Icons.task_alt_outlined, 'Task', isActive: true),
+          const Spacer(),
+          const Divider(color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 12),
+          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
+            ToastHelper.show(context, 'Help Center is under construction');
+          }),
+          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
+    final activeColor = const Color(0xFF20B486);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: InkWell(
+        onTap: onTap ?? () {},
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)), size: 20),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, bool showMenuIcon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          if (showMenuIcon)
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          const Text(
+            'Task',
+            style: TextStyle(
+              color: Color(0xFF20B486),
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Color(0xFF4B5563)),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 16),
+          Row(
+            children: [
+              Text(
+                _trainerName,
+                style: const TextStyle(
+                  color: Color(0xFF1F2937),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 12),
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFF20B486),
+                backgroundImage: _trainerAvatarUrl.isNotEmpty ? NetworkImage(_trainerAvatarUrl) : null,
+                child: _trainerAvatarUrl.isEmpty
+                    ? Text(_trainerInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectDate(BuildContext context, bool isFrom) async {
+    final initialDate = isFrom ? (_fromDate ?? DateTime.now()) : (_toDate ?? DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF20B486),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF1F2937),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+      });
+      _fetchTasks();
+    }
+  }
+
   Widget _buildFilterSection() {
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'Search tasks...',
-                    border: InputBorder.none,
-                    icon: Icon(Icons.search, color: Color(0xFF9CA3AF)),
-                  ),
-                  onSubmitted: (_) {
-                    _currentPage = 0;
-                    _fetchTasks();
-                  },
-                ),
-              ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: TextField(
+            controller: _searchController,
+            decoration: const InputDecoration(
+              hintText: 'Search tasks...',
+              border: InputBorder.none,
+              icon: Icon(Icons.search, color: Color(0xFF9CA3AF)),
             ),
-            const SizedBox(width: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TrainerLeadAssignTaskPage()),
-                );
-              },
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Task', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20B486),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ],
+            onSubmitted: (_) => _fetchTasks(),
+          ),
         ),
         const SizedBox(height: 16),
         Container(
@@ -304,7 +432,7 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
                       child: DropdownButton<String>(
                         value: _selectedType,
                         isDense: true,
-                        items: _types.map((String value) {
+                        items: ['All type', 'Quiz', 'Lesson', 'Exam', 'Course', 'Section'].map((String value) {
                           return DropdownMenuItem<String>(
                             value: value,
                             child: Text(value),
@@ -315,7 +443,6 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
                             setState(() {
                               _selectedType = newValue;
                             });
-                            _currentPage = 0;
                             _fetchTasks();
                           }
                         },
@@ -348,15 +475,14 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
               border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                SizedBox(width: 50, child: Text('NO.', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151), fontSize: 12))),
-                Expanded(flex: 3, child: Text('TASK CONTENT', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151), fontSize: 12))),
-                Expanded(flex: 2, child: Text('ASSIGNEE', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151), fontSize: 12))),
-                Expanded(flex: 2, child: Text('REVIEWER', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151), fontSize: 12))),
-                Expanded(flex: 2, child: Text('TYPE', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151), fontSize: 12))),
-                Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151), fontSize: 12))),
-                Expanded(flex: 1, child: Text('ACTION', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151), fontSize: 12), textAlign: TextAlign.center)),
+                const SizedBox(width: 50, child: Text('NO.', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151)))),
+                const Expanded(flex: 3, child: Text('TASK CONTENT', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151)))),
+                const Expanded(child: Text('DEADLINE', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151)))),
+                const Expanded(child: Text('TYPE', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151)))),
+                const Expanded(child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151)))),
+                const Expanded(child: Text('ACTION', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF374151)), textAlign: TextAlign.center)),
               ],
             ),
           ),
@@ -376,13 +502,11 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
                 child: Row(
                   children: [
                     SizedBox(width: 50, child: Text('${_currentPage * _pageSize + index + 1}', style: const TextStyle(color: Color(0xFF4B5563)))),
-                    Expanded(flex: 3, child: Text(task.taskContent, style: const TextStyle(color: Color(0xFF1F2937), fontWeight: FontWeight.w500))),
-                    Expanded(flex: 2, child: Text(task.assigneeName ?? 'N/A', style: const TextStyle(color: Color(0xFF4B5563)))),
-                    Expanded(flex: 2, child: Text(task.reviewerName ?? 'N/A', style: const TextStyle(color: Color(0xFF4B5563)))),
-                    Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _buildBadge(task.type ?? 'Unknown', isType: true))),
-                    Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _buildBadge(task.status ?? 'Unknown', isType: false))),
+                    Expanded(flex: 3, child: Text(task.taskContent, style: const TextStyle(color: Color(0xFF1F2937)))),
+                    Expanded(child: Text(_formatDate(task.deadline), style: const TextStyle(color: Color(0xFF4B5563)))),
+                    Expanded(child: Align(alignment: Alignment.centerLeft, child: _buildBadge(task.type, isType: true))),
+                    Expanded(child: Align(alignment: Alignment.centerLeft, child: _buildBadge(task.status, isType: false))),
                     Expanded(
-                      flex: 1,
                       child: Center(
                         child: _buildActionButton(task),
                       ),
@@ -407,12 +531,11 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
                           _fetchTasks();
                         } : null,
                       ),
-                      ...List.generate(_totalPages > 5 ? 5 : _totalPages, (index) {
-                        final displayIndex = index; // Simplified logic for demo
-                        final isSelected = displayIndex == _currentPage;
+                      ...List.generate(_totalPages, (index) {
+                        final isSelected = index == _currentPage;
                         return InkWell(
                           onTap: () {
-                            setState(() => _currentPage = displayIndex);
+                            setState(() => _currentPage = index);
                             _fetchTasks();
                           },
                           child: Container(
@@ -422,11 +545,10 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
                               color: isSelected ? const Color(0xFF20B486) : Colors.transparent,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text('${displayIndex + 1}', style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF4B5563))),
+                            child: Text('${index + 1}', style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF4B5563))),
                           ),
                         );
                       }),
-                      if (_totalPages > 5) const Text('...'),
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
                         onPressed: _currentPage < _totalPages - 1 ? () {
@@ -454,7 +576,6 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
     } else {
       switch (text.toUpperCase()) {
         case 'ASSIGNED':
-        case 'PENDING':
           bgColor = const Color(0xFFFEF3C7);
           textColor = const Color(0xFFD97706);
           break;
@@ -484,21 +605,21 @@ class _TrainerLeadTasksPageState extends State<TrainerLeadTasksPage> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
-        text.toUpperCase() == 'IN_PROGRESS' ? 'In Progress' : (text.isNotEmpty ? text[0].toUpperCase() + text.substring(1).toLowerCase() : ''),
+        text.toUpperCase() == 'IN_PROGRESS' ? 'In Progress' : text[0].toUpperCase() + text.substring(1).toLowerCase(),
         style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w500),
       ),
     );
   }
 
-  Widget _buildActionButton(TrainerLeadTaskModel task) {
+  Widget _buildActionButton(TrainerTaskModel task) {
     return IconButton(
-      icon: const Icon(Icons.remove_red_eye, color: Color(0xFF20B486)),
-      tooltip: 'View / Edit Detail',
+      icon: const Icon(Icons.remove_red_eye, color: Color(0xFF2ec4b6)),
+      tooltip: 'View Detail',
       onPressed: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => TrainerLeadTaskDetailPage(taskId: task.id),
+            builder: (context) => TrainerTaskDetailPage(taskId: task.id),
           ),
         ).then((_) {
           _fetchTasks();

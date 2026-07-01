@@ -1,34 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../data/repositories/trainer_lead_repository.dart';
+import '../../../data/repositories/trainer_task_repository.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../domain/model/task_activity_model.dart';
-import 'widgets/trainer_lead_sidebar.dart';
-import 'widgets/trainer_lead_header.dart';
-import 'trainer_lead_tasks_page.dart';
+import 'trainer_tasks_page.dart';
+import 'trainer_dashboard_page.dart';
+import 'trainer_courses_page.dart';
+import 'question_bank/trainer_question_bank_page.dart';
+import '../login_page.dart';
 
-class TrainerLeadTaskDetailPage extends StatefulWidget {
+class TrainerTaskDetailPage extends StatefulWidget {
   final int taskId;
-  const TrainerLeadTaskDetailPage({super.key, required this.taskId});
+  const TrainerTaskDetailPage({super.key, required this.taskId});
 
   @override
-  State<TrainerLeadTaskDetailPage> createState() => _TrainerLeadTaskDetailPageState();
+  State<TrainerTaskDetailPage> createState() => _TrainerTaskDetailPageState();
 }
 
-class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
-  final TrainerLeadRepository _repository = TrainerLeadRepository();
+class _TrainerTaskDetailPageState extends State<TrainerTaskDetailPage> {
+  final TrainerTaskRepository _repository = TrainerTaskRepository();
   
-  String _userName = 'Thảo';
+  String _userName = 'Trainer';
   String _userInitial = 'T';
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 
-  List<Map<String, dynamic>> _trainers = [];
-  List<Map<String, dynamic>> _reviewers = [];
   List<TaskActivityModel> _taskActivities = [];
   int? _selectedAssignee;
+  String? _assigneeName;
   int? _selectedReviewer;
+  String? _reviewerName;
   String? _selectedType;
   DateTime? _reviewDeadline;
   String? _selectedStatus;
@@ -48,7 +50,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final fullName = prefs.getString('user_fullname') ?? 'Trainer';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -64,14 +66,10 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
 
   Future<void> _fetchData() async {
     try {
-      final trainers = await _repository.getTrainers();
-      final reviewers = await _repository.getReviewers();
       final taskDetail = await _repository.getTaskDetail(widget.taskId);
       final activities = await _repository.getTaskActivities(widget.taskId);
       
       setState(() {
-        _trainers = trainers;
-        _reviewers = reviewers;
         _taskActivities = activities;
         
         _titleController.text = taskDetail['title'] ?? '';
@@ -82,12 +80,11 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
         }
         
         _selectedAssignee = taskDetail['assigneeId'];
+        _assigneeName = taskDetail['assigneeName'];
         _selectedReviewer = taskDetail['reviewerId'];
+        _reviewerName = taskDetail['reviewerName'];
         
         _selectedStatus = taskDetail['status'];
-        if (_selectedStatus != 'ASSIGNED') {
-          _statuses.remove('ASSIGNED');
-        }
         if (_selectedStatus != null && !_statuses.contains(_selectedStatus)) {
           _statuses.add(_selectedStatus!);
         }
@@ -108,39 +105,14 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _reviewDeadline ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) {
-      setState(() {
-        _reviewDeadline = picked;
-      });
-    }
-  }
-
-  void _showConfirmationDialog() {
-    if (_titleController.text.trim().isEmpty || _descController.text.trim().isEmpty || 
-        _selectedAssignee == null || _reviewDeadline == null || _selectedType == null || _selectedStatus == null) {
-      ToastHelper.showError(context, 'Please fill all fields');
-      return;
-    }
-
-    if (_selectedReviewer != null && _selectedAssignee == _selectedReviewer) {
-      ToastHelper.showError(context, 'Assignee cannot be the same as Reviewer');
-      return;
-    }
-
+  Future<void> _handleAcceptTask() async {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirm Update'),
-          content: const Text('Are you sure you want to update this task?'),
-          actions: <Widget>[
+          title: const Text('Accept Task'),
+          content: const Text('Are you sure you want to accept this task?'),
+          actions: [
             TextButton(
               child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
               onPressed: () {
@@ -148,11 +120,11 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
               },
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2ec4b6)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20B486)),
               child: const Text('Confirm', style: TextStyle(color: Colors.white)),
               onPressed: () {
                 Navigator.of(context).pop();
-                _submitTask();
+                _performAcceptTask();
               },
             ),
           ],
@@ -161,35 +133,26 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
     );
   }
 
-  Future<void> _submitTask() async {
+  Future<void> _performAcceptTask() async {
     setState(() {
       _isSubmitting = true;
     });
 
     try {
-      await _repository.updateTask(widget.taskId, {
-        'title': _titleController.text,
-        'description': _descController.text,
-        'type': _selectedType,
-        'assigneeId': _selectedAssignee,
-        'reviewerId': _selectedReviewer,
-        'deadline': _reviewDeadline!.toIso8601String().split('.')[0],
-        'status': _selectedStatus,
-      });
-      
+      await _repository.acceptTask(widget.taskId);
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Task updated successfully');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const TrainerLeadTasksPage()),
-        );
+        ToastHelper.showSuccess(context, 'Task accepted successfully');
+        _fetchData(); // Reload detail to show Go to Task
       }
     } catch (e) {
-      setState(() {
-        _isSubmitting = false;
-      });
       if (mounted) {
-        ToastHelper.showError(context, 'Error: $e');
+        ToastHelper.showError(context, 'Error accepting task: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -201,18 +164,14 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
       body: Row(
         children: [
           // Sidebar
-          const TrainerLeadSidebar(activeMenu: 'Task'),
+          if (MediaQuery.of(context).size.width >= 768) SizedBox(width: 250, child: _buildSidebar(context)),
           
           // Main Content Area
           Expanded(
             child: Column(
               children: [
                 // Header
-                TrainerLeadHeader(
-                  title: 'Task > Task Detail',
-                  userName: _userName,
-                  userInitial: _userInitial,
-                ),
+                _buildHeader(context, MediaQuery.of(context).size.width < 768),
                 
                 // Content
                 Expanded(
@@ -281,14 +240,14 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
               children: [
                 // Task Title
                 _buildLabel('Task Title'),
-                _buildTextField(_titleController, 'Enter task title...'),
+                _buildTextField(_titleController, 'Task title...', readOnly: true),
                 
                 const SizedBox(height: 12),
 
                 // Task Description
                 _buildLabel('Task Description'),
                 Expanded(
-                  child: _buildTextField(_descController, 'Enter task content here...', expands: true),
+                  child: _buildTextField(_descController, 'Task content...', expands: true, readOnly: true),
                 ),
 
                 const SizedBox(height: 12),
@@ -300,8 +259,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                       child: _buildDropdown(
                         'Task Type',
                         _selectedType,
-                        _types.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        (val) => setState(() => _selectedType = val),
+                        _selectedType != null ? [DropdownMenuItem(value: _selectedType, child: Text(_selectedType!))] : [],
                       ),
                     ),
                     const SizedBox(width: 20),
@@ -309,7 +267,6 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                       child: _buildDatePicker(
                         'Deadline',
                         _reviewDeadline,
-                        () => _selectDate(context),
                       ),
                     ),
                   ],
@@ -324,8 +281,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                       child: _buildDropdown(
                         'Assignee',
                         _selectedAssignee,
-                        _trainers.map((e) => DropdownMenuItem(value: e['id'], child: Text(e['fullName']))).toList(),
-                        (val) => setState(() => _selectedAssignee = val),
+                        _selectedAssignee != null ? [DropdownMenuItem(value: _selectedAssignee, child: Text(_assigneeName ?? 'Unknown'))] : [],
                       ),
                     ),
                     const SizedBox(width: 20),
@@ -333,8 +289,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                       child: _buildDropdown(
                         'Reviewer',
                         _selectedReviewer,
-                        _reviewers.map((e) => DropdownMenuItem(value: e['id'], child: Text(e['fullName']))).toList(),
-                        (val) => setState(() => _selectedReviewer = val),
+                        _selectedReviewer != null ? [DropdownMenuItem(value: _selectedReviewer, child: Text(_reviewerName ?? 'Unknown'))] : [],
                       ),
                     ),
                   ],
@@ -356,8 +311,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                 child: _buildDropdown(
                   'Status',
                   _selectedStatus,
-                  _statuses.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                  (val) => setState(() => _selectedStatus = val),
+                  _selectedStatus != null ? [DropdownMenuItem(value: _selectedStatus, child: Text(_selectedStatus!))] : [],
                 ),
               ),
               Row(
@@ -366,7 +320,7 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                     onPressed: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const TrainerLeadTasksPage()),
+                        MaterialPageRoute(builder: (context) => const TrainerTasksPage()),
                       );
                     },
                     style: OutlinedButton.styleFrom(
@@ -377,19 +331,35 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                     ),
                     child: const Text('Back'),
                   ),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: _isSubmitting ? null : _showConfirmationDialog,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2ec4b6),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  if (_selectedStatus == 'ASSIGNED') ...[
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: _isSubmitting ? null : _handleAcceptTask,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20B486),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: _isSubmitting 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Accept Task', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                    child: _isSubmitting 
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('UPDATE', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+                  ] else if (_selectedStatus == 'IN_PROGRESS') ...[
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        ToastHelper.show(context, 'Redirecting to task (Placeholder)');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text('Go to Task', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -491,9 +461,9 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
                   children: [
                     const Text('Assigned Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
-                    _buildMemberRow('Assignee', _selectedAssignee != null ? _trainers.firstWhere((e) => e['id'] == _selectedAssignee, orElse: () => {'fullName': 'Unknown'})['fullName'] : 'None', Colors.blue),
+                    _buildMemberRow('Assignee', _assigneeName ?? 'Unknown', Colors.blue),
                     const SizedBox(height: 12),
-                    _buildMemberRow('Reviewer', _selectedReviewer != null ? _reviewers.firstWhere((e) => e['id'] == _selectedReviewer, orElse: () => {'fullName': 'Unknown'})['fullName'] : 'None', Colors.purple),
+                    _buildMemberRow('Reviewer', _reviewerName ?? 'Unknown', Colors.purple),
                   ],
                 ),
               ),
@@ -608,9 +578,10 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, {int? maxLines = 1, bool expands = false}) {
+  Widget _buildTextField(TextEditingController controller, String hint, {int? maxLines = 1, bool expands = false, bool readOnly = false}) {
     return TextField(
       controller: controller,
+      readOnly: readOnly,
       maxLines: expands ? null : maxLines,
       expands: expands,
       textAlignVertical: expands ? TextAlignVertical.top : null,
@@ -626,11 +597,13 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
           borderSide: BorderSide(color: Colors.grey.shade300),
         ),
         contentPadding: const EdgeInsets.all(12),
+        fillColor: readOnly ? Colors.grey.shade100 : Colors.white,
+        filled: readOnly,
       ),
     );
   }
 
-  Widget _buildDropdown(String label, dynamic value, List<DropdownMenuItem<dynamic>> items, Function(dynamic) onChanged) {
+  Widget _buildDropdown(String label, dynamic value, List<DropdownMenuItem<dynamic>> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -640,15 +613,16 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey.shade300),
             borderRadius: BorderRadius.circular(8),
+            color: Colors.grey.shade100,
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<dynamic>(
               isExpanded: true,
               value: value,
-              icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade600),
-              hint: Text('Select $label', style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
+              icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade400),
+              hint: Text(value != null ? value.toString() : 'Select $label', style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
               items: items,
-              onChanged: onChanged,
+              onChanged: null, // Disabled
             ),
           ),
         ),
@@ -656,36 +630,214 @@ class _TrainerLeadTaskDetailPageState extends State<TrainerLeadTaskDetailPage> {
     );
   }
 
-  Widget _buildDatePicker(String label, DateTime? date, VoidCallback onTap, {bool disabled = false}) {
+  Widget _buildDatePicker(String label, DateTime? date) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildLabel(label),
-        InkWell(
-          onTap: disabled ? null : onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-              color: disabled ? Colors.grey.shade100 : Colors.white,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  date != null ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}' : 'Select Date',
-                  style: TextStyle(
-                    color: date != null ? Colors.black87 : Colors.grey.shade400,
-                    fontSize: 14,
-                  ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.grey.shade100,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                date != null ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}' : 'Select Date',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14,
                 ),
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade400),
-              ],
-            ),
+              ),
+              Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade400),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  void _handleLogout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('user_role');
+    await prefs.remove('user_fullname');
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    }
+  }
+
+  Widget _buildSidebar(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE6FFFA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.school, size: 18, color: Color(0xFF20B486)),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'HanGo',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
+          _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', onTap: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerDashboardPage()));
+          }),
+          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()));
+          }),
+          _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
+          _buildSidebarItem(Icons.people_outline, 'Learner'),
+          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()));
+          }),
+          _buildSidebarItem(Icons.task_alt_outlined, 'Task', isActive: true, onTap: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerTasksPage()));
+          }),
+          const Spacer(),
+          const Divider(color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 12),
+          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
+            ToastHelper.show(context, 'Help Center is under construction');
+          }),
+          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
+    final activeColor = const Color(0xFF20B486);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: InkWell(
+        onTap: onTap ?? () {},
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)), size: 20),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, bool showMenuIcon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+      ),
+      child: Row(
+        children: [
+          if (showMenuIcon)
+            IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () {
+                Scaffold.of(context).openDrawer();
+              },
+            ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF9CA3AF)),
+                filled: true,
+                fillColor: const Color(0xFFF3F4F6),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+          const SizedBox(width: 24),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: Color(0xFF4B5563)),
+                onPressed: () {},
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          CircleAvatar(
+            backgroundColor: const Color(0xFF20B486),
+            child: Text(
+              _userInitial,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            _userName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
