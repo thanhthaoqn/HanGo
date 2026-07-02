@@ -6,6 +6,7 @@ import '../pages/register_page.dart';
 import '../pages/exam/list_exams_page.dart';
 import '../pages/course/list_courses_page.dart';
 import '../pages/learner/learner_home_page.dart';
+import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
 
 import '../../utils/toast_helper.dart';
@@ -250,6 +251,21 @@ class _SharedHeaderState extends State<SharedHeader> {
         ),
         const SizedBox(width: 24),
         _buildHeaderNavLink('Flashcard'),
+        const SizedBox(width: 24),
+        _buildHeaderNavLink(
+          'Learning Pathway',
+          active: widget.activeTab == 'Learning Pathway',
+          onTap: () {
+            if (widget.activeTab != 'Learning Pathway') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LearningPathwayPage(),
+                ),
+              );
+            }
+          },
+        ),
       ],
     );
 
