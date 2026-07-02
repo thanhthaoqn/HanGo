@@ -21,26 +21,36 @@ class InteractiveNodeTree extends StatelessWidget {
       itemBuilder: (context, index) {
         final node = nodes[index];
         final isLast = index == nodes.length - 1;
-        
+
         // Zig-zag alignment: Left, Center, Right, Center, Left...
         // For simplicity, alternating left and right slightly
-        final alignment = index % 2 == 0 ? Alignment.centerLeft : Alignment.centerRight;
-        final paddingHorizontal = index % 2 == 0 ? const EdgeInsets.only(left: 40, right: 80) : const EdgeInsets.only(left: 80, right: 40);
+        final alignment = index % 2 == 0
+            ? Alignment.centerLeft
+            : Alignment.centerRight;
+        final paddingHorizontal = index % 2 == 0
+            ? const EdgeInsets.only(left: 40, right: 80)
+            : const EdgeInsets.only(left: 80, right: 40);
 
-        return _buildNodeItem(context, node, isLast, alignment, paddingHorizontal);
+        return _buildNodeItem(
+          context,
+          node,
+          isLast,
+          alignment,
+          paddingHorizontal,
+        );
       },
     );
   }
 
   Widget _buildNodeItem(
-    BuildContext context, 
-    PathwayNode node, 
-    bool isLast, 
-    Alignment alignment, 
-    EdgeInsets padding
+    BuildContext context,
+    PathwayNode node,
+    bool isLast,
+    Alignment alignment,
+    EdgeInsets padding,
   ) {
     final isSelected = selectedNode?.step == node.step;
-    
+
     return Stack(
       alignment: Alignment.topCenter,
       children: [
@@ -51,12 +61,12 @@ class InteractiveNodeTree extends StatelessWidget {
             bottom: -60,
             child: Container(
               width: 4,
-              color: node.status == NodeStatus.completed 
+              color: node.status == NodeStatus.completed
                   ? const Color(0xFF10B981) // Green
                   : const Color(0xFFE2E8F0), // Gray
             ),
           ),
-          
+
         // Node Content
         Align(
           alignment: alignment,
@@ -71,7 +81,7 @@ class InteractiveNodeTree extends StatelessWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected 
+                    color: isSelected
                         ? const Color(0xFF3B82F6) // Selected Blue
                         : _getBorderColor(node.status),
                     width: isSelected ? 2 : 1.5,
@@ -102,7 +112,7 @@ class InteractiveNodeTree extends StatelessWidget {
                         children: [
                           _buildStatusBadge(node.status),
                           Text(
-                            'Bước ${node.step}',
+                            'Step ${node.step}',
                             style: const TextStyle(
                               color: Color(0xFF94A3B8),
                               fontWeight: FontWeight.w600,
@@ -117,8 +127,8 @@ class InteractiveNodeTree extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: node.status == NodeStatus.locked 
-                              ? const Color(0xFF94A3B8) 
+                          color: node.status == NodeStatus.locked
+                              ? const Color(0xFF94A3B8)
                               : const Color(0xFF1E293B),
                           height: 1.3,
                         ),
@@ -127,12 +137,14 @@ class InteractiveNodeTree extends StatelessWidget {
                       Wrap(
                         spacing: 8,
                         runSpacing: 4,
-                        children: node.tags.map((tag) => _buildTag(tag, node.status)).toList(),
+                        children: node.tags
+                            .map((tag) => _buildTag(tag, node.status))
+                            .toList(),
                       ),
                       if (node.status == NodeStatus.inProgress) ...[
                         const SizedBox(height: 16),
                         _buildProgressBar(node.progressPercent),
-                      ]
+                      ],
                     ],
                   ),
                 ),
@@ -146,15 +158,19 @@ class InteractiveNodeTree extends StatelessWidget {
 
   Color _getBorderColor(NodeStatus status) {
     switch (status) {
-      case NodeStatus.completed: return const Color(0xFF10B981);
-      case NodeStatus.inProgress: return const Color(0xFF3B82F6);
-      case NodeStatus.locked: return const Color(0xFFE2E8F0);
+      case NodeStatus.completed:
+        return const Color(0xFF10B981);
+      case NodeStatus.inProgress:
+        return const Color(0xFF3B82F6);
+      case NodeStatus.locked:
+        return const Color(0xFFE2E8F0);
     }
   }
 
   Color _getShadowColor(NodeStatus status, bool isSelected) {
     if (isSelected) return const Color(0xFF3B82F6).withOpacity(0.3);
-    if (status == NodeStatus.inProgress) return const Color(0xFF3B82F6).withOpacity(0.2);
+    if (status == NodeStatus.inProgress)
+      return const Color(0xFF3B82F6).withOpacity(0.2);
     return Colors.transparent;
   }
 
@@ -172,7 +188,14 @@ class InteractiveNodeTree extends StatelessWidget {
             children: [
               Icon(Icons.check_circle, size: 14, color: Color(0xFF10B981)),
               SizedBox(width: 4),
-              Text('Hoàn thành', style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(
+                'Completed',
+                style: TextStyle(
+                  color: Color(0xFF10B981),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         );
@@ -188,7 +211,14 @@ class InteractiveNodeTree extends StatelessWidget {
             children: [
               Icon(Icons.play_circle_fill, size: 14, color: Color(0xFF3B82F6)),
               SizedBox(width: 4),
-              Text('Đang học', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(
+                'In Progress',
+                style: TextStyle(
+                  color: Color(0xFF3B82F6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         );
@@ -204,7 +234,14 @@ class InteractiveNodeTree extends StatelessWidget {
             children: [
               Icon(Icons.lock, size: 14, color: Color(0xFF94A3B8)),
               SizedBox(width: 4),
-              Text('Chưa mở', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(
+                'Locked',
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         );

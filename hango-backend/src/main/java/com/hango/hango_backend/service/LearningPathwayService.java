@@ -74,7 +74,7 @@ public class LearningPathwayService {
         }
 
         String systemPrompt = """
-                You are an experienced AI Mentor for high school English exam preparation.
+                .
                 Analyze the learner exam result JSON and propose a personalized learning roadmap with at most 4 steps.
 
                 Core rules:
@@ -215,13 +215,28 @@ public class LearningPathwayService {
             throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
         }
 
+        String pathwayStepsText = pathway.getNodes().stream()
+                .map(node -> "Bước " + node.getStepOrder() + ": " + node.getCourse().getTitle() + " (status=" + node.getStatus() + ")")
+                .reduce("", (left, right) -> left.isBlank() ? right : left + "\n" + right);
+
         String systemPrompt = """
-                You are an AI Mentor. The learner is following this pathway.
-                Answer briefly, clearly, and kindly.
-                Current pathway steps: %s
-                """.formatted(pathway.getNodes().stream()
-                .map(node -> "Step " + node.getStepOrder() + ": " + node.getCourse().getTitle())
-                .reduce("", (left, right) -> left + "\n" + right));
+                Bạn là Trợ lý học tập AI cho Learning Pathway của HanGo và hãy trả lời bằng tiếng Việt.
+                Người học đang theo lộ trình bên dưới.
+
+                QUY TẮC BẮT BUỘC (RẤT QUAN TRỌNG):
+                1) Chỉ hỗ trợ theo lộ trình hiện tại. Bạn KHÔNG trả lời các nội dung không liên quan đến roadmap này.
+                2) Luôn trả lời bằng tiếng Việt (chỉ giữ nguyên tiếng Anh khi trích dẫn trực tiếp).
+                3) Không “chat tự do”; không tự bịa thêm bước/khóa học ngoài các bước hiện có.
+                4) Nếu người học hỏi điều gì đó KHÔNG thuộc phạm vi lộ trình, hãy từ chối nhẹ nhàng + nhắc họ quay lại một Bước trong roadmap.
+
+                LỘ TRÌNH HIỆN TẠI:
+                %s
+
+                Nhiệm vụ:
+                - Giải thích lý do các bước xuất hiện và gợi ý cách học cho từng bước.
+                - Nếu câu hỏi thuộc nội dung một bước cụ thể, hãy bám sát tiêu đề khóa học của bước đó và gợi ý ôn tập.
+                - Nếu không xác định được bước liên quan, hãy hỏi lại người học để chọn đúng Bước.
+                """.formatted(pathwayStepsText);
 
         List<GeminiGenerateRequest.Content> chatHistory = List.of(
                 GeminiGenerateRequest.Content.builder()
@@ -336,3 +351,4 @@ public class LearningPathwayService {
         return "This course helps reinforce " + category + " based on your recent test result." + scoreText;
     }
 }
+
