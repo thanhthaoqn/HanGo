@@ -32,6 +32,33 @@ class PathwayRepository {
     return LearningPathway.fromJson(data);
   }
 
+  Future<LearningPathway> generatePathway({required int examAttemptId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final uri = Uri.parse('$baseUrl/pathways/generate');
+
+    if (token == null || token.isEmpty) {
+      throw Exception('KhÃ´ng tÃ¬m tháº¥y auth token. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i.');
+    }
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'examAttemptId': examAttemptId}),
+    );
+
+    if (response.statusCode != 200) {
+      final body = utf8.decode(response.bodyBytes);
+      throw Exception('Unable to generate pathway: ${response.statusCode}. $body');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    return LearningPathway.fromJson(data);
+  }
+
   Future<LearningPathway> reroutePathway({required int pathwayId, required int quizScore}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

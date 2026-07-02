@@ -75,13 +75,13 @@
 
 ### 🚨 Phase 4: Quality Assurance _(Assigned to: QA Agent)_
 
-- [ ] **Anti-Hallucination Test:** Xác minh AI không tự bịa `course_id` ngoài danh sách SystemCourses.
-- [ ] **Dynamic Re-routing Test:** Khi điểm quiz < ngưỡng → lộ trình được tính toán lại chính xác.
-- [ ] **Widget Test Node Tree:** Kiểm tra animation transitions (Locked → In Progress → Completed) đạt 60fps.
-- [ ] **Edge Case — Cold Start:** User chưa có exam attempt nào → hiển thị thông báo hướng dẫn làm bài thi trước.
-- [ ] **Edge Case — Empty Courses:** Không có khóa học Published nào phù hợp → AI trả về thông báo phù hợp, không crash.
-- [ ] **Security Test:** LEARNER role chỉ xem được pathway của chính mình, không truy cập pathway user khác.
-- [ ] **Concurrent Test:** 2 request `generate` cùng lúc cho cùng 1 user → không tạo duplicate pathway.
+- [ ] (In Progress) **Anti-Hallucination Test:** Xác minh AI không tự bịa `course_id` ngoài danh sách SystemCourses.
+- [ ] (In Progress) **Dynamic Re-routing Test:** Khi điểm quiz < ngưỡng → lộ trình được tính toán lại chính xác.
+- [ ] (In Progress) **Widget Test Node Tree:** Kiểm tra animation transitions (Locked → In Progress → Completed) đạt 60fps.
+- [ ] (In Progress) **Edge Case — Cold Start:** User chưa có exam attempt nào → hiển thị thông báo hướng dẫn làm bài thi trước.
+- [ ] (In Progress) **Edge Case — Empty Courses:** Không có khóa học Published nào phù hợp → AI trả về thông báo phù hợp, không crash.
+- [ ] (In Progress) **Security Test:** LEARNER role chỉ xem được pathway của chính mình, không truy cập pathway user khác.
+- [ ] (In Progress) **Concurrent Test:** 2 request `generate` cùng lúc cho cùng 1 user → không tạo duplicate pathway.
 
 ---
 

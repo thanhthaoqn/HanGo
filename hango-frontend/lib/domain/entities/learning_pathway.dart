@@ -25,12 +25,12 @@ class PathwayNode {
 
   factory PathwayNode.fromJson(Map<String, dynamic> json) {
     NodeStatus parseStatus(String statusStr) {
-      switch (statusStr) {
-        case 'In_Progress':
+      switch (statusStr.trim().toUpperCase()) {
+        case 'IN_PROGRESS':
           return NodeStatus.inProgress;
-        case 'Completed':
+        case 'COMPLETED':
           return NodeStatus.completed;
-        case 'Locked':
+        case 'LOCKED':
         default:
           return NodeStatus.locked;
       }

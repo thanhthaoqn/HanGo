@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
+import '../../../data/repositories/pathway_repository.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
@@ -230,7 +231,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     _saveAnswersToCache();
   }
 
-  void _autoSubmit() {
+  Future<void> _autoSubmit() async {
     if (_isSubmitted) return;
     _clearCache();
     setState(() {
@@ -246,7 +247,8 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     }
     double score = (correctCount / _examQuestions.length) * 10;
     
-    _saveAttemptToHistory(score);
+    await _saveAttemptToHistory(score);
+    if (!mounted) return;
 
     Navigator.pushReplacement(
       context,
@@ -339,7 +341,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context); // Close confirm dialog
                         _clearCache();
                         setState(() {
@@ -356,10 +358,11 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                         }
                         double score = (correctCount / _examQuestions.length) * 10;
                         
-                        _saveAttemptToHistory(score);
+                        await _saveAttemptToHistory(score);
+                        if (!mounted) return;
 
                         Navigator.pushReplacement(
-                          context,
+                          this.context,
                           MaterialPageRoute(
                             builder: (context) => ExamResultPage(
                               exam: widget.exam,
@@ -412,9 +415,15 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
       _userAnswers.forEach((key, value) {
         answersForSubmit[(key + 1).toString()] = value;
       });
-      await repository.submitExamAttempt(widget.exam.id, score, answersForSubmit);
+      final attempt = await repository.submitExamAttempt(widget.exam.id, score, answersForSubmit);
+      final rawAttemptId = attempt['id'];
+      final attemptId = rawAttemptId is int ? rawAttemptId : int.tryParse('$rawAttemptId');
+
+      if (attemptId != null && attemptId > 0) {
+        await PathwayRepository().generatePathway(examAttemptId: attemptId);
+      }
     } catch (e) {
-      debugPrint("Error saving attempt to history: $e");
+      debugPrint("Error saving attempt or generating pathway: $e");
     }
   }
 

@@ -20,8 +20,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
@@ -37,7 +39,7 @@ public class LearningPathwayService {
 
     @Transactional
     public LearningPathwayResponseDTO generatePathway(Long studentId, Long examAttemptId) {
-        User student = userRepository.findById(studentId)
+        User student = userRepository.findByIdForUpdate(studentId)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
 
         ExamAttempt examAttempt = examAttemptRepository.findById(examAttemptId)
@@ -47,101 +49,98 @@ public class LearningPathwayService {
             throw new ApiException("Access denied to this exam attempt", HttpStatus.FORBIDDEN);
         }
 
-        // 1. Lấy danh sách System Courses
-        List<Course> availableCourses = courseRepository.findAll().stream()
-                .filter(c -> "PUBLISHED".equalsIgnoreCase(c.getStatus()))
+        List<Course> allCourses = courseRepository.findAll().stream()
+                .filter(course -> course.getDeletedAt() == null)
                 .toList();
+        List<Course> publishedCourses = allCourses.stream()
+                .filter(course -> "PUBLISHED".equalsIgnoreCase(course.getStatus()))
+                .toList();
+        boolean usingExistingCoursesFallback = publishedCourses.isEmpty();
+        List<Course> availableCourses = usingExistingCoursesFallback ? allCourses : publishedCourses;
 
-        StringBuilder courseListBuilder = new StringBuilder();
-        for (Course c : availableCourses) {
-            courseListBuilder.append(String.format("- ID: %d, Tên: %s, Thể loại: %s, Độ khó: %s, Tóm tắt: %s\n",
-                    c.getId(),
-                    c.getTitle(),
-                    c.getCategory() != null ? c.getCategory().getParamValue() : "N/A",
-                    c.getDifficulty() != null ? c.getDifficulty().getParamValue() : "N/A",
-                    c.getDescription()
-            ));
+        if (availableCourses.isEmpty()) {
+            return createEmptyPathway(student, examAttempt,
+                    "No courses are available yet, so I cannot build a learning pathway. Please try again after a trainer creates a course.");
         }
 
-        // 2. Build System Prompt
+        StringBuilder courseListBuilder = new StringBuilder();
+        for (Course course : availableCourses) {
+            courseListBuilder.append(String.format("- ID: %d, Name: %s, Category: %s, Difficulty: %s, Summary: %s%n",
+                    course.getId(),
+                    course.getTitle(),
+                    course.getCategory() != null ? course.getCategory().getParamValue() : "N/A",
+                    course.getDifficulty() != null ? course.getDifficulty().getParamValue() : "N/A",
+                    course.getDescription()));
+        }
+
         String systemPrompt = """
-                Bạn là một AI Mentor giàu kinh nghiệm ôn thi THPT Quốc gia môn Tiếng Anh.
-                Nhiệm vụ của bạn là phân tích cấu trúc dữ liệu JSON bài làm của học viên, nhận diện lỗ hổng kiến thức,
-                sau đó ĐỀ XUẤT một lộ trình học tập (Roadmap) cá nhân hoá, gồm tối đa 4 bước.
-                
-                QUY TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ):
-                1. CHỈ ĐƯỢC PHÉP chọn khóa học (course_id) từ danh sách [AVAILABLE_COURSES] dưới đây. TUYỆT ĐỐI KHÔNG tự bịa ra khóa học.
-                2. Lộ trình phải đi từ nền tảng (Ngữ pháp/Từ vựng cơ bản) lên nâng cao (Đọc hiểu).
-                3. Định dạng trả về BẮT BUỘC là chuỗi JSON hợp lệ (không bao gồm markdown block ```json hay gì khác).
-                
+                You are an experienced AI Mentor for high school English exam preparation.
+                Analyze the learner exam result JSON and propose a personalized learning roadmap with at most 4 steps.
+
+                Core rules:
+                1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
+                2. Prioritize foundations first, then harder reading or advanced skills.
+                3. Return valid JSON only, without markdown fences.
+
                 [AVAILABLE_COURSES]
                 %s
-                
-                ĐỊNH DẠNG JSON TRẢ VỀ:
+
+                JSON format:
                 {
                   "roadmap_id": "AUTO_GEN",
-                  "mentor_summary": "Nhận xét tổng quan của mentor về bài thi...",
+                  "mentor_summary": "Short mentor analysis...",
                   "nodes": [
-                    { "step": 1, "course_id": 1, "reason_why": "Lý do học phần này...", "status": "In_Progress", "tags": ["#Grammar"] },
-                    { "step": 2, "course_id": 2, "reason_why": "Lý do học phần này...", "status": "Locked", "tags": ["#Reading"] }
+                    { "step": 1, "course_id": 1, "reason_why": "Why this course helps...", "status": "IN_PROGRESS", "tags": ["#Grammar"] },
+                    { "step": 2, "course_id": 2, "reason_why": "Why this course helps...", "status": "LOCKED", "tags": ["#Reading"] }
                   ]
                 }
-                """.formatted(courseListBuilder.toString());
+                """.formatted(courseListBuilder);
 
-        // 3. Chuẩn bị nội dung gửi cho AI (Dữ liệu bài thi)
-        String userContent = "Đây là kết quả thi của tôi: \n" + examAttempt.getAnswersJson();
-
+        String userContent = "Latest exam attempt: \n" + examAttempt.getAnswersJson();
         List<GeminiGenerateRequest.Content> chatHistory = List.of(
                 GeminiGenerateRequest.Content.builder()
                         .role("user")
                         .parts(List.of(GeminiGenerateRequest.Part.builder().text(userContent).build()))
-                        .build()
-        );
-
-        // 4. Gọi AI
-        String aiResponseText = geminiClientService.generateChatResponse(systemPrompt, chatHistory);
-
-        // 5. Làm sạch và Parse JSON
-        aiResponseText = aiResponseText.replaceAll("(?s)^```json\\s*", "")
-                .replaceAll("(?s)```\\s*$", "")
-                .trim();
+                        .build());
 
         LearningPathwayResponseDTO responseDto;
         try {
+            String aiResponseText = geminiClientService.generateChatResponse(systemPrompt, chatHistory);
+            aiResponseText = aiResponseText.replaceAll("(?s)^```json\\s*", "")
+                    .replaceAll("(?s)```\\s*$", "")
+                    .trim();
             responseDto = objectMapper.readValue(aiResponseText, LearningPathwayResponseDTO.class);
         } catch (Exception e) {
-            log.error("Failed to parse AI JSON response: {}", aiResponseText, e);
-            throw new ApiException("AI returned invalid JSON format", HttpStatus.INTERNAL_SERVER_ERROR);
+            log.warn("Falling back to deterministic learning pathway because AI generation failed: {}", e.getMessage());
+            responseDto = buildFallbackPathwayDto(examAttempt, availableCourses, usingExistingCoursesFallback);
         }
 
-        // 6. Xoá lộ trình cũ nếu có (hoặc Archive)
-        Optional<LearningPathway> existingPathway = learningPathwayRepository.findByStudentIdAndStatus(studentId, "ACTIVE");
-        existingPathway.ifPresent(p -> {
-            p.setStatus("ARCHIVED");
-            learningPathwayRepository.save(p);
-        });
+        archiveActivePathway(studentId);
 
-        // 7. Lưu vào DB
         LearningPathway newPathway = LearningPathway.builder()
                 .student(student)
                 .examAttempt(examAttempt)
-                .mentorSummary(responseDto.getMentorSummary())
+                .mentorSummary(responseDto.getMentorSummary() != null
+                        ? responseDto.getMentorSummary()
+                        : "I built a pathway from your exam result using the currently available HanGo courses.")
                 .status("ACTIVE")
                 .build();
 
         if (responseDto.getNodes() != null) {
             for (PathwayNodeDTO nodeDto : responseDto.getNodes()) {
                 Course course = availableCourses.stream()
-                        .filter(c -> c.getId().equals(nodeDto.getCourseId()))
+                        .filter(candidate -> candidate.getId().equals(nodeDto.getCourseId()))
                         .findFirst()
                         .orElse(null);
 
                 if (course != null) {
                     PathwayNode node = PathwayNode.builder()
-                            .stepOrder(nodeDto.getStep())
+                            .stepOrder(nodeDto.getStep() != null ? nodeDto.getStep() : newPathway.getNodes().size() + 1)
                             .course(course)
-                            .status(nodeDto.getStatus() != null ? nodeDto.getStatus() : "LOCKED")
-                            .reasonWhy(nodeDto.getReasonWhy())
+                            .status(normalizeNodeStatus(nodeDto.getStatus(), newPathway.getNodes().isEmpty()))
+                            .reasonWhy(nodeDto.getReasonWhy() != null
+                                    ? nodeDto.getReasonWhy()
+                                    : defaultReasonForCourse(course, examAttempt))
                             .progressPercent(0)
                             .build();
                     newPathway.addNode(node);
@@ -149,21 +148,12 @@ public class LearningPathwayService {
             }
         }
 
-        learningPathwayRepository.save(newPathway);
-
-        // Cập nhật lại DTO để trả về cho Client
-        responseDto.setPathwayId(newPathway.getId());
-        responseDto.setRoadmapId("RM_USER_" + studentId + "_" + newPathway.getId());
-        
-        // Thêm CourseTitle vào DTO để hiển thị
-        for (PathwayNodeDTO dto : responseDto.getNodes()) {
-            availableCourses.stream()
-                    .filter(c -> c.getId().equals(dto.getCourseId()))
-                    .findFirst()
-                    .ifPresent(c -> dto.setCourseTitle(c.getTitle()));
+        if (newPathway.getNodes().isEmpty()) {
+            addFallbackNodes(newPathway, examAttempt, availableCourses);
         }
 
-        return responseDto;
+        LearningPathway savedPathway = learningPathwayRepository.save(newPathway);
+        return toResponseDto(savedPathway, studentId);
     }
 
     @Transactional
@@ -194,20 +184,7 @@ public class LearningPathwayService {
         }
 
         LearningPathway savedPathway = learningPathwayRepository.save(pathway);
-        return LearningPathwayResponseDTO.builder()
-                .pathwayId(savedPathway.getId())
-                .roadmapId("RM_USER_" + studentId + "_" + savedPathway.getId())
-                .mentorSummary(savedPathway.getMentorSummary())
-                .nodes(savedPathway.getNodes().stream().map(node -> PathwayNodeDTO.builder()
-                        .step(node.getStepOrder())
-                        .courseId(node.getCourse().getId())
-                        .courseTitle(node.getCourse().getTitle())
-                        .status(node.getStatus())
-                        .reasonWhy(node.getReasonWhy())
-                        .progressPercent(node.getProgressPercent())
-                        .tags(node.getCourse().getCategory() != null ? List.of("#" + node.getCourse().getCategory().getParamValue()) : java.util.Collections.emptyList())
-                        .build()).toList())
-                .build();
+        return toResponseDto(savedPathway, studentId);
     }
 
     @Transactional(readOnly = true)
@@ -230,6 +207,31 @@ public class LearningPathwayService {
         return toResponseDto(pathway, studentId);
     }
 
+    public String chatWithMentor(Long pathwayId, Long studentId, String message) {
+        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(studentId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        String systemPrompt = """
+                You are an AI Mentor. The learner is following this pathway.
+                Answer briefly, clearly, and kindly.
+                Current pathway steps: %s
+                """.formatted(pathway.getNodes().stream()
+                .map(node -> "Step " + node.getStepOrder() + ": " + node.getCourse().getTitle())
+                .reduce("", (left, right) -> left + "\n" + right));
+
+        List<GeminiGenerateRequest.Content> chatHistory = List.of(
+                GeminiGenerateRequest.Content.builder()
+                        .role("user")
+                        .parts(List.of(GeminiGenerateRequest.Part.builder().text(message).build()))
+                        .build());
+
+        return geminiClientService.generateChatResponse(systemPrompt, chatHistory);
+    }
+
     private LearningPathwayResponseDTO toResponseDto(LearningPathway pathway, Long studentId) {
         return LearningPathwayResponseDTO.builder()
                 .pathwayId(pathway.getId())
@@ -242,34 +244,95 @@ public class LearningPathwayService {
                         .status(node.getStatus())
                         .reasonWhy(node.getReasonWhy())
                         .progressPercent(node.getProgressPercent())
-                        .tags(node.getCourse().getCategory() != null ? List.of("#" + node.getCourse().getCategory().getParamValue()) : java.util.Collections.emptyList())
+                        .tags(node.getCourse().getCategory() != null
+                                ? List.of("#" + node.getCourse().getCategory().getParamValue())
+                                : Collections.emptyList())
                         .build()).toList())
                 .build();
     }
 
-    public String chatWithMentor(Long pathwayId, Long studentId, String message) {
-        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
-                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+    private LearningPathwayResponseDTO createEmptyPathway(User student, ExamAttempt examAttempt, String mentorSummary) {
+        archiveActivePathway(student.getId());
 
-        if (!pathway.getStudent().getId().equals(studentId)) {
-            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        LearningPathway pathway = LearningPathway.builder()
+                .student(student)
+                .examAttempt(examAttempt)
+                .mentorSummary(mentorSummary)
+                .status("ACTIVE")
+                .build();
+
+        LearningPathway savedPathway = learningPathwayRepository.save(pathway);
+        return toResponseDto(savedPathway, student.getId());
+    }
+
+    private void archiveActivePathway(Long studentId) {
+        Optional<LearningPathway> existingPathway = learningPathwayRepository.findByStudentIdAndStatus(studentId, "ACTIVE");
+        existingPathway.ifPresent(pathway -> {
+            pathway.setStatus("ARCHIVED");
+            learningPathwayRepository.save(pathway);
+        });
+    }
+
+    private LearningPathwayResponseDTO buildFallbackPathwayDto(
+            ExamAttempt examAttempt,
+            List<Course> availableCourses,
+            boolean usingExistingCoursesFallback) {
+        AtomicInteger step = new AtomicInteger(1);
+        return LearningPathwayResponseDTO.builder()
+                .roadmapId("AUTO_GEN")
+                .mentorSummary(usingExistingCoursesFallback
+                        ? "I generated a starter pathway from the courses currently available in HanGo. Publish more courses later to make recommendations sharper."
+                        : "I generated a starter pathway from your latest exam result and the currently published HanGo courses.")
+                .nodes(availableCourses.stream()
+                        .limit(4)
+                        .map(course -> {
+                            int currentStep = step.getAndIncrement();
+                            return PathwayNodeDTO.builder()
+                                    .step(currentStep)
+                                    .courseId(course.getId())
+                                    .courseTitle(course.getTitle())
+                                    .status(currentStep == 1 ? "IN_PROGRESS" : "LOCKED")
+                                    .reasonWhy(defaultReasonForCourse(course, examAttempt))
+                                    .progressPercent(0)
+                                    .tags(course.getCategory() != null
+                                            ? List.of("#" + course.getCategory().getParamValue())
+                                            : Collections.emptyList())
+                                    .build();
+                        })
+                        .toList())
+                .build();
+    }
+
+    private void addFallbackNodes(LearningPathway pathway, ExamAttempt examAttempt, List<Course> availableCourses) {
+        for (int index = 0; index < Math.min(availableCourses.size(), 4); index++) {
+            Course course = availableCourses.get(index);
+            pathway.addNode(PathwayNode.builder()
+                    .stepOrder(index + 1)
+                    .course(course)
+                    .status(index == 0 ? "IN_PROGRESS" : "LOCKED")
+                    .reasonWhy(defaultReasonForCourse(course, examAttempt))
+                    .progressPercent(0)
+                    .build());
+        }
+    }
+
+    private String normalizeNodeStatus(String status, boolean firstNode) {
+        if (status == null || status.isBlank()) {
+            return firstNode ? "IN_PROGRESS" : "LOCKED";
         }
 
-        String systemPrompt = """
-                Bạn là AI Mentor. Học sinh đang theo lộ trình học tập do bạn đề xuất.
-                Hãy trả lời câu hỏi của học sinh một cách ngắn gọn, súc tích và thân thiện.
-                Lộ trình hiện tại của học sinh gồm các bước sau: %s
-                """.formatted(pathway.getNodes().stream()
-                .map(n -> "Bước " + n.getStepOrder() + ": " + n.getCourse().getTitle())
-                .reduce("", (a, b) -> a + "\n" + b));
+        String normalized = status.trim().toUpperCase().replace('-', '_');
+        return switch (normalized) {
+            case "IN_PROGRESS", "COMPLETED", "LOCKED" -> normalized;
+            default -> firstNode ? "IN_PROGRESS" : "LOCKED";
+        };
+    }
 
-        List<GeminiGenerateRequest.Content> chatHistory = List.of(
-                GeminiGenerateRequest.Content.builder()
-                        .role("user")
-                        .parts(List.of(GeminiGenerateRequest.Part.builder().text(message).build()))
-                        .build()
-        );
-
-        return geminiClientService.generateChatResponse(systemPrompt, chatHistory);
+    private String defaultReasonForCourse(Course course, ExamAttempt examAttempt) {
+        String scoreText = examAttempt.getScore() != null
+                ? " Your latest score was " + examAttempt.getScore() + "."
+                : "";
+        String category = course.getCategory() != null ? course.getCategory().getParamValue() : "this topic";
+        return "This course helps reinforce " + category + " based on your recent test result." + scoreText;
     }
 }

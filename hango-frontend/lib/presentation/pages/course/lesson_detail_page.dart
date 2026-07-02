@@ -3,6 +3,7 @@ import 'package:flutter_html/flutter_html.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/lesson_repository.dart';
+import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../domain/model/lesson_detail.dart';
 import '../../widgets/shared_header.dart';
@@ -1643,7 +1644,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
-  void _submitQuiz(List<QuizQuestion> activeQuestions) {
+  Future<void> _submitQuiz(List<QuizQuestion> activeQuestions) async {
     int correctCount = 0;
     for (int i = 0; i < activeQuestions.length; i++) {
       if (_selectedAnswers[i] == activeQuestions[i].correctIndex) {
@@ -1651,9 +1652,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
     }
     final score = (correctCount / activeQuestions.length) * 10.0;
+    final submittedAnswers = Map<int, int>.from(_selectedAnswers);
 
     setState(() {
-      _attemptsAnswers.add(Map<int, int>.from(_selectedAnswers));
+      _attemptsAnswers.add(submittedAnswers);
       _mockAttempts.add(
         QuizAttempt(
           attemptNumber: _mockAttempts.length + 1,
@@ -1668,6 +1670,28 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     toggleFullscreen(false);
 
+    try {
+      await _lessonRepository.postQuizAttempt(
+        widget.lessonId,
+        _currentUserId,
+        score,
+        submittedAnswers,
+      );
+
+      final quizScorePercent = (score * 10).round();
+      if (quizScorePercent < 60) {
+        final pathwayRepository = PathwayRepository();
+        final pathway = await pathwayRepository.getMyPathway();
+        await pathwayRepository.reroutePathway(
+          pathwayId: pathway.pathwayId,
+          quizScore: quizScorePercent,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error syncing quiz attempt or rerouting pathway: $e');
+    }
+
+    if (!mounted) return;
     ToastHelper.showSuccess(
       context,
       'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0',
