@@ -17,7 +17,9 @@ public class TaskDetailDto {
     private String description;
     private String type;
     private Long assigneeId;
+    private String assigneeName;
     private Long reviewerId;
+    private String reviewerName;
     private LocalDateTime deadline;
     private String status;
 }

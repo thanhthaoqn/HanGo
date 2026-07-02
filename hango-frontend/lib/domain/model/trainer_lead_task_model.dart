@@ -5,6 +5,7 @@ class TrainerLeadTaskModel {
   final String? reviewerName;
   final String? type;
   final String? status;
+  final DateTime? deadline;
 
   TrainerLeadTaskModel({
     required this.id,
@@ -13,6 +14,7 @@ class TrainerLeadTaskModel {
     this.reviewerName,
     this.type,
     this.status,
+    this.deadline,
   });
 
   factory TrainerLeadTaskModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class TrainerLeadTaskModel {
       reviewerName: json['reviewerName'] as String?,
       type: json['type'] as String?,
       status: json['status'] as String?,
+      deadline: json['deadline'] != null ? DateTime.parse(json['deadline']) : null,
     );
   }
 }

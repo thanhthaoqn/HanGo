@@ -14,3 +14,11 @@ Future<PickedFile?> pickImage() async {
 Future<PickedFile?> pickPdf() async {
   return impl.pickPdfFile();
 }
+
+void registerDragDrop(Function(double clientX, double clientY, PickedFile file) onFileDropped) {
+  impl.setupDragDrop(onFileDropped);
+}
+
+void unregisterDragDrop() {
+  impl.cancelDragDrop();
+}
