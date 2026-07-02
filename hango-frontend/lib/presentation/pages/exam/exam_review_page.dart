@@ -22,6 +22,7 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
   late Map<int, int> _userAnswers;
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _questionKeys = {};
+  final ValueNotifier<double> _sidebarOffsetY = ValueNotifier<double>(0.0);
 
   final List<Map<String, dynamic>> _baseQuestions = [
     {
@@ -123,6 +124,35 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
       });
       _questionKeys[i] = GlobalKey();
     }
+
+    _scrollController.addListener(_updateSidebarOffset);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_updateSidebarOffset);
+    _scrollController.dispose();
+    _sidebarOffsetY.dispose();
+    super.dispose();
+  }
+
+  void _updateSidebarOffset() {
+    double triggerOffset = 220.0;
+    double topPadding = 20.0;
+    
+    double newOffset = 0.0;
+    if (_scrollController.offset > triggerOffset) {
+      newOffset = _scrollController.offset - triggerOffset + topPadding;
+      
+      double estQuestionsHeight = _examQuestions.length * 600.0;
+      double maxOffset = estQuestionsHeight - 250.0;
+      if (maxOffset < 0) maxOffset = 0;
+      if (newOffset > maxOffset) {
+        newOffset = maxOffset;
+      }
+    }
+    
+    _sidebarOffsetY.value = newOffset;
   }
 
   void _scrollToQuestion(int index) {
@@ -194,7 +224,19 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
                             children: [
                               Expanded(flex: 3, child: _buildQuestionsList()),
                               const SizedBox(width: 32),
-                              Expanded(flex: 1, child: _buildSideNavPanel()),
+                              Expanded(
+                                flex: 1,
+                                child: ValueListenableBuilder<double>(
+                                  valueListenable: _sidebarOffsetY,
+                                  builder: (context, offsetY, child) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(top: offsetY),
+                                      child: child,
+                                    );
+                                  },
+                                  child: _buildSideNavPanel(),
+                                ),
+                              ),
                             ],
                           )
                         : Column(

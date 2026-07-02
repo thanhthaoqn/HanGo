@@ -5,16 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TaskManagementDto {
-    private Long id;
+public class TrainerTaskDto {
+    private Long id; // CreatorTask id (the id needed to accept the task)
+    private Long taskId; // Actual task id
     private String taskContent;
-    private String assigneeName;
-    private String reviewerName;
+    private LocalDateTime deadline;
     private String type;
     private String status;
-    private java.time.LocalDateTime deadline;
 }

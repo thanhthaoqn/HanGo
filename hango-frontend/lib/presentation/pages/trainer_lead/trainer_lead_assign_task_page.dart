@@ -140,7 +140,7 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
         'type': _selectedType,
         'assigneeId': _selectedAssignee,
         'reviewerId': _selectedReviewer,
-        'reviewDeadline': _reviewDeadline!.toIso8601String(),
+        'reviewDeadline': _reviewDeadline!.toIso8601String().split('.')[0],
       });
       
       if (mounted) {
@@ -206,8 +206,7 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                               border: Border.all(color: Colors.grey.shade200),
                             ),
                             padding: const EdgeInsets.all(24),
-                            child: SingleChildScrollView(
-                              child: Column(
+                            child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // Task Title
@@ -269,7 +268,6 @@ class _TrainerLeadAssignTaskPageState extends State<TrainerLeadAssignTaskPage> {
                                     ],
                                   ),
                                 ],
-                              ),
                             ),
                           ),
                         ),
