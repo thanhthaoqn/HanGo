@@ -205,6 +205,12 @@ class AppState extends ChangeNotifier {
               data['message'] ??
               'Không nhận được câu trả lời từ AI.',
           wasOutOfScope: data['wasOutOfScope'] ?? false,
+          suggestedQuestions:
+              (data['suggestedQuestions'] as List?)
+                  ?.whereType<String>()
+                  .where((e) => e.trim().isNotEmpty)
+                  .toList() ??
+              const [],
         );
       } else {
         String serverError = 'Lỗi hệ thống xử lý AI';
@@ -221,6 +227,7 @@ class AppState extends ChangeNotifier {
         conversationId: conversationId ?? 0,
         reply: '⚠️ Lỗi: ${e.toString().replaceAll('Exception:', '')}',
         wasOutOfScope: false,
+        suggestedQuestions: const [],
       );
     }
   }
@@ -230,10 +237,12 @@ class AiChatResponse {
   final int conversationId;
   final String reply;
   final bool wasOutOfScope;
+  final List<String> suggestedQuestions;
 
   AiChatResponse({
     required this.conversationId,
     required this.reply,
     required this.wasOutOfScope,
+    this.suggestedQuestions = const [],
   });
 }

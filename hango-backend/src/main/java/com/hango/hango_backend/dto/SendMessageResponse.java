@@ -16,4 +16,8 @@ public class SendMessageResponse {
 
     /** true nếu câu hỏi của learner bị guardrail xác định là ngoài phạm vi bài học. */
     private boolean wasOutOfScope;
+
+    /** 3 câu hỏi gợi ý để learner có thể bấm hỏi luôn (theo ngữ cảnh bài học). */
+    private java.util.List<String> suggestedQuestions;
 }
+

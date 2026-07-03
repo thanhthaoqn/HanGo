@@ -37,19 +37,28 @@ class AiMessage {
     required this.content,
     this.createdAt,
     this.wasOutOfScope = false,
+    this.suggestedQuestions = const [],
   });
 
   final String role;
   final String content;
   final DateTime? createdAt;
   final bool wasOutOfScope;
+  final List<String> suggestedQuestions;
 
   factory AiMessage.fromJson(Map<String, dynamic> json) {
+    final questionsJson = json['suggestedQuestions'] as List?;
     return AiMessage(
       role: json['role'] as String? ?? 'ASSISTANT',
       content: json['content'] as String? ?? '',
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       wasOutOfScope: json['wasOutOfScope'] as bool? ?? false,
+      suggestedQuestions:
+          questionsJson
+              ?.whereType<String>()
+              .where((e) => e.trim().isNotEmpty)
+              .toList() ??
+          const [],
     );
   }
 }
@@ -59,17 +68,26 @@ class SendMessageResponse {
     required this.conversationId,
     required this.reply,
     required this.wasOutOfScope,
+    this.suggestedQuestions = const [],
   });
 
   final int conversationId;
   final String reply;
   final bool wasOutOfScope;
+  final List<String> suggestedQuestions;
 
   factory SendMessageResponse.fromJson(Map<String, dynamic> json) {
+    final questionsJson = json['suggestedQuestions'] as List?;
     return SendMessageResponse(
       conversationId: (json['conversationId'] as num?)?.toInt() ?? 0,
       reply: json['reply'] as String? ?? '',
       wasOutOfScope: json['wasOutOfScope'] as bool? ?? false,
+      suggestedQuestions:
+          questionsJson
+              ?.whereType<String>()
+              .where((e) => e.trim().isNotEmpty)
+              .toList() ??
+          const [],
     );
   }
 }
