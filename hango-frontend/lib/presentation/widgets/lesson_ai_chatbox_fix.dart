@@ -26,12 +26,11 @@ class LessonAiChatbox extends StatefulWidget {
 }
 
 class _LessonAiChatboxState extends State<LessonAiChatbox> {
-  final _messageController = TextEditingController();
-  final _scrollController = ScrollController();
+  final _message = TextEditingController();
+  final _scroll = ScrollController();
 
   final List<AiMessage> _messages = [];
   Future<AiHealth>? _health;
-
   int? _conversationId;
   bool _sending = false;
   String? _error;
@@ -58,13 +57,6 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
       });
       _loadFromCache();
     }
-  }
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadFromCache() async {
@@ -126,15 +118,22 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     }
   }
 
+  @override
+  void dispose() {
+    _message.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
   Future<void> _send() async {
-    final text = _messageController.text.trim();
+    final text = _message.text.trim();
     if (text.isEmpty || _sending) return;
 
     setState(() {
       _sending = true;
       _error = null;
       _messages.add(AiMessage(role: 'USER', content: text));
-      _messageController.clear();
+      _message.clear();
     });
     _scrollToEnd();
 
@@ -173,9 +172,9 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
 
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+      if (!_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
       );
@@ -199,8 +198,8 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
             messages: _messages,
             error: _error,
             sending: _sending,
-            controller: _messageController,
-            scroll: _scrollController,
+            messageController: _message,
+            scroll: _scroll,
             health: _health ?? context.read<AppState>().checkAiStatus(),
             onSend: _send,
           ),
@@ -218,7 +217,7 @@ class _ChatPanel extends StatelessWidget {
     required this.messages,
     required this.error,
     required this.sending,
-    required this.controller,
+    required this.messageController,
     required this.scroll,
     required this.health,
     required this.onSend,
@@ -230,7 +229,7 @@ class _ChatPanel extends StatelessWidget {
   final List<AiMessage> messages;
   final String? error;
   final bool sending;
-  final TextEditingController controller;
+  final TextEditingController messageController;
   final ScrollController scroll;
   final Future<AiHealth> health;
   final Future<void> Function() onSend;
@@ -346,13 +345,12 @@ class _ChatPanel extends StatelessWidget {
                               : CrossAxisAlignment.start,
                           children: [
                             _ChatBubble(message: msg),
-                            if (msg.role != 'USER' &&
-                                msg.suggestedQuestions.isNotEmpty)
+                            if (msg.role != 'USER')
                               QuickQuestionsRow(
                                 questions: msg.suggestedQuestions,
                                 onTapQuestion: (q) {
-                                  controller.text = q;
-                                  controller.selection =
+                                  messageController.text = q;
+                                  messageController.selection =
                                       TextSelection.collapsed(offset: q.length);
                                   onSend();
                                 },
@@ -373,7 +371,7 @@ class _ChatPanel extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: controller,
+                      controller: messageController,
                       minLines: 1,
                       maxLines: 3,
                       maxLength: 500,

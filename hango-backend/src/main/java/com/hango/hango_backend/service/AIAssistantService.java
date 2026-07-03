@@ -141,6 +141,78 @@ public class AIAssistantService {
 
                 userMessage.setWasOutOfScope(outOfScope);
 
+                // Sinh suggestedQuestions (3 câu) dựa theo ngữ cảnh bài học + câu trả lời vừa tạo.
+                // Nếu out-of-scope thì vẫn trả về null/empty để UI có thể ẩn.
+                java.util.List<String> suggestedQuestions = new java.util.ArrayList<>();
+                try {
+                        if (!outOfScope) {
+                                // Yêu cầu Gemini trả đúng 3 câu hỏi, mỗi câu 1 dòng.
+                                String systemForSuggestions = """
+                                Bạn là trợ lý học tập AI.
+                                Dựa trên BÀI HỌC, CÂU HỎI NGƯỜI HỌC và đặc biệt là NỘI DUNG TRẢ LỜI của trợ lý (TRỢ LÝ ĐÃ TRẢ LỜI), hãy đề xuất đúng 3 câu hỏi tiếp theo (tiếng Việt) để người học tiếp tục đào sâu.
+
+                                Mỗi câu hỏi phải:
+                                - bám sát TRỢ LÝ ĐÃ TRẢ LỜI (ví dụ: hỏi rõ một ý, hỏi ví dụ minh hoạ khác, hỏi bước tiếp theo, hỏi cách áp dụng)
+                                - liên quan trực tiếp đến bài học và có thể trả lời được trong phạm vi bài học
+                                - độ dài ngắn gọn (<= 80 ký tự)
+                                - không hỏi ngoài lề
+
+                                YÊU CẦU FORMAT BẮT BUỘC:
+                                Trả về JSON thuần, đúng như:
+                                {"suggestedQuestions":["...","...","..."]}
+                                """;
+
+                                // Dùng promptbuilder hệ thống hiện tại cho scope, nhưng thêm ràng buộc format.
+                                // Ta gửi: systemForSuggestions + history gồm câu hỏi hiện tại & replyText.
+                                java.util.List<com.hango.hango_backend.dto.GeminiGenerateRequest.Content> history = new java.util.ArrayList<>();
+
+                                // history.add(...) - sửa lỗi builder/parts để tránh IDE hiểu nhầm kiểu builder.
+                                history.add(
+                                                com.hango.hango_backend.dto.GeminiGenerateRequest.Content.builder()
+                                                                .role("user")
+                                                                .parts(
+                                                                                java.util.List.of(
+                                                                                                com.hango.hango_backend.dto.GeminiGenerateRequest.Part.builder()
+                                                                                                                .text("Bài học: " + lesson.getTitle()
+                                                                                                                                + "\n\nNội dung: " + lesson.getContentText()
+                                                                                                                                + "\n\nCâu hỏi learner: " + request.getMessage()
+                                                                                                                                + "\n\nTrợ lý đã trả lời: " + replyText)
+                                                                                                                .build()))
+                                                                .build());
+
+                                // Gọi Gemini lấy JSON.
+                                String raw = geminiClientService.generateChatResponse(systemForSuggestions, history);
+
+                                // Parse JSON đơn giản: tìm mảng suggestedQuestions.
+                                // Tránh dependency JSON mapper mới: parse thủ công thô theo pattern.
+                                // (Trong thực tế nên dùng Jackson; nhưng để nhanh, dùng xử lý cơ bản)
+                                int startArr = raw.indexOf("[");
+                                int endArr = raw.lastIndexOf("]");
+                                if (startArr != -1 && endArr != -1 && endArr > startArr) {
+                                        String arr = raw.substring(startArr + 1, endArr);
+                                        // match chuỗi trong dấu "..."
+                                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\\"(.*?)\\\"")
+                                                        .matcher(arr);
+                                        while (m.find()) {
+                                                String q = m.group(1);
+                                                if (q != null) {
+                                                        q = q.trim();
+                                                        if (!q.isEmpty()) suggestedQuestions.add(q);
+                                                }
+                                                if (suggestedQuestions.size() >= 3) break;
+                                        }
+                                }
+
+                                // fallback: đảm bảo đúng 3 phần tử (nếu Gemini trả ít)
+                                if (suggestedQuestions.size() > 3) suggestedQuestions = suggestedQuestions.subList(0, 3);
+                                if (suggestedQuestions.size() < 3) {
+                                        // để empty/thiếu thì UI vẫn chạy; không ép thêm.
+                                }
+                        }
+                } catch (Exception e) {
+                        log.warn("Không sinh được suggestedQuestions, bỏ qua. cause={}", e.getMessage());
+                }
+
                 AIMessage assistantMessage = AIMessage.builder()
                                 .conversation(conversation)
                                 .role(AIMessage.MessageRole.ASSISTANT)
@@ -156,7 +228,10 @@ public class AIAssistantService {
                                 .conversationId(conversation.getId())
                                 .reply(replyText)
                                 .wasOutOfScope(outOfScope)
+                                .suggestedQuestions(suggestedQuestions)
                                 .build();
+
+
         }
 
         private AIConversation getOrCreateConversation(Long learnerId, SendMessageRequest request, Lesson lesson) {
@@ -203,3 +278,4 @@ public class AIAssistantService {
                 return conversationRepository.findByLearnerIdOrderByStartedAtDesc(learnerId);
         }
 }
+
