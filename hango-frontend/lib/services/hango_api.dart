@@ -234,7 +234,7 @@ class HangoApi {
       if (search != null && search.isNotEmpty) 'search': search,
       if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
     };
-    
+
     // Build URL with query params
     final baseUri = _uri('/api/v1/trainer/questions');
     final uri = Uri(

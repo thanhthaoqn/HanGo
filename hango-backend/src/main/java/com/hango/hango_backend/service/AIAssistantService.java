@@ -151,6 +151,13 @@ public class AIAssistantService {
                                 Bạn là trợ lý học tập AI.
                                 Dựa trên BÀI HỌC, CÂU HỎI NGƯỜI HỌC và đặc biệt là NỘI DUNG TRẢ LỜI của trợ lý (TRỢ LÝ ĐÃ TRẢ LỜI), hãy đề xuất đúng 3 câu hỏi tiếp theo (tiếng Việt) để người học tiếp tục đào sâu.
 
+                                QUAN TRỌNG (BẮT BUỘC):
+                                - 3 câu gợi ý này CHỈ LÀ CÂU HỎI (không phải đáp án).
+                                - TUYỆT ĐỐI KHÔNG kèm đáp án/giải thích đầy đủ cho quiz vừa được tạo trong đoạn chat.
+                                - Không được đưa các cụm như: "Đáp án là", "Correct answer", "đúng là", "A/B/C", hoặc các phương án kèm đáp án.
+                                - Không được trả lời luôn câu hỏi/quiz mà trước đó trợ lý vừa tạo.
+                                - Nếu trợ lý vừa tạo quiz trắc nghiệm nhiều lựa chọn, câu gợi ý phải hỏi một ý/khái niệm khác, ví dụ khác, hoặc yêu cầu luyện tập tương tự nhưng KHÔNG kèm đáp án.
+
                                 Mỗi câu hỏi phải:
                                 - bám sát TRỢ LÝ ĐÃ TRẢ LỜI (ví dụ: hỏi rõ một ý, hỏi ví dụ minh hoạ khác, hỏi bước tiếp theo, hỏi cách áp dụng)
                                 - liên quan trực tiếp đến bài học và có thể trả lời được trong phạm vi bài học
