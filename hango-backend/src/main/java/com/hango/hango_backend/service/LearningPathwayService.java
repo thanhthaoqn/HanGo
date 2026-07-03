@@ -3,6 +3,7 @@ package com.hango.hango_backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
+import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.dto.PathwayNodeDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.ExamAttempt;
@@ -36,6 +37,9 @@ public class LearningPathwayService {
     private final UserRepository userRepository;
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
+    private final ExamResultAnalyzerService examResultAnalyzerService;
+
+
 
     @Transactional
     public LearningPathwayResponseDTO generatePathway(Long studentId, Long examAttemptId) {
@@ -73,9 +77,17 @@ public class LearningPathwayService {
                     course.getDescription()));
         }
 
+        // TODO-FT15 (8.2 + 9): AI cần “đầu vào chuẩn” từ examAttempt.answersJson hiện tại
+        // để tránh phân tích nhầm dữ liệu của learner.
+        // Tool: phân tích “lỗ hổng kiến thức” từ answersJson của bài thi gần nhất.
+        // Đảm bảo AI dùng đúng dữ liệu learner cung cấp.
+        ExamResultAnalysisDTO examAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(examAttempt);
+
         String systemPrompt = """
+
                 .
-                Analyze the learner exam result JSON and propose a personalized learning roadmap with at most 4 steps.
+                Bạn là Trợ lý lập lộ trình học tập.
+                Nhiệm vụ: dựa trên JSON bài thi mới nhất của learner (answersJson) và phần phân tích do tool cung cấp để đề xuất lộ trình cá nhân hóa.
 
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
@@ -84,6 +96,11 @@ public class LearningPathwayService {
 
                 [AVAILABLE_COURSES]
                 %s
+
+                TOOL INPUT (EXAM ANALYSIS):
+                - examAttemptId: %s
+                - score: %s
+                - knowledge_gaps_json: %s
 
                 JSON format:
                 {
@@ -94,7 +111,13 @@ public class LearningPathwayService {
                     { "step": 2, "course_id": 2, "reason_why": "Why this course helps...", "status": "LOCKED", "tags": ["#Reading"] }
                   ]
                 }
-                """.formatted(courseListBuilder);
+                """.formatted(
+                courseListBuilder,
+                examAnalysis.getExamAttemptId(),
+                examAnalysis.getScore(),
+                examAnalysis.getKnowledgeGapsJson() == null ? "" : examAnalysis.getKnowledgeGapsJson()
+        );
+
 
         String userContent = "Latest exam attempt: \n" + examAttempt.getAnswersJson();
         List<GeminiGenerateRequest.Content> chatHistory = List.of(
@@ -122,7 +145,7 @@ public class LearningPathwayService {
                 .examAttempt(examAttempt)
                 .mentorSummary(responseDto.getMentorSummary() != null
                         ? responseDto.getMentorSummary()
-                        : "I built a pathway from your exam result using the currently available HanGo courses.")
+                        : "Tôi đã xây dựng một lộ trình từ kết quả bài kiểm tra của bạn bằng cách sử dụng các khóa học hiện có trong HanGo.")
                 .status("ACTIVE")
                 .build();
 
@@ -166,8 +189,8 @@ public class LearningPathwayService {
         }
 
         pathway.setMentorSummary(quizScore < 60
-                ? "Dynamic rerouting triggered because your latest quiz score was low. I am refocusing the roadmap on the foundational skills you need first."
-                : "Your recent quiz performance is acceptable, so the current roadmap remains the best fit.");
+                ? "Hệ thống đã tự động thay đổi lộ trình học tập do điểm bài kiểm tra gần nhất của bạn hơi thấp. Tôi đang tập trung điều chỉnh lại lộ trình vào các kỹ năng nền tảng mà bạn cần nắm vững trước tiên."
+                : "Hiệu suất bài kiểm tra gần đây của bạn là chấp nhận được, vì vậy lộ trình hiện tại vẫn là lựa chọn tốt nhất.");
 
         if (pathway.getNodes() != null) {
             boolean firstNodeSeen = false;
@@ -296,8 +319,8 @@ public class LearningPathwayService {
         return LearningPathwayResponseDTO.builder()
                 .roadmapId("AUTO_GEN")
                 .mentorSummary(usingExistingCoursesFallback
-                        ? "I generated a starter pathway from the courses currently available in HanGo. Publish more courses later to make recommendations sharper."
-                        : "I generated a starter pathway from your latest exam result and the currently published HanGo courses.")
+                        ? "Tôi đã tạo một lộ trình khởi đầu từ các khóa học hiện có trong HanGo. Vui lòng đăng tải thêm khóa học để có được những gợi ý chính xác hơn."
+                        : "Tôi đã tạo một lộ trình khởi đầu từ kết quả bài kiểm tra gần nhất của bạn và các khóa học đang được công bố trong HanGo.")
                 .nodes(availableCourses.stream()
                         .limit(4)
                         .map(course -> {
@@ -345,10 +368,10 @@ public class LearningPathwayService {
 
     private String defaultReasonForCourse(Course course, ExamAttempt examAttempt) {
         String scoreText = examAttempt.getScore() != null
-                ? " Your latest score was " + examAttempt.getScore() + "."
+                ? " Điểm số của bạn gần đây nhất là " + examAttempt.getScore() + "."
                 : "";
         String category = course.getCategory() != null ? course.getCategory().getParamValue() : "this topic";
-        return "This course helps reinforce " + category + " based on your recent test result." + scoreText;
+        return "Khóa học này giúp bạn củng cố thêm về " + category + " dựa trên kết quả gần đây nhất của bạn." + scoreText;
     }
 }
 

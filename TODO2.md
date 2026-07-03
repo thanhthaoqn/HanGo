@@ -85,7 +85,59 @@
 
 ---
 
+Phase 5: Agentic Upgrade
+Hiện tại hệ thống đang mang tính "bị động" (Reactive). Tức là user làm xong bài thi -> Hệ thống gọi AI -> AI sinh ra JSON -> End. Một AI Agent đích thực phải có khả năng tự suy luận chuỗi hành động (Chain of Thought), tự động theo dõi tiến độ của user ngầm bên dưới mà không cần user phải chủ động ấn nút.
+
+## 🚀 Phase 5 (Agentic Upgrade) — Checklist chi tiết
+
+- [ ] (In Progress) **Agent Tooling — Function Calling**
+  - [ ] Thiết kế & đăng ký các Tool/Function cho Agent trong Spring Boot (ví dụ: `triggerReroute`, `getPathwayById`, `getUserProgressSnapshot`, `reportBadRoadmap`).
+  - [ ] Quy ước schema input/output cho từng Tool để AI gọi đúng format (kèm ví dụ payload).
+  - [ ] Implement orchestrator: khi AI quyết định gọi Tool thì backend thực thi Tool và trả kết quả về cho AI để tiếp tục chuỗi hành động.
+  - [ ] Kiểm soát quyền gọi tool: chỉ LEARNER được reroute/lấy pathway của chính họ.
+
+- [ ] (In Progress) **Dynamic Reroute qua Function Calling**
+  - [ ] Chuẩn hóa ngữ nghĩa “mức độ khó” (vd: `EASY_MODE`, `NORMAL_MODE`, `HARD_MODE`) và map sang tham số cho `LearningPathwayService.reroutePathway`.
+  - [ ] Thêm rule reroute rõ ràng dựa trên quizResult (ngưỡng điểm + số lần fail liên tiếp + cooldown).
+  - [ ] Update AI prompt để bắt buộc: khi nhận user yêu cầu “học lại từ đầu/khó quá” thì AI phải gọi `triggerReroute` thay vì tự bịa lộ trình.
+  - [ ] Logging: lưu tool calls (tool name, args, pathwayId, requestId) để audit/debug.
+
+- [ ] (In Progress) **Long-term Memory — Chat Memory**
+  - [ ] Tạo bảng `ai_chat_histories` (id, user_id, pathway_id, role, content, created_at, metadata_json).
+  - [ ] Khi user gọi `POST /api/v1/pathways/{id}/chat`: ghi toàn bộ tin nhắn (user + assistant) vào DB.
+  - [ ] Khi tạo prompt: lấy 5-10 tin nhắn gần nhất cùng pathway_id (hoặc fallback theo user_id nếu chưa có pathway).
+  - [ ] Xác định chiến lược cắt ngữ cảnh (context window): ưu tiên message mới nhất + system instructions + tool results.
+
+- [ ] (In Progress) **Long-term Memory — Profile memory (Vector/Non-Vector)**
+  - [ ] (MVP) Lưu “Learning Profile” dạng JSON (skill gaps, course preferences, last_failed_group, last_success_group) trong 1 bảng riêng hoặc metadata trong DB.
+  - [ ] (Nâng cao) Nếu có pgvector/Milvus: embedding + query theo user_id & key phrases (skill/group/difficulty) để bổ sung vào prompt.
+  - [ ] Agent response phải tham chiếu profile memory (ví dụ: “tuần trước em yếu nhóm X, hôm nay em đang tiến bộ”).
+
+- [ ] (In Progress) **Prompt Management (LLMOps) — no hardcode**
+  - [ ] Tách toàn bộ System Prompt/Instruction đang hardcode trong `LearningPathwayService` ra file `.st` (StringTemplate) hoặc cấu hình ngoài.
+  - [ ] Tạo lớp Prompt provider (vd: `LearningPathwayPromptProvider`) để load template theo featureId/variant.
+  - [ ] Thêm versioning cho prompt (vd: `prompt_version` trong metadata) để trace hành vi agent.
+  - [ ] Update unit test đảm bảo prompt template được load và render đúng placeholder.
+
+- [ ] (In Progress) **Human-in-the-loop — Reporting & Flag**
+  - [ ] Thêm UI/API “Báo cáo lộ trình lỗi” (submit lý do: mismatch skill level, course hallucination, roadmap nonsense...).
+  - [ ] Backend: lưu report vào bảng (vd: `learning_pathway_reports`) kèm pathwayId, node step, triệu chứng, raw AI output hash.
+  - [ ] Rule flag: nếu reroute >= 3 lần liên tiếp trong thời gian T → tạo flag cho Admin/Teacher review.
+  - [ ] Agent prompt cần quy định: khi gặp input mơ hồ, hỏi lại thay vì reroute ngay.
+
+- [ ] (In Progress) **Security & Guardrails for Agentic Calls**
+  - [ ] Tool-level authorization: mọi tool trả về/ghi dữ liệu đều check `user_id` thuộc sở hữu pathway.
+  - [ ] Anti-hallucination guardrail (ở tầng tool/result validation): validate mỗi `course_id` thuộc SystemCourses (Published) trước khi commit pathway nodes.
+  - [ ] Rate limit/anti-spam cho chat & reroute actions.
+
+- [ ] (In Progress) **Tests for Agentic Upgrade**
+  - [ ] Integration test: AI chat → agent tool call → reroute cập nhật pathway nodes đúng.
+  - [ ] Unit test: prompt provider render đúng template placeholders.
+  - [ ] Security test: LEARNER không truy cập pathway khác qua tool calls.
+  - [ ] Regression test: existing endpoints `/generate`, `/reroute`, `/chat` vẫn hoạt động.
+
 ## 📋 THAM KHẢO: ĐẶC TẢ CHI TIẾT GỐC
+
 
 ### Tổng quan luồng nghiệp vụ (Workflow)
 1. Học viên hoàn thành một Bài thi thử (Exam). Hệ thống trả về cấu trúc dữ liệu lỗi sai chi tiết (Matrix Exam Result).
