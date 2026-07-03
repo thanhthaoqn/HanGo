@@ -8,6 +8,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TrainerCreateCourseRequestDTO {
+    private Long taskId;
     private String title;
     private String description;
     private String categoryKey;

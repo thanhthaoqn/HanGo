@@ -9,7 +9,8 @@ import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
 
 class CreateCoursePage extends StatefulWidget {
-  const CreateCoursePage({super.key});
+  final int? taskId;
+  const CreateCoursePage({super.key, this.taskId});
 
   @override
   State<CreateCoursePage> createState() => _CreateCoursePageState();
@@ -196,13 +197,19 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       }
 
       final uri = Uri.parse('$apiBaseUrl/trainer/courses');
-      final body = jsonEncode({
+      final Map<String, dynamic> bodyData = {
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
-      });
+      };
+      
+      if (widget.taskId != null) {
+        bodyData['taskId'] = widget.taskId;
+      }
+      
+      final body = jsonEncode(bodyData);
 
       final response = await http.post(
         uri,

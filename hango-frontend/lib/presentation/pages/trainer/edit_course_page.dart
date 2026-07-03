@@ -243,6 +243,38 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
   }
 
+  void _submitCourse() async {
+    setState(() { _isSaving = true; });
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('Authentication token not found');
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/courses/${widget.courseId}/submit');
+      final response = await http.post(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Course submitted successfully!');
+          Navigator.pop(context, true);
+        }
+      } else {
+        throw Exception('Failed to submit course: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error submitting course: $e');
+      if (mounted) {
+        ToastHelper.showError(context, 'Error submitting course: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() { _isSaving = false; });
+      }
+    }
+  }
+
   void _saveCourse() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -933,7 +965,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: null, // Disabled in mock
+                onPressed: _isSaving ? null : _submitCourse,
                 icon: const Icon(Icons.play_arrow, size: 16),
                 label: const Text(
                   'Submit for Review',
@@ -944,8 +976,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20B486).withOpacity(0.5),
+                  backgroundColor: const Color(0xFF20B486),
                   disabledBackgroundColor: const Color(0xFF20B486).withOpacity(0.4),
+                  foregroundColor: Colors.white,
                   disabledForegroundColor: Colors.white.withOpacity(0.8),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(

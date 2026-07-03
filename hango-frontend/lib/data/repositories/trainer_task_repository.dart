@@ -132,4 +132,25 @@ class TrainerTaskRepository {
       throw Exception('Error accepting task: $e');
     }
   }
+
+  Future<int?> getCourseIdByTaskId(int taskId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) throw Exception('No token found');
+
+      final uri = Uri.parse('$_baseUrl/trainer/courses/by-task/$taskId');
+      final response = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['courseId'];
+      } else if (response.statusCode == 404) {
+        return null;
+      } else {
+        throw Exception('Failed to fetch course id: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching course id: $e');
+    }
+  }
 }

@@ -124,4 +124,32 @@ public class TrainerDashboardController {
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
+
+    @GetMapping("/courses/by-task/{taskId}")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> getCourseIdByTaskId(@PathVariable Long taskId, @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            Long courseId = trainerDashboardService.getCourseIdByTaskId(taskId);
+            if (courseId != null) {
+                return ResponseEntity.ok("{\"courseId\": " + courseId + "}");
+            } else {
+                return ResponseEntity.status(404).body("{\"error\": \"Course not found\"}");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/courses/{id}/submit")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> submitCourse(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            trainerDashboardService.submitTrainerCourse(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course submitted successfully\"}");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
 }

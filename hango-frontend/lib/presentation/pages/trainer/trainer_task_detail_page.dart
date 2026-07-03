@@ -8,6 +8,8 @@ import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../login_page.dart';
+import 'create_course_page.dart';
+import 'edit_course_page.dart';
 
 class TrainerTaskDetailPage extends StatefulWidget {
   final int taskId;
@@ -348,8 +350,23 @@ class _TrainerTaskDetailPageState extends State<TrainerTaskDetailPage> {
                   ] else if (_selectedStatus == 'IN_PROGRESS') ...[
                     const SizedBox(width: 16),
                     ElevatedButton(
-                      onPressed: () {
-                        ToastHelper.show(context, 'Redirecting to task (Placeholder)');
+                      onPressed: () async {
+                        setState(() { _isSubmitting = true; });
+                        try {
+                          int? courseId = await _repository.getCourseIdByTaskId(widget.taskId);
+                          if (!mounted) return;
+                          if (courseId != null) {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => EditCoursePage(courseId: courseId)));
+                          } else {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => CreateCoursePage(taskId: widget.taskId)));
+                          }
+                        } catch (e) {
+                          ToastHelper.showError(context, 'Error navigating to task: $e');
+                        } finally {
+                          if (mounted) {
+                            setState(() { _isSubmitting = false; });
+                          }
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF3B82F6),

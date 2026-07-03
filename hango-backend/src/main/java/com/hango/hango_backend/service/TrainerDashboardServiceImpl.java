@@ -26,6 +26,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final SystemParameterRepository systemParameterRepository;
     private final SectionRepository sectionRepository;
     private final LessonRepository lessonRepository;
+    private final TaskActivityRepository taskActivityRepository;
+    private final CreatorTaskRepository creatorTaskRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -178,7 +180,17 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .status("DRAFT")
                 .build();
 
-        courseRepository.save(course);
+        com.hango.hango_backend.entity.Course savedCourse = courseRepository.save(course);
+
+        if (request.getTaskId() != null) {
+            com.hango.hango_backend.entity.TaskActivity activity = com.hango.hango_backend.entity.TaskActivity.builder()
+                    .taskId(request.getTaskId())
+                    .userId(user.getId())
+                    .newStatus("LINKED_COURSE")
+                    .note(savedCourse.getId().toString())
+                    .build();
+            taskActivityRepository.save(activity);
+        }
     }
 
     @Override
@@ -307,6 +319,58 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setDifficulty(savedCourse.getDifficulty());
 
                 lessonRepository.save(lesson);
+            }
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Long getCourseIdByTaskId(Long taskId) {
+        return taskActivityRepository.findByTaskIdOrderByCreatedAtDesc(taskId).stream()
+                .filter(a -> "LINKED_COURSE".equals(a.getNewStatus()))
+                .findFirst()
+                .map(a -> {
+                    try {
+                        return Long.parseLong(a.getNote());
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public void submitTrainerCourse(Long courseId, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                
+        com.hango.hango_backend.entity.Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
+
+        if (!course.getCreator().getId().equals(user.getId())) {
+            throw new RuntimeException("You are not authorized to submit this course");
+        }
+
+        course.setStatus("PENDING");
+        courseRepository.save(course);
+
+        java.util.Optional<com.hango.hango_backend.entity.TaskActivity> linkedActivity = taskActivityRepository.findFirstByNewStatusAndNote("LINKED_COURSE", courseId.toString());
+        if (linkedActivity.isPresent()) {
+            Long taskId = linkedActivity.get().getTaskId();
+            java.util.Optional<com.hango.hango_backend.entity.CreatorTask> ctOpt = creatorTaskRepository.findByTaskId(taskId);
+            if (ctOpt.isPresent()) {
+                com.hango.hango_backend.entity.CreatorTask ct = ctOpt.get();
+                ct.setStatus("PENDING");
+                creatorTaskRepository.save(ct);
+                
+                com.hango.hango_backend.entity.TaskActivity activity = com.hango.hango_backend.entity.TaskActivity.builder()
+                        .taskId(taskId)
+                        .userId(user.getId())
+                        .newStatus("PENDING")
+                        .note("Course submitted for review")
+                        .build();
+                taskActivityRepository.save(activity);
             }
         }
     }
