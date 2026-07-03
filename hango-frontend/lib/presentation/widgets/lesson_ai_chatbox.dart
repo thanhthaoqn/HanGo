@@ -10,6 +10,8 @@ import 'package:hango/services/app_state.dart';
 import 'package:hango/utils/app_theme.dart';
 
 import 'lesson_ai_chatbox_quick_questions.dart';
+import 'lesson_ai_chatbox_default_questions.dart';
+import 'lesson_ai_chatbox_empty_state.dart';
 
 class LessonAiChatbox extends StatefulWidget {
   const LessonAiChatbox({
@@ -44,7 +46,14 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
   void initState() {
     super.initState();
     _health = context.read<AppState>().checkAiStatus();
-    _loadFromCache();
+    _loadFromCache().then((_) {
+      // Khi mở chatbox: nếu cache có tin nhắn assistant kèm suggestedQuestions
+      // thì UI sẽ tự render 3 câu gợi ý.
+      // Nếu cache rỗng (đang chưa hỏi gì hoặc vừa xóa), messages sẽ rỗng
+      // => UI hiển thị dòng hướng dẫn.
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   @override
@@ -126,6 +135,21 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     }
   }
 
+  Future<void> _clearHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheKey);
+    if (!mounted) return;
+    setState(() {
+      _conversationId = null;
+      _messages.clear();
+      _error = null;
+      _messageController.clear();
+    });
+
+    // Sau khi xóa, nếu không có tin nhắn nào thì không có suggestedQuestions.
+    // UX sẽ hiển thị lại dòng hướng dẫn hiện có.
+  }
+
   Future<void> _send() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _sending) return;
@@ -203,6 +227,7 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
             scroll: _scrollController,
             health: _health ?? context.read<AppState>().checkAiStatus(),
             onSend: _send,
+            onClearHistory: _clearHistory,
           ),
         );
       },
@@ -222,6 +247,7 @@ class _ChatPanel extends StatelessWidget {
     required this.scroll,
     required this.health,
     required this.onSend,
+    required this.onClearHistory,
   });
 
   final double width;
@@ -234,6 +260,7 @@ class _ChatPanel extends StatelessWidget {
   final ScrollController scroll;
   final Future<AiHealth> health;
   final Future<void> Function() onSend;
+  final Future<void> Function() onClearHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -302,7 +329,7 @@ class _ChatPanel extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     waiting
-                                        ? 'Đang kiểm tra Gemini'
+                                        ? 'Đang kiểm tra AI...'
                                         : snapshot.data?.message ??
                                               'Chưa kiểm tra AI',
                                     maxLines: 1,
@@ -320,19 +347,59 @@ class _ChatPanel extends StatelessWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    tooltip: 'Xóa lịch sử chat (chỉ trên thiết bị)',
+                    onPressed: sending
+                        ? null
+                        : () async {
+                            final ok =
+                                await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) {
+                                    return AlertDialog(
+                                      title: const Text('Xác nhận xóa lịch sử'),
+                                      content: const Text(
+                                        'Bạn có chắc muốn xóa lịch sử chat này không?\n\nThao tác này chỉ xóa dữ liệu trên thiết bị.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop(false);
+                                          },
+                                          child: const Text('Hủy'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop(true);
+                                          },
+                                          child: const Text('Xóa'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ) ??
+                                false;
+
+                            if (ok) {
+                              await onClearHistory();
+                            }
+                          },
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
                 ],
               ),
             ),
             Expanded(
               child: messages.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Text(
-                          'Hỏi về bài học này để AI trả lời trong đúng ngữ cảnh.',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+                  ? LessonAiChatboxEmptyState(
+                      title: 'Gợi ý câu hỏi để bắt đầu học',
+                      questions: defaultLessonAiSuggestedQuestions(),
+                      onTapQuestion: (q) {
+                        controller.text = q;
+                        controller.selection =
+                            TextSelection.collapsed(offset: q.length);
+                        onSend();
+                      },
                     )
                   : ListView.builder(
                       controller: scroll,
@@ -362,6 +429,7 @@ class _ChatPanel extends StatelessWidget {
                       },
                     ),
             ),
+
             if (error != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
