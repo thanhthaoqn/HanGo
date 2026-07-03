@@ -18,13 +18,15 @@
   - [ ] Thêm test cho `chatWithMentor`/endpoint đảm bảo prompt tiếng Việt + không trả lời ngoài phạm vi.
 - [ ] 7) Chạy build & tests backend + chạy flutter analyze (nếu có thay FE).
 
-- [ ] 8) (Tool) Tạo Service parse/chuẩn hóa “lỗ hổng kiến thức” từ `ExamAttempt.answersJson` để AI Mentor/Agent có đầu vào đúng.
-  - [ ] 8.1 Tạo thêm `ExamResultAnalyzerService` (hoặc tương tự) làm “tool” cho roadmap.
-- [ ] 8.2 Tích hợp tool vào `LearningPathwayService.generatePathway(...)` để AI phân tích “lỗ hổng kiến thức” dựa trên `ExamAttempt.answersJson` và nhúng vào prompt.
+- [x] 8) (Tool) Tạo Service parse/chuẩn hóa “lỗ hổng kiến thức” từ `ExamAttempt.answersJson` để AI Mentor/Agent có đầu vào đúng.
+  - [x] 8.1 Đã có `ExamResultAnalyzerService` làm “tool” cho roadmap (hiện đang ở mức parse placeholder: trả về `rawAnswersJson` + `score`).
+- [x] 8.2 Đã tích hợp tool vào `LearningPathwayService.generatePathway(...)` để đưa `examAttempt.answersJson` + `ExamResultAnalysisDTO` vào `systemPrompt` trước khi gọi Gemini.
 
-- [ ] 9) Xác nhận AI đã phân tích dữ liệu của bài làm gần nhất (latest examAttempt) trước khi gọi Gemini:
-  - [ ] Đảm bảo luồng `generatePathway` dùng đúng `examAttemptId` truyền vào.
-  - [ ] Nhúng kết quả `ExamResultAnalysisDTO` vào system prompt (mentor_summary/nodes lý do...).
+- [x] 9) Xác nhận AI đã phân tích dữ liệu của bài làm gần nhất (latest examAttempt) trước khi gọi Gemini:
+  - [x] Luồng `generatePathway(studentId, examAttemptId)` lấy `ExamAttempt` theo đúng `examAttemptId` truyền vào, kiểm tra ownership của learner.
+  - [x] Kết quả `ExamResultAnalysisDTO` (`examAttemptId/score/knowledge_gaps_json`) được nhúng vào system prompt để AI không bỏ qua dữ liệu.
+
+- [ ] Lưu ý kiểm tra bổ sung: hiện tại “knowledge_gaps_json” đang là placeholder (chưa parse schema weaknesses/skills thật từ `answersJson`). Nếu có yêu cầu phân tích theo dữ liệu cá nhân cụ thể với schema chính xác, cần bổ sung parser DTO + logic trích xuất “lỗ hổng kiến thức” từ `answersJson` theo chuẩn frontend/backend.
 
 
 
