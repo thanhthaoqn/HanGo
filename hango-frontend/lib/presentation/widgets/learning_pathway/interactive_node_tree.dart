@@ -110,7 +110,10 @@ class InteractiveNodeTree extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildStatusBadge(node.status),
+                          Flexible(
+                            child: _buildStatusBadge(node.status),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             'Step ${node.step}',
                             style: const TextStyle(
@@ -183,17 +186,21 @@ class InteractiveNodeTree extends StatelessWidget {
             color: const Color(0xFF10B981).withOpacity(0.1),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
+            children: const [
               Icon(Icons.check_circle, size: 14, color: Color(0xFF10B981)),
               SizedBox(width: 4),
-              Text(
-                'Completed',
-                style: TextStyle(
-                  color: Color(0xFF10B981),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  'Completed',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFF10B981),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -206,17 +213,21 @@ class InteractiveNodeTree extends StatelessWidget {
             color: const Color(0xFF3B82F6).withOpacity(0.1),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
+            children: const [
               Icon(Icons.play_circle_fill, size: 14, color: Color(0xFF3B82F6)),
               SizedBox(width: 4),
-              Text(
-                'In Progress',
-                style: TextStyle(
-                  color: Color(0xFF3B82F6),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  'In Progress',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFF3B82F6),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -229,17 +240,21 @@ class InteractiveNodeTree extends StatelessWidget {
             color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
+            children: const [
               Icon(Icons.lock, size: 14, color: Color(0xFF94A3B8)),
               SizedBox(width: 4),
-              Text(
-                'Locked',
-                style: TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  'Locked',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],

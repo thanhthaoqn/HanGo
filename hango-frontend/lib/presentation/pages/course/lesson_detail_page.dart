@@ -61,34 +61,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   int? _reviewAttemptIndex;
   final Map<int, int> _selectedAnswers = {};
 
-  final List<QuizAttempt> _mockAttempts = [
-    QuizAttempt(
-      attemptNumber: 1,
-      state: 'Finished',
-      grade: '10.0 / 10.0',
-      submittedTime: '2026-06-21 14:32',
-    ),
-    QuizAttempt(
-      attemptNumber: 2,
-      state: 'Finished',
-      grade: '8.8 / 10.0',
-      submittedTime: '2026-06-21 15:10',
-    ),
-  ];
-
-  final List<Map<int, int>> _attemptsAnswers = [
-    {
-      0: 1,
-      1: 1,
-      2: 1,
-      3: 2,
-      4: 2,
-      5: 1,
-      6: 0,
-      7: 1,
-    }, // mock attempt 1 (perfect score!)
-    {0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 1, 6: 0, 7: 1}, // mock attempt 2
-  ];
+  List<QuizAttempt> _mockAttempts = [];
+  List<Map<int, int>> _attemptsAnswers = [];
 
   Future<void> _loadData() async {
     try {
@@ -96,13 +70,48 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _isLoading = true;
         _errorMessage = null;
       });
+      await _loadCurrentUserId();
       final course = await _courseRepository.fetchCourseDetail(widget.courseId);
       final lesson = await _lessonRepository.fetchLessonDetail(
         _currentLessonId,
       );
+      
+      final List<dynamic> attemptsData = await _lessonRepository.fetchQuizAttempts(_currentLessonId, _currentUserId);
+      final List<QuizAttempt> parsedAttempts = [];
+      final List<Map<int, int>> parsedAnswers = [];
+      
+      for (final raw in attemptsData) {
+        final map = Map<String, dynamic>.from(raw);
+        final attemptNum = map['attemptNumber'] as int? ?? 1;
+        final state = map['state'] as String? ?? 'Finished';
+        final grade = map['grade'] as String? ?? '0.0';
+        final submittedTime = map['submittedTime'] as String? ?? '';
+        
+        parsedAttempts.add(QuizAttempt(
+          attemptNumber: attemptNum,
+          state: state,
+          grade: grade,
+          submittedTime: submittedTime,
+        ));
+        
+        final Map<int, int> answersMap = {};
+        if (map['answers'] != null) {
+          final rawAnswers = Map<String, dynamic>.from(map['answers']);
+          rawAnswers.forEach((k, v) {
+            final keyInt = int.tryParse(k);
+            if (keyInt != null && v is int) {
+              answersMap[keyInt] = v;
+            }
+          });
+        }
+        parsedAnswers.add(answersMap);
+      }
+
       setState(() {
         _courseDetail = course;
         _lessonDetail = lesson;
+        _mockAttempts = parsedAttempts;
+        _attemptsAnswers = parsedAnswers;
         _isLoading = false;
       });
     } catch (e) {
@@ -125,9 +134,42 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
     try {
       final newLesson = await _lessonRepository.fetchLessonDetail(lessonId);
+      final attemptsData = await _lessonRepository.fetchQuizAttempts(lessonId, _currentUserId);
+      final List<QuizAttempt> parsedAttempts = [];
+      final List<Map<int, int>> parsedAnswers = [];
+      
+      for (final raw in attemptsData) {
+        final map = Map<String, dynamic>.from(raw);
+        final attemptNum = map['attemptNumber'] as int? ?? 1;
+        final state = map['state'] as String? ?? 'Finished';
+        final grade = map['grade'] as String? ?? '0.0';
+        final submittedTime = map['submittedTime'] as String? ?? '';
+        
+        parsedAttempts.add(QuizAttempt(
+          attemptNumber: attemptNum,
+          state: state,
+          grade: grade,
+          submittedTime: submittedTime,
+        ));
+        
+        final Map<int, int> answersMap = {};
+        if (map['answers'] != null) {
+          final rawAnswers = Map<String, dynamic>.from(map['answers']);
+          rawAnswers.forEach((k, v) {
+            final keyInt = int.tryParse(k);
+            if (keyInt != null && v is int) {
+              answersMap[keyInt] = v;
+            }
+          });
+        }
+        parsedAnswers.add(answersMap);
+      }
+
       setState(() {
         _currentLessonId = lessonId;
         _lessonDetail = newLesson;
+        _mockAttempts = parsedAttempts;
+        _attemptsAnswers = parsedAnswers;
         _isNavigatingLesson = false;
       });
       if (startQuiz) {
@@ -1126,17 +1168,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     ),
                     Expanded(
                       flex: 2,
-                      child: Text(
-                        'State',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: Text(
@@ -1217,29 +1248,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                   color: Color(0xFF475569),
                                   fontWeight: FontWeight.w500,
                                 ),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF22C55E),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    attempt.state,
-                                    style: const TextStyle(
-                                      color: Color(0xFF22C55E),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
                               ),
                             ),
                             Expanded(
@@ -1459,14 +1467,26 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 ),
                 padding: const EdgeInsets.all(16),
                 child: SingleChildScrollView(
-                  child: Text(
-                    passage,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      color: Color(0xFF334155),
-                      height: 1.5,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Html(
+                    data: passage,
+                    style: {
+                      "body": Style(
+                        fontSize: FontSize(14.5),
+                        color: const Color(0xFF334155),
+                        lineHeight: LineHeight.number(1.5),
+                        fontWeight: FontWeight.w500,
+                        margin: Margins.zero,
+                        padding: HtmlPaddings.zero,
+                      ),
+                      "p": Style(
+                        fontSize: FontSize(14.5),
+                        color: const Color(0xFF334155),
+                        lineHeight: LineHeight.number(1.5),
+                        fontWeight: FontWeight.w500,
+                        margin: Margins.zero,
+                        padding: HtmlPaddings.zero,
+                      ),
+                    },
                   ),
                 ),
               ),
@@ -1655,17 +1675,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     final submittedAnswers = Map<int, int>.from(_selectedAnswers);
 
     setState(() {
-      _attemptsAnswers.add(submittedAnswers);
-      _mockAttempts.add(
-        QuizAttempt(
-          attemptNumber: _mockAttempts.length + 1,
-          state: 'Finished',
-          grade: '${score.toStringAsFixed(1)} / 10.0',
-          submittedTime: DateTime.now().toString().substring(0, 16),
-        ),
-      );
       _isDoingQuiz = false;
-      _reviewAttemptIndex = _mockAttempts.length - 1;
     });
 
     toggleFullscreen(false);
@@ -1677,6 +1687,43 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         score,
         submittedAnswers,
       );
+
+      final List<dynamic> attemptsData = await _lessonRepository.fetchQuizAttempts(widget.lessonId, _currentUserId);
+      final List<QuizAttempt> parsedAttempts = [];
+      final List<Map<int, int>> parsedAnswers = [];
+      
+      for (final raw in attemptsData) {
+        final map = Map<String, dynamic>.from(raw);
+        final attemptNum = map['attemptNumber'] as int? ?? 1;
+        final state = map['state'] as String? ?? 'Finished';
+        final grade = map['grade'] as String? ?? '0.0';
+        final submittedTime = map['submittedTime'] as String? ?? '';
+        
+        parsedAttempts.add(QuizAttempt(
+          attemptNumber: attemptNum,
+          state: state,
+          grade: grade,
+          submittedTime: submittedTime,
+        ));
+        
+        final Map<int, int> answersMap = {};
+        if (map['answers'] != null) {
+          final rawAnswers = Map<String, dynamic>.from(map['answers']);
+          rawAnswers.forEach((k, v) {
+            final keyInt = int.tryParse(k);
+            if (keyInt != null && v is int) {
+              answersMap[keyInt] = v;
+            }
+          });
+        }
+        parsedAnswers.add(answersMap);
+      }
+
+      setState(() {
+        _mockAttempts = parsedAttempts;
+        _attemptsAnswers = parsedAnswers;
+        _reviewAttemptIndex = _mockAttempts.isNotEmpty ? _mockAttempts.length - 1 : null;
+      });
 
       final quizScorePercent = (score * 10).round();
       if (quizScorePercent < 60) {

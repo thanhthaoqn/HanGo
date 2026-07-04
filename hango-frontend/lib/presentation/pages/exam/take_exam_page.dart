@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../data/repositories/pathway_repository.dart';
+import '../../../utils/fullscreen_helper.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
@@ -145,6 +146,11 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
     _loadCachedAnswers();
     _startTimer();
+
+    // Trigger fullscreen mode
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      toggleFullscreen(true);
+    });
   }
 
   @override
@@ -153,6 +159,8 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     _timerAnimationController?.dispose();
     _gridScrollController.dispose();
     _contentScrollController.dispose();
+    // Exit fullscreen mode
+    toggleFullscreen(false);
     super.dispose();
   }
 
@@ -247,7 +255,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     }
     double score = (correctCount / _examQuestions.length) * 10;
     
-    await _saveAttemptToHistory(score);
+    final attemptMap = await _saveAttemptToHistory(score);
     if (!mounted) return;
 
     Navigator.pushReplacement(
@@ -259,7 +267,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
           correctCount: correctCount,
           totalQuestions: _examQuestions.length,
           userAnswers: _userAnswers,
-          attempt: {
+          attempt: attemptMap ?? {
             "attemptNumber": 1,
             "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
             "score": score,
@@ -358,7 +366,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                         }
                         double score = (correctCount / _examQuestions.length) * 10;
                         
-                        await _saveAttemptToHistory(score);
+                        final attemptMap = await _saveAttemptToHistory(score);
                         if (!mounted) return;
 
                         Navigator.pushReplacement(
@@ -370,7 +378,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                               correctCount: correctCount,
                               totalQuestions: _examQuestions.length,
                               userAnswers: _userAnswers,
-                              attempt: {
+                              attempt: attemptMap ?? {
                                 "attemptNumber": 1,
                                 "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
                                 "score": score,
@@ -408,7 +416,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     );
   }
 
-  Future<void> _saveAttemptToHistory(double score) async {
+  Future<Map<String, dynamic>?> _saveAttemptToHistory(double score) async {
     try {
       final repository = ExamRepository();
       Map<String, int> answersForSubmit = {};
@@ -422,188 +430,279 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
       if (attemptId != null && attemptId > 0) {
         await PathwayRepository().generatePathway(examAttemptId: attemptId);
       }
+      return attempt;
     } catch (e) {
       debugPrint("Error saving attempt or generating pathway: $e");
+      return null;
     }
   }
 
-
-
-  @override
-  Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width > 900;
-    final currentQuestion = _examQuestions[_currentQuestionIndex];
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      appBar: AppBar(
-        title: Text(widget.exam.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Ask confirmation before leaving
-            showDialog(
-              context: context,
-              builder: (context) => Dialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                backgroundColor: Colors.white,
-                elevation: 10,
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 400),
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFEF2F2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.warning_amber_rounded,
-                          color: Color(0xFFEF4444),
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Quit Test?',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Are you sure you want to leave? Your progress will be saved, but the timer will keep counting down if you leave.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                'Resume',
-                                style: TextStyle(
-                                  color: Color(0xFF475569),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context); // Close confirm
-                                Navigator.pop(context); // Close take exam screen
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFEF4444),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                'Quit',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+  void _showExitExamConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        elevation: 10,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF2F2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFEF4444),
+                  size: 28,
                 ),
               ),
-            );
-          },
-        ),
-        actions: [
-          // Countdown Timer with warning behavior
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _timerScaleAnimation!,
-                builder: (context, child) {
-                  final isWarning = _timeLeft <= 120;
-                  final timeStr = _formatTime(_timeLeft);
-                  return Transform.scale(
-                    scale: isWarning ? _timerScaleAnimation!.value : 1.0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isWarning ? const Color(0xFFFEE2E2) : const Color(0xFFE8F8F5),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isWarning ? const Color(0xFFFCA5A5) : const Color(0xFF28B79B),
-                          width: 1.5
+              const SizedBox(height: 16),
+              const Text(
+                'Quit Test?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Are you sure you want to leave? Your progress will be saved, but the timer will keep counting down if you leave.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.timer_outlined,
-                            size: 16,
-                            color: isWarning ? const Color(0xFFEF4444) : const Color(0xFF167B66),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            timeStr,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: isWarning ? const Color(0xFFEF4444) : const Color(0xFF167B66),
-                            ),
-                          ),
-                        ],
+                      child: const Text(
+                        'Resume',
+                        style: TextStyle(
+                          color: Color(0xFF475569),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close confirm
+                        Navigator.pop(context); // Close take exam screen
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Quit',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExitExamHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: _showExitExamConfirmation,
+              child: Row(
+                children: const [
+                  Icon(Icons.arrow_back, size: 20, color: Color(0xFF1E293B)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Exit Exam',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    );
+  }
+
+  Widget _buildExamTopBar(bool isDesktop) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Left: Main Question Content Area
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF28B79B),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Question ${_currentQuestionIndex + 1} / ${_examQuestions.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F7F4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFF28B79B).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 16,
+                      color: Color(0xFF28B79B),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${_userAnswers.length} done',
+                      style: const TextStyle(
+                        color: Color(0xFF28B79B),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          // Countdown Timer!
+          AnimatedBuilder(
+            animation: _timerScaleAnimation!,
+            builder: (context, child) {
+              final isWarning = _timeLeft <= 120;
+              final timeStr = _formatTime(_timeLeft);
+              return Transform.scale(
+                scale: isWarning ? _timerScaleAnimation!.value : 1.0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isWarning ? const Color(0xFFFEE2E2) : const Color(0xFFE8F8F5),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isWarning ? const Color(0xFFFCA5A5) : const Color(0xFF28B79B),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 16,
+                        color: isWarning ? const Color(0xFFEF4444) : const Color(0xFF167B66),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        timeStr,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isWarning ? const Color(0xFFEF4444) : const Color(0xFF167B66),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExamActiveQuestionPane() {
+    final currentQuestion = _examQuestions[_currentQuestionIndex];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Expanded(
-            flex: 3,
             child: SingleChildScrollView(
               controller: _contentScrollController,
-              padding: const EdgeInsets.all(32.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Skill & Question Number Header
+                  // Skill header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -709,145 +808,198 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                       ),
                     );
                   }),
-                  const SizedBox(height: 48),
-
-                  // Bottom action buttons (Prev/Next)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _currentQuestionIndex > 0
-                            ? () => setState(() => _currentQuestionIndex--)
-                            : null,
-                        icon: const Icon(Icons.arrow_back),
-                        label: const Text('Previous'),
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: const Color(0xFF28B79B),
-                          backgroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                          side: BorderSide(color: Colors.grey.shade200),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: _currentQuestionIndex < _examQuestions.length - 1
-                            ? () => setState(() => _currentQuestionIndex++)
-                            : null,
-                        icon: const Icon(Icons.arrow_forward),
-                        label: const Text('Next'),
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: const Color(0xFF28B79B),
-                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
           ),
-
-          // Right Sidebar: Question Status Grid
-          if (isDesktop)
-            Container(
-              width: 320,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(left: BorderSide(color: Colors.grey.shade200)),
+          const SizedBox(height: 16),
+          // Bottom Navigation Buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _currentQuestionIndex > 0
+                    ? () => setState(() => _currentQuestionIndex--)
+                    : null,
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Previous'),
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: const Color(0xFF28B79B),
+                  backgroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  side: BorderSide(color: Colors.grey.shade200),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Progress Overview',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Answered: ${_userAnswers.length} / ${_examQuestions.length}',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Question Grid
-                  Expanded(
-                    child: SingleChildScrollView(
-                      controller: _gridScrollController,
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: List.generate(_examQuestions.length, (index) {
-                          final isAnswered = _userAnswers.containsKey(index);
-                          final isActive = _currentQuestionIndex == index;
+              ElevatedButton.icon(
+                onPressed: _currentQuestionIndex < _examQuestions.length - 1
+                    ? () => setState(() => _currentQuestionIndex++)
+                    : null,
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Next'),
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF28B79B),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-                          Color bgColor = Colors.white;
-                          Color borderColor = Colors.grey.shade200;
-                          Color textColor = Colors.grey.shade700;
+  Widget _buildExamRightSidebarPane() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Progress Overview',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Answered: ${_userAnswers.length} / ${_examQuestions.length}',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+          const SizedBox(height: 24),
+          
+          // Question Grid
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _gridScrollController,
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: List.generate(_examQuestions.length, (index) {
+                  final isAnswered = _userAnswers.containsKey(index);
+                  final isActive = _currentQuestionIndex == index;
 
-                          if (isActive) {
-                            bgColor = Colors.white;
-                            borderColor = const Color(0xFF28B79B);
-                            textColor = const Color(0xFF28B79B);
-                          } else if (isAnswered) {
-                            bgColor = const Color(0xFFE8F8F5);
-                            borderColor = const Color(0xFF28B79B).withOpacity(0.5);
-                            textColor = const Color(0xFF167B66);
-                          }
+                  Color bgColor = Colors.white;
+                  Color borderColor = Colors.grey.shade200;
+                  Color textColor = Colors.grey.shade700;
 
-                          return InkWell(
-                            onTap: () => setState(() => _currentQuestionIndex = index),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: bgColor,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: borderColor, width: isActive ? 2 : 1),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: textColor,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
+                  if (isActive) {
+                    bgColor = Colors.white;
+                    borderColor = const Color(0xFF28B79B);
+                    textColor = const Color(0xFF28B79B);
+                  } else if (isAnswered) {
+                    bgColor = const Color(0xFFE8F8F5);
+                    borderColor = const Color(0xFF28B79B).withOpacity(0.5);
+                    textColor = const Color(0xFF167B66);
+                  }
+
+                  return InkWell(
+                    onTap: () => setState(() => _currentQuestionIndex = index),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor, width: isActive ? 2 : 1),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Submit button
-                  SizedBox(
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _confirmSubmit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF28B79B),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text(
-                        'Submit Exam',
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${index + 1}',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
                           fontWeight: FontWeight.bold,
+                          color: textColor,
+                          fontSize: 14,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  );
+                }),
               ),
             ),
+          ),
+          const SizedBox(height: 24),
+
+          // Submit button
+          SizedBox(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _confirmSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF28B79B),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text(
+                'Submit Exam',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
+      appBar: null, // Removed standard AppBar as requested
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildExitExamHeader(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    _buildExamTopBar(isDesktop),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: isDesktop
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 7,
+                                  child: _buildExamActiveQuestionPane(),
+                                ),
+                                const SizedBox(width: 24),
+                                SizedBox(
+                                  width: 320,
+                                  child: _buildExamRightSidebarPane(),
+                                ),
+                              ],
+                            )
+                          : SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  _buildExamActiveQuestionPane(),
+                                  const SizedBox(height: 24),
+                                  _buildExamRightSidebarPane(),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

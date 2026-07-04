@@ -278,8 +278,8 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
           Container(
             width: 90,
             height: 90,
-            decoration: BoxDecoration(
-              color: isPassed ? const Color(0xFFE8F8F5) : const Color(0xFFFEE2E2),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE8F8F5),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -288,17 +288,17 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
               children: [
                 Text(
                   scoreValue.toStringAsFixed(1),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
-                    color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                    color: Color(0xFF167B66),
                   ),
                 ),
-                Text(
+                const Text(
                   '/10.0',
                   style: TextStyle(
                     fontSize: 10,
-                    color: isPassed ? const Color(0xFF28B79B) : const Color(0xFFEF4444).withOpacity(0.7),
+                    color: Color(0xFF28B79B),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -323,22 +323,6 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isPassed ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        isPassed ? 'PASSED' : 'FAILED',
-                        style: TextStyle(
-                          color: isPassed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Text(
                       'Attempt: #${widget.attempt['attemptNumber']}',
                       style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 13),

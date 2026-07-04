@@ -180,15 +180,11 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
               ),
               Row(
                 children: [
-                  const Icon(Icons.star, color: Color(0xFFFBBF24), size: 16),
+                  const Icon(Icons.people_alt_outlined, color: Color(0xFF94A3B8), size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    widget.exam.rating.toStringAsFixed(1),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  Text(
-                    ' (${widget.exam.learnerCountFormatted})',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                    widget.exam.learnerCountFormatted,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],
               ),
@@ -454,33 +450,30 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                         final attemptNum = attempt['attemptNumber'] ?? (index + 1);
                         final date = attempt['date'] ?? '';
                         final score = (attempt['score'] as num?)?.toDouble() ?? 0.0;
-                        final status = attempt['status'] ?? 'PASSED';
                         
-                        final isPassed = score >= 5.0;
-
                         return Row(
                           children: [
                             // Circular attempt index indicator
                             Container(
                               width: 36,
                               height: 36,
-                              decoration: BoxDecoration(
-                                color: isPassed ? const Color(0xFFE8F8F5) : const Color(0xFFFEE2E2),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE8F8F5),
                                 shape: BoxShape.circle,
                               ),
                               alignment: Alignment.center,
                               child: Text(
                                 '#$attemptNum',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                                  color: Color(0xFF167B66),
                                   fontSize: 13,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 16),
                             
-                            // Date and status
+                            // Date
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,22 +482,6 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                                     date,
                                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF374151)),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isPassed ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      isPassed ? 'PASSED' : 'FAILED',
-                                      style: TextStyle(
-                                        color: isPassed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  )
                                 ],
                               ),
                             ),
@@ -515,10 +492,10 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                               children: [
                                 Text(
                                   score.toStringAsFixed(1),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w900,
-                                    color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                                    color: Color(0xFF167B66),
                                   ),
                                 ),
                                 const Text(
@@ -550,7 +527,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                                 ),
                               ),
                               child: const Text(
-                                'Xem lại',
+                                'Review',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                             ),
