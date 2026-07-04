@@ -13,6 +13,8 @@ import '../course/course_detail_page.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'learning_pathway_page.dart';
+import '../flashcard/list_flashcards_page.dart';
+import '../exam/take_exam_page.dart';
 
 class LearnerHomePage extends StatefulWidget {
   const LearnerHomePage({super.key});
@@ -143,10 +145,72 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                             await prefs.setBool(showOnboardingKey, false);
                             if (!mounted) return;
                             Navigator.pop(ctx); // Close dialog
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ListExamsPage()),
+
+                            // Show a loading indicator
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (loadingCtx) => const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                                ),
+                              ),
                             );
+
+                            try {
+                              final exams = await _examRepository.fetchExams(status: 'PUBLISHED');
+                              
+                              if (!mounted) return;
+                              Navigator.pop(context); // Close loading indicator
+
+                              if (exams.isNotEmpty) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TakeExamPage(exam: exams.first),
+                                  ),
+                                );
+                              } else {
+                                // Fallback exam
+                                final fallbackExam = Exam(
+                                  id: '1',
+                                  title: 'Đề thi thử Tốt nghiệp THPT Quốc Gia môn Tiếng Anh',
+                                  description: 'Bài thi khảo sát năng lực Tiếng Anh dành cho học sinh chuẩn bị thi THPT Quốc Gia.',
+                                  creatorName: 'Bộ Giáo Dục và Đào Tạo',
+                                  questionCount: 40,
+                                  durationMinutes: 50,
+                                  rating: 5.0,
+                                  learnerCountFormatted: '152k Learner',
+                                );
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TakeExamPage(exam: fallbackExam),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (!mounted) return;
+                              Navigator.pop(context); // Close loading indicator
+                              
+                              // Fallback exam in case of network/API error
+                              final fallbackExam = Exam(
+                                id: '1',
+                                title: 'Đề thi thử Tốt nghiệp THPT Quốc Gia môn Tiếng Anh',
+                                description: 'Bài thi khảo sát năng lực Tiếng Anh dành cho học sinh chuẩn bị thi THPT Quốc Gia.',
+                                creatorName: 'Bộ Giáo Dục và Đào Tạo',
+                                questionCount: 40,
+                                durationMinutes: 50,
+                                rating: 5.0,
+                                learnerCountFormatted: '152k Learner',
+                              );
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TakeExamPage(exam: fallbackExam),
+                                ),
+                              );
+                            }
                           },
                           borderRadius: BorderRadius.circular(16),
                           child: Container(
@@ -427,7 +491,15 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           ListTile(
             leading: const Icon(Icons.style_outlined),
             title: const Text('Flashcard'),
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ListFlashcardsPage(),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.route_outlined),
@@ -1149,17 +1221,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    exam.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
                     'Created By: ${exam.creatorName}',
                     style: const TextStyle(
                       fontSize: 11,
@@ -1196,30 +1257,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         style: const TextStyle(
                           fontSize: 11,
                           color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Stars and learner count
-                  Row(
-                    children: [
-                      ...List.generate(5, (index) {
-                        return Icon(
-                          Icons.star,
-                          size: 12,
-                          color: index < (exam.rating).floor()
-                              ? const Color(0xFFFBBF24)
-                              : Colors.grey.shade300,
-                        );
-                      }),
-                      const SizedBox(width: 4),
-                      Text(
-                        exam.learnerCountFormatted,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF9CA3AF),
                         ),
                       ),
                     ],

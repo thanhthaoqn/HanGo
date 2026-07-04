@@ -120,17 +120,6 @@ class _ExamCardState extends State<ExamCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.exam.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
                       'Created By: ${widget.exam.creatorName}',
                       style: const TextStyle(
                         fontSize: 11,
@@ -154,30 +143,6 @@ class _ExamCardState extends State<ExamCard> {
                         Text(
                           '${widget.exam.durationMinutes} minute',
                           style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    // Stars and learner count
-                    Row(
-                      children: [
-                        ...List.generate(5, (index) {
-                          return Icon(
-                            Icons.star,
-                            size: 12,
-                            color: index < widget.exam.rating.floor() 
-                                ? const Color(0xFFFBBF24) 
-                                : Colors.grey.shade300,
-                          );
-                        }),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.exam.learnerCountFormatted,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF9CA3AF),
-                          ),
                         ),
                       ],
                     ),

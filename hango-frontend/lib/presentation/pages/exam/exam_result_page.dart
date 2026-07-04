@@ -230,18 +230,24 @@ class _ExamResultPageState extends State<ExamResultPage> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Circular Score Indicator
+          // Score circle
           Container(
             width: 140,
             height: 140,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isPassed ? const Color(0xFFE8F8F5) : const Color(0xFFFEE2E2),
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                ),
+              ],
               border: Border.all(
-                color: isPassed ? const Color(0xFF28B79B) : const Color(0xFFEF4444),
-                width: 4,
+                color: const Color(0xFF28B79B),
+                width: 5,
               ),
             ),
             alignment: Alignment.center,
@@ -250,39 +256,21 @@ class _ExamResultPageState extends State<ExamResultPage> {
               children: [
                 Text(
                   widget.score.toStringAsFixed(1),
-                  style: TextStyle(
-                    fontSize: 44,
-                    fontWeight: FontWeight.w900,
-                    color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                  style: const TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF167B66),
                   ),
                 ),
-                Text(
+                const Text(
                   "/ 10 Score",
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isPassed ? const Color(0xFF28B79B) : const Color(0xFFEF4444).withOpacity(0.8),
+                    color: Color(0xFF28B79B),
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Passed/Failed Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: isPassed ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Text(
-              isPassed ? 'PASSED' : 'FAILED',
-              style: TextStyle(
-                color: isPassed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
             ),
           ),
           const SizedBox(height: 32),
@@ -652,33 +640,30 @@ class _ExamResultPageState extends State<ExamResultPage> {
                         final attemptNum = attempt['attemptNumber'] ?? (index + 1);
                         final date = attempt['date'] ?? '';
                         final score = (attempt['score'] as num?)?.toDouble() ?? 0.0;
-                        final status = attempt['status'] ?? 'PASSED';
                         
-                        final isPassed = score >= 5.0;
-
                         return Row(
                           children: [
                             // Circular attempt index indicator
                             Container(
                               width: 36,
                               height: 36,
-                              decoration: BoxDecoration(
-                                color: isPassed ? const Color(0xFFE8F8F5) : const Color(0xFFFEE2E2),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE8F8F5),
                                 shape: BoxShape.circle,
                               ),
                               alignment: Alignment.center,
                               child: Text(
                                 '#$attemptNum',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                                  color: Color(0xFF167B66),
                                   fontSize: 13,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 16),
                             
-                            // Date and status
+                            // Date
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -687,22 +672,6 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                     date,
                                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF374151)),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isPassed ? const Color(0xFFD1FAE5) : const Color(0xFFFEE2E2),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      isPassed ? 'PASSED' : 'FAILED',
-                                      style: TextStyle(
-                                        color: isPassed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  )
                                 ],
                               ),
                             ),
@@ -713,10 +682,10 @@ class _ExamResultPageState extends State<ExamResultPage> {
                               children: [
                                 Text(
                                   score.toStringAsFixed(1),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w900,
-                                    color: isPassed ? const Color(0xFF167B66) : const Color(0xFFEF4444),
+                                    color: Color(0xFF167B66),
                                   ),
                                 ),
                                 const Text(
