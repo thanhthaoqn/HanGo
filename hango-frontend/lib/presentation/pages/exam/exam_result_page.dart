@@ -8,6 +8,8 @@ import '../../widgets/shared_header.dart';
 import '../course/course_detail_page.dart';
 import 'exam_review_page.dart';
 import 'list_exams_page.dart';
+
+import '../learner/learning_pathway_page.dart';
 import '../../../data/repositories/exam_ai_recommendation_repository.dart';
 
 class ExamResultPage extends StatefulWidget {
@@ -624,6 +626,174 @@ class _ExamResultPageState extends State<ExamResultPage> {
                     padding: EdgeInsets.symmetric(vertical: 48.0),
                     child: CircularProgressIndicator(color: Color(0xFF28B79B)),
                   ),
+                )
+              : (_aiRecommendedCourses.isNotEmpty)
+              ? Column(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        'The (AI) Learning Pathway suggestions are ready — you can create your Learning Pathway right below.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                    ),
+                    ..._aiRecommendedCourses.map((r) {
+                      final courseIdRaw = r['courseId'];
+                      final int courseId = courseIdRaw is int
+                          ? courseIdRaw
+                          : int.tryParse(courseIdRaw.toString()) ?? 0;
+
+                      final title = (r['title'] ?? '').toString();
+                      final category = (r['category'] ?? '').toString();
+                      final difficulty = (r['difficulty'] ?? '').toString();
+                      final reasonWhy = (r['reasonWhy'] ?? '').toString();
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade100),
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFFF9FAFB),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 70,
+                                height: 70,
+                                color: Colors.grey.shade200,
+                                child: const Icon(
+                                  Icons.book_outlined,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE0F2FE),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      (category.isNotEmpty
+                                              ? category
+                                              : 'AI Recommended')
+                                          .toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Color(0xFF0369A1),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    title.isNotEmpty ? title : 'Course',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  if (reasonWhy.isNotEmpty)
+                                    Text(
+                                      reasonWhy,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      if (courseId > 0) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                CourseDetailPage(
+                                                  courseId: courseId,
+                                                ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF28B79B),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Learn Now',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LearningPathwayPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.timeline_outlined),
+                        label: const Text('Create/View Learning Pathway'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color.fromARGB(
+                            255,
+                            11,
+                            102,
+                            96,
+                          ),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 )
               : (_aiRecommendedCourses.isNotEmpty)
               ? Column(
