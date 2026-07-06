@@ -31,23 +31,19 @@ public class ExamResultAnalyzerService {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * Phân tích 1 attempt (giữ backward compatibility).
+     */
     public ExamResultAnalysisDTO analyzeLatestExamAttempt(ExamAttempt examAttempt) {
-
-        // Hiện tại repository đang lưu answersJson (string JSON). Chúng ta chưa có schema DTO parse sẵn,
-        // nên tạm thời trả về raw + một vài trường suy ra (score/weaknesses nếu parse được).
-        // Bước tiếp theo sẽ mở rộng: parse schema thật và trả về “lỗ hổng kiến thức” chuẩn.
-
         Map<String, Object> hints = new HashMap<>();
 
         String answersJson = examAttempt.getAnswersJson();
         hints.put("answersJson", answersJson);
 
         if (examAttempt.getScore() != null) {
-            // examAttempt.getScore() có thể là BigDecimal, convert sang Integer cho DTO layer
             hints.put("score", examAttempt.getScore().intValue());
         }
 
-        // weakness/difficulty sẽ được chuẩn hóa sau khi có DTO parse đúng schema.
         return ExamResultAnalysisDTO.builder()
                 .examAttemptId(examAttempt.getId())
                 .score(examAttempt.getScore() != null ? examAttempt.getScore().intValue() : null)
@@ -56,6 +52,161 @@ public class ExamResultAnalyzerService {
                 .hints(hints)
                 .build();
     }
+
+    /**
+     * Phân tích tổng hợp N attempts gần nhất của learner để suy ra điểm yếu kỹ năng.
+     *
+     * Quy ước: gọi tool để extract skill gaps từ answersJson, rồi merge theo tần suất.
+     */
+    public ExamResultAnalysisDTO analyzeLearnerAttempts(Long learnerId, List<ExamAttempt> attempts) {
+        if (attempts == null || attempts.isEmpty()) {
+            return ExamResultAnalysisDTO.builder()
+                    .examAttemptId(null)
+                    .score(null)
+                    .rawAnswersJson(null)
+                    .knowledgeGapsJson("{}")
+                    .hints(Map.of("learnerId", learnerId, "attemptsUsed", 0))
+                    .build();
+        }
+
+        // Merge yếu theo skill/topic (placeholder schema hiện tại).
+        Map<String, Integer> weakSkillCount = new HashMap<>();
+        Map<String, Integer> criticalTopicCount = new HashMap<>();
+
+        Integer minScore = null;
+        Integer maxScore = null;
+        Integer sumScore = 0;
+        int scoredAttempts = 0;
+
+        List<Long> attemptIds = attempts.stream().map(ExamAttempt::getId).toList();
+
+        // rawAnswersJson (chỉ lấy attempt mới nhất để không bơm prompt quá lớn)
+        ExamAttempt latest = attempts.get(0);
+        String rawLatestAnswers = latest.getAnswersJson();
+
+        for (ExamAttempt attempt : attempts) {
+            if (attempt.getScore() != null) {
+                int s = attempt.getScore().intValue();
+                sumScore += s;
+                scoredAttempts++;
+                minScore = (minScore == null) ? s : Math.min(minScore, s);
+                maxScore = (maxScore == null) ? s : Math.max(maxScore, s);
+            }
+
+            String knowledgeGapsJson = extractKnowledgeGapsPlaceholder(attempt.getAnswersJson());
+            // knowledgeGapsJson là JSON string placeholder:
+            // {weak_skills:[...], critical_topics:[...], incorrect_count:X}
+            mergeKnowledgeGapsFromPlaceholder(knowledgeGapsJson, weakSkillCount, criticalTopicCount);
+        }
+
+        // Nếu schema/parse answersJson không đủ để gom skill đúng,
+        // fallback bằng cách lấy danh sách weak_skills từ attempt mới nhất.
+        if (weakSkillCount.isEmpty()) {
+            String latestGaps = extractKnowledgeGapsPlaceholder(latest.getAnswersJson());
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = objectMapper.readValue(latestGaps, Map.class);
+                Object weakSkillsObj = parsed.get("weak_skills");
+                if (weakSkillsObj instanceof List<?> weakSkillsList) {
+                    for (Object s : weakSkillsList) {
+                        if (s == null) continue;
+                        String key = s.toString().trim();
+                        if (key.isBlank()) continue;
+                        weakSkillCount.put(key, 1);
+                    }
+                }
+            } catch (Exception ignore) {
+                // ignore
+            }
+        }
+
+        double avgScore = scoredAttempts > 0 ? (double) sumScore / scoredAttempts : 0.0;
+
+        List<String> weakSkills = weakSkillCount.entrySet().stream()
+                .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+                .limit(10)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        List<String> criticalTopics = criticalTopicCount.entrySet().stream()
+                .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+                .limit(10)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("weak_skills", weakSkills);
+        summary.put("critical_topics", criticalTopics);
+        summary.put("attempts_used", attempts.size());
+        summary.put("score_avg", avgScore);
+        summary.put("score_min", minScore);
+        summary.put("score_max", maxScore);
+
+        return ExamResultAnalysisDTO.builder()
+                .examAttemptId(latest.getId())
+                .score(latest.getScore() != null ? latest.getScore().intValue() : null)
+                .rawAnswersJson(rawLatestAnswers)
+                .knowledgeGapsJson(serializeSafe(summary))
+                .hints(Map.of(
+                        "learnerId", learnerId,
+                        "attemptIds", attemptIds,
+                        "attemptsUsed", attempts.size(),
+                        "score_avg", avgScore
+                ))
+                .build();
+    }
+
+    private String serializeSafe(Map<String, Object> summary) {
+        try {
+            return objectMapper.writeValueAsString(summary);
+        } catch (Exception e) {
+            log.warn("Failed to serialize knowledge gap summary: {}", e.getMessage());
+            return "{}";
+        }
+    }
+
+    /**
+     * knowledgeGapsJson hiện tại có thể là JSON placeholder hoặc fallback raw.
+     * Nếu là JSON placeholder thì parse và merge.
+     */
+    private void mergeKnowledgeGapsFromPlaceholder(
+            String knowledgeGapsJson,
+            Map<String, Integer> weakSkillCount,
+            Map<String, Integer> criticalTopicCount) {
+
+        if (knowledgeGapsJson == null || knowledgeGapsJson.isBlank()) {
+            return;
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> parsed = objectMapper.readValue(knowledgeGapsJson, Map.class);
+
+            Object weakSkillsObj = parsed.get("weak_skills");
+            if (weakSkillsObj instanceof List<?> weakSkillsList) {
+                for (Object s : weakSkillsList) {
+                    if (s == null) continue;
+                    String key = s.toString().trim();
+                    if (key.isBlank()) continue;
+                    weakSkillCount.merge(key, 1, Integer::sum);
+                }
+            }
+
+            Object topicsObj = parsed.get("critical_topics");
+            if (topicsObj instanceof List<?> topicsList) {
+                for (Object t : topicsList) {
+                    if (t == null) continue;
+                    String key = t.toString().trim();
+                    if (key.isBlank()) continue;
+                    criticalTopicCount.merge(key, 1, Integer::sum);
+                }
+            }
+        } catch (Exception e) {
+            // nếu parse fail -> bỏ qua để không làm hỏng flow
+            log.debug("Skipping merge because knowledgeGapsJson not parseable placeholder. err={}", e.getMessage());
+        }
+    }
+
 
     private String extractKnowledgeGapsPlaceholder(String answersJson) {
         // Parse answersJson -> thống kê câu sai theo topic/skill.
