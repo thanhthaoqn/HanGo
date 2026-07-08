@@ -8,8 +8,11 @@ class TrainerQuestion {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  final String? displayNo;
+
   TrainerQuestion({
     required this.id,
+    this.displayNo,
     required this.questionText,
     required this.categoryName,
     required this.difficultyName,

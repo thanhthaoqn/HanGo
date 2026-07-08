@@ -23,6 +23,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final ExamRepository examRepository;
+    private final ExamQuestionRepository examQuestionRepository;
     private final SystemParameterRepository systemParameterRepository;
     private final SectionRepository sectionRepository;
     private final LessonRepository lessonRepository;
@@ -309,5 +310,49 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lessonRepository.save(lesson);
             }
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.hango.hango_backend.dto.TrainerExamResponseDTO> getTrainerExams(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        Long trainerId = user.getId();
+
+        List<com.hango.hango_backend.entity.Exam> exams = examRepository.findByCreatedByIdAndDeletedAtIsNull(trainerId);
+
+        return exams.stream().map(exam -> {
+            int questionCount = examQuestionRepository.countByIdExamId(exam.getId());
+            return com.hango.hango_backend.dto.TrainerExamResponseDTO.builder()
+                    .id(exam.getId())
+                    .title(exam.getTitle())
+                    .createdAt(exam.getCreatedAt())
+                    .questionCount(questionCount)
+                    .expectedQuestionCount(exam.getExpectedQuestionCount())
+                    .durationMinutes(exam.getDurationMinutes())
+                    .status(exam.getStatus() != null ? exam.getStatus() : "private")
+                    .visibility(exam.getVisibility() != null ? exam.getVisibility() : "PRIVATE")
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void createTrainerExam(String email, com.hango.hango_backend.dto.TrainerCreateExamRequestDTO request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        
+        com.hango.hango_backend.entity.Exam exam = new com.hango.hango_backend.entity.Exam();
+        exam.setTitle(request.getTitle());
+        exam.setDescription(request.getDescription());
+        exam.setExpectedQuestionCount(request.getExpectedQuestionCount());
+        exam.setPassingScore(request.getPassingScore());
+        exam.setDurationMinutes(request.getDurationMinutes());
+        
+        exam.setStatus("DRAFT");
+        exam.setVisibility("PRIVATE");
+        exam.setCreatedBy(user);
+        
+        examRepository.save(exam);
     }
 }

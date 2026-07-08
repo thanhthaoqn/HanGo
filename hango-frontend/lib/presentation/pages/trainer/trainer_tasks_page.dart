@@ -6,6 +6,7 @@ import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
+import 'trainer_exams_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import 'trainer_task_detail_page.dart';
 import '../../../utils/toast_helper.dart';
@@ -199,7 +200,12 @@ class _TrainerTasksPageState extends State<TrainerTasksPage> {
           _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()));
           }),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
+          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
+            );
+          }),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
           _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()));
