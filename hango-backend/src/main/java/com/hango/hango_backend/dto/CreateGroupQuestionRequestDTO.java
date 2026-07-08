@@ -15,6 +15,8 @@ public class CreateGroupQuestionRequestDTO {
     private String passageText;
     private String explanation;
     private Long categoryId;
+    private Long skillParamId; // REQUIRED by DB (skill-param-id)
     private Long difficultyId;
     private List<CreateSubQuestionDTO> subQuestions;
 }
+
