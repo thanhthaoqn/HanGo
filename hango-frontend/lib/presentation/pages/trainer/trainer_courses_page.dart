@@ -7,6 +7,7 @@ import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_tasks_page.dart';
+import 'trainer_exams_page.dart';
 
 import 'create_course_page.dart';
 import 'edit_course_page.dart';
@@ -293,7 +294,12 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             },
           ),
           _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
+          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
+            );
+          }),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
           _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
             Navigator.pushReplacement(

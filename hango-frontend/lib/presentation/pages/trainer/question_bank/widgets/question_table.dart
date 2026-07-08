@@ -106,6 +106,17 @@ class QuestionTable extends StatelessWidget {
             ),
             child: Row(
               children: const [
+                SizedBox(
+                  width: 60,
+                  child: Text(
+                    'NO.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
                 Expanded(
                   flex: 5,
                   child: Text(
@@ -168,6 +179,18 @@ class QuestionTable extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // NO.
+                    SizedBox(
+                      width: 60,
+                      child: Text(
+                        q.displayNo ?? q.id.toString(),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
                     // Question text
                     Expanded(
                       flex: 5,
