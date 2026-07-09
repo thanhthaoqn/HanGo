@@ -1,4 +1,4 @@
-# Feature Specification: FE-05 - Course Management
+# Feature Specification: FT-03 - Course Management
 
 ## 1. Business Context
 Course Management is the core feature for Trainers to create and structure their courses. It allows Trainers to define the syllabus by creating Courses, dividing them into Sections (Chapters), and further breaking them down into Lessons. This structural hierarchy is essential for organizing educational content logically.
