@@ -1,4 +1,4 @@
-# Feature Specification: FE-02 - Profile Management
+# Feature Specification: FT-02 - Account Management
 
 ## 1. Business Context
 Account Management allows users to view and update their personal information (Profile), including Avatar, Name, and Phone Number. For Admins, this feature provides a comprehensive dashboard to manage all users in the system, including the ability to lock/unlock accounts to maintain community standards.

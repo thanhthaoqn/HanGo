@@ -1,4 +1,4 @@
-# Feature Specification: FE-09 - AI Assistant
+# Feature Specification: FT-08 - AI Learning Assistant
 
 ## 1. Business Context
 The AI Learning Assistant feature is the technological highlight of HanGo. It provides an in-app Chat Interface where Learners can ask questions regarding lesson content, request document summaries, or get explanations for difficult concepts. This substitutes the need for continuous 1:1 instructor support.
