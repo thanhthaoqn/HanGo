@@ -15,6 +15,7 @@ import java.util.Map;
 public class ExamAttemptResponseDTO {
     private Long id;
     private Long examId;
+    private String examTitle;
     private BigDecimal score;
     private Integer attemptNumber;
     private String date;

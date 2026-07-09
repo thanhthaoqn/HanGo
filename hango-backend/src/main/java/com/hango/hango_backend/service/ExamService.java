@@ -80,6 +80,16 @@ public class ExamService {
                 .collect(Collectors.toList());
     }
 
+    public List<ExamAttemptResponseDTO> getMyExamAttempts(Long userId) {
+        List<ExamAttempt> attempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(userId);
+        return attempts.stream()
+                .map(a -> {
+                    int attemptNum = examAttemptRepository.countByExamIdAndStudentId(a.getExam().getId(), userId);
+                    return mapToAttemptDTO(a, attemptNum);
+                })
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public ExamAttemptResponseDTO saveExamAttempt(Long examId, Long userId, ExamAttemptRequestDTO request) {
         Exam exam = examRepository.findById(examId)
@@ -133,6 +143,7 @@ public class ExamService {
         return ExamAttemptResponseDTO.builder()
                 .id(attempt.getId())
                 .examId(attempt.getExam().getId())
+                .examTitle(attempt.getExam().getTitle())
                 .score(attempt.getScore())
                 .attemptNumber(attemptNumber)
                 .date(dateStr)

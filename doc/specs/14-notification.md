@@ -1,4 +1,4 @@
-# Feature Specification: FT-14 - Notification
+# Feature Specification: FE-14 - Notification
 
 ## 1. Business Context
 The Notification system helps retain users (Retention) by reminding them of important events. The system will send notifications when a new course is published, when a Task deadline is approaching, or when someone replies to your comment.
@@ -11,10 +11,10 @@ The Notification system helps retain users (Retention) by reminding them of impo
 - [ ] Unread notifications are bolded or have a different background color. Clicking a notification marks it as "Read" and navigates to the corresponding screen.
 
 **Backend (Spring Boot):**
-- [ ] `notifications` table containing columns: `id`, `user_id`, `title`, `content`, `type` (COURSE, TASK, COMMENT), `is_read`, `created_at`.
+- [ ] `notifications` table containing columns: `id`, `user_id`, `title`, `content`, `type` (COURSE, EXAM, COMMENT), `is_read`, `created_at`.
 - [ ] API `GET /api/v1/notifications` (Fetch paginated list of notifications for the current user).
 - [ ] API `PUT /api/v1/notifications/{id}/read` (Mark as read).
-- [ ] Automated Notification Logic: e.g., when a Lead creates a new Task -> Auto-insert 1 row into the `notifications` table for the `assigned_to` user.
+- [ ] Automated Notification Logic: e.g., when a Trainer publishes a new course/exam -> Auto-insert 1 row into the `notifications` table for all enrolled users.
 
 ## 3. Technical Constraints
 - **Backend Design:** Avoid tightly coupling notification generation logic with the main business logic. Must use **Spring ApplicationEventPublisher** (Observer Pattern) to publish notification events asynchronously (`@Async`), avoiding slowing down the main API.

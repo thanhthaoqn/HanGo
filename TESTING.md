@@ -29,7 +29,7 @@ This document outlines the testing methodologies and expectations for both the F
 - **Tools:** JUnit 5, Mockito.
 - **Guidelines:**
   - Mock the Repository layer to test Service business logic in isolation.
-  - Specifically test complex logic: Exam score calculation, Task state transitions, and Authorization rules.
+  - Specifically test complex logic: Exam score calculation, and Authorization rules.
 
 ### 2.2 Integration Testing
 - **Scope:** Controller -> Service -> Repository layer interaction.
@@ -45,7 +45,7 @@ This document outlines the testing methodologies and expectations for both the F
 E2E testing should cover the most important workflows defined in the SRS:
 - **Learner Flow:** Login -> Browse Courses -> Start Exam -> Submit Exam -> View Results.
 - **Trainer Flow:** Login -> Open Course Builder -> Create Curriculum -> Add Question -> Submit for Review.
-- **Lead Flow:** Login -> View Pending Courses -> Approve Course.
+- **Course Manager Flow:** Login -> View Pending Courses -> Approve Course.
 
 ### 3.2 AI Agent Testing
 - AI responses are non-deterministic, making them hard to unit test.
