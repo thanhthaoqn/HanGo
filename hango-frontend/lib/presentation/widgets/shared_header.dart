@@ -8,9 +8,10 @@ import '../pages/course/list_courses_page.dart';
 import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
-import '../pages/flashcard/list_flashcards_page.dart';
+import '../pages/learner/my_learning_page.dart';
 
 import '../../utils/toast_helper.dart';
+import '../../utils/language_manager.dart';
 
 class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isDesktop;
@@ -38,11 +39,28 @@ class _SharedHeaderState extends State<SharedHeader> {
   String _userEmail = '';
   String _userInitials = 'L';
   String _userAvatarUrl = '';
+  bool _isVietnamese = true;
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
+    _isVietnamese = LanguageManager.isVi;
+    LanguageManager.isVietnamese.addListener(_onLanguageChanged);
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) {
+      setState(() {
+        _isVietnamese = LanguageManager.isVi;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    LanguageManager.isVietnamese.removeListener(_onLanguageChanged);
+    super.dispose();
   }
 
   @override
@@ -147,9 +165,158 @@ class _SharedHeaderState extends State<SharedHeader> {
             color: active ? const Color(0xFF28B79B) : const Color(0xFF4B5563),
             fontWeight: active ? FontWeight.bold : FontWeight.w500,
             fontSize: 15,
+            fontFamily: 'Outfit',
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTeachingButton() {
+    return TextButton.icon(
+      onPressed: () {
+        ToastHelper.show(context, _isVietnamese ? 'Chuyển sang giao diện giảng dạy' : 'Switch to teaching interface');
+      },
+      icon: const Icon(
+        Icons.school_outlined,
+        size: 18,
+        color: Color(0xFF4B5563),
+      ),
+      label: Text(
+        _isVietnamese ? 'Dạy học' : 'Teach',
+        style: const TextStyle(
+          color: Color(0xFF4B5563),
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          fontFamily: 'Outfit',
+        ),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageSwitcher() {
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () {
+              LanguageManager.setLanguage(true);
+              ToastHelper.show(context, 'Đã chuyển sang Tiếng Việt');
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isVietnamese ? const Color(0xFF28B79B) : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'VI',
+                style: TextStyle(
+                  color: _isVietnamese ? Colors.white : const Color(0xFF64748B),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              LanguageManager.setLanguage(false);
+              ToastHelper.show(context, 'Switched to English');
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: !_isVietnamese ? const Color(0xFF28B79B) : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'EN',
+                style: TextStyle(
+                  color: !_isVietnamese ? Colors.white : const Color(0xFF64748B),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWishlistButton() {
+    return IconButton(
+      icon: const Icon(
+        Icons.favorite_border_rounded,
+        color: Color(0xFF4B5563),
+        size: 24,
+      ),
+      onPressed: () {
+        ToastHelper.show(context, 'Danh sách yêu thích');
+      },
+      tooltip: 'Danh sách yêu thích',
+    );
+  }
+
+  Widget _buildCartButton() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(
+            Icons.shopping_cart_outlined,
+            color: Color(0xFF4B5563),
+            size: 24,
+          ),
+          onPressed: () {
+            ToastHelper.show(context, 'Giỏ hàng của bạn');
+          },
+          tooltip: 'Giỏ hàng',
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF05A22),
+              shape: BoxShape.circle,
+            ),
+            constraints: const BoxConstraints(
+              minWidth: 16,
+              minHeight: 16,
+            ),
+            child: const Center(
+              child: Text(
+                '3',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -159,7 +326,6 @@ class _SharedHeaderState extends State<SharedHeader> {
       onTap: widget.hideNavLinks
           ? null
           : () {
-              // If not already on home page (activeTab is empty string for LearnerHomePage)
               if (widget.activeTab != '') {
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -224,20 +390,23 @@ class _SharedHeaderState extends State<SharedHeader> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildHeaderNavLink(
-          'Exams',
-          active: widget.activeTab == 'Exams',
+          _isVietnamese ? 'Trang chủ' : 'Home',
+          active: widget.activeTab == 'Trang chủ' || widget.activeTab == '',
           onTap: () {
-            if (widget.activeTab != 'Exams') {
-              Navigator.push(
+            if (widget.activeTab != '') {
+              Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                MaterialPageRoute(
+                  builder: (context) => const LearnerHomePage(),
+                ),
+                (route) => false,
               );
             }
           },
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 12),
         _buildHeaderNavLink(
-          'Courses',
+          _isVietnamese ? 'Khóa học' : 'Courses',
           active: widget.activeTab == 'Courses',
           onTap: () {
             if (widget.activeTab != 'Courses') {
@@ -250,24 +419,22 @@ class _SharedHeaderState extends State<SharedHeader> {
             }
           },
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 12),
         _buildHeaderNavLink(
-          'Flashcard',
-          active: widget.activeTab == 'Flashcard',
+          _isVietnamese ? 'Đề thi' : 'Exams',
+          active: widget.activeTab == 'Exams',
           onTap: () {
-            if (widget.activeTab != 'Flashcard') {
+            if (widget.activeTab != 'Exams') {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const ListFlashcardsPage(),
-                ),
+                MaterialPageRoute(builder: (context) => const ListExamsPage()),
               );
             }
           },
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: 12),
         _buildHeaderNavLink(
-          'Learning Pathway',
+          _isVietnamese ? 'Lộ trình' : 'Pathway',
           active: widget.activeTab == 'Learning Pathway',
           onTap: () {
             if (widget.activeTab != 'Learning Pathway') {
@@ -287,6 +454,16 @@ class _SharedHeaderState extends State<SharedHeader> {
         ? Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.isDesktop) ...[
+                _buildTeachingButton(),
+                const SizedBox(width: 4),
+                _buildLanguageSwitcher(),
+                const SizedBox(width: 4),
+                _buildWishlistButton(),
+                const SizedBox(width: 2),
+                _buildCartButton(),
+                const SizedBox(width: 2),
+              ],
               // Notification Bell
               Stack(
                 alignment: Alignment.center,
@@ -295,29 +472,42 @@ class _SharedHeaderState extends State<SharedHeader> {
                     icon: const Icon(
                       Icons.notifications_none_outlined,
                       color: Color(0xFF4B5563),
-                      size: 26,
+                      size: 24,
                     ),
                     onPressed: widget.hideNavLinks
                         ? null
                         : () {
-                            ToastHelper.show(context, 'No new notifications');
+                            ToastHelper.show(context, _isVietnamese ? 'Không có thông báo mới' : 'No new notifications');
                           },
                   ),
                   Positioned(
-                    top: 10,
-                    right: 10,
+                    top: 4,
+                    right: 4,
                     child: Container(
-                      width: 8,
-                      height: 8,
+                      padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
+                        color: Color(0xFFF05A22),
                         shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: const Center(
+                        child: Text(
+                          '3',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 8),
 
               // User profile with Popup Menu
               PopupMenuButton<String>(
@@ -332,6 +522,23 @@ class _SharedHeaderState extends State<SharedHeader> {
                         builder: (context) => const MyInformationPage(),
                       ),
                     );
+                  } else if (val == 'learning') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyLearningPage(),
+                      ),
+                    );
+                  } else if (val == 'cart') {
+                    ToastHelper.show(context, _isVietnamese ? 'Mở giỏ hàng của bạn' : 'Opening your cart');
+                  } else if (val == 'wishlist') {
+                    ToastHelper.show(context, _isVietnamese ? 'Mở danh sách mong ước của bạn' : 'Opening your wishlist');
+                  } else if (val == 'instructor_dashboard') {
+                    ToastHelper.show(context, _isVietnamese ? 'Mở bảng điều khiển giảng viên' : 'Opening instructor dashboard');
+                  } else if (val == 'purchase_history') {
+                    ToastHelper.show(context, _isVietnamese ? 'Mở lịch sử mua hàng' : 'Opening purchase history');
+                  } else if (val == 'notifications') {
+                    ToastHelper.show(context, _isVietnamese ? 'Không có thông báo mới' : 'No new notifications');
                   }
                 },
                 offset: const Offset(0, 52),
@@ -345,62 +552,31 @@ class _SharedHeaderState extends State<SharedHeader> {
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
+                      shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFFE5E7EB),
+                        color: const Color(0xFFE2E8F0),
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
-                          blurRadius: 8,
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                          ),
-                          child: ClipOval(
-                            child: _userAvatarUrl.isNotEmpty
-                                ? Image.network(
-                                    _userAvatarUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) =>
-                                        _buildInitialsAvatar(28, 12),
-                                  )
-                                : _buildInitialsAvatar(28, 12),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _userFullName,
-                          style: const TextStyle(
-                            color: Color(0xFF1E293B),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 16,
-                          color: Color(0xFF64748B),
-                        ),
-                      ],
+                    child: ClipOval(
+                      child: _userAvatarUrl.isNotEmpty
+                          ? Image.network(
+                              _userAvatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildInitialsAvatar(36, 14),
+                            )
+                          : _buildInitialsAvatar(36, 14),
                     ),
                   ),
                 ),
@@ -438,6 +614,8 @@ class _SharedHeaderState extends State<SharedHeader> {
                                   children: [
                                     Text(
                                       _userFullName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: Color(0xFF0F172A),
@@ -465,6 +643,175 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
                   PopupMenuItem(
+                    value: 'learning',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.school_outlined,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _isVietnamese ? 'Học tập' : 'My Learning',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'cart',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.shopping_cart_outlined,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _isVietnamese ? 'Giỏ hàng của tôi' : 'My Cart',
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                color: Color(0xFF1E293B),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8B5CF6),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              '5',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'wishlist',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.favorite_border_rounded,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _isVietnamese ? 'Danh sách mong ước' : 'Wishlist',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'instructor_dashboard',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.dashboard_outlined,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _isVietnamese ? 'Bảng điều khiển của giảng viên' : 'Instructor Dashboard',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'purchase_history',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.history_rounded,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _isVietnamese ? 'Lịch sử mua hàng' : 'Purchase History',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const PopupMenuDivider(height: 1),
+                  PopupMenuItem(
+                    value: 'notifications',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.notifications_none_outlined,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _isVietnamese ? 'Thông báo' : 'Notifications',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const PopupMenuDivider(height: 1),
+                  PopupMenuItem(
                     value: 'my_info',
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -483,9 +830,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
-                            'My Information',
-                            style: TextStyle(
+                          Text(
+                            _isVietnamese ? 'Thông tin của tôi' : 'My Information',
+                            style: const TextStyle(
                               fontFamily: 'Outfit',
                               color: Color(0xFF1E293B),
                               fontWeight: FontWeight.w500,
@@ -496,38 +843,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'profile',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE6FFFA),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.settings_outlined,
-                              size: 18,
-                              color: Color(0xFF28B79B),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Profile Settings',
-                            style: TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Color(0xFF1E293B),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+
                   PopupMenuItem(
                     value: 'logout',
                     child: Container(
@@ -547,9 +863,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Text(
-                            'Log Out',
-                            style: TextStyle(
+                          Text(
+                            _isVietnamese ? 'Đăng xuất' : 'Logout',
+                            style: const TextStyle(
                               fontFamily: 'Outfit',
                               color: Colors.redAccent,
                               fontWeight: FontWeight.w500,
@@ -564,46 +880,57 @@ class _SharedHeaderState extends State<SharedHeader> {
               ),
             ],
           )
-        : Row(
+          : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.isDesktop) ...[
+                _buildTeachingButton(),
+                const SizedBox(width: 8),
+                _buildLanguageSwitcher(),
+                const SizedBox(width: 8),
+                _buildWishlistButton(),
+                const SizedBox(width: 4),
+                _buildCartButton(),
+                const SizedBox(width: 8),
+              ],
               TextButton(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const RegisterPage(),
+                      builder: (context) => const LoginPage(),
                     ),
                   );
                 },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
                 child: const Text(
-                  'Register',
+                  'Đăng nhập',
                   style: TextStyle(
-                    color: Color(0xFF2DD4BF),
+                    color: Color(0xFF1E293B),
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 15,
+                    fontFamily: 'Outfit',
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Container(
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF14B8A6), Color(0xFF0891B2)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
+                  color: const Color(0xFFF05A22),
                   borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF05A22).withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const LoginPage(),
+                        builder: (context) => const RegisterPage(),
                       ),
                     );
                   },
@@ -611,7 +938,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
+                      horizontal: 24,
                       vertical: 12,
                     ),
                     shape: RoundedRectangleBorder(
@@ -619,11 +946,12 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
                   child: const Text(
-                    'Login',
+                    'Đăng ký',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 15,
+                      fontFamily: 'Outfit',
                     ),
                   ),
                 ),
