@@ -7,6 +7,7 @@ import '../../../../services/hango_api.dart';
 import '../../login_page.dart';
 import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
+import '../trainer_exams_page.dart';
 import 'models/trainer_question.dart';
 import 'widgets/question_filter_pane.dart';
 import 'widgets/question_search_bar.dart';
@@ -30,6 +31,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
 
   // Filter States
   String _selectedType = 'QUIZ';
+  String _selectedGroupType = 'Choose Group Type';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
   int _currentPage = 1;
@@ -176,28 +178,47 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       ]);
     } else {
       // EXAM Mock Data
-      mocks.addAll([
-        TrainerQuestion(
-          id: 101,
-          questionText: 'The man _______ is speaking to our teacher is my uncle.',
-          categoryName: 'Grammar & Vocabulary',
-          difficultyName: 'Easy',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 10)),
-          updatedAt: now.subtract(const Duration(days: 9)),
-        ),
-        TrainerQuestion(
-          id: 102,
-          questionText: 'Choose the sentence that is closest in meaning to the following: "I would rather stay home than go out tonight."',
-          categoryName: 'Grammar & Vocabulary',
-          difficultyName: 'Medium',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 8)),
-          updatedAt: now.subtract(const Duration(days: 8)),
-        ),
-      ]);
+      if (_selectedGroupType == 'Choose Group Type') {
+        mocks.addAll([
+          TrainerQuestion(
+            id: 1,
+            displayNo: '1-6',
+            questionText: 'Vietnam International Art Exhibition 2025 - A Landmark Cultural Event',
+            categoryName: 'Reading Comprehension',
+            difficultyName: 'Medium',
+            status: 'APPROVED',
+            creatorName: _trainerName,
+            createdAt: now.subtract(const Duration(days: 44, hours: 3)),
+            updatedAt: now.subtract(const Duration(days: 33, hours: 1)),
+          ),
+          TrainerQuestion(
+            id: 2,
+            displayNo: '7-14',
+            questionText: 'The concept of project farming, where farmers come together.....',
+            categoryName: 'Reading Comprehension',
+            difficultyName: 'Medium',
+            status: 'APPROVED',
+            creatorName: _trainerName,
+            createdAt: now.subtract(const Duration(days: 43, hours: 7)),
+            updatedAt: now.subtract(const Duration(days: 43, hours: 7)),
+          ),
+        ]);
+      } else {
+        // Mock data for a specific group type
+        mocks.addAll(List.generate(6, (index) {
+          return TrainerQuestion(
+            id: 100 + index,
+            displayNo: '${index + 1}',
+            questionText: 'Mock question for $_selectedGroupType (${index + 1})',
+            categoryName: _selectedGroupType,
+            difficultyName: 'Medium',
+            status: 'APPROVED',
+            creatorName: _trainerName,
+            createdAt: now.subtract(Duration(days: index)),
+            updatedAt: now.subtract(Duration(days: index)),
+          );
+        }));
+      }
     }
 
     // Client-side search filtering on mocks
@@ -237,6 +258,15 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   void _handleTypeChanged(String type) {
     setState(() {
       _selectedType = type;
+      _selectedGroupType = 'Choose Group Type';
+      _currentPage = 1;
+    });
+    _fetchQuestions();
+  }
+
+  void _handleGroupTypeChanged(String groupType) {
+    setState(() {
+      _selectedGroupType = groupType;
       _currentPage = 1;
     });
     _fetchQuestions();
@@ -294,6 +324,8 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                         QuestionFilterPane(
                           selectedType: _selectedType,
                           onTypeChanged: _handleTypeChanged,
+                          selectedGroupType: _selectedGroupType,
+                          onGroupTypeChanged: _handleGroupTypeChanged,
                         ),
                         const SizedBox(width: 24),
                         // Right pane: Search bar and Table
@@ -425,7 +457,12 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
               );
             },
           ),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam'),
+          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
+            );
+          }),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
           _buildSidebarItem(
             Icons.question_answer_outlined,
