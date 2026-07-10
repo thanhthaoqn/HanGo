@@ -12,6 +12,8 @@ import java.util.List;
 public interface ExamRepository extends JpaRepository<Exam, Long> {
     List<Exam> findByDeletedAtIsNullAndStatus(String status);
 
+    List<Exam> findByCreatedByIdAndDeletedAtIsNull(Long createdById);
+
     @Query("SELECT COUNT(e) FROM Exam e WHERE e.createdBy.id = :createdById AND e.deletedAt IS NULL")
     long countByCreatedByIdAndDeletedAtIsNull(@Param("createdById") Long createdById);
 }
