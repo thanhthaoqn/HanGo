@@ -7,8 +7,8 @@ import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
-import 'trainer_tasks_page.dart';
 import 'trainer_create_exam_page.dart';
+import 'trainer_edit_exam_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -425,7 +425,17 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
-                  onPressed: () {},
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                        examId: exam['id'],
+                        examTitle: exam['title'] ?? 'Untitled',
+                        examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                      )),
+                    );
+                    _fetchExamsData();
+                  },
                   splashRadius: 20,
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -641,14 +651,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               context,
               MaterialPageRoute(
                 builder: (context) => const TrainerQuestionBankPage(),
-              ),
-            );
-          }),
-          _buildSidebarItem(Icons.task_alt_outlined, 'Task', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerTasksPage(),
               ),
             );
           }),

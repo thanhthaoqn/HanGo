@@ -1,7 +1,9 @@
 package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.QuestionDTO;
+import com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO;
 import com.hango.hango_backend.service.TrainerQuestionService;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,7 +14,7 @@ import java.util.List;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
-@RequestMapping("/api/v1/trainer/questions")
+@RequestMapping("/api/v1/trainer/question-bank")
 @RequiredArgsConstructor
 public class TrainerQuestionController {
 
@@ -31,5 +33,17 @@ public class TrainerQuestionController {
         List<QuestionDTO> questions = trainerQuestionService.getTrainerQuestions(
                 userDetails.getUsername(), type, search, sortBy);
         return ResponseEntity.ok(questions);
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<Map<String, Object>> createQuestion(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody CreateGroupQuestionRequestDTO request) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Map<String, Object> response = trainerQuestionService.createQuestionBankGroup(userDetails.getUsername(), request);
+        return ResponseEntity.ok(response);
     }
 }
