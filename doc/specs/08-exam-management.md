@@ -1,4 +1,4 @@
-# Feature Specification: FE-08 - Exam Management
+# Feature Specification: FT-06 - Exam Management
 
 ## 1. Business Context
 The Exam Management feature is a tool to measure and evaluate the competency of Learners. It allows linking questions from the Question Bank into an exam, defining time limits, and setting passing scores. For the Learner, this is an interface featuring a countdown timer, test execution, and automatic scoring immediately upon submission.

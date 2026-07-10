@@ -1,4 +1,4 @@
-# Feature Specification: FE-07 - Question Bank Management
+# Feature Specification: FT-05 - Question Bank Management
 
 ## 1. Business Context
 The Assessment system requires a flexible and centralized question repository. The Question Bank Management feature allows Trainers to create, edit, and categorize questions (Multiple Choice, Fill in the Blank, True/False) by Category/Skill. Specifically, it provides the ability to bulk Import/Export via Excel files, saving significant time compared to manual data entry.

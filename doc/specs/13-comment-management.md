@@ -1,4 +1,4 @@
-# Feature Specification: FE-13 - Comment Management
+# Feature Specification: FT-11 - Comment Management
 
 ## 1. Business Context
 Learning requires interaction (Community). The Comment System allows Learners to ask questions and discuss directly under each lesson, receiving answers from Trainers or other Learners. This feature establishes a Q&A model similar to major MOOC platforms (Udemy, Coursera).
@@ -15,7 +15,7 @@ Learning requires interaction (Community). The Comment System allows Learners to
 - [ ] API `POST /api/v1/lessons/{id}/comments` to write a root comment.
 - [ ] API `POST /api/v1/comments/{id}/replies` to reply to a comment.
 - [ ] API `GET /api/v1/lessons/{id}/comments` with pagination (Pageable) including nested replies.
-- [ ] Authorization: Trainer/Course Manager has the right to delete any comment within their course. Learners can only delete their own comments.
+- [ ] Authorization: Trainer/Lead has the right to delete any comment within their course. Learners can only delete their own comments.
 
 ## 3. Technical Constraints
 - **Database:** The `comments` table must support a tree structure using a `parent_id` column (Self-referencing relationship).

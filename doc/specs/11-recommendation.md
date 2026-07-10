@@ -1,7 +1,7 @@
-# Feature Specification: FE-11 - Recommendation
+# Feature Specification: FT-07 - Recommendation System
 
 ## 1. Business Context
-To personalize learning paths, the Recommendation System analyzes exam results or a Learner's learning history to suggest the next lessons or courses. This is an advanced (Rule-based) feature that intelligently helps Learners patch knowledge gaps, increasing user retention rates.
+To personalize learning paths, the Recommendation System analyzes exam results or a Learner's learning history to suggest the next lessons, flashcards, or courses. This is an advanced (Rule-based) feature that intelligently helps Learners patch knowledge gaps, increasing user retention rates.
 
 ## 2. Acceptance Criteria
 
