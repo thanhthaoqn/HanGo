@@ -45,25 +45,15 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
 
-        if ("QUIZ".equalsIgnoreCase(type)) {
-            sql.append(
-                    "SELECT DISTINCT q.id, q.question_text, qc.name as category_name, sp.param_value as difficulty_name, q.status, u.full_name as creator_name, q.created_at, q.updated_at ")
-                    .append("FROM questions q ")
-                    .append("JOIN lesson_quizzes lq ON q.id = lq.question_id ")
-                    .append("JOIN question_categories qc ON q.category_id = qc.id ")
-                    .append("JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
-                    .append("JOIN users u ON q.created_by = u.id ")
-                    .append("WHERE 1=1 ");
-        } else { // EXAM
-            sql.append(
-                    "SELECT DISTINCT q.id, q.question_text, qc.name as category_name, sp.param_value as difficulty_name, q.status, u.full_name as creator_name, q.created_at, q.updated_at ")
-                    .append("FROM questions q ")
-                    .append("JOIN exam_questions eq ON q.id = eq.question_id ")
-                    .append("JOIN question_categories qc ON q.category_id = qc.id ")
-                    .append("JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
-                    .append("JOIN users u ON q.created_by = u.id ")
-                    .append("WHERE 1=1 ");
-        }
+        // Remove filtering by Quiz/Exam since Question Bank should show ALL questions created by trainer
+        sql.append(
+                "SELECT DISTINCT q.id, q.question_text, qc.name as category_name, sp.param_value as difficulty_name, q.status, u.full_name as creator_name, q.created_at, q.updated_at ")
+                .append("FROM questions q ")
+                .append("JOIN question_categories qc ON q.category_id = qc.id ")
+                .append("LEFT JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
+                .append("JOIN users u ON q.created_by = u.id ")
+                .append("WHERE q.created_by = ? ");
+        params.add(user.getId());
 
         if (search != null && !search.trim().isEmpty()) {
             sql.append("AND (q.question_text LIKE ? OR qc.name LIKE ?) ");
@@ -145,9 +135,19 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 q.setQuestionGroup(group);
                 q.setQuestionText(subQ.getQuestionText());
                 q.setExplanation(subQ.getExplanation());
-                q.setDifficulty(difficulty);
-                q.setStatus("APPROVED");
-                q.setSkillParam(skillParam);
+                q.setStatus("PRIVATE");
+
+                SystemParameter qDifficulty = difficulty;
+                if (subQ.getDifficultyId() != null) {
+                    qDifficulty = systemParameterRepository.findById(subQ.getDifficultyId()).orElse(difficulty);
+                }
+                q.setDifficulty(qDifficulty);
+
+                SystemParameter qSkill = skillParam;
+                if (subQ.getSkillParamId() != null) {
+                    qSkill = systemParameterRepository.findById(subQ.getSkillParamId()).orElse(skillParam);
+                }
+                q.setSkillParam(qSkill);
 
                 q = questionRepository.save(q);
                 questionIds.add(q.getId());
@@ -173,5 +173,21 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         response.put("groupId", group != null ? group.getId() : null);
         response.put("questionIds", questionIds);
         return response;
+    }
+
+    @Override
+    public void updateQuestionStatus(String email, Long questionId, String status) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new RuntimeException("Question not found"));
+
+        if (!question.getCreatedBy().getId().equals(user.getId())) {
+            throw new RuntimeException("You do not have permission to update this question");
+        }
+
+        question.setStatus(status);
+        questionRepository.save(question);
     }
 }

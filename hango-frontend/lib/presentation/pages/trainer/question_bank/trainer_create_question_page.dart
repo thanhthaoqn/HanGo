@@ -21,6 +21,8 @@ class OptionState {
 class QuestionState {
   TextEditingController questionTextController = TextEditingController();
   TextEditingController explanationController = TextEditingController();
+  int? selectedSkillId;
+  int? selectedDifficultyId;
   List<OptionState> options = [];
 
   QuestionState() {
@@ -54,9 +56,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
   List<Map<String, dynamic>> _groupTypes = [];
   List<Map<String, dynamic>> _difficulties = [];
 
-  int? _selectedSkillId;
   int? _selectedGroupTypeId;
-  int? _selectedDifficultyId;
 
   final TextEditingController _passageController = TextEditingController();
   List<QuestionState> _questions = [QuestionState()];
@@ -104,8 +104,16 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
         _difficulties = difficulties;
         _groupTypes = groupTypes;
 
-        if (_skills.isNotEmpty) _selectedSkillId = _skills.first['id'] as int;
-        if (_difficulties.isNotEmpty) _selectedDifficultyId = _difficulties.first['id'] as int;
+        if (_skills.isNotEmpty) {
+          for (var q in _questions) {
+            q.selectedSkillId = _skills.first['id'] as int;
+          }
+        }
+        if (_difficulties.isNotEmpty) {
+          for (var q in _questions) {
+            q.selectedDifficultyId = _difficulties.first['id'] as int;
+          }
+        }
         if (_groupTypes.isNotEmpty) _selectedGroupTypeId = _groupTypes.first['id'] as int;
 
         _isLoadingMetadata = false;
@@ -125,6 +133,14 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       return;
     }
     for (var i = 0; i < _questions.length; i++) {
+      if (_questions[i].selectedSkillId == null) {
+        ToastHelper.show(context, 'Question ${i + 1} must have a Skill Type.', isError: true);
+        return;
+      }
+      if (_questions[i].selectedDifficultyId == null) {
+        ToastHelper.show(context, 'Question ${i + 1} must have a Difficulty.', isError: true);
+        return;
+      }
       if (_questions[i].questionTextController.text.trim().isEmpty) {
         ToastHelper.show(context, 'Question ${i + 1} text cannot be empty.', isError: true);
         return;
@@ -139,12 +155,12 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
     try {
       final payload = {
         'categoryId': _selectedGroupTypeId,
-        'skillParamId': _selectedSkillId,
-        'difficultyId': _selectedDifficultyId,
         'passageText': _isQuestionGroup ? _passageController.text : null,
         'subQuestions': _questions.map((q) => {
           'questionText': q.questionTextController.text,
           'explanation': q.explanationController.text,
+          'skillParamId': q.selectedSkillId,
+          'difficultyId': q.selectedDifficultyId,
           'options': q.options.map((o) => {
             'optionText': o.textController.text,
             'isCorrect': o.isCorrect,
@@ -369,77 +385,125 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('SKILL TYPE'),
-                    _buildDropdown(
-                      value: _selectedSkillId,
-                      items: _skills,
-                      onChanged: (val) => setState(() => _selectedSkillId = val),
-                      displayKey: 'paramValue',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('GROUP TYPE'),
-                    _buildDropdown(
-                      value: _selectedGroupTypeId,
-                      items: _groupTypes,
-                      onChanged: (val) => setState(() => _selectedGroupTypeId = val),
-                      displayKey: 'name',
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('DIFFICULTY'),
-                    _buildDropdown(
-                      value: _selectedDifficultyId,
-                      items: _difficulties,
-                      onChanged: (val) => setState(() => _selectedDifficultyId = val),
-                      displayKey: 'paramValue',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('STATUS'),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+          if (!_isQuestionGroup) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('SKILL TYPE'),
+                      _buildDropdown(
+                        value: _questions.isNotEmpty ? _questions[0].selectedSkillId : null,
+                        items: _skills,
+                        onChanged: (val) {
+                          if (_questions.isNotEmpty) {
+                            setState(() => _questions[0].selectedSkillId = val);
+                          }
+                        },
+                        displayKey: 'paramValue',
                       ),
-                      child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('GROUP TYPE'),
+                      _buildDropdown(
+                        value: _selectedGroupTypeId,
+                        items: _groupTypes,
+                        onChanged: (val) => setState(() => _selectedGroupTypeId = val),
+                        displayKey: 'name',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('DIFFICULTY'),
+                      _buildDropdown(
+                        value: _questions.isNotEmpty ? _questions[0].selectedDifficultyId : null,
+                        items: _difficulties,
+                        onChanged: (val) {
+                          if (_questions.isNotEmpty) {
+                            setState(() => _questions[0].selectedDifficultyId = val);
+                          }
+                        },
+                        displayKey: 'paramValue',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('STATUS'),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('GROUP TYPE'),
+                      _buildDropdown(
+                        value: _selectedGroupTypeId,
+                        items: _groupTypes,
+                        onChanged: (val) => setState(() => _selectedGroupTypeId = val),
+                        displayKey: 'name',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('STATUS'),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -566,7 +630,10 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
         InkWell(
           onTap: () {
             setState(() {
-              _questions.add(QuestionState());
+              final newQ = QuestionState();
+              if (_skills.isNotEmpty) newQ.selectedSkillId = _skills.first['id'] as int;
+              if (_difficulties.isNotEmpty) newQ.selectedDifficultyId = _difficulties.first['id'] as int;
+              _questions.add(newQ);
             });
           },
           child: Container(
@@ -652,6 +719,42 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_isQuestionGroup) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('SKILL TYPE'),
+                            _buildDropdown(
+                              value: qState.selectedSkillId,
+                              items: _skills,
+                              onChanged: (val) => setState(() => qState.selectedSkillId = val),
+                              displayKey: 'paramValue',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('DIFFICULTY'),
+                            _buildDropdown(
+                              value: qState.selectedDifficultyId,
+                              items: _difficulties,
+                              onChanged: (val) => setState(() => qState.selectedDifficultyId = val),
+                              displayKey: 'paramValue',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 if (showQuestionText) ...[
                   _buildLabel('QUESTION'),
                   TextField(

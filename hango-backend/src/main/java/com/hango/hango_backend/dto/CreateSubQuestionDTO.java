@@ -13,5 +13,7 @@ import java.util.List;
 public class CreateSubQuestionDTO {
     private String questionText;
     private String explanation;
+    private Long skillParamId;
+    private Long difficultyId;
     private List<CreateOptionDTO> options;
 }

@@ -10,7 +10,8 @@ class QuestionTable extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<TrainerQuestion> onViewPressed;
   final ValueChanged<TrainerQuestion> onEditPressed;
-  final ValueChanged<TrainerQuestion> onDeletePressed;
+  final Function(TrainerQuestion, bool) onStatusToggled;
+
 
   const QuestionTable({
     Key? key,
@@ -22,7 +23,7 @@ class QuestionTable extends StatelessWidget {
     required this.onPageChanged,
     required this.onViewPressed,
     required this.onEditPressed,
-    required this.onDeletePressed,
+    required this.onStatusToggled,
   }) : super(key: key);
 
   String _formatTime(DateTime dt) {
@@ -143,6 +144,17 @@ class QuestionTable extends StatelessWidget {
                   flex: 2,
                   child: Text(
                     'Last\nUpdated',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Status',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -293,6 +305,34 @@ class QuestionTable extends StatelessWidget {
                         ],
                       ),
                     ),
+                    // Status (Toggle)
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Switch(
+                              value: q.status == 'PUBLIC',
+                              activeColor: const Color(0xFF20B486),
+                              onChanged: (val) {
+                                onStatusToggled(q, val);
+                              },
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              q.status == 'PUBLIC' ? 'Public' : 'Private',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: q.status == 'PUBLIC' ? const Color(0xFF20B486) : const Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     // Actions
                     SizedBox(
                       width: 120,
@@ -315,15 +355,6 @@ class QuestionTable extends StatelessWidget {
                             constraints: const BoxConstraints(),
                             onPressed: () => onEditPressed(q),
                             tooltip: 'Edit Question',
-                          ),
-                          const SizedBox(width: 12),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            color: const Color(0xFFEF4444),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => onDeletePressed(q),
-                            tooltip: 'Delete Question',
                           ),
                         ],
                       ),
