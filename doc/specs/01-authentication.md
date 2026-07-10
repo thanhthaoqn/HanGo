@@ -1,4 +1,4 @@
-# Feature Specification: FE-01 - Authentication
+# Feature Specification: FT-01 - Authentication
 
 ## 1. Business Context
 The Authentication feature ensures that only valid users can access the HanGo system. It includes Registration, Login (using traditional Email/Password and Google OAuth2), as well as Forgot Password. This is the first layer of defense for the EdTech system, ensuring personalized learning paths and data security.

@@ -359,6 +359,51 @@ public class SectionQuestionController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/questions/{id}")
+    @Transactional
+    public ResponseEntity<?> updateQuestion(
+            @PathVariable Long id,
+            @RequestBody CreateQuestionRequestDTO request) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+        }
+
+        try {
+            int updatedRows = jdbcTemplate.update(
+                    "UPDATE questions SET question_text = ?, explanation = ? WHERE id = ?",
+                    request.getQuestionText(),
+                    request.getExplanation(),
+                    id
+            );
+
+            if (updatedRows == 0) {
+                return ResponseEntity.status(404).body("{\"error\": \"Question not found\"}");
+            }
+
+            // Update options
+            jdbcTemplate.update("DELETE FROM question_options WHERE question_id = ?", id);
+            List<CreateOptionDTO> options = request.getOptions();
+            if (options != null && !options.isEmpty()) {
+                for (CreateOptionDTO opt : options) {
+                    jdbcTemplate.update(
+                            "INSERT INTO question_options (question_id, option_text, is_correct) VALUES (?, ?, ?)",
+                            id,
+                            opt.getOptionText(),
+                            opt.getIsCorrect() != null && opt.getIsCorrect() ? 1 : 0
+                    );
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Question updated successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"Failed to update question: \" + e.getMessage()}");
+        }
+    }
+
     @PostMapping("/questions/group")
     @Transactional
     public ResponseEntity<?> createGroupQuestion(@RequestBody CreateGroupQuestionRequestDTO request) {

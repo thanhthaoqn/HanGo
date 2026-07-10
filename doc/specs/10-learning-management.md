@@ -1,7 +1,7 @@
-# Feature Specification: FE-10 - Learning Management
+# Feature Specification: FT-09 - Learning Progress
 
 ## 1. Business Context
-The system needs to provide Learners with the ability to track the Learning Progress of each course they are enrolled in. This helps motivate learning (Gamification), ensuring learners know exactly what percentage they have completed and what part they need to study next. For the Trainer/Course Manager, this is core data to evaluate course effectiveness.
+The system needs to provide Learners with the ability to track the Learning Progress of each course they are enrolled in. This helps motivate learning (Gamification), ensuring learners know exactly what percentage they have completed and what part they need to study next. For the Trainer/Lead, this is core data to evaluate course effectiveness.
 
 ## 2. Acceptance Criteria
 

@@ -1,4 +1,4 @@
-# Feature Specification: FE-06 - Course Content Management
+# Feature Specification: FT-04 - Course Content Management
 
 ## 1. Business Context
 Once the course structure is defined, Trainers need to populate it with actual content. Course Content Management allows Trainers to upload heavy media files (Videos, PDFs) and write detailed text lessons using a Rich-text editor. It also provides the ability to reorder lessons easily via drag-and-drop.
