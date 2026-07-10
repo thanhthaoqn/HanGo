@@ -59,10 +59,10 @@ class PathwayRepository {
     return LearningPathway.fromJson(data);
   }
 
-  Future<LearningPathway> reroutePathway({required int pathwayId, required int quizScore}) async {
+  Future<LearningPathway> reroutePathway({required int pathwayId}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/reroute?quizScore=$quizScore');
+    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/reroute');
 
     if (token == null || token.isEmpty) {
       throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');

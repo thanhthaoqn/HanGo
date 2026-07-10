@@ -23,4 +23,10 @@ public class PathwayNodeDTO {
     private String reasonWhy;
     @JsonProperty("progress_percent")
     private Integer progressPercent;
+    @JsonProperty("skill_type")
+    private String skillType;
+    @JsonProperty("total_lessons")
+    private Integer totalLessons;
+    @JsonProperty("completed_lessons")
+    private Integer completedLessons;
 }
