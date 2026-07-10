@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/learning_pathway/interactive_node_tree.dart';
 import '../../widgets/learning_pathway/ai_mentor_side_panel.dart';
+import '../../widgets/learning_pathway/pathway_summary_header.dart';
+import '../../widgets/learning_pathway/skill_analysis_panel.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 
@@ -17,6 +19,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
   LearningPathway? _pathway;
   PathwayNode? _selectedNode;
   bool _isLoading = true;
+  bool _isDarkMode = true;
   String? _errorMessage;
 
   @override
@@ -33,29 +36,26 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
 
     try {
       final pathway = await _repository.getMyPathway();
+      if (!mounted) return;
       setState(() {
         _pathway = pathway;
         _selectedNode = pathway.nodes.isNotEmpty ? pathway.nodes.first : null;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _pathway = null;
-        _errorMessage = e.toString();
-        if (e.toString().contains('404')) {
-          _errorMessage = 'Hiện chưa có lộ trình học. Vui lòng tạo lộ trình mới hoặc kiểm tra lại trang khóa học.';
-        }
+        _errorMessage = e.toString().contains('404')
+            ? 'No active pathway yet. Finish an exam to let AI build a route for you.'
+            : e.toString();
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _handleNodeTap(PathwayNode node) {
-    setState(() {
-      _selectedNode = node;
-    });
+    setState(() => _selectedNode = node);
   }
 
   void _handlePathwayUpdated(LearningPathway updatedPathway) {
@@ -65,59 +65,93 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     });
   }
 
+  void _showSkillAnalysis() {
+    final pathway = _pathway;
+    if (pathway == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SkillAnalysisPanel(
+          weakSkills: pathway.weakSkills,
+          attemptsUsed: 10,
+          isDarkMode: _isDarkMode,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 900;
+        final isDesktop = constraints.maxWidth >= 960;
+        final bg = _isDarkMode ? const Color(0xFF0D1117) : const Color(0xFFF8FAFC);
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF8FAFC),
-          appBar: SharedHeader(
-            isDesktop: isDesktop,
-            activeTab: 'Learning Pathway',
+          backgroundColor: bg,
+          appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Learning Pathway'),
+          body: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _isDarkMode
+                    ? const [Color(0xFF0D1117), Color(0xFF0F172A)]
+                    : const [Color(0xFFF8FAFC), Color(0xFFEFFDF8)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: _isLoading
+                ? _buildLoading()
+                : _errorMessage != null
+                    ? _buildErrorBody()
+                    : _pathway == null
+                        ? _buildErrorBody()
+                        : isDesktop
+                            ? _buildDesktopLayout()
+                            : _buildMobileLayout(),
           ),
-          body: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-                  ? _buildErrorBody()
-                  : _pathway == null
-                      ? const Center(child: Text('Không có lộ trình để hiển thị.'))
-                      : isDesktop
-                          ? _buildDesktopLayout(isDesktop)
-                          : _buildMobileLayout(isDesktop),
         );
       },
     );
   }
 
-  Widget _buildDesktopLayout(bool isDesktop) {
+  Widget _buildDesktopLayout() {
     return Column(
       children: [
+        PathwaySummaryHeader(
+          pathway: _pathway!,
+          isDarkMode: _isDarkMode,
+          onAnalysisPressed: _showSkillAnalysis,
+          onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
+        ),
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Cột Trái 65% - Node Tree
               Expanded(
-                flex: 65,
-                child: Container(
-                  color: const Color(0xFFF8FAFC),
-                  child: InteractiveNodeTree(
-                    nodes: _pathway!.nodes,
-                    onNodeTap: _handleNodeTap,
-                    selectedNode: _selectedNode,
-                  ),
+                flex: 64,
+                child: InteractiveNodeTree(
+                  nodes: _pathway!.nodes,
+                  onNodeTap: _handleNodeTap,
+                  selectedNode: _selectedNode,
+                  isDarkMode: _isDarkMode,
                 ),
               ),
-              
-              // Cột Phải 35% - AI Mentor
               Expanded(
-                flex: 35,
+                flex: 36,
                 child: AIMentorSidePanel(
                   pathway: _pathway!,
                   selectedNode: _selectedNode,
                   onPathwayUpdated: _handlePathwayUpdated,
+                  isDarkMode: _isDarkMode,
                 ),
               ),
             ],
@@ -127,59 +161,128 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
-  Widget _buildMobileLayout(bool isDesktop) {
-    // For mobile, we can use a Stack or just a basic column.
+  Widget _buildMobileLayout() {
     return Column(
       children: [
-        Expanded(
-          child: InteractiveNodeTree(
-            nodes: _pathway!.nodes,
-            onNodeTap: _handleNodeTap,
-            selectedNode: _selectedNode,
-          ),
+        PathwaySummaryHeader(
+          pathway: _pathway!,
+          isDarkMode: _isDarkMode,
+          onAnalysisPressed: _showSkillAnalysis,
+          onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
-        SizedBox(
-          height: 350,
-          child: AIMentorSidePanel(
-            pathway: _pathway!,
-            selectedNode: _selectedNode,
-            onPathwayUpdated: _handlePathwayUpdated,
+        Expanded(
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 600,
+                  child: InteractiveNodeTree(
+                    nodes: _pathway!.nodes,
+                    onNodeTap: _handleNodeTap,
+                    selectedNode: _selectedNode,
+                    isDarkMode: _isDarkMode,
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 460,
+                  child: AIMentorSidePanel(
+                    pathway: _pathway!,
+                    selectedNode: _selectedNode,
+                    onPathwayUpdated: _handlePathwayUpdated,
+                    isDarkMode: _isDarkMode,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildErrorBody() {
+  Widget _buildLoading() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.88, end: 1),
+        duration: const Duration(milliseconds: 900),
+        curve: Curves.easeInOut,
+        builder: (context, value, child) => Transform.scale(scale: value, child: child),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 56, color: Color(0xFFEF4444)),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage ?? 'Đã xảy ra lỗi.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF334155)),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _loadPathway,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Tải lại lộ trình'),
-            ),
+            CircularProgressIndicator(color: Color(0xFF28B79B)),
+            SizedBox(height: 18),
+            Text('Preparing your pathway...', style: TextStyle(color: Color(0xFF8B949E), fontWeight: FontWeight.w600)),
           ],
         ),
       ),
     );
   }
-}
 
+  Widget _buildErrorBody() {
+    final dark = _isDarkMode;
+    final titleColor = dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A);
+    final textColor = dark ? const Color(0xFF8B949E) : const Color(0xFF64748B);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF161B22) : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(dark ? 0.28 : 0.06),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF28B79B).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.route_rounded, size: 42, color: Color(0xFF28B79B)),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'No pathway to show yet',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: titleColor),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _errorMessage ?? 'Finish an exam first, then HanGo can build a personalized learning route.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, height: 1.5, color: textColor),
+              ),
+              const SizedBox(height: 22),
+              ElevatedButton.icon(
+                onPressed: _loadPathway,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Reload pathway'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28B79B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

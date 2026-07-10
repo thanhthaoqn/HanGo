@@ -256,6 +256,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     double score = (correctCount / _examQuestions.length) * 10;
     
     final attemptMap = await _saveAttemptToHistory(score);
+    await _maybeRefreshPathway(attemptMap);
     if (!mounted) return;
 
     Navigator.pushReplacement(
@@ -367,6 +368,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                         double score = (correctCount / _examQuestions.length) * 10;
                         
                         final attemptMap = await _saveAttemptToHistory(score);
+                        await _maybeRefreshPathway(attemptMap);
                         if (!mounted) return;
 
                         Navigator.pushReplacement(
@@ -419,21 +421,122 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
   Future<Map<String, dynamic>?> _saveAttemptToHistory(double score) async {
     try {
       final repository = ExamRepository();
-      Map<String, int> answersForSubmit = {};
+      Map<String, dynamic> answersForSubmit = {};
       _userAnswers.forEach((key, value) {
-        answersForSubmit[(key + 1).toString()] = value;
+        final question = _examQuestions[key];
+        answersForSubmit[(key + 1).toString()] = {
+          'selectedOption': value,
+          'isCorrect': value == question['correctIndex'],
+          'skill': question['skill'],
+          'topic': question['skill'],
+        };
       });
       final attempt = await repository.submitExamAttempt(widget.exam.id, score, answersForSubmit);
-      final rawAttemptId = attempt['id'];
-      final attemptId = rawAttemptId is int ? rawAttemptId : int.tryParse('$rawAttemptId');
-
-      if (attemptId != null && attemptId > 0) {
-        await PathwayRepository().generatePathway(examAttemptId: attemptId);
-      }
       return attempt;
     } catch (e) {
-      debugPrint("Error saving attempt or generating pathway: $e");
+      debugPrint("Error saving attempt: $e");
       return null;
+    }
+  }
+
+  Future<void> _maybeRefreshPathway(Map<String, dynamic>? attemptMap) async {
+    final rawAttemptId = attemptMap?['id'];
+    final attemptId = rawAttemptId is int ? rawAttemptId : int.tryParse('$rawAttemptId');
+    if (attemptId == null || attemptId <= 0 || !mounted) return;
+
+    final pathwayRepository = PathwayRepository();
+    var hasCurrentPathway = false;
+    try {
+      await pathwayRepository.getMyPathway();
+      hasCurrentPathway = true;
+    } catch (_) {
+      hasCurrentPathway = false;
+    }
+
+    if (!mounted) return;
+    if (!hasCurrentPathway) {
+      try {
+        await pathwayRepository.generatePathway(examAttemptId: attemptId);
+      } catch (e) {
+        debugPrint("Error generating first pathway: $e");
+      }
+      return;
+    }
+
+    final shouldRefresh = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF28B79B)]),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Update your learning pathway?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'This exam gives AI a fresher signal. You can update the pathway now or keep your current route unchanged.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, height: 1.5, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Keep current'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Update now'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (shouldRefresh == true) {
+      try {
+        await pathwayRepository.generatePathway(examAttemptId: attemptId);
+      } catch (e) {
+        debugPrint("Error refreshing pathway after exam: $e");
+      }
     }
   }
 

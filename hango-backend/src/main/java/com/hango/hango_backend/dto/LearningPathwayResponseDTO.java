@@ -19,4 +19,14 @@ public class LearningPathwayResponseDTO {
     @JsonProperty("mentor_summary")
     private String mentorSummary;
     private List<PathwayNodeDTO> nodes;
+
+    // Skill analysis metadata for FE Skill Analysis Panel
+    @JsonProperty("weak_skills")
+    private List<String> weakSkills;
+
+    @JsonProperty("total_steps")
+    private Integer totalSteps;
+
+    @JsonProperty("completed_steps")
+    private Integer completedSteps;
 }

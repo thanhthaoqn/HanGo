@@ -1,7 +1,10 @@
 package com.hango.hango_backend.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * DTO đại diện cho từng câu trả lời trong answersJson của ExamAttempt.
@@ -10,10 +13,13 @@ import lombok.Data;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserAnswerDTO {
 
     private Long questionId;
     private String topic;
+    @JsonAlias("skillType")
     private String skill;
     private Boolean isCorrect;
     private String userAnswer;

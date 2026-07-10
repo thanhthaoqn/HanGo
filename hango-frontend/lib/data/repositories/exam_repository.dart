@@ -58,7 +58,7 @@ class ExamRepository {
     }
   }
 
-  Future<Map<String, dynamic>> submitExamAttempt(String examId, double score, Map<String, int> answers) async {
+  Future<Map<String, dynamic>> submitExamAttempt(String examId, double score, Map<String, dynamic> answers) async {
     try {
       final uri = Uri.parse('$baseUrl/exams/$examId/submit');
       

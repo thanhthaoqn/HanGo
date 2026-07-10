@@ -14,6 +14,8 @@ import com.hango.hango_backend.exeption.ApiException;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
 import com.hango.hango_backend.repository.LearningPathwayRepository;
+import com.hango.hango_backend.repository.LessonProgressRepository;
+import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +40,8 @@ public class LearningPathwayService {
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
     private final ExamResultAnalyzerService examResultAnalyzerService;
+    private final LessonProgressRepository lessonProgressRepository;
+    private final LessonRepository lessonRepository;
 
 
 
@@ -185,7 +189,7 @@ public class LearningPathwayService {
     }
 
     @Transactional
-    public LearningPathwayResponseDTO reroutePathway(Long pathwayId, Long studentId, int quizScore) {
+    public LearningPathwayResponseDTO reroutePathway(Long pathwayId, Long studentId) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
                 .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
 
@@ -193,7 +197,15 @@ public class LearningPathwayService {
             throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
         }
 
-        pathway.setMentorSummary(quizScore < 60
+        List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
+        int effectiveScore = recentAttempts.stream()
+                .filter(attempt -> attempt.getScore() != null)
+                .findFirst()
+                .map(attempt -> attempt.getScore().intValue())
+                .orElse(0);
+
+        final int finalScore = effectiveScore;
+        pathway.setMentorSummary(finalScore < 60
                 ? "Hệ thống đã tự động thay đổi lộ trình học tập do điểm bài kiểm tra gần nhất của bạn hơi thấp. Tôi đang tập trung điều chỉnh lại lộ trình vào các kỹ năng nền tảng mà bạn cần nắm vững trước tiên."
                 : "Hiệu suất bài kiểm tra gần đây của bạn là chấp nhận được, vì vậy lộ trình hiện tại vẫn là lựa chọn tốt nhất.");
 
@@ -202,7 +214,9 @@ public class LearningPathwayService {
             for (PathwayNode node : pathway.getNodes()) {
                 if (!firstNodeSeen && node.getStepOrder() != null && node.getStepOrder() == 1) {
                     node.setStatus("IN_PROGRESS");
-                    node.setProgressPercent(Math.max(node.getProgressPercent(), 25));
+                    // Reset progress only if less than current real progress
+                    int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
+                    node.setProgressPercent(Math.max(node.getProgressPercent(), realProgress));
                     firstNodeSeen = true;
                 } else if (!"COMPLETED".equalsIgnoreCase(node.getStatus())) {
                     node.setStatus("LOCKED");
@@ -300,22 +314,89 @@ public class LearningPathwayService {
     }
 
     private LearningPathwayResponseDTO toResponseDto(LearningPathway pathway, Long studentId) {
+        List<PathwayNodeDTO> nodeDTOs = pathway.getNodes().stream().map(node -> {
+            int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
+            long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+            long completedLessons = countCompletedLessons(studentId, node.getCourse().getId());
+            String skillType = node.getCourse().getCategory() != null
+                    ? node.getCourse().getCategory().getParamValue()
+                    : null;
+
+            // Auto-sync node status based on actual progress
+            String resolvedStatus = node.getStatus();
+            if (totalLessons > 0 && realProgress >= 100) {
+                resolvedStatus = "COMPLETED";
+            } else if (realProgress > 0 && "LOCKED".equalsIgnoreCase(node.getStatus())) {
+                resolvedStatus = "IN_PROGRESS";
+            }
+
+            return PathwayNodeDTO.builder()
+                    .step(node.getStepOrder())
+                    .courseId(node.getCourse().getId())
+                    .courseTitle(node.getCourse().getTitle())
+                    .status(resolvedStatus)
+                    .reasonWhy(node.getReasonWhy())
+                    .progressPercent(realProgress)
+                    .skillType(skillType)
+                    .totalLessons(Math.toIntExact(Math.min(totalLessons, Integer.MAX_VALUE)))
+                    .completedLessons(Math.toIntExact(Math.min(completedLessons, Integer.MAX_VALUE)))
+                    .tags(node.getCourse().getCategory() != null
+                            ? List.of("#" + node.getCourse().getCategory().getParamValue())
+                            : Collections.emptyList())
+                    .build();
+        }).toList();
+
+        int totalSteps = nodeDTOs.size();
+        int completedSteps = (int) nodeDTOs.stream()
+                .filter(n -> "COMPLETED".equalsIgnoreCase(n.getStatus()))
+                .count();
+
+        // Extract weak skills from recent exam attempts for Skill Analysis Panel
+        List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
+        ExamResultAnalysisDTO analysisDTO = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
+        List<String> weakSkills = Collections.emptyList();
+        if (analysisDTO != null && analysisDTO.getKnowledgeGapsJson() != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> gaps = objectMapper.readValue(analysisDTO.getKnowledgeGapsJson(), java.util.Map.class);
+                Object ws = gaps.get("weak_skills");
+                if (ws instanceof List<?> wsList) {
+                    weakSkills = wsList.stream().map(Object::toString).toList();
+                }
+            } catch (Exception e) {
+                log.debug("Failed to parse weak_skills from knowledge gap: {}", e.getMessage());
+            }
+        }
+
         return LearningPathwayResponseDTO.builder()
                 .pathwayId(pathway.getId())
                 .roadmapId("RM_USER_" + studentId + "_" + pathway.getId())
                 .mentorSummary(pathway.getMentorSummary())
-                .nodes(pathway.getNodes().stream().map(node -> PathwayNodeDTO.builder()
-                        .step(node.getStepOrder())
-                        .courseId(node.getCourse().getId())
-                        .courseTitle(node.getCourse().getTitle())
-                        .status(node.getStatus())
-                        .reasonWhy(node.getReasonWhy())
-                        .progressPercent(node.getProgressPercent())
-                        .tags(node.getCourse().getCategory() != null
-                                ? List.of("#" + node.getCourse().getCategory().getParamValue())
-                                : Collections.emptyList())
-                        .build()).toList())
+                .nodes(nodeDTOs)
+                .totalSteps(totalSteps)
+                .completedSteps(completedSteps)
+                .weakSkills(weakSkills)
                 .build();
+    }
+
+    /**
+     * Calculates the real course completion percentage for a given learner and course,
+     * based on actual LessonProgress records stored in the DB.
+     */
+    private int calculateCourseProgressPercent(Long studentId, Long courseId) {
+        try {
+            long totalLessons = lessonRepository.countByCourseId(courseId);
+            if (totalLessons == 0) return 0;
+            long completedLessons = countCompletedLessons(studentId, courseId);
+            return (int) Math.min(100, Math.round((double) completedLessons / totalLessons * 100));
+        } catch (Exception e) {
+            log.warn("Failed to calculate progress for student={} course={}: {}", studentId, courseId, e.getMessage());
+            return 0;
+        }
+    }
+
+    private long countCompletedLessons(Long studentId, Long courseId) {
+        return lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(studentId, courseId);
     }
 
     private LearningPathwayResponseDTO createEmptyPathway(User student, ExamAttempt examAttempt, String mentorSummary) {

@@ -51,10 +51,9 @@ public class LearningPathwayController {
     @PreAuthorize("hasRole('LEARNER')")
     public ResponseEntity<LearningPathwayResponseDTO> reroutePathway(
             @PathVariable Long id,
-            @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestParam(defaultValue = "0") int quizScore) {
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
-        LearningPathwayResponseDTO response = learningPathwayService.reroutePathway(id, userDetails.getId(), quizScore);
+        LearningPathwayResponseDTO response = learningPathwayService.reroutePathway(id, userDetails.getId());
         return ResponseEntity.ok(response);
     }
 
