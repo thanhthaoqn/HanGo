@@ -9,6 +9,12 @@ import java.util.List;
 @Repository
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> {
     int countByExamId(Long examId);
+
     List<ExamAttempt> findByExamIdAndStudentIdOrderBySubmittedAtAsc(Long examId, Long studentId);
+
     int countByExamIdAndStudentId(Long examId, Long studentId);
+
+    // Lấy N attempts gần nhất của learner (theo submittedAt desc) để tổng hợp skill gaps.
+    List<ExamAttempt> findTop10ByStudent_IdOrderBySubmittedAtDesc(Long studentId);
 }
+

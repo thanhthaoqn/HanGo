@@ -9,6 +9,9 @@ import '../course/course_detail_page.dart';
 import 'exam_review_page.dart';
 import 'list_exams_page.dart';
 
+import '../learner/learning_pathway_page.dart';
+import '../../../data/repositories/exam_ai_recommendation_repository.dart';
+
 class ExamResultPage extends StatefulWidget {
   final Exam exam;
   final double score;
@@ -40,12 +43,18 @@ class _ExamResultPageState extends State<ExamResultPage> {
   List<Map<String, dynamic>> _attempts = [];
   bool _isLoadingAttempts = true;
 
+  // AI recommendation (không thay thế hoàn toàn rule-based, dùng làm “bong bóng phân tích”)
+  String _aiWeaknessSummary = "";
+  bool _isLoadingAi = true;
+  List<Map<String, dynamic>> _aiRecommendedCourses = [];
+
   @override
   void initState() {
     super.initState();
     _analyzeSkills();
     _loadRecommendations();
     _loadAttempts();
+    _loadAiRecommendations();
   }
 
   Future<void> _loadAttempts() async {
@@ -69,8 +78,16 @@ class _ExamResultPageState extends State<ExamResultPage> {
   void _analyzeSkills() {
     // Generate questions matching exam's question count to match skill types
     final List<String> baseSkills = [
-      "Grammar", "Grammar", "Vocabulary", "Grammar", "Grammar", 
-      "Vocabulary", "Vocabulary", "Vocabulary", "Reading Comprehension", "Reading Comprehension"
+      "Grammar",
+      "Grammar",
+      "Vocabulary",
+      "Grammar",
+      "Grammar",
+      "Vocabulary",
+      "Vocabulary",
+      "Vocabulary",
+      "Reading Comprehension",
+      "Reading Comprehension",
     ];
 
     Map<String, int> totalPerSkill = {};
@@ -79,7 +96,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
     for (int i = 0; i < widget.totalQuestions; i++) {
       final skill = baseSkills[i % baseSkills.length];
       totalPerSkill[skill] = (totalPerSkill[skill] ?? 0) + 1;
-      
+
       final correctIndex = _getMockCorrectIndex(i);
       if (widget.userAnswers[i] == correctIndex) {
         correctPerSkill[skill] = (correctPerSkill[skill] ?? 0) + 1;
@@ -111,22 +128,75 @@ class _ExamResultPageState extends State<ExamResultPage> {
     return correctIndices[questionIndex % correctIndices.length];
   }
 
+  Future<void> _loadAiRecommendations() async {
+    // Tạo “bong bóng phân tích AI + khóa học gợi ý”
+    // Dựa trên examAttemptId lấy từ attempt history gần nhất.
+    try {
+      final latestAttemptId = (() {
+        if (widget.attempt['id'] != null)
+          return int.tryParse(widget.attempt['id'].toString());
+        if (widget.attempt['attemptId'] != null) {
+          return int.tryParse(widget.attempt['attemptId'].toString());
+        }
+        return null;
+      })();
+
+      if (latestAttemptId == null) {
+        // Không có id attempt => bỏ qua, giữ rule-based.
+        setState(() {
+          _isLoadingAi = false;
+        });
+        return;
+      }
+
+      final repo = ExamAIRecommendationRepository();
+      final aiResp = await repo.recommendCoursesAI(
+        examAttemptId: latestAttemptId,
+      );
+
+      final weakness = (aiResp['weaknessSummary'] ?? '')?.toString() ?? '';
+      final recsRaw = aiResp['recommendedCourses'];
+      final recs = (recsRaw is List)
+          ? recsRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+          : <Map<String, dynamic>>[];
+
+      setState(() {
+        _aiWeaknessSummary = weakness;
+        _aiRecommendedCourses = recs;
+        _isLoadingAi = false;
+      });
+    } catch (e) {
+      debugPrint('AI recommend failed: $e');
+      setState(() {
+        _isLoadingAi = false;
+        _aiWeaknessSummary = '';
+        _aiRecommendedCourses = [];
+      });
+    }
+  }
+
   Future<void> _loadRecommendations() async {
     try {
       final courses = await _courseRepository.fetchCourses();
-      
+
       // Filter courses matching weak skill category name or keywords
       List<Course> filtered = courses.where((c) {
         final titleLower = c.title.toLowerCase();
         final catLower = c.category.toLowerCase();
         final weakLower = _weakestSkill.toLowerCase();
-        
+
         if (weakLower.contains("grammar")) {
-          return titleLower.contains("grammar") || titleLower.contains("ngữ pháp") || catLower.contains("grammar");
+          return titleLower.contains("grammar") ||
+              titleLower.contains("ngữ pháp") ||
+              catLower.contains("grammar");
         } else if (weakLower.contains("vocabulary")) {
-          return titleLower.contains("vocabulary") || titleLower.contains("từ vựng") || titleLower.contains("word");
+          return titleLower.contains("vocabulary") ||
+              titleLower.contains("từ vựng") ||
+              titleLower.contains("word");
         } else if (weakLower.contains("reading")) {
-          return titleLower.contains("reading") || titleLower.contains("đọc") || titleLower.contains("toeic");
+          return titleLower.contains("reading") ||
+              titleLower.contains("đọc") ||
+              titleLower.contains("toeic");
         }
         return true;
       }).toList();
@@ -198,7 +268,10 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 ),
                               ),
                               const SizedBox(width: 32),
-                              Expanded(flex: 2, child: _buildRecommendationsPanel()),
+                              Expanded(
+                                flex: 2,
+                                child: _buildRecommendationsPanel(),
+                              ),
                             ],
                           )
                         : Column(
@@ -245,10 +318,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
                   blurRadius: 10,
                 ),
               ],
-              border: Border.all(
-                color: const Color(0xFF28B79B),
-                width: 5,
-              ),
+              border: Border.all(color: const Color(0xFF28B79B), width: 5),
             ),
             alignment: Alignment.center,
             child: Column(
@@ -279,9 +349,24 @@ class _ExamResultPageState extends State<ExamResultPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStatBox(Icons.quiz_outlined, 'Total', '${widget.totalQuestions}', Colors.grey.shade700),
-              _buildStatBox(Icons.check_circle_outline, 'Correct', '${widget.correctCount}', const Color(0xFF10B981)),
-              _buildStatBox(Icons.cancel_outlined, 'Incorrect', '${widget.totalQuestions - widget.correctCount}', const Color(0xFFEF4444)),
+              _buildStatBox(
+                Icons.quiz_outlined,
+                'Total',
+                '${widget.totalQuestions}',
+                Colors.grey.shade700,
+              ),
+              _buildStatBox(
+                Icons.check_circle_outline,
+                'Correct',
+                '${widget.correctCount}',
+                const Color(0xFF10B981),
+              ),
+              _buildStatBox(
+                Icons.cancel_outlined,
+                'Incorrect',
+                '${widget.totalQuestions - widget.correctCount}',
+                const Color(0xFFEF4444),
+              ),
             ],
           ),
           const Divider(height: 48),
@@ -291,7 +376,11 @@ class _ExamResultPageState extends State<ExamResultPage> {
             alignment: Alignment.centerLeft,
             child: Text(
               'Skill Breakdown',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F2937)),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Color(0xFF1F2937),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -308,11 +397,19 @@ class _ExamResultPageState extends State<ExamResultPage> {
                     children: [
                       Text(
                         skill,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4B5563)),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Color(0xFF4B5563),
+                        ),
                       ),
                       Text(
                         '${(val * 100).toStringAsFixed(0)}% Accuracy',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -326,7 +423,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
                       valueColor: AlwaysStoppedAnimation<Color>(
                         val >= 0.8
                             ? const Color(0xFF10B981)
-                            : (val >= 0.5 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444)),
+                            : (val >= 0.5
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFFEF4444)),
                       ),
                     ),
                   ),
@@ -342,6 +441,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
+                    // Navigate back to Review page of the same attempt
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -356,9 +456,14 @@ class _ExamResultPageState extends State<ExamResultPage> {
                   label: const Text('Review Detailed Answers'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF28B79B),
-                    side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                    side: const BorderSide(
+                      color: Color(0xFF28B79B),
+                      width: 1.5,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -368,7 +473,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                      MaterialPageRoute(
+                        builder: (context) => const ListExamsPage(),
+                      ),
                     );
                   },
                   icon: const Icon(Icons.arrow_back, size: 18),
@@ -378,12 +485,14 @@ class _ExamResultPageState extends State<ExamResultPage> {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -402,9 +511,19 @@ class _ExamResultPageState extends State<ExamResultPage> {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F2937))),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+          ),
         ],
       ),
     );
@@ -437,10 +556,67 @@ class _ExamResultPageState extends State<ExamResultPage> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Our analysis shows you could improve in this skill area. We recommend these courses to help you succeed:',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.4),
+          // AI Analysis Bubble (không phải chatbox)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2FE),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF93C5FD)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(
+                      Icons.smart_toy_rounded,
+                      color: Color.fromARGB(255, 46, 191, 142),
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Hango Analysis',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color.fromARGB(255, 19, 204, 180),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _isLoadingAi
+                    ? const Text(
+                        'Analyzing your strengths & weaknesses...',
+                        style: TextStyle(
+                          color: Color.fromARGB(255, 42, 134, 79),
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      )
+                    : (_aiWeaknessSummary.isNotEmpty
+                          ? Text(
+                              _aiWeaknessSummary,
+                              style: const TextStyle(
+                                color: Color(0xFF1E3A8A),
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            )
+                          : const Text(
+                              'I’ll suggest courses based on our analysis (AI is not ready yet).',
+                              style: TextStyle(
+                                color: Color(0xFF1E3A8A),
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                            )),
+              ],
+            ),
           ),
+
           const SizedBox(height: 24),
 
           // Loader or List of Courses
@@ -451,122 +627,452 @@ class _ExamResultPageState extends State<ExamResultPage> {
                     child: CircularProgressIndicator(color: Color(0xFF28B79B)),
                   ),
                 )
-              : _recommendedCourses.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 48.0),
-                        child: Text(
-                          'No suitable courses found.',
-                          style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+              : (_aiRecommendedCourses.isNotEmpty)
+              ? Column(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        'The (AI) Learning Pathway suggestions are ready — you can create your Learning Pathway right below.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1F2937),
                         ),
                       ),
-                    )
-                  : Column(
-                      children: _recommendedCourses.map((course) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade100),
-                            borderRadius: BorderRadius.circular(12),
-                            color: const Color(0xFFF9FAFB),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Course Image/Thumbnail
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 70,
-                                  height: 70,
-                                  color: Colors.grey.shade200,
-                                  child: course.thumbnailUrl.isNotEmpty
-                                      ? Image.network(
-                                          course.thumbnailUrl,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) =>
-                                              const Icon(Icons.book_outlined, color: Colors.grey),
-                                        )
-                                      : const Icon(Icons.book_outlined, color: Colors.grey),
+                    ),
+                    ..._aiRecommendedCourses.map((r) {
+                      final courseIdRaw = r['courseId'];
+                      final int courseId = courseIdRaw is int
+                          ? courseIdRaw
+                          : int.tryParse(courseIdRaw.toString()) ?? 0;
+
+                      final title = (r['title'] ?? '').toString();
+                      final category = (r['category'] ?? '').toString();
+                      final difficulty = (r['difficulty'] ?? '').toString();
+                      final reasonWhy = (r['reasonWhy'] ?? '').toString();
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade100),
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFFF9FAFB),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 70,
+                                height: 70,
+                                color: Colors.grey.shade200,
+                                child: const Icon(
+                                  Icons.book_outlined,
+                                  color: Colors.grey,
                                 ),
                               ),
-                              const SizedBox(width: 16),
-
-                              // Course Details
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE0F2FE),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        course.category.toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Color(0xFF0369A1),
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      course.title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE0F2FE),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      (category.isNotEmpty
+                                              ? category
+                                              : 'AI Recommended')
+                                          .toUpperCase(),
                                       style: const TextStyle(
+                                        color: Color(0xFF0369A1),
+                                        fontSize: 9,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: Color(0xFF1F2937),
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.star, color: Colors.amber.shade500, size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${course.stars}',
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '${course.difficulty}',
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                                        ),
-                                      ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    title.isNotEmpty ? title : 'Course',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: Color(0xFF1F2937),
                                     ),
-                                    const SizedBox(height: 12),
-                                    ElevatedButton(
-                                      onPressed: () {
+                                  ),
+                                  const SizedBox(height: 6),
+                                  if (reasonWhy.isNotEmpty)
+                                    Text(
+                                      reasonWhy,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      if (courseId > 0) {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) => CourseDetailPage(courseId: course.id),
+                                            builder: (context) =>
+                                                CourseDetailPage(
+                                                  courseId: courseId,
+                                                ),
                                           ),
                                         );
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF28B79B),
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF28B79B),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
                                       ),
-                                      child: const Text('Learn Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Learn Now',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LearningPathwayPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.timeline_outlined),
+                        label: const Text('Create/View Learning Pathway'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color.fromARGB(
+                            255,
+                            11,
+                            102,
+                            96,
+                          ),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : (_aiRecommendedCourses.isNotEmpty)
+              ? Column(
+                  children: _aiRecommendedCourses.map((r) {
+                    final courseIdRaw = r['courseId'];
+                    final int courseId = courseIdRaw is int
+                        ? courseIdRaw
+                        : int.tryParse(courseIdRaw.toString()) ?? 0;
+
+                    final title = (r['title'] ?? '').toString();
+                    final category = (r['category'] ?? '').toString();
+                    final difficulty = (r['difficulty'] ?? '').toString();
+                    final reasonWhy = (r['reasonWhy'] ?? '').toString();
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade100),
+                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFFF9FAFB),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey.shade200,
+                              child: const Icon(
+                                Icons.book_outlined,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE0F2FE),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    (category.isNotEmpty
+                                            ? category
+                                            : 'AI Recommended')
+                                        .toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Color(0xFF0369A1),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  title.isNotEmpty ? title : 'Course',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Color(0xFF1F2937),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                if (reasonWhy.isNotEmpty)
+                                  Text(
+                                    reasonWhy,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade700,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                const SizedBox(height: 12),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    if (courseId > 0) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              CourseDetailPage(
+                                                courseId: courseId,
+                                              ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF28B79B),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Learn Now',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                )
+              : _recommendedCourses.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 48.0),
+                    child: Text(
+                      'No suitable courses found.',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                )
+              : Column(
+                  children: _recommendedCourses.map((course) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade100),
+                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFFF9FAFB),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Course Image/Thumbnail
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey.shade200,
+                              child: course.thumbnailUrl.isNotEmpty
+                                  ? Image.network(
+                                      course.thumbnailUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.book_outlined,
+                                                color: Colors.grey,
+                                              ),
+                                    )
+                                  : const Icon(
+                                      Icons.book_outlined,
+                                      color: Colors.grey,
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Course Details
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE0F2FE),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    course.category.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Color(0xFF0369A1),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  course.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Color(0xFF1F2937),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.star,
+                                      color: Colors.amber.shade500,
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${course.stars}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${course.difficulty}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade500,
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 12),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => CourseDetailPage(
+                                          courseId: course.id,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF28B79B),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Learn Now',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        );
-                      }).toList(),
-                    ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
         ],
       ),
     );
@@ -585,7 +1091,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
             color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -605,126 +1111,150 @@ class _ExamResultPageState extends State<ExamResultPage> {
             style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
           const SizedBox(height: 24),
-          
+
           _isLoadingAttempts
               ? const Center(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 40.0),
-                    child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color(0xFF28B79B))),
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation(Color(0xFF28B79B)),
+                    ),
                   ),
                 )
               : _attempts.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 48.0),
-                        child: Column(
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 48.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.history_toggle_off,
+                          size: 48,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "No attempts yet.\nStart the exam to see your history.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _attempts.length,
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 24),
+                  itemBuilder: (context, index) {
+                    final attempt = _attempts[index];
+                    final attemptNum = attempt['attemptNumber'] ?? (index + 1);
+                    final date = attempt['date'] ?? '';
+                    final score = (attempt['score'] as num?)?.toDouble() ?? 0.0;
+
+                    return Row(
+                      children: [
+                        // Circular attempt index indicator
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE8F8F5),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '#$attemptNum',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF167B66),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // Date
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                date,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13.5,
+                                  color: Color(0xFF374151),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Score display
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Icon(Icons.history_toggle_off, size: 48, color: Colors.grey.shade300),
-                            const SizedBox(height: 12),
                             Text(
-                              "No attempts yet.\nStart the exam to see your history.",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey.shade400, fontSize: 13, height: 1.4),
+                              score.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF167B66),
+                              ),
+                            ),
+                            const Text(
+                              '/10.0',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _attempts.length,
-                      separatorBuilder: (context, index) => const Divider(height: 24),
-                      itemBuilder: (context, index) {
-                        final attempt = _attempts[index];
-                        final attemptNum = attempt['attemptNumber'] ?? (index + 1);
-                        final date = attempt['date'] ?? '';
-                        final score = (attempt['score'] as num?)?.toDouble() ?? 0.0;
-                        
-                        return Row(
-                          children: [
-                            // Circular attempt index indicator
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFE8F8F5),
-                                shape: BoxShape.circle,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                '#$attemptNum',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF167B66),
-                                  fontSize: 13,
+                        const SizedBox(width: 16),
+                        // Review button
+                        OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ExamReviewPage(
+                                  exam: widget.exam,
+                                  attempt: attempt,
                                 ),
                               ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF28B79B),
+                            side: const BorderSide(color: Color(0xFF28B79B)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
                             ),
-                            const SizedBox(width: 16),
-                            
-                            // Date
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    date,
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF374151)),
-                                  ),
-                                ],
-                              ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            
-                            // Score display
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  score.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF167B66),
-                                  ),
-                                ),
-                                const Text(
-                                  '/10.0',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey),
-                                )
-                              ],
+                          ),
+                          child: const Text(
+                            'Review',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(width: 16),
-                            // Review button
-                            OutlinedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ExamReviewPage(
-                                      exam: widget.exam,
-                                      attempt: attempt,
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF28B79B),
-                                side: const BorderSide(color: Color(0xFF28B79B)),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                'Review',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
         ],
       ),
     );

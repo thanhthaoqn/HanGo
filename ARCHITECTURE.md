@@ -10,11 +10,10 @@ HanGo is an EdTech platform built on a modern Client-Server architecture. The sy
 
 **Monitored Context:**
 The system manages several core EdTech domains that dictate the architecture:
-- **Identity & Access:** Role-based contexts for Learners, Trainers, Leads, and Admins.
+- **Identity & Access:** Role-based contexts for Learners, Trainers, Course Managers, and Admins.
 - **Course Management:** Hierarchical content (Courses > Sections > Lessons).
 - **Assessment:** Question Banks, Exams, and automated grading.
 - **Learner Progress:** Tracking enrollments, exam attempts, and completion metrics.
-- **Internal Workflow (Tasks):** Assignment of tasks from Leads to Trainers.
 
 ## 2. Core Tech Stack & Constraints
 
@@ -66,7 +65,7 @@ The backend enforces a strict N-Tier pattern where Controllers only talk to Serv
 
 **Security Constraints:**
 - **Stateless Authentication:** Handled exclusively via JWT. Tokens must be stored securely on the client (`shared_preferences`).
-- **Role-Based Access Control (RBAC):** Strict enforcement at both the API level and the UI routing level (e.g., Trainers cannot access Lead dashboards).
+- **Role-Based Access Control (RBAC):** Strict enforcement at both the API level and the UI routing level (e.g., Trainers cannot access Course Manager dashboards).
 - **Payload Validation:** All incoming data must pass through DTO validation (`spring-boot-starter-validation`) before reaching business logic layers.
 
 ## 5. Architectural Quality Gates

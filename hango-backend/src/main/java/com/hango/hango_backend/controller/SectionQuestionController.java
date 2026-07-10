@@ -299,16 +299,17 @@ public class SectionQuestionController {
             return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
         }
 
-        // Default category & difficulty if null
+        // Default category / difficulty if null
         Long categoryId = request.getCategoryId() != null ? request.getCategoryId() : 1L;
         Long difficultyId = request.getDifficultyId() != null ? request.getDifficultyId() : 14L;
+        Long skillParamId = request.getSkillParamId() != null ? request.getSkillParamId() : 1L;
 
         Long questionId = null;
         try {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
-                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, skill_param_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
                 ps.setLong(1, currentUserId);
@@ -322,6 +323,7 @@ public class SectionQuestionController {
                 } else {
                     ps.setNull(7, java.sql.Types.BIGINT);
                 }
+                ps.setLong(8, skillParamId);
                 return ps;
             }, keyHolder);
 
@@ -357,6 +359,51 @@ public class SectionQuestionController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/questions/{id}")
+    @Transactional
+    public ResponseEntity<?> updateQuestion(
+            @PathVariable Long id,
+            @RequestBody CreateQuestionRequestDTO request) {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+        }
+
+        try {
+            int updatedRows = jdbcTemplate.update(
+                    "UPDATE questions SET question_text = ?, explanation = ? WHERE id = ?",
+                    request.getQuestionText(),
+                    request.getExplanation(),
+                    id
+            );
+
+            if (updatedRows == 0) {
+                return ResponseEntity.status(404).body("{\"error\": \"Question not found\"}");
+            }
+
+            // Update options
+            jdbcTemplate.update("DELETE FROM question_options WHERE question_id = ?", id);
+            List<CreateOptionDTO> options = request.getOptions();
+            if (options != null && !options.isEmpty()) {
+                for (CreateOptionDTO opt : options) {
+                    jdbcTemplate.update(
+                            "INSERT INTO question_options (question_id, option_text, is_correct) VALUES (?, ?, ?)",
+                            id,
+                            opt.getOptionText(),
+                            opt.getIsCorrect() != null && opt.getIsCorrect() ? 1 : 0
+                    );
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Question updated successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"Failed to update question: \" + e.getMessage()}");
+        }
+    }
+
     @PostMapping("/questions/group")
     @Transactional
     public ResponseEntity<?> createGroupQuestion(@RequestBody CreateGroupQuestionRequestDTO request) {
@@ -365,9 +412,11 @@ public class SectionQuestionController {
             return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
         }
 
-        // Default category & difficulty if null
+        // Default category / skill / difficulty if null
         Long categoryId = request.getCategoryId() != null ? request.getCategoryId() : 1L;
+        Long skillParamId = request.getSkillParamId() != null ? request.getSkillParamId() : 1L;
         Long difficultyId = request.getDifficultyId() != null ? request.getDifficultyId() : 14L;
+
 
         // 1. Insert into question_groups
         Long questionGroupId = null;
@@ -408,7 +457,8 @@ public class SectionQuestionController {
                     final Long finalGroupId = questionGroupId;
                     jdbcTemplate.update(connection -> {
                         java.sql.PreparedStatement ps = connection.prepareStatement(
-                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id, skill_param_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+
                                 java.sql.Statement.RETURN_GENERATED_KEYS
                         );
                         ps.setLong(1, currentUserId);
@@ -423,7 +473,9 @@ public class SectionQuestionController {
                             ps.setNull(7, java.sql.Types.BIGINT);
                         }
                         ps.setLong(8, finalGroupId);
+                        ps.setLong(9, skillParamId);
                         return ps;
+
                     }, keyHolder);
 
                     Number key = keyHolder.getKey();
