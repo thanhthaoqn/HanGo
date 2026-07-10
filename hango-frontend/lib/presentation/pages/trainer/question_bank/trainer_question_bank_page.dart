@@ -8,6 +8,7 @@ import '../../login_page.dart';
 import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
 import '../trainer_exams_page.dart';
+import 'trainer_create_question_page.dart';
 import 'models/trainer_question.dart';
 import 'widgets/question_filter_pane.dart';
 import 'widgets/question_search_bar.dart';
@@ -339,8 +340,9 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                                 sortBy: _sortBy,
                                 onSortChanged: _handleSortChanged,
                                 onCreatePressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Create Question flow is under construction')),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const TrainerCreateQuestionPage()),
                                   );
                                 },
                                 onImportPressed: () {

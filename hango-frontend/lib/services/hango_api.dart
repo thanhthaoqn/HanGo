@@ -236,7 +236,7 @@ class HangoApi {
     };
 
     // Build URL with query params
-    final baseUri = _uri('/api/v1/trainer/questions');
+    final baseUri = _uri('/api/v1/trainer/question-bank');
     final uri = Uri(
       scheme: baseUri.scheme,
       host: baseUri.host,
@@ -250,5 +250,59 @@ class HangoApi {
         .whereType<Map<String, dynamic>>()
         .map(TrainerQuestion.fromJson)
         .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {
+    final body = await _send(
+      http.get(_uri('/api/v1/metadata/parameters?type=$type'), headers: _headers),
+    );
+    return (body as List? ?? const []).whereType<Map<String, dynamic>>().toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getQuestionCategories() async {
+    final body = await _send(
+      http.get(_uri('/api/v1/metadata/categories'), headers: _headers),
+    );
+    return (body as List? ?? const []).whereType<Map<String, dynamic>>().toList();
+  }
+
+  Future<void> createTrainerQuestionGroup(Map<String, dynamic> payload) async {
+    await _send(
+      http.post(
+        _uri('/api/v1/trainer/question-bank'),
+        headers: _headers,
+        body: jsonEncode(payload),
+      ),
+    );
+  }
+
+  Future<void> saveExamQuestions(int examId, Map<String, dynamic> payload) async {
+    await _send(
+      http.post(
+        _uri('/api/v1/trainer/exams/$examId/questions'),
+        headers: _headers,
+        body: jsonEncode(payload),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> getExamQuestions(int examId) async {
+    final body = await _send(
+      http.get(
+        _uri('/api/v1/trainer/exams/$examId/questions'),
+        headers: _headers,
+      ),
+    );
+    return body as Map<String, dynamic>;
+  }
+
+  Future<void> updateExamStatus(int examId, String status) async {
+    await _send(
+      http.patch(
+        _uri('/api/v1/trainer/exams/$examId/status'),
+        headers: _headers,
+        body: jsonEncode({'status': status}),
+      ),
+    );
   }
 }

@@ -2,9 +2,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
+import '../login_page.dart';
+import 'trainer_dashboard_page.dart';
+import 'trainer_courses_page.dart';
 import 'trainer_exams_page.dart';
+import 'question_bank/trainer_question_bank_page.dart';
 
 class TrainerCreateExamPage extends StatefulWidget {
   const TrainerCreateExamPage({super.key});
@@ -16,6 +21,9 @@ class TrainerCreateExamPage extends StatefulWidget {
 class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
+  String _trainerName = 'Thảo';
+  String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
 
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -39,6 +47,36 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
     // Initialize current date
     final now = DateTime.now();
     _dateController.text = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _loadTrainerInfo();
+  }
+
+  Future<void> _loadTrainerInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
+    String initials = 'T';
+    if (fullName.trim().isNotEmpty) {
+      final parts = fullName.trim().split(' ');
+      if (parts.isNotEmpty) {
+        initials = parts.last[0].toUpperCase();
+      }
+    }
+    setState(() {
+      _trainerName = fullName;
+      _trainerInitials = initials;
+      _trainerAvatarUrl = avatarUrl;
+    });
+  }
+
+  void _handleLogout() async {
+    await _authService.logout();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -103,29 +141,25 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isDesktop = size.width > 1024;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Exam > Create New Exam',
-          style: TextStyle(
-            color: Color(0xFF20B486),
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Outfit',
-          ),
-        ),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Container(
+      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      body: Row(
+        children: [
+          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(context, !isDesktop),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Container(
             constraints: const BoxConstraints(maxWidth: 800),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -263,8 +297,14 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
                 ],
               ),
             ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -325,6 +365,261 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF20B486)),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSidebar(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE6FFFA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.school,
+                    size: 18,
+                    color: Color(0xFF38C9A6),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'HanGo',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
+          _buildSidebarItem(
+            Icons.dashboard_outlined,
+            'Dashboard',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerDashboardPage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerCoursesPage(),
+              ),
+            );
+          }),
+          _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: true),
+          _buildSidebarItem(Icons.people_outline, 'Learner'),
+          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerQuestionBankPage(),
+              ),
+            );
+          }),
+          const Spacer(),
+          const Divider(color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 12),
+          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
+            ToastHelper.show(context, 'Help Center is under construction');
+          }),
+          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
+    final activeColor = const Color(0xFF38C9A6);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: InkWell(
+        onTap: onTap ?? () {},
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 14,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+    return Container(
+      color: Colors.white,
+      height: 70,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          if (showMenuButton) ...[
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Row(
+            children: [
+              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF38C9A6)),
+              const SizedBox(width: 4),
+              RichText(
+                text: const TextSpan(
+                  style: TextStyle(
+                    color: Color(0xFF38C9A6),
+                    fontSize: 14,
+                    fontFamily: 'Outfit',
+                  ),
+                  children: [
+                    TextSpan(
+                      text: 'Exam > ',
+                      style: TextStyle(fontWeight: FontWeight.normal),
+                    ),
+                    TextSpan(
+                      text: 'Create New Exam',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_none_outlined,
+                  color: Color(0xFF4B5563),
+                  size: 24,
+                ),
+                onPressed: () {
+                  ToastHelper.show(context, 'No new notifications');
+                },
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Colors.redAccent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Row(
+            children: [
+              Text(
+                _trainerName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                  fontSize: 14,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE2F9F3),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: _trainerAvatarUrl.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _trainerAvatarUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Text(
+                            _trainerInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF38C9A6),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _trainerInitials,
+                        style: const TextStyle(
+                          color: Color(0xFF38C9A6),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF38C9A6),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

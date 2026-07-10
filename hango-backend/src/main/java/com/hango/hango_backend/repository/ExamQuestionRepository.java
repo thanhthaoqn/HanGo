@@ -8,4 +8,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ExamQuestionRepository extends JpaRepository<ExamQuestion, ExamQuestionId> {
     int countByIdExamId(Long examId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByIdExamId(Long examId);
 }

@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class TrainerDashboardServiceImpl implements TrainerDashboardService {
@@ -27,6 +29,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final SystemParameterRepository systemParameterRepository;
     private final SectionRepository sectionRepository;
     private final LessonRepository lessonRepository;
+    private final TrainerQuestionService trainerQuestionService;
+    private final QuestionRepository questionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -353,6 +357,113 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         exam.setVisibility("PRIVATE");
         exam.setCreatedBy(user);
         
+        examRepository.save(exam);
+    }
+
+    @Override
+    @Transactional
+    public void saveExamQuestions(Long examId, String email, com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO request) {
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found with id: " + examId));
+                
+        if (!exam.getCreatedBy().getEmail().equals(email)) {
+            throw new RuntimeException("Unauthorized to edit this exam");
+        }
+        
+        examQuestionRepository.deleteByIdExamId(examId);
+
+        int order = 1;
+        if (request.getBlocks() != null) {
+            for (com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO block : request.getBlocks()) {
+                Map<String, Object> res = trainerQuestionService.createQuestionBankGroup(email, block);
+                
+                if (res != null && res.containsKey("questionIds")) {
+                    @SuppressWarnings("unchecked")
+                    List<Long> qIds = (List<Long>) res.get("questionIds");
+                    if (qIds != null) {
+                        for (Long qId : qIds) {
+                            com.hango.hango_backend.entity.ExamQuestion eq = new com.hango.hango_backend.entity.ExamQuestion();
+                            eq.setId(new com.hango.hango_backend.entity.ExamQuestionId(examId, qId));
+                            eq.setQuestionOrder(order++);
+                            examQuestionRepository.save(eq);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO getExamQuestions(Long examId, String email) {
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+                
+        List<com.hango.hango_backend.entity.Question> questions = questionRepository.findByExamIdOrderByQuestionOrder(examId);
+
+        List<com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO> blocks = new ArrayList<>();
+        com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO currentBlock = null;
+        Long currentGroupId = null;
+
+        for (com.hango.hango_backend.entity.Question q : questions) {
+            Long groupId = q.getQuestionGroup() != null ? q.getQuestionGroup().getId() : null;
+            
+            if (groupId == null || !groupId.equals(currentGroupId) || currentBlock == null) {
+                currentBlock = new com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO();
+                currentBlock.setCategoryId(q.getCategory() != null ? q.getCategory().getId() : null);
+                currentBlock.setSkillParamId(q.getSkillParam() != null ? q.getSkillParam().getId() : null);
+                currentBlock.setDifficultyId(q.getDifficulty() != null ? q.getDifficulty().getId() : null);
+                currentBlock.setSectionId(q.getSection() != null ? q.getSection().getId() : null);
+                currentBlock.setSubQuestions(new ArrayList<>());
+                
+                if (groupId != null && q.getQuestionGroup() != null) {
+                    currentBlock.setPassageText(q.getQuestionGroup().getContextText());
+                } else {
+                    currentBlock.setPassageText(null);
+                }
+                
+                blocks.add(currentBlock);
+                currentGroupId = groupId;
+            }
+            
+            com.hango.hango_backend.dto.CreateSubQuestionDTO subQ = new com.hango.hango_backend.dto.CreateSubQuestionDTO();
+            subQ.setQuestionText(q.getQuestionText());
+            subQ.setExplanation(q.getExplanation());
+            
+            List<com.hango.hango_backend.dto.CreateOptionDTO> options = new ArrayList<>();
+            if (q.getOptions() != null) {
+                for (com.hango.hango_backend.entity.QuestionOption opt : q.getOptions()) {
+                    com.hango.hango_backend.dto.CreateOptionDTO oDto = new com.hango.hango_backend.dto.CreateOptionDTO();
+                    oDto.setOptionText(opt.getOptionText());
+                    oDto.setIsCorrect(opt.getIsCorrect());
+                    options.add(oDto);
+                }
+            }
+            subQ.setOptions(options);
+            
+            currentBlock.getSubQuestions().add(subQ);
+        }
+
+        com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO response = new com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO();
+        response.setBlocks(blocks);
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public void updateExamStatus(Long examId, String email, String status) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+                
+        // Optional: verify that the user is the creator of the exam
+        if (!exam.getCreatedBy().getId().equals(user.getId())) {
+            throw new RuntimeException("User is not authorized to update this exam");
+        }
+        
+        exam.setStatus(status);
         examRepository.save(exam);
     }
 }

@@ -22,8 +22,11 @@ public class Question {
     @JoinColumn(name = "category_id", referencedColumnName = "id", nullable = false)
     private QuestionCategory category;
 
-    @Column(name = "group_id")
-    private Long groupId;
+    // @Column(name = "group_id")
+    // private Long groupId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id", referencedColumnName = "id", nullable = true)
+    private QuestionGroup questionGroup;
 
     @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
     private String questionText;
@@ -40,6 +43,13 @@ public class Question {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id", referencedColumnName = "id", nullable = true)
     private Section section;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "skill_param_id", referencedColumnName = "id", nullable = true)
+    private SystemParameter skillParam;
+
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<QuestionOption> options;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
