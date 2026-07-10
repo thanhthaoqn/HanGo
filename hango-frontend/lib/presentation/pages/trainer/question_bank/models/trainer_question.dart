@@ -3,7 +3,7 @@ class TrainerQuestion {
   final String questionText;
   final String categoryName;
   final String difficultyName;
-  final String status;
+  String status;
   final String creatorName;
   final DateTime createdAt;
   final DateTime updatedAt;

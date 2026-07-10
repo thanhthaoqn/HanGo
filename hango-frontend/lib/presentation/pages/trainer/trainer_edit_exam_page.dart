@@ -21,6 +21,8 @@ class OptionState {
 class QuestionState {
   TextEditingController questionTextController = TextEditingController();
   TextEditingController explanationController = TextEditingController();
+  int? selectedSkillId;
+  int? selectedDifficultyId;
   List<OptionState> options = [];
 
   QuestionState() {
@@ -181,8 +183,6 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
         for (var blockData in blocksData) {
           final block = QuestionBlockState();
           block.selectedGroupTypeId = blockData['categoryId'];
-          block.selectedSkillId = blockData['skillParamId'];
-          block.selectedDifficultyId = blockData['difficultyId'];
           
           if (blockData['passageText'] != null && blockData['passageText'].toString().isNotEmpty) {
             block.isQuestionGroup = true;
@@ -198,6 +198,8 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
               final qState = QuestionState();
               qState.questionTextController.text = qData['questionText'] ?? '';
               qState.explanationController.text = qData['explanation'] ?? '';
+              qState.selectedSkillId = qData['skillParamId'] ?? blockData['skillParamId'];
+              qState.selectedDifficultyId = qData['difficultyId'] ?? blockData['difficultyId'];
               
               final optsData = qData['options'] as List?;
               if (optsData != null && optsData.isNotEmpty) {
@@ -238,20 +240,20 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
         ToastHelper.show(context, 'Khối ${i + 1}: Vui lòng chọn Danh mục (Category).', isError: true);
         return;
       }
-      if (block.selectedSkillId == null) {
-        ToastHelper.show(context, 'Khối ${i + 1}: Vui lòng chọn Kỹ năng (Skill).', isError: true);
-        return;
-      }
-      if (block.selectedDifficultyId == null) {
-        ToastHelper.show(context, 'Khối ${i + 1}: Vui lòng chọn Độ khó (Difficulty).', isError: true);
-        return;
-      }
       if (block.isQuestionGroup && block.passageController.text.trim().isEmpty) {
         ToastHelper.show(context, 'Khối ${i + 1}: Nội dung đoạn văn không được để trống.', isError: true);
         return;
       }
       for (var j = 0; j < block.questions.length; j++) {
         final q = block.questions[j];
+        if (q.selectedSkillId == null) {
+          ToastHelper.show(context, 'Khối ${i + 1} - Câu ${j + 1}: Vui lòng chọn Kỹ năng (Skill).', isError: true);
+          return;
+        }
+        if (q.selectedDifficultyId == null) {
+          ToastHelper.show(context, 'Khối ${i + 1} - Câu ${j + 1}: Vui lòng chọn Độ khó (Difficulty).', isError: true);
+          return;
+        }
         if (q.questionTextController.text.trim().isEmpty) {
           ToastHelper.show(context, 'Khối ${i + 1} - Câu ${j + 1}: Nội dung câu hỏi không được để trống.', isError: true);
           return;
@@ -270,12 +272,12 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       final payload = {
         'blocks': _blocks.map((block) => {
           'categoryId': block.selectedGroupTypeId,
-          'skillParamId': block.selectedSkillId,
-          'difficultyId': block.selectedDifficultyId,
           'passageText': block.isQuestionGroup ? block.passageController.text : null,
           'subQuestions': block.questions.map((q) => {
             'questionText': q.questionTextController.text,
             'explanation': q.explanationController.text,
+            'skillParamId': q.selectedSkillId,
+            'difficultyId': q.selectedDifficultyId,
             'options': q.options.map((o) => {
               'optionText': o.textController.text,
               'isCorrect': o.isCorrect,
@@ -770,77 +772,125 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('SKILL TYPE'),
-                    _buildDropdown(
-                      value: block.selectedSkillId,
-                      items: _skills,
-                      onChanged: (val) => setState(() => block.selectedSkillId = val),
-                      displayKey: 'paramValue',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('GROUP TYPE'),
-                    _buildDropdown(
-                      value: block.selectedGroupTypeId,
-                      items: _groupTypes,
-                      onChanged: (val) => setState(() => block.selectedGroupTypeId = val),
-                      displayKey: 'name',
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('DIFFICULTY'),
-                    _buildDropdown(
-                      value: block.selectedDifficultyId,
-                      items: _difficulties,
-                      onChanged: (val) => setState(() => block.selectedDifficultyId = val),
-                      displayKey: 'paramValue',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('STATUS'),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+          if (!block.isQuestionGroup) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('SKILL TYPE'),
+                      _buildDropdown(
+                        value: block.questions.isNotEmpty ? block.questions[0].selectedSkillId : null,
+                        items: _skills,
+                        onChanged: (val) {
+                          if (block.questions.isNotEmpty) {
+                            setState(() => block.questions[0].selectedSkillId = val);
+                          }
+                        },
+                        displayKey: 'paramValue',
                       ),
-                      child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('GROUP TYPE'),
+                      _buildDropdown(
+                        value: block.selectedGroupTypeId,
+                        items: _groupTypes,
+                        onChanged: (val) => setState(() => block.selectedGroupTypeId = val),
+                        displayKey: 'name',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('DIFFICULTY'),
+                      _buildDropdown(
+                        value: block.questions.isNotEmpty ? block.questions[0].selectedDifficultyId : null,
+                        items: _difficulties,
+                        onChanged: (val) {
+                          if (block.questions.isNotEmpty) {
+                            setState(() => block.questions[0].selectedDifficultyId = val);
+                          }
+                        },
+                        displayKey: 'paramValue',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('STATUS'),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('GROUP TYPE'),
+                      _buildDropdown(
+                        value: block.selectedGroupTypeId,
+                        items: _groupTypes,
+                        onChanged: (val) => setState(() => block.selectedGroupTypeId = val),
+                        displayKey: 'name',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('STATUS'),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1057,6 +1107,42 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (block.isQuestionGroup) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('SKILL TYPE'),
+                            _buildDropdown(
+                              value: qState.selectedSkillId,
+                              items: _skills,
+                              onChanged: (val) => setState(() => qState.selectedSkillId = val),
+                              displayKey: 'paramValue',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('DIFFICULTY'),
+                            _buildDropdown(
+                              value: qState.selectedDifficultyId,
+                              items: _difficulties,
+                              onChanged: (val) => setState(() => qState.selectedDifficultyId = val),
+                              displayKey: 'paramValue',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 if (showQuestionText) ...[
                   _buildLabel('QUESTION'),
                   TextField(

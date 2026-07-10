@@ -429,6 +429,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             com.hango.hango_backend.dto.CreateSubQuestionDTO subQ = new com.hango.hango_backend.dto.CreateSubQuestionDTO();
             subQ.setQuestionText(q.getQuestionText());
             subQ.setExplanation(q.getExplanation());
+            subQ.setSkillParamId(q.getSkillParam() != null ? q.getSkillParam().getId() : null);
+            subQ.setDifficultyId(q.getDifficulty() != null ? q.getDifficulty().getId() : null);
             
             List<com.hango.hango_backend.dto.CreateOptionDTO> options = new ArrayList<>();
             if (q.getOptions() != null) {

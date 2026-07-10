@@ -248,8 +248,21 @@ class HangoApi {
     final body = await _send(http.get(uri, headers: _headers));
     return (body as List? ?? const [])
         .whereType<Map<String, dynamic>>()
-        .map(TrainerQuestion.fromJson)
+        .map((json) => TrainerQuestion.fromJson(json))
         .toList();
+  }
+
+  Future<void> toggleQuestionStatus(int questionId, String newStatus) async {
+    final queryParams = {'status': newStatus};
+    final baseUri = _uri('/api/v1/trainer/question-bank/$questionId/status');
+    final uri = Uri(
+      scheme: baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.port,
+      path: baseUri.path,
+      queryParameters: queryParams,
+    );
+    await _send(http.patch(uri, headers: _headers));
   }
 
   Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {

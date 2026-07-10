@@ -46,4 +46,17 @@ public class TrainerQuestionController {
         Map<String, Object> response = trainerQuestionService.createQuestionBankGroup(userDetails.getUsername(), request);
         return ResponseEntity.ok(response);
     }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<Map<String, Object>> toggleQuestionStatus(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id,
+            @RequestParam String status) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        trainerQuestionService.updateQuestionStatus(userDetails.getUsername(), id, status);
+        return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
+    }
 }
