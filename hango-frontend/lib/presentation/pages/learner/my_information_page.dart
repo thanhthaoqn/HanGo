@@ -827,6 +827,44 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                           label: 'date of birth*',
                           controller: _dobController,
                           hint: 'DD/MM/YYYY',
+                          readOnly: true,
+                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                          onTap: () async {
+                            DateTime initialDate = DateTime.now().subtract(const Duration(days: 365 * 18));
+                            if (_dobController.text.isNotEmpty) {
+                              final parts = _dobController.text.split('/');
+                              if (parts.length == 3) {
+                                final parsed = DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+                                if (parsed != null) {
+                                  initialDate = parsed;
+                                }
+                              }
+                            }
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initialDate,
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: Color(0xFF28B79B),
+                                      onPrimary: Colors.white,
+                                      onSurface: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              final day = picked.day.toString().padLeft(2, '0');
+                              final month = picked.month.toString().padLeft(2, '0');
+                              final year = picked.year.toString();
+                              _dobController.text = '$day/$month/$year';
+                            }
+                          },
                           validator: (v) {
                             if (v == null || v.isEmpty) return 'Required';
                             final parts = v.split('/');
@@ -940,6 +978,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
     required TextEditingController controller,
     String? hint,
     String? Function(String?)? validator,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -957,10 +998,13 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         TextFormField(
           controller: controller,
           validator: validator,
+          readOnly: readOnly,
+          onTap: onTap,
           style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+            suffixIcon: suffixIcon,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -975,7 +1019,7 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
               borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
           ),
         ),
       ],

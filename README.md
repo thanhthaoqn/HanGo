@@ -19,24 +19,24 @@ HanGo is a modern client-server educational technology platform focusing on pers
 
 ## 🚀 Overview & Core Features
 
-The HanGo system manages 14 core feature modules serving multiple user roles: **Learner**, **Trainer** (Instructor/Content Creator), **Lead** (Training Program Lead), and **Admin** (Administrator).
+The HanGo system manages 14 core feature modules serving multiple user roles: **Learner**, **Trainer** (Instructor/Content Creator), **Course Manager** (Content Reviewer), and **Admin** (Administrator).
 
 | Feature Module                        | Description                                                                                   | Primary Roles                 |
 | :------------------------------------ | :-------------------------------------------------------------------------------------------- | :---------------------------- |
-| **[FT-01] Authentication**            | Login and Registration, Google OAuth2 integration, and JWT security filter.                   | All                           |
-| **[FT-02] Account Management**        | Personal profile management, avatar uploads via Cloudinary, and account locking.              | Learner, Trainer, Admin       |
-| **[FT-03] Course Management**         | Course creation, curriculum structure design, and course approval workflows.                  | Trainer, Lead                 |
-| **[FT-04] Course Content Management** | Markdown/HTML rich text editor, curriculum drag-and-drop, and large video/media uploads.      | Trainer                       |
-| **[FT-05] Question Bank Management**  | Question bank management, Excel import support via Apache POI library.                        | Trainer                       |
-| **[FT-06] Exam Management**           | Online quizzes and mock exams with countdown timers, scoring algorithms, and attempt locking. | Learner, Trainer              |
-| **[FT-07] Recommendation System**     | Rule-based recommendation engine suggesting courses based on learner exam results.            | Learner                       |
-| **[FT-08] AI Learning Assistant**     | Interactive AI assistant supporting real-time streaming text (SSE/chunks) and lesson context. | Learner                       |
-| **[FT-09] Learning Progress**         | Course enrollment, progress tracking, and automated completion percentage calculations.       | Learner                       |
-| **[FT-10] Flashcard Management**      | Flip and swipe interactive flashcards for effective vocabulary learning.                      | Learner                       |
-| **[FT-11] Comment Management**        | Hierarchical/nested comments under lessons with bad-word filtering and XSS prevention.        | Learner, Trainer              |
-| **[FT-12] Task Management**           | Task assignment from Lead to Trainers with Kanban status tracking.                            | Trainer, Lead                 |
-| **[FT-13] Analytics Dashboard**       | Visual statistics and analytics charts (Bar, Pie charts) on learning performance.             | Learner, Trainer, Lead, Admin |
-| **[FT-14] Notification**              | Asynchronous system-wide notifications triggered by important events.                         | All                           |
+| **[FE-01] Authentication**            | Login and Registration, Google OAuth2 integration, and JWT security filter.                   | All                           |
+| **[FE-02] Profile Management**        | Personal profile management and avatar uploads via Cloudinary.                                | All                           |
+| **[FE-03] Role & Permission**         | Account list management, locking/unlocking, platform dashboards, AI monitoring & audit logs.  | Admin                         |
+| **[FE-04] Trainer Onboarding**        | Trainer application submission, verification documents upload, and admin review/approval.    | Learner, Admin                |
+| **[FE-05] Course Management**         | Course listings discovery, categories filter, price tier suggestions, versioning, review.    | Learner, Trainer, CourseManager|
+| **[FE-06] Course Content**            | Syllabus editing, sections & lessons, LessonBlock formatting, Excel import (Apache POI).      | Trainer                       |
+| **[FE-07] Question Bank**             | Question bank management, A/B/C/D choice editors, AI generation draft helpers.                | Trainer                       |
+| **[FE-08] Exam Management**           | Mock exams, 40 questions / 50 minutes timer, auto-grading, and unlimited attempts.            | Learner, Trainer, CourseManager|
+| **[FE-09] AI Assistant**              | Explain concepts/questions chatbot for Learners, generate questions drafts for Trainers.      | Learner, Trainer              |
+| **[FE-10] Learning Management**       | Enrollment, sequential lesson learning unlocks (N -> N+1), course progress, limited reviews.   | Learner                       |
+| **[FE-11] Recommendation**            | Weakness analysis by SkillType, rule-based recommendation, AI Learning Pathway.               | Learner                       |
+| **[FE-12] Payment & Revenue**         | Purchases using VNPay, order tracking, revenue split records, and monthly payouts.            | Learner, Trainer, Admin       |
+| **[FE-13] Comment Management**        | Nested comments under lessons and quizzes with moderation capability by Admin.                | Learner, Trainer, Admin       |
+| **[FE-14] Notification**              | Realtime WebSocket push notifications and transactional emails for system events.             | All                           |
 
 ---
 

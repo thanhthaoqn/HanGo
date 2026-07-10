@@ -114,6 +114,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _attemptsAnswers = parsedAnswers;
         _isLoading = false;
       });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('last_lesson_id_for_${widget.courseId}', _currentLessonId);
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -172,6 +174,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _attemptsAnswers = parsedAnswers;
         _isNavigatingLesson = false;
       });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('last_lesson_id_for_${widget.courseId}', lessonId);
       if (startQuiz) {
         toggleFullscreen(true);
       } else {

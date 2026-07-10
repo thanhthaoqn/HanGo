@@ -9,7 +9,7 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
   - **Frontend:** Flutter (Web-first approach).
   - **Backend:** Java 21, Spring Boot.
   - **Database:** MySQL.
-- **Primary Users:** Learner, Trainer (Instructor/Content Creator), Training Lead, Admin.
+- **Primary Users:** Learner, Trainer (Instructor/Content Creator), Course Manager, Admin.
 
 ## 2. Core Architectural Principles
 - **N-Tier Architecture (Backend):** Adhere to the one-way data flow `Controller` -> `Service` -> `Repository`. Absolutely no business logic should be written in the Controller.
@@ -47,7 +47,7 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 - **Data Privacy:** All sensitive user information (Passwords, Emails, Phone Numbers) must be secured and encrypted (e.g., using BCrypt for passwords) before being saved to the database. Never log sensitive information into system log files.
 - **Authentication & Authorization:** 
   - Use JWT (JSON Web Tokens) for all login sessions and API communication.
-  - Strict Role-Based Access Control (Learner, Trainer, Lead, Admin) at the Controller level using annotations (e.g., `@PreAuthorize`).
+  - Strict Role-Based Access Control (Learner, Trainer, CourseManager, Admin) at the Controller level using annotations (e.g., `@PreAuthorize`).
 - **Security Rules:** 
   - Prevent SQL Injection: Only use Parameterized Queries (Spring Data JPA handles this automatically), absolutely no manual SQL string concatenation.
   - Prevent XSS/CSRF: Sanitize input/output across the entire system and ensure standard Spring Security configurations.
