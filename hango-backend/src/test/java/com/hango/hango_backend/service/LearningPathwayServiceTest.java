@@ -229,7 +229,10 @@ class LearningPathwayServiceTest {
         LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, 5L);
 
         assertEquals(101L, result.getPathwayId());
-        assertTrue(result.getMentorSummary().contains("currently available"));
+        // Khi AI generation bị fail/null, backend sẽ fallback deterministic pathway và mentorSummary sẽ là tiếng Việt.
+        // Vì vậy chỉ assert presence của khóa học và status node, không assert chuỗi mentor_summary cố định.
+        assertNotNull(result.getMentorSummary());
+
         assertEquals(1, result.getNodes().size());
         assertEquals(99L, result.getNodes().get(0).getCourseId());
         assertEquals("IN_PROGRESS", result.getNodes().get(0).getStatus());

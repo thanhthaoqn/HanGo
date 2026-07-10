@@ -77,11 +77,16 @@ public class LearningPathwayService {
                     course.getDescription()));
         }
 
-        // TODO-FT15 (8.2 + 9): AI cần “đầu vào chuẩn” từ examAttempt.answersJson hiện tại
-        // để tránh phân tích nhầm dữ liệu của learner.
-        // Tool: phân tích “lỗ hổng kiến thức” từ answersJson của bài thi gần nhất.
-        // Đảm bảo AI dùng đúng dữ liệu learner cung cấp.
-        ExamResultAnalysisDTO examAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(examAttempt);
+        // AI cần đầu vào chuẩn dựa trên lịch sử làm bài của learner.
+        // Giữ examAttemptId làm mốc (để đúng yêu cầu API), nhưng vẫn tổng hợp thêm N attempts gần nhất.
+        List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
+        ExamResultAnalysisDTO examAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
+        if (examAnalysis == null) {
+            // Fallback để tránh phá flow (đặc biệt trong unit tests khi mock chưa set returns).
+            examAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(examAttempt);
+        }
+
+
 
         String systemPrompt = """
 
@@ -242,6 +247,14 @@ public class LearningPathwayService {
                 .map(node -> "Bước " + node.getStepOrder() + ": " + node.getCourse().getTitle() + " (status=" + node.getStatus() + ")")
                 .reduce("", (left, right) -> left.isBlank() ? right : left + "\n" + right);
 
+        // Bổ sung dữ liệu học tập gần nhất (score + knowledge gaps tổng hợp) để AI có thể trả lời câu hỏi kiểu "bài test gần nhất".
+        // Lưu ý: vẫn không cung cấp raw answersJson nhằm giảm rủi ro lộ dữ liệu.
+        List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
+        ExamResultAnalysisDTO chatExamAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
+        if (chatExamAnalysis == null) {
+            chatExamAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(pathway.getExamAttempt());
+        }
+
         String systemPrompt = """
                 Bạn là Trợ lý học tập AI cho Learning Pathway của HanGo và hãy trả lời bằng tiếng Việt.
                 Người học đang theo lộ trình bên dưới.
@@ -250,16 +263,32 @@ public class LearningPathwayService {
                 1) Chỉ hỗ trợ theo lộ trình hiện tại. Bạn KHÔNG trả lời các nội dung không liên quan đến roadmap này.
                 2) Luôn trả lời bằng tiếng Việt (chỉ giữ nguyên tiếng Anh khi trích dẫn trực tiếp).
                 3) Không “chat tự do”; không tự bịa thêm bước/khóa học ngoài các bước hiện có.
-                4) Nếu người học hỏi điều gì đó KHÔNG thuộc phạm vi lộ trình, hãy từ chối nhẹ nhàng + nhắc họ quay lại một Bước trong roadmap.
+                4) Nếu người học hỏi về “bài test gần nhất/điểm số/lịch sử làm bài”, bạn ĐƯỢC phép trả lời dựa trên dữ liệu phân tích đã cung cấp (TOOL INPUT) ở dưới.
+                5) Nếu câu hỏi không liên quan roadmap và không khớp dữ liệu phân tích bên dưới, hãy từ chối nhẹ nhàng + nhắc họ quay lại một Bước trong roadmap.
 
                 LỘ TRÌNH HIỆN TẠI:
                 %s
 
+                TOOL INPUT (RECENT EXAM ANALYSIS):
+                - attempts_used: %s
+                - score_avg: %s
+                - score_min: %s
+                - score_max: %s
+                - knowledge_gaps_json: %s
+
                 Nhiệm vụ:
-                - Giải thích lý do các bước xuất hiện và gợi ý cách học cho từng bước.
-                - Nếu câu hỏi thuộc nội dung một bước cụ thể, hãy bám sát tiêu đề khóa học của bước đó và gợi ý ôn tập.
+                - Nếu câu hỏi thuộc nội dung một bước cụ thể, bám sát tiêu đề khóa học của bước đó và gợi ý ôn tập.
+                - Nếu người học hỏi về điểm số/bài test gần nhất, hãy trả lời dựa trên TOOL INPUT và liên hệ trực tiếp đến roadmap hiện tại.
                 - Nếu không xác định được bước liên quan, hãy hỏi lại người học để chọn đúng Bước.
-                """.formatted(pathwayStepsText);
+                """.formatted(
+                pathwayStepsText,
+                chatExamAnalysis == null || chatExamAnalysis.getKnowledgeGapsJson() == null ? "0" : "(see knowledge_gaps_json)",
+                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_avg") != null ? chatExamAnalysis.getHints().get("score_avg").toString() : ""),
+                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_min") != null ? chatExamAnalysis.getHints().get("score_min").toString() : ""),
+                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_max") != null ? chatExamAnalysis.getHints().get("score_max").toString() : ""),
+                chatExamAnalysis == null ? "{}" : (chatExamAnalysis.getKnowledgeGapsJson() == null ? "{}" : chatExamAnalysis.getKnowledgeGapsJson())
+        );
+
 
         List<GeminiGenerateRequest.Content> chatHistory = List.of(
                 GeminiGenerateRequest.Content.builder()

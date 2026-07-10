@@ -211,9 +211,9 @@ public class AuthService {
                 User user = userRepository.findByEmail(email)
                         .orElseGet(() -> {
                             // Find or create ROLE_USER role
-                            Role userRole = roleRepository.findByRoleName("ROLE_USER")
+                            Role userRole = roleRepository.findByRoleName("LEARNER")
                                     .orElseGet(() -> {
-                                        Role newRole = Role.builder().roleName("ROLE_USER").build();
+                                        Role newRole = Role.builder().roleName("LEARNER").build();
                                         return roleRepository.save(newRole);
                                     });
 

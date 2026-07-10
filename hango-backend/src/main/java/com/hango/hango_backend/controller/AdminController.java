@@ -102,10 +102,44 @@ public class AdminController {
             // 1. Filter by roleType
             for (User user : allUsers) {
                 boolean isLearner = user.getRoles().stream()
-                        .anyMatch(r -> r.getRoleName().equalsIgnoreCase("LEARNER"));
-                
+                        .anyMatch(r -> {
+                            String name = r.getRoleName().toUpperCase();
+                            if (name.startsWith("ROLE_")) name = name.substring(5);
+                            return name.equals("LEARNER");
+                        });
+                boolean isTrainer = user.getRoles().stream()
+                        .anyMatch(r -> {
+                            String name = r.getRoleName().toUpperCase();
+                            if (name.startsWith("ROLE_")) name = name.substring(5);
+                            return name.equals("TRAINER");
+                        });
+                boolean isTrainerLead = user.getRoles().stream()
+                        .anyMatch(r -> {
+                            String name = r.getRoleName().toUpperCase();
+                            if (name.startsWith("ROLE_")) name = name.substring(5);
+                            return name.equals("TRAINER_LEAD");
+                        });
+                boolean isAdmin = user.getRoles().stream()
+                        .anyMatch(r -> {
+                            String name = r.getRoleName().toUpperCase();
+                            if (name.startsWith("ROLE_")) name = name.substring(5);
+                            return name.equals("ADMINISTRATOR") || name.equals("ADMIN");
+                        });
+
                 if ("learner".equalsIgnoreCase(roleType)) {
                     if (isLearner) {
+                        filteredUsers.add(user);
+                    }
+                } else if ("trainer".equalsIgnoreCase(roleType)) {
+                    if (isTrainer) {
+                        filteredUsers.add(user);
+                    }
+                } else if ("course_manager".equalsIgnoreCase(roleType) || "trainer_lead".equalsIgnoreCase(roleType)) {
+                    if (isTrainerLead) {
+                        filteredUsers.add(user);
+                    }
+                } else if ("admin".equalsIgnoreCase(roleType)) {
+                    if (isAdmin) {
                         filteredUsers.add(user);
                     }
                 } else { // "staff"

@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
-import 'trainer_tasks_page.dart';
 
 import 'create_course_page.dart';
 import 'edit_course_page.dart';
@@ -300,14 +299,6 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               context,
               MaterialPageRoute(
                 builder: (context) => const TrainerQuestionBankPage(),
-              ),
-            );
-          }),
-          _buildSidebarItem(Icons.task_alt_outlined, 'Task', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerTasksPage(),
               ),
             );
           }),

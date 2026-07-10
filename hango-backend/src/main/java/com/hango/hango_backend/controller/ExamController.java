@@ -39,6 +39,16 @@ public class ExamController {
         return ResponseEntity.ok(exams);
     }
 
+    @GetMapping("/my-attempts")
+    public ResponseEntity<List<ExamAttemptResponseDTO>> getMyExamAttempts() {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return ResponseEntity.status(401).build();
+        }
+        List<ExamAttemptResponseDTO> attempts = examService.getMyExamAttempts(currentUserId);
+        return ResponseEntity.ok(attempts);
+    }
+
     @GetMapping("/{id}/attempts")
     public ResponseEntity<List<ExamAttemptResponseDTO>> getExamAttempts(@PathVariable Long id) {
         Long currentUserId = getCurrentUserId();

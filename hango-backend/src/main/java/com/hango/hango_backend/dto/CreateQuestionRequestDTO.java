@@ -15,6 +15,7 @@ public class CreateQuestionRequestDTO {
     private String questionText;
     private String explanation;
     private Long categoryId;
+    private Long skillParamId;
     private Long difficultyId;
     private List<CreateOptionDTO> options;
 }

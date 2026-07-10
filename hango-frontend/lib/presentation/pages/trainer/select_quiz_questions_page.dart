@@ -200,6 +200,217 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
   }
 
+  // Edit Question Dialog
+  Future<void> _showEditQuestionDialog(Map<String, dynamic> q) async {
+    final TextEditingController textCtrl = TextEditingController(text: q['questionText'] ?? '');
+    final TextEditingController explCtrl = TextEditingController(text: q['explanation'] ?? '');
+    
+    List<String> options = [];
+    if (q['options'] != null) {
+      options = List<String>.from(q['options']);
+    }
+    List<TextEditingController> optCtrls = options.map((o) => TextEditingController(text: o)).toList();
+    if (optCtrls.isEmpty) {
+      optCtrls.add(TextEditingController());
+      optCtrls.add(TextEditingController());
+    }
+    
+    int correctIndex = q['correctIndex'] ?? 0;
+    if (correctIndex >= optCtrls.length) correctIndex = 0;
+    
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setStateSB) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Edit Question', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B))),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: 600,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Question Text', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: textCtrl,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Explanation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: explCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Options', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      ...List.generate(optCtrls.length, (index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            children: [
+                              Radio<int>(
+                                value: index,
+                                groupValue: correctIndex,
+                                activeColor: const Color(0xFF20B486),
+                                onChanged: (val) {
+                                  setStateSB(() {
+                                    correctIndex = val!;
+                                  });
+                                },
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: optCtrls[index],
+                                  decoration: InputDecoration(
+                                    hintText: 'Option ${index + 1}',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
+                                onPressed: () {
+                                  if (optCtrls.length > 2) {
+                                    setStateSB(() {
+                                      optCtrls[index].dispose();
+                                      optCtrls.removeAt(index);
+                                      if (correctIndex == index) correctIndex = 0;
+                                      else if (correctIndex > index) correctIndex--;
+                                    });
+                                  } else {
+                                    ToastHelper.showError(ctx, 'Minimum 2 options required.');
+                                  }
+                                },
+                              )
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () {
+                          setStateSB(() {
+                            optCtrls.add(TextEditingController());
+                          });
+                        },
+                        icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
+                        label: const Text('Add Option', style: TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold)),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                OutlinedButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF475569))),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20B486),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: isSaving ? null : () async {
+                    final qId = q['id'];
+                    final updatedText = textCtrl.text.trim();
+                    final updatedExpl = explCtrl.text.trim();
+                    final updatedOpts = optCtrls.map((c) => c.text.trim()).toList();
+                    
+                    if (updatedText.isEmpty) {
+                      ToastHelper.showError(ctx, 'Question text cannot be empty.');
+                      return;
+                    }
+                    if (updatedOpts.any((o) => o.isEmpty)) {
+                      ToastHelper.showError(ctx, 'All options must be filled.');
+                      return;
+                    }
+
+                    setStateSB(() => isSaving = true);
+
+                    try {
+                      final token = await _authService.getToken();
+                      final payload = {
+                        "questionText": updatedText,
+                        "explanation": updatedExpl,
+                        "options": List.generate(updatedOpts.length, (i) => {
+                          "optionText": updatedOpts[i],
+                          "isCorrect": i == correctIndex
+                        })
+                      };
+                      
+                      final response = await http.put(
+                        Uri.parse('$apiBaseUrl/trainer/questions/$qId'),
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': 'Bearer $token',
+                        },
+                        body: jsonEncode(payload),
+                      );
+
+                      if (response.statusCode == 200) {
+                        ToastHelper.showSuccess(ctx, 'Question updated successfully');
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          _loadQuizQuestions(_currentPage);
+                        }
+                      } else {
+                        ToastHelper.showError(ctx, 'Failed to update question.');
+                        setStateSB(() => isSaving = false);
+                      }
+                    } catch (e) {
+                      ToastHelper.showError(ctx, 'Error updating question: $e');
+                      setStateSB(() => isSaving = false);
+                    }
+                  },
+                  child: isSaving 
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Save Changes', style: TextStyle(color: Colors.white)),
+                )
+              ],
+            );
+          }
+        );
+      }
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -799,7 +1010,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 18),
-                                      onPressed: () {}, // Optional Edit
+                                      onPressed: () => _showEditQuestionDialog(q),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),

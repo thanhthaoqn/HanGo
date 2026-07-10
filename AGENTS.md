@@ -16,7 +16,7 @@ The HanGo virtual development team consists of three specialized AI Agents. Each
 
 ## 2. Multi-Agent Collaboration Workflow & Hand-off Protocol (Giao thức phối hợp)
 
-To implement any of the 14 features defined in `/doc/specs/`, Agents must execute the following **Mockup-Driven (Frontend-First)** workflow. This ensures UI can be built and reviewed rapidly based on Figma designs before locking down the Backend.
+To implement any of the 14 features defined in `/HanGo_Documentation.md`, Agents must execute the following **Mockup-Driven (Frontend-First)** workflow. This ensures UI can be built and reviewed rapidly based on Figma designs before locking down the Backend.
 
 1. **Human Trigger:** Human assigns a specific screen/feature, provides a Figma mockup link or image, and specifies the Agent role.
 2. **Phase 1 - Frontend UI & Mock Data (Frontend Agent):**
@@ -50,9 +50,9 @@ An AI Agent is **NOT** allowed to check off `[x] Done` in `/TODO.md` unless the 
 
 When an Agent starts a new session or takes over a task, it **MUST** forcibly load its memory context in the following exact sequence:
 
-1. **Read Security Constitution:** [`/doc/CONSTITUTION.md`](doc/CONSTITUTION.md) (To internalize security rules and constraints).
-2. **Read System Architecture:** [`/doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md) (To understand the Clean Architecture and N-Tier layers).
-3. **Read Specific Feature Spec:** [`/doc/specs/[id]-[feature].md`](doc/specs/) (To understand the exact Business Context, Acceptance Criteria, and Edge Cases).
+1. **Read Security Constitution:** [`/CONSTITUTION.md`](CONSTITUTION.md) (To internalize security rules and constraints).
+2. **Read System Architecture:** [`/ARCHITECTURE.md`](ARCHITECTURE.md) (To understand the Clean Architecture and N-Tier layers).
+3. **Read Baseline Requirements:** [`/HanGo_Documentation.md`](HanGo_Documentation.md) (To understand business requirements, workflows, and specifications).
 4. **Read Current State:** [`/TODO.md`](TODO.md) (To identify what is `In Progress` and what remains to be done).
 
 ## 5. Escalation Boundaries (Lằn ranh đỏ gọi Con người)
