@@ -87,4 +87,30 @@ class ExamRepository {
       throw Exception('Error submitting exam: $e');
     }
   }
+
+  Future<List<Map<String, dynamic>>> fetchMyExamAttempts() async {
+    try {
+      final uri = Uri.parse('$baseUrl/exams/my-attempts');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        return data.map((e) => Map<String, dynamic>.from(e)).toList();
+      } else {
+        throw Exception('Failed to load my attempts: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching my attempts: $e');
+    }
+  }
 }

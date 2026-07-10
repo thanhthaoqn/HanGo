@@ -42,7 +42,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   List<double> _chartValues = [0, 0, 0, 0, 0, 0, 0];
 
   // Accounts tab state and variables
-  String _accountsTab = 'staff'; // 'staff' | 'learner'
+  String _accountsTab = 'trainer'; // 'trainer' | 'course_manager' | 'learner'
   int _accountsPage = 0;
   int _accountsTotalPages = 1;
   bool _isLoadingAccounts = false;
@@ -343,58 +343,110 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final isDeactivating = targetStatus == 'INACTIVE';
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
           ),
-          title: Row(
+          backgroundColor: Colors.white,
+          elevation: 8,
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isDeactivating ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                color: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDeactivating ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isDeactivating ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                  color: isDeactivating ? const Color(0xFFD97706) : const Color(0xFF059669),
+                  size: 32,
+                ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(height: 16),
               Text(
                 isDeactivating ? 'Deactivate Account' : 'Activate Account',
-                style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                ),
               ),
             ],
           ),
-          content: Text(
-            isDeactivating
-                ? 'Are you sure you want to deactivate this account? The staff member will not be able to log in to the platform.'
-                : 'Are you sure you want to activate this account? The staff member will regain access to the platform.',
-            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Color(0xFF6B7280), fontFamily: 'Outfit'),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                setState(() {
-                  _editStatus = targetStatus;
-                });
-                ToastHelper.showSuccess(context, 'Status changed to $targetStatus. Click Update to save changes.');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isDeactivating
+                    ? 'Are you sure you want to deactivate this account? The staff member will not be able to log in to the platform.'
+                    : 'Are you sure you want to activate this account? The staff member will regain access to the platform.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF4B5563),
+                  height: 1.5,
                 ),
-                elevation: 0,
               ),
-              child: const Text(
-                'Confirm',
-                style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE5E7EB)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF4B5563),
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _editStatus = targetStatus;
+                        });
+                        ToastHelper.showSuccess(context, 'Status changed to $targetStatus. Click Update to save changes.');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDeactivating ? const Color(0xFFEF4444) : const Color(0xFF28B79B),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Confirm',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -407,55 +459,107 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final isDeactivating = !newVal;
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(20),
           ),
-          title: Row(
+          backgroundColor: Colors.white,
+          elevation: 8,
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                isDeactivating ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                color: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDeactivating ? const Color(0xFFFEF3C7) : const Color(0xFFD1FAE5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isDeactivating ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                  color: isDeactivating ? const Color(0xFFD97706) : const Color(0xFF059669),
+                  size: 32,
+                ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(height: 16),
               Text(
                 isDeactivating ? 'Deactivate Account' : 'Activate Account',
-                style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                ),
               ),
             ],
           ),
-          content: Text(
-            isDeactivating
-                ? 'Are you sure you want to deactivate the account for \'$userName\'? This user will not be able to log in to the platform.'
-                : 'Are you sure you want to activate the account for \'$userName\'? This user will regain access to the platform.',
-            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Color(0xFF6B7280), fontFamily: 'Outfit'),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _toggleUserStatus(userId, newVal);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDeactivating ? Colors.orangeAccent : const Color(0xFF28B79B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isDeactivating
+                    ? 'Are you sure you want to deactivate the account for \'$userName\'? This user will not be able to log in to the platform.'
+                    : 'Are you sure you want to activate the account for \'$userName\'? This user will regain access to the platform.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF4B5563),
+                  height: 1.5,
                 ),
-                elevation: 0,
               ),
-              child: const Text(
-                'Confirm',
-                style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE5E7EB)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF4B5563),
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _toggleUserStatus(userId, newVal);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDeactivating ? const Color(0xFFEF4444) : const Color(0xFF28B79B),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Confirm',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -656,10 +760,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const SizedBox(width: 6),
                 Text(
                   _selectedUserForEdit != null
-                      ? ((_selectedUserForEdit!['roles'] as List?)?.first?.toString().contains('LEARNER') == true
-                          ? 'Learner Account Detail'
+                      ? (((_selectedUserForEdit!['roles'] as List?)?.isNotEmpty == true)
+                          ? (_selectedUserForEdit!['roles'].first.toString().contains('LEARNER')
+                              ? 'Learner Account Detail'
+                              : (_selectedUserForEdit!['roles'].first.toString().contains('TRAINER_LEAD')
+                                  ? 'Course Manager Account Detail'
+                                  : 'Trainer Account Detail'))
                           : 'Trainer Account Detail')
-                      : (_showCreateNewAccountView ? 'Create New Account' : (_accountsTab == 'staff' ? 'Trainer' : 'Learner')),
+                      : (_showCreateNewAccountView ? 'Create New Account' : (_accountsTab == 'trainer' ? 'Trainer' : (_accountsTab == 'course_manager' ? 'Course Manager' : 'Learner'))),
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF28B79B),
@@ -669,34 +777,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ],
             )
-          else if (_selectedMenuIndex == 4)
-            Row(
-              children: [
-                const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
-                const SizedBox(width: 6),
-                const Text(
-                  'Comment',
-                  style: TextStyle(
-                    fontSize: 13, 
-                    color: Color(0xFF28B79B), 
-                    fontFamily: 'Outfit',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(Icons.chevron_right, size: 14, color: Color(0xFF9CA3AF)),
-                const SizedBox(width: 6),
-                Text(
-                  _currentCommentTab,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF28B79B),
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
-            )
+
           else
             const SizedBox(), // Empty spacer on desktop
 
@@ -1516,15 +1597,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
 
-        // 2. Subtabs Menu (Trainer | Learner)
+        // 2. Subtabs Menu (Trainer | Course Manager | Learner)
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                _buildAccountsSubTab('Trainer', _accountsTab == 'staff', () {
+                _buildAccountsSubTab('Trainer', _accountsTab == 'trainer', () {
                   setState(() {
-                    _accountsTab = 'staff';
+                    _accountsTab = 'trainer';
+                    _accountsPage = 0;
+                  });
+                  _fetchAccounts();
+                }),
+                const SizedBox(width: 24),
+                _buildAccountsSubTab('Course Manager', _accountsTab == 'course_manager', () {
+                  setState(() {
+                    _accountsTab = 'course_manager';
                     _accountsPage = 0;
                   });
                   _fetchAccounts();
@@ -1960,7 +2049,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       case 'TRAINER_LEAD':
         bg = const Color(0xFFEEF2F6);
         fg = const Color(0xFF6366F1);
-        label = 'Trainer Lead';
+        label = 'Course Manager';
         break;
       case 'TRAINER':
         bg = const Color(0xFFDBEAFE);
@@ -2064,7 +2153,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               const SizedBox(height: 16),
               _buildInteractionRow('15 seconds ago', 'Summarized course "Lý thuyết Hóa học lớp 12"', 'Status: SUCCESS'),
               const Divider(),
-              _buildInteractionRow('2 mins ago', 'Generated flashcard questions for Exam "Vật lý 10"', 'Status: SUCCESS'),
+              _buildInteractionRow('2 mins ago', 'Generated quiz questions for Exam "Vật lý 10"', 'Status: SUCCESS'),
               const Divider(),
               _buildInteractionRow('5 mins ago', 'Answered quiz clarification for "Toán Học Giải Tích"', 'Status: SUCCESS'),
             ],
@@ -2157,8 +2246,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           final cardsList = [
             _buildRoleConfigCard(
               'LEARNER',
-              'The default role for platform users. Allows access to browse courses, review materials, create custom flashcards, and run exams standard to high school syllabus.',
-              ['Take Exams', 'Browse Courses', 'Review Flashcards'],
+              'The default role for platform users. Allows access to browse courses, review materials, receive AI learning recommendations, and run exams standard to high school syllabus.',
+              ['Take Exams', 'Browse Courses', 'AI Recommendations'],
               cardWidth,
             ),
             _buildRoleConfigCard(
@@ -2282,6 +2371,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (word.isEmpty) return '';
       return word[0].toUpperCase() + word.substring(1).toLowerCase();
     }).join(' ');
+    if (displayRole.toLowerCase() == 'trainer lead') {
+      displayRole = 'Course Manager';
+    }
 
     String userInitials = '';
     if (fullName.trim().isNotEmpty) {
@@ -2392,15 +2484,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           fontFamily: 'Outfit',
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'ID: PS-$userId-CC',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B7280),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
+                      const SizedBox(),
                     ],
                   ),
                 ],
@@ -2559,7 +2643,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           },
                           items: const [
                             DropdownMenuItem(value: 'Trainer', child: Text('Trainer')),
-                            DropdownMenuItem(value: 'Trainer Lead', child: Text('Trainer Lead')),
+                            DropdownMenuItem(value: 'Trainer Lead', child: Text('Course Manager')),
                             DropdownMenuItem(value: 'ADMIN', child: Text('Admin')),
                           ],
                           decoration: InputDecoration(
@@ -3431,7 +3515,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           },
           items: const [
             DropdownMenuItem(value: 'Trainer', child: Text('Trainer', style: TextStyle(fontFamily: 'Outfit'))),
-            DropdownMenuItem(value: 'Trainer Lead', child: Text('Trainer Lead', style: TextStyle(fontFamily: 'Outfit'))),
+            DropdownMenuItem(value: 'Trainer Lead', child: Text('Course Manager', style: TextStyle(fontFamily: 'Outfit'))),
             DropdownMenuItem(value: 'Admin', child: Text('Admin', style: TextStyle(fontFamily: 'Outfit'))),
           ],
           decoration: InputDecoration(
@@ -4028,15 +4112,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             fontFamily: 'Outfit',
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'ID: PS-29384-CC',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B7280),
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
+                        const SizedBox(),
                       ],
                     ),
                   ),

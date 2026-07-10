@@ -7,7 +7,6 @@ import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_courses_page.dart';
 import 'trainer_exams_page.dart';
-import 'trainer_tasks_page.dart';
 import '../../../utils/toast_helper.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 
@@ -243,14 +242,6 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.task_alt_outlined, 'Task', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerTasksPage(),
-              ),
             );
           }),
           const Spacer(),

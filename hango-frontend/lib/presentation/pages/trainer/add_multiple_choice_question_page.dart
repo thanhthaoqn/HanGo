@@ -8,6 +8,9 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/file_picker_helper.dart';
 import 'add_new_question_page.dart';
 
+import '../../../data/repositories/trainer_ai_recommendation_repository.dart';
+import '../../../domain/model/trainer_ai_question_models.dart';
+
 class AddMultipleChoiceQuestionPage extends StatefulWidget {
   final int courseId;
   final String courseTitle;
@@ -33,15 +36,124 @@ class AddMultipleChoiceQuestionPage extends StatefulWidget {
   });
 
   @override
-  State<AddMultipleChoiceQuestionPage> createState() => _AddMultipleChoiceQuestionPageState();
+  State<AddMultipleChoiceQuestionPage> createState() =>
+      _AddMultipleChoiceQuestionPageState();
 }
 
-class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestionPage> {
+class _AddMultipleChoiceQuestionPageState
+    extends State<AddMultipleChoiceQuestionPage> {
   final AuthService _authService = AuthService();
+
+  // AI inputs
+  final TextEditingController _topicSeedController = TextEditingController();
+  // alias for UI label consistency
+  final TextEditingController _aiTopicSeedController = TextEditingController();
+  int _aiQuantity = 2;
+  final TrainerAiQuestionRepository _aiRepo = TrainerAiQuestionRepository();
+  bool _isGeneratingByAi = false;
+
+  // AI-generated state lock
+  final GlobalKey _aiPanelKey = GlobalKey();
+
+  Future<void> _handleGenerateByAI() async {
+    final topicSeed = _topicSeedController.text.trim();
+    if (topicSeed.isEmpty) {
+      ToastHelper.showError(
+        context,
+        'Please enter Topic / seed before generating.',
+      );
+      return;
+    }
+
+    setState(() {
+      _isGeneratingByAi = true;
+    });
+
+    try {
+      final resp = await _aiRepo.generate(
+        mode: 'MULTIPLE',
+        sectionId: widget.sectionId,
+        topicSeed: topicSeed,
+        quantity: _aiQuantity,
+      );
+
+      final group = resp.group;
+      if (group == null) {
+        ToastHelper.showError(
+          context,
+          'AI did not return MULTIPLE group data.',
+        );
+        return;
+      }
+
+      // Replace controllers text
+      _passageController.text = group.passageText;
+      _hintController.text = group.explanation;
+
+      // Rebuild answer sets and controllers
+      for (final set in _answerSets) {
+        set['explanationController'].dispose();
+        final options = set['options'] as List<Map<String, dynamic>>;
+        for (final opt in options) {
+          opt['textController'].dispose();
+        }
+      }
+      _answerSets.clear();
+
+      final subQs = group.subQuestions;
+      if (subQs.isEmpty) {
+        ToastHelper.showError(context, 'AI returned 0 subQuestions.');
+        return;
+      }
+
+      for (int i = 0; i < subQs.length; i++) {
+        final sq = subQs[i];
+
+        // Ensure exactly one correct option for UI validation
+        final optionObjs = sq.options;
+        bool foundCorrect = optionObjs.any((o) => o.isCorrect);
+        int correctIdx = optionObjs.indexWhere((o) => o.isCorrect);
+        if (!foundCorrect) correctIdx = 0;
+
+        // Build options with exactly 1 isCorrect
+        final List<Map<String, dynamic>> options = [];
+        for (int j = 0; j < optionObjs.length; j++) {
+          final opt = optionObjs[j];
+          options.add({
+            'textController': TextEditingController(text: opt.optionText),
+            'isCorrect': j == correctIdx,
+          });
+        }
+
+        setState(() {
+          _answerSets.add({
+            'isExpanded': i == 0,
+            'subQuestionController': TextEditingController(
+              text: sq.questionText,
+            ),
+            'explanationController': TextEditingController(
+              text: sq.explanation,
+            ),
+            'options': options,
+          });
+        });
+      }
+
+      setState(() {});
+      ToastHelper.showSuccess(context, 'AI generated group question loaded.');
+    } catch (e) {
+      debugPrint('Error generating MULTIPLE by AI: $e');
+      ToastHelper.showError(context, 'AI generate failed. Please try again.');
+    } finally {
+      setState(() {
+        _isGeneratingByAi = false;
+      });
+    }
+  }
 
   // Text inputs
   final TextEditingController _passageController = TextEditingController(
-    text: ""
+    text: "",
   );
   final TextEditingController _hintController = TextEditingController();
 
@@ -61,7 +173,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
     super.initState();
     // Initialize with 2 empty answer sets matching mockup
     _addAnswerSet(
-      questionText: 'Question 1',
+      subQuestionText: '',
       optionsData: [
         {'text': '', 'isCorrect': false},
         {'text': '', 'isCorrect': false},
@@ -73,7 +185,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
     );
 
     _addAnswerSet(
-      questionText: 'Question 2',
+      subQuestionText: '',
       optionsData: [
         {'text': '', 'isCorrect': true},
         {'text': '', 'isCorrect': false},
@@ -87,7 +199,8 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
     if (kIsWeb) {
       registerDragDrop((clientX, clientY, pickedFile) {
         if (_dropZoneKey.currentContext == null) return;
-        final RenderBox renderBox = _dropZoneKey.currentContext!.findRenderObject() as RenderBox;
+        final RenderBox renderBox =
+            _dropZoneKey.currentContext!.findRenderObject() as RenderBox;
         final position = renderBox.localToGlobal(Offset.zero);
         final size = renderBox.size;
         if (clientX >= position.dx &&
@@ -101,11 +214,12 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
   }
 
   void _addAnswerSet({
-    required String questionText,
+    String subQuestionText = '',
     required List<Map<String, dynamic>> optionsData,
     String explanation = '',
     bool isExpanded = false,
   }) {
+    final subQCtrl = TextEditingController(text: subQuestionText);
     final expCtrl = TextEditingController(text: explanation);
     final List<Map<String, dynamic>> options = [];
 
@@ -118,8 +232,8 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
 
     setState(() {
       _answerSets.add({
-        'questionText': questionText,
         'isExpanded': isExpanded,
+        'subQuestionController': subQCtrl,
         'explanationController': expCtrl,
         'options': options,
       });
@@ -127,9 +241,8 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
   }
 
   void _addNewAnswerSetClick() {
-    int nextNum = _answerSets.length + 1;
     _addAnswerSet(
-      questionText: 'Question $nextNum',
+      subQuestionText: '',
       optionsData: [
         {'text': '', 'isCorrect': true},
         {'text': '', 'isCorrect': false},
@@ -150,22 +263,21 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
   void _removeAnswerSet(int index) {
     setState(() {
       final set = _answerSets[index];
+      final TextEditingController subQCtrl = set['subQuestionController'] as TextEditingController;
+      subQCtrl.dispose();
       set['explanationController'].dispose();
       final options = set['options'] as List<Map<String, dynamic>>;
       for (var opt in options) {
         opt['textController'].dispose();
       }
       _answerSets.removeAt(index);
-      // Normalize titles
-      for (int i = 0; i < _answerSets.length; i++) {
-        _answerSets[i]['questionText'] = 'Question ${i + 1}';
-      }
     });
   }
 
   void _addOptionToSet(int setIndex) {
     setState(() {
-      final options = _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
+      final options =
+          _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
       options.add({
         'textController': TextEditingController(),
         'isCorrect': false,
@@ -174,9 +286,13 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
   }
 
   void _removeOptionFromSet(int setIndex, int optionIndex) {
-    final options = _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
+    final options =
+        _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
     if (options.length <= 1) {
-      ToastHelper.showError(context, 'Each question set must have at least one option.');
+      ToastHelper.showError(
+        context,
+        'Each question set must have at least one option.',
+      );
       return;
     }
     setState(() {
@@ -187,7 +303,8 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
 
   void _handleOptionSelect(int setIndex, int optionIndex) {
     setState(() {
-      final options = _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
+      final options =
+          _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
       // Single choice per sub-question set
       for (int i = 0; i < options.length; i++) {
         options[i]['isCorrect'] = (i == optionIndex);
@@ -264,7 +381,12 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
     List<Map<String, dynamic>> payloadSubQuestions = [];
     for (int i = 0; i < _answerSets.length; i++) {
       final set = _answerSets[i];
-      final label = set['questionText'] as String;
+      final subQCtrl = set['subQuestionController'] as TextEditingController;
+      final label = subQCtrl.text.trim();
+      if (label.isEmpty) {
+        ToastHelper.showError(context, 'Please enter sub-question text for Question ${i + 1}.');
+        return;
+      }
       final exp = set['explanationController'].text.trim();
       final options = set['options'] as List<Map<String, dynamic>>;
 
@@ -273,21 +395,24 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
       for (int j = 0; j < options.length; j++) {
         final text = options[j]['textController'].text.trim();
         if (text.isEmpty) {
-          ToastHelper.showError(context, 'Please fill in all option texts for $label.');
+          ToastHelper.showError(
+            context,
+            'Please fill in all option texts for Question ${i + 1}.',
+          );
           return;
         }
         final bool isCorrect = options[j]['isCorrect'] as bool;
         if (isCorrect) {
           hasCorrectAnswer = true;
         }
-        payloadOptions.add({
-          'optionText': text,
-          'isCorrect': isCorrect,
-        });
+        payloadOptions.add({'optionText': text, 'isCorrect': isCorrect});
       }
 
       if (!hasCorrectAnswer) {
-        ToastHelper.showError(context, 'Please select a correct answer for $label.');
+        ToastHelper.showError(
+          context,
+          'Please select a correct answer for Question ${i + 1}.',
+        );
         return;
       }
 
@@ -305,7 +430,10 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
     try {
       final token = await _authService.getToken();
       if (token == null) {
-        ToastHelper.showError(context, 'Your session has expired. Please log in again.');
+        ToastHelper.showError(
+          context,
+          'Your session has expired. Please log in again.',
+        );
         setState(() {
           _isSaving = false;
         });
@@ -317,6 +445,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
         'passageText': passageText,
         'explanation': _hintController.text.trim(),
         'categoryId': 1,
+        'skillParamId': 1,
         'difficultyId': 14,
         'subQuestions': payloadSubQuestions,
       };
@@ -332,13 +461,19 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
 
       if (response.statusCode == 200) {
         final resData = jsonDecode(response.body);
-        final List<dynamic> idsList = resData['questionIds'] as List<dynamic>? ?? [];
+        final List<dynamic> idsList =
+            resData['questionIds'] as List<dynamic>? ?? [];
         final List<int> questionIds = idsList.map((id) => id as int).toList();
-        ToastHelper.showSuccess(context, 'Group question created successfully!');
+        ToastHelper.showSuccess(
+          context,
+          'Group question created successfully!',
+        );
         widget.onQuestionCreated(questionIds);
         Navigator.pop(context);
       } else {
-        final errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to save group question';
+        final errorMsg =
+            jsonDecode(response.body)['error'] ??
+            'Failed to save group question';
         ToastHelper.showError(context, errorMsg);
       }
     } catch (e) {
@@ -359,6 +494,8 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
     _passageController.dispose();
     _hintController.dispose();
     for (var set in _answerSets) {
+      final TextEditingController subQCtrl = set['subQuestionController'] as TextEditingController;
+      subQCtrl.dispose();
       set['explanationController'].dispose();
       final options = set['options'] as List<Map<String, dynamic>>;
       for (var opt in options) {
@@ -489,7 +626,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF4B5563), size: 24),
+            icon: const Icon(
+              Icons.notifications_none_outlined,
+              color: Color(0xFF4B5563),
+              size: 24,
+            ),
             onPressed: () {},
           ),
           const SizedBox(width: 16),
@@ -617,13 +758,13 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  child: Container(
-                    width: 4,
-                    color: const Color(0xFF20B486),
-                  ),
+                  child: Container(width: 4, color: const Color(0xFF20B486)),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       Container(
@@ -714,20 +855,30 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                     backgroundColor: const Color(0xFFE2E8F0),
                     foregroundColor: const Color(0xFF94A3B8),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   icon: const Icon(Icons.send_outlined, size: 14),
                   label: const Text(
                     'Submit for Review',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Outfit'),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Center(
                   child: Text(
                     'submit once 100% completed',
-                    style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF94A3B8),
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                 ),
               ],
@@ -788,7 +939,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                   SizedBox(width: 6),
                   Text(
                     'Draft saved 2m ago',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF475569), fontFamily: 'Outfit'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF475569),
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                 ],
               ),
@@ -831,7 +986,10 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                         children: [
                           Container(
                             color: const Color(0xFFF8FAFC),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             child: Row(
                               children: [
                                 _buildFormatButton('B'),
@@ -849,11 +1007,160 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                             maxLines: 12,
                             decoration: const InputDecoration(
                               hintText: 'Enter your passage here...',
-                              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontFamily: 'Outfit'),
+                              hintStyle: TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 13,
+                                fontFamily: 'Outfit',
+                              ),
                               contentPadding: EdgeInsets.all(12),
                               border: InputBorder.none,
                             ),
-                            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), height: 1.5, fontFamily: 'Outfit'),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF1E293B),
+                              height: 1.5,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Generate by AI (Multiple)
+                    Container(
+                      key: _aiPanelKey,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Generate by AI (Multiple Questions)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _topicSeedController,
+                            minLines: 1,
+                            maxLines: 2,
+                            decoration: const InputDecoration(
+                              hintText:
+                                  'Topic / seed (vd: Reading about travel stories)',
+                              hintStyle: TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 12,
+                                fontFamily: 'Outfit',
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(8),
+                                ),
+                              ),
+                            ),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF1E293B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: TextEditingController(
+                                    text: '$_aiQuantity',
+                                  ),
+                                  enabled: false,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Quantity (subQuestions)',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.all(
+                                        Radius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              SizedBox(
+                                width: 72,
+                                child: TextField(
+                                  controller: TextEditingController(),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (v) {
+                                    final n = int.tryParse(v.trim());
+                                    if (n == null) return;
+                                    setState(() {
+                                      _aiQuantity = n.clamp(2, 10);
+                                    });
+                                  },
+                                  decoration: const InputDecoration(
+                                    hintText: '2..10',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.all(
+                                        Radius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: _isGeneratingByAi
+                                ? null
+                                : () async {
+                                    await _handleGenerateByAI();
+                                  },
+                            icon: const Icon(
+                              Icons.auto_awesome_outlined,
+                              size: 16,
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF20B486),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            label: _isGeneratingByAi
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Generate by AI',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Fill passage & sub-questions automatically. You still press Save manually.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                              fontFamily: 'Outfit',
+                            ),
                           ),
                         ],
                       ),
@@ -861,6 +1168,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                     const SizedBox(height: 24),
                     const Text(
                       'PDF Attachment (Optional)',
+
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -887,7 +1195,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                               child: const Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.picture_as_pdf_outlined, size: 28, color: Color(0xFF64748B)),
+                                  Icon(
+                                    Icons.picture_as_pdf_outlined,
+                                    size: 28,
+                                    color: Color(0xFF64748B),
+                                  ),
                                   SizedBox(height: 8),
                                   Text(
                                     'Upload PDF Document',
@@ -927,22 +1239,37 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                       maxLines: 2,
                       decoration: InputDecoration(
                         hintText: 'Add a hint to help students...',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontFamily: 'Outfit'),
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
+                        ),
                         contentPadding: const EdgeInsets.all(12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF20B486),
+                            width: 1.5,
+                          ),
                         ),
                       ),
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF1E293B),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                   ],
                 ),
@@ -973,8 +1300,13 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
               onPressed: () => Navigator.pop(context),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFCBD5E1)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text(
                 'Cancel',
@@ -993,14 +1325,22 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                 backgroundColor: const Color(0xFF20B486),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: _isSaving
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text(
                       'Save',
@@ -1047,11 +1387,7 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
         borderRadius: BorderRadius.circular(4),
         child: Padding(
           padding: const EdgeInsets.all(4.0),
-          child: Icon(
-            icon,
-            size: 14,
-            color: const Color(0xFF64748B),
-          ),
+          child: Icon(icon, size: 14, color: const Color(0xFF64748B)),
         ),
       ),
     );
@@ -1127,7 +1463,9 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                     child: LinearProgressIndicator(
                       value: _pdfUploadProgress,
                       backgroundColor: const Color(0xFFF1F5F9),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF20B486),
+                      ),
                       minHeight: 4,
                     ),
                   ),
@@ -1136,7 +1474,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+            icon: const Icon(
+              Icons.delete_outline,
+              color: Color(0xFFEF4444),
+              size: 18,
+            ),
             onPressed: _isUploadingPdf ? null : _removePdf,
           ),
         ],
@@ -1180,7 +1522,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_box_outlined, size: 16, color: Colors.white),
+                      Icon(
+                        Icons.check_box_outlined,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'Multiple Choice',
@@ -1228,7 +1574,11 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.edit_square, size: 16, color: Color(0xFF64748B)),
+                        Icon(
+                          Icons.edit_square,
+                          size: 16,
+                          color: Color(0xFF64748B),
+                        ),
                         SizedBox(width: 6),
                         Text(
                           'Single Choice',
@@ -1281,9 +1631,12 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
             itemBuilder: (context, setIdx) {
               final set = _answerSets[setIdx];
               final bool isExpanded = set['isExpanded'] as bool;
-              final String title = set['questionText'] as String;
+              final String title = 'Question ${setIdx + 1}';
+              final TextEditingController subQCtrl =
+                  set['subQuestionController'] as TextEditingController;
               final options = set['options'] as List<Map<String, dynamic>>;
-              final TextEditingController expCtrl = set['explanationController'] as TextEditingController;
+              final TextEditingController expCtrl =
+                  set['explanationController'] as TextEditingController;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -1291,7 +1644,9 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isExpanded ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
+                    color: isExpanded
+                        ? const Color(0xFF20B486)
+                        : const Color(0xFFE2E8F0),
                     width: isExpanded ? 1.5 : 1,
                   ),
                 ),
@@ -1306,7 +1661,10 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                       },
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         child: Row(
                           children: [
                             Text(
@@ -1314,14 +1672,20 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
-                                color: isExpanded ? const Color(0xFF20B486) : const Color(0xFF1E293B),
+                                color: isExpanded
+                                    ? const Color(0xFF20B486)
+                                    : const Color(0xFF1E293B),
                                 fontFamily: 'Outfit',
                               ),
                             ),
                             const Spacer(),
                             if (_answerSets.length > 1) ...[
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 16),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Color(0xFFEF4444),
+                                  size: 16,
+                                ),
                                 onPressed: () => _removeAnswerSet(setIdx),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
@@ -1329,7 +1693,9 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                               const SizedBox(width: 8),
                             ],
                             Icon(
-                              isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                              isExpanded
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
                               color: const Color(0xFF64748B),
                               size: 18,
                             ),
@@ -1344,6 +1710,41 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Sub-question title
+                            TextField(
+                              controller: subQCtrl,
+                              minLines: 1,
+                              maxLines: null,
+                              keyboardType: TextInputType.multiline,
+                              decoration: InputDecoration(
+                                hintText: 'Sub-question text',
+                                filled: true,
+
+                                fillColor: const Color(0xFFF8FAFC),
+                                contentPadding: const EdgeInsets.all(10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF20B486),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
                             // Options builder for this question set
                             ListView.builder(
                               shrinkWrap: true,
@@ -1352,16 +1753,25 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                               itemBuilder: (context, optIdx) {
                                 final opt = options[optIdx];
                                 final bool isCorrect = opt['isCorrect'] as bool;
-                                final textCtrl = opt['textController'] as TextEditingController;
+                                final textCtrl =
+                                    opt['textController']
+                                        as TextEditingController;
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: isCorrect ? const Color(0xFFE2F9F3) : Colors.white,
+                                    color: isCorrect
+                                        ? const Color(0xFFE2F9F3)
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
+                                      color: isCorrect
+                                          ? const Color(0xFF20B486)
+                                          : const Color(0xFFE2E8F0),
                                       width: isCorrect ? 1.5 : 1,
                                     ),
                                   ),
@@ -1369,15 +1779,20 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                     children: [
                                       // Choice circular radio button
                                       InkWell(
-                                        onTap: () => _handleOptionSelect(setIdx, optIdx),
+                                        onTap: () =>
+                                            _handleOptionSelect(setIdx, optIdx),
                                         child: Container(
                                           width: 20,
                                           height: 20,
                                           decoration: BoxDecoration(
-                                            color: isCorrect ? const Color(0xFF20B486) : Colors.white,
+                                            color: isCorrect
+                                                ? const Color(0xFF20B486)
+                                                : Colors.white,
                                             shape: BoxShape.circle,
                                             border: Border.all(
-                                              color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFCBD5E1),
+                                              color: isCorrect
+                                                  ? const Color(0xFF20B486)
+                                                  : const Color(0xFFCBD5E1),
                                               width: 1.5,
                                             ),
                                           ),
@@ -1387,22 +1802,44 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                                       Expanded(
                                         child: TextField(
                                           controller: textCtrl,
+                                          minLines: 1,
+                                          maxLines: null,
+                                          keyboardType: TextInputType.multiline,
                                           decoration: const InputDecoration(
                                             hintText: 'Enter option text...',
-                                            hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontFamily: 'Outfit'),
+                                            hintStyle: TextStyle(
+                                              color: Color(0xFF94A3B8),
+                                              fontSize: 13,
+                                              fontFamily: 'Outfit',
+                                            ),
                                             border: InputBorder.none,
                                             contentPadding: EdgeInsets.zero,
                                           ),
-                                          style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Color(0xFF1E293B),
+                                            fontFamily: 'Outfit',
+                                          ),
                                         ),
                                       ),
                                       if (isCorrect) ...[
-                                        const Icon(Icons.check_circle, color: Color(0xFF20B486), size: 18),
+                                        const Icon(
+                                          Icons.check_circle,
+                                          color: Color(0xFF20B486),
+                                          size: 18,
+                                        ),
                                         const SizedBox(width: 8),
                                       ],
                                       IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
-                                        onPressed: () => _removeOptionFromSet(setIdx, optIdx),
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          color: Color(0xFFEF4444),
+                                          size: 18,
+                                        ),
+                                        onPressed: () => _removeOptionFromSet(
+                                          setIdx,
+                                          optIdx,
+                                        ),
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(),
                                       ),
@@ -1414,10 +1851,19 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                             // Add option to set button
                             TextButton.icon(
                               onPressed: () => _addOptionToSet(setIdx),
-                              icon: const Icon(Icons.add, size: 14, color: Color(0xFF20B486)),
+                              icon: const Icon(
+                                Icons.add,
+                                size: 14,
+                                color: Color(0xFF20B486),
+                              ),
                               label: const Text(
                                 'Add Option',
-                                style: TextStyle(color: Color(0xFF20B486), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                                style: TextStyle(
+                                  color: Color(0xFF20B486),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Outfit',
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -1435,27 +1881,46 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
                             const SizedBox(height: 6),
                             TextField(
                               controller: expCtrl,
-                              maxLines: 3,
+                              minLines: 3,
+                              maxLines: null,
+                              keyboardType: TextInputType.multiline,
                               decoration: InputDecoration(
-                                hintText: 'Explain why this correct answer is selected...',
-                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontFamily: 'Outfit'),
+                                hintText:
+                                    'Explain why this correct answer is selected...',
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 11,
+                                  fontFamily: 'Outfit',
+                                ),
                                 fillColor: const Color(0xFFF8FAFC),
                                 filled: true,
                                 contentPadding: const EdgeInsets.all(10),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(6),
-                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(6),
-                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE2E8F0),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(6),
-                                  borderSide: const BorderSide(color: Color(0xFF20B486), width: 1),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF20B486),
+                                    width: 1,
+                                  ),
                                 ),
                               ),
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF475569), height: 1.4, fontFamily: 'Outfit'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF475569),
+                                height: 1.4,
+                                fontFamily: 'Outfit',
+                              ),
                             ),
                           ],
                         ),
@@ -1472,7 +1937,9 @@ class _AddMultipleChoiceQuestionPageState extends State<AddMultipleChoiceQuestio
             onPressed: _addNewAnswerSetClick,
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFCBD5E1)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
             icon: const Icon(Icons.add, size: 14, color: Color(0xFF475569)),
