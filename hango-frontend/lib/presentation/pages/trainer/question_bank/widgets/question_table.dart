@@ -234,22 +234,24 @@ class QuestionTable extends StatelessWidget {
                                   style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: _getDifficultyColor(q.difficultyName).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  q.difficultyName,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: _getDifficultyColor(q.difficultyName),
-                                    fontWeight: FontWeight.w600,
+                              if (!q.isGroup) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: _getDifficultyColor(q.difficultyName).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    q.difficultyName,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: _getDifficultyColor(q.difficultyName),
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ],

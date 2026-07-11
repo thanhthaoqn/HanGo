@@ -31,7 +31,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _errorMessage = '';
 
   // Filter States
-  String _selectedType = 'QUIZ';
+  String _selectedType = 'ALL';
   String _selectedGroupType = 'Choose Group Type';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
@@ -128,7 +128,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   void _handleTypeChanged(String type) {
     setState(() {
       _selectedType = type;
-      _selectedGroupType = 'Choose Group Type';
       _currentPage = 1;
     });
     _fetchQuestions();
@@ -212,7 +211,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(builder: (context) => const TrainerCreateQuestionPage()),
-                                  );
+                                  ).then((_) => _fetchQuestions());
                                 },
                                 onImportPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -234,14 +233,22 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                                   });
                                 },
                                 onViewPressed: (q) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Viewing question: ${q.questionText}')),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                                      question: q,
+                                      isReadOnly: true,
+                                    )),
                                   );
                                 },
                                 onEditPressed: (q) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Editing question: ${q.questionText}')),
-                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                                      question: q,
+                                      isEdit: true,
+                                    )),
+                                  ).then((_) => _fetchQuestions());
                                 },
                                 onStatusToggled: (q, isPublic) async {
                                   final oldStatus = q.status;
@@ -256,7 +263,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                                     final token = await _authService.getToken();
                                     if (token != null) {
                                       final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                                      await api.toggleQuestionStatus(q.id, newStatus);
+                                      await api.toggleQuestionStatus(q.id, newStatus, isGroup: q.isGroup);
                                     } else {
                                       throw Exception('No token');
                                     }
