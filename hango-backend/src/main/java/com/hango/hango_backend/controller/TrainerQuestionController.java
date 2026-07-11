@@ -47,16 +47,44 @@ public class TrainerQuestionController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/detail/{id}")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<CreateGroupQuestionRequestDTO> getQuestionDetail(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean isGroup) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        CreateGroupQuestionRequestDTO detail = trainerQuestionService.getQuestionDetail(userDetails.getUsername(), id, isGroup);
+        return ResponseEntity.ok(detail);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<Map<String, Object>> updateQuestionBankGroup(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean isGroup,
+            @RequestBody CreateGroupQuestionRequestDTO request) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        trainerQuestionService.updateQuestionBankGroup(userDetails.getUsername(), id, isGroup, request);
+        return ResponseEntity.ok(Map.of("message", "Question updated successfully"));
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
     public ResponseEntity<Map<String, Object>> toggleQuestionStatus(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
-            @RequestParam String status) {
+            @RequestParam String status,
+            @RequestParam(defaultValue = "false") boolean isGroup) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
-        trainerQuestionService.updateQuestionStatus(userDetails.getUsername(), id, status);
+        trainerQuestionService.updateQuestionStatus(userDetails.getUsername(), id, status, isGroup);
         return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
     }
 }

@@ -25,7 +25,7 @@ class QuestionFilterPane extends StatelessWidget {
         border: Border.all(color: const Color(0xFFF1F5F9)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -36,7 +36,7 @@ class QuestionFilterPane extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'SELECT TYPE',
+            'FILTER BY STATUS',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -45,99 +45,49 @@ class QuestionFilterPane extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: selectedType,
-                isExpanded: true,
-                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
-                dropdownColor: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                items: ['QUIZ', 'EXAM'].map((String type) {
-                  return DropdownMenuItem<String>(
-                    value: type,
-                    child: Text(
-                      type,
-                      style: const TextStyle(
+          ...[
+            {'value': 'ALL', 'label': 'All Questions', 'icon': Icons.list_alt_outlined},
+            {'value': 'PRIVATE', 'label': 'Private', 'icon': Icons.lock_outline},
+            {'value': 'PUBLIC', 'label': 'Public', 'icon': Icons.public_outlined},
+          ].map((item) {
+            final isSelected = selectedType == item['value'];
+            return GestureDetector(
+              onTap: () => onTypeChanged(item['value'] as String),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF38C9A6).withValues(alpha: 0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF38C9A6) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      item['icon'] as IconData,
+                      size: 16,
+                      color: isSelected ? const Color(0xFF38C9A6) : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      item['label'] as String,
+                      style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1E293B),
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? const Color(0xFF38C9A6) : const Color(0xFF475569),
                       ),
                     ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    onTypeChanged(value);
-                  }
-                },
-              ),
-            ),
-          ),
-          if (selectedType == 'EXAM') ...[
-            const SizedBox(height: 24),
-            const Text(
-              'SELECT GROUP TYPE',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF94A3B8),
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: selectedGroupType,
-                  isExpanded: true,
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  items: [
-                    'Choose Group Type',
-                    'SHORT_CLOZE_ANNOUNCEMENT',
-                    'SHORT_CLOZE_LEAFLET',
-                    'REORDER_CONVERSATION',
-                    'REORDER_TEXT',
-                    'LONG_CLOZE',
-                    'READING_COMPREHENSION_1',
-                    'READING_COMPREHENSION_2'
-                  ].map((String type) {
-                    return DropdownMenuItem<String>(
-                      value: type,
-                      child: Text(
-                        type,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF1E293B),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      onGroupTypeChanged(value);
-                    }
-                  },
+                    if (isSelected) ...[
+                      const Spacer(),
+                      const Icon(Icons.check_circle, size: 16, color: Color(0xFF38C9A6)),
+                    ],
+                  ],
                 ),
               ),
-            ),
-          ],
+            );
+          }),
         ],
       ),
     );

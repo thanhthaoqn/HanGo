@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -252,8 +253,8 @@ class HangoApi {
         .toList();
   }
 
-  Future<void> toggleQuestionStatus(int questionId, String newStatus) async {
-    final queryParams = {'status': newStatus};
+  Future<void> toggleQuestionStatus(int questionId, String newStatus, {bool isGroup = false}) async {
+    final queryParams = {'status': newStatus, 'isGroup': isGroup.toString()};
     final baseUri = _uri('/api/v1/trainer/question-bank/$questionId/status');
     final uri = Uri(
       scheme: baseUri.scheme,
@@ -263,6 +264,39 @@ class HangoApi {
       queryParameters: queryParams,
     );
     await _send(http.patch(uri, headers: _headers));
+  }
+
+  Future<Map<String, dynamic>> getTrainerQuestionDetail(int id, {bool isGroup = false}) async {
+    final queryParams = {'isGroup': isGroup.toString()};
+    final baseUri = _uri('/api/v1/trainer/question-bank/detail/$id');
+    final uri = Uri(
+      scheme: baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.port,
+      path: baseUri.path,
+      queryParameters: queryParams,
+    );
+    final body = await _send(http.get(uri, headers: _headers));
+    return body as Map<String, dynamic>;
+  }
+
+  Future<void> updateTrainerQuestionGroup(int id, Map<String, dynamic> payload, {bool isGroup = false}) async {
+    final queryParams = {'isGroup': isGroup.toString()};
+    final baseUri = _uri('/api/v1/trainer/question-bank/$id');
+    final uri = Uri(
+      scheme: baseUri.scheme,
+      host: baseUri.host,
+      port: baseUri.port,
+      path: baseUri.path,
+      queryParameters: queryParams,
+    );
+    await _send(
+      http.put(
+        uri,
+        headers: _headers,
+        body: jsonEncode(payload),
+      ),
+    );
   }
 
   Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {
@@ -317,5 +351,39 @@ class HangoApi {
         body: jsonEncode({'status': status}),
       ),
     );
+  }
+
+  /// Upload an Excel file to import questions into an exam.
+  /// Returns the server response map with keys: message, totalQuestions, blocks.
+  Future<Map<String, dynamic>> importExamExcel(int examId, Uint8List fileBytes, String fileName) async {
+    final uri = _uri('/api/v1/trainer/exams/$examId/import-excel');
+    final request = http.MultipartRequest('POST', uri);
+    // Add auth header
+    if (_headers.containsKey('Authorization')) {
+      request.headers['Authorization'] = _headers['Authorization']!;
+    }
+    request.files.add(http.MultipartFile.fromBytes(
+      'file',
+      fileBytes,
+      filename: fileName,
+    ));
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode >= 400) {
+      throw ApiFailure('Import failed: ${response.body}', statusCode: response.statusCode);
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Download the Excel import template for exam questions.
+  Future<Uint8List> downloadImportTemplate() async {
+    final response = await http.get(
+      _uri('/api/v1/trainer/exams/import-excel/template'),
+      headers: _headers,
+    );
+    if (response.statusCode >= 400) {
+      throw ApiFailure('Failed to download template', statusCode: response.statusCode);
+    }
+    return response.bodyBytes;
   }
 }

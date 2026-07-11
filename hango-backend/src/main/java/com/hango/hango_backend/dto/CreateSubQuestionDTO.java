@@ -11,6 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateSubQuestionDTO {
+    private Long id;
     private String questionText;
     private String explanation;
     private Long skillParamId;

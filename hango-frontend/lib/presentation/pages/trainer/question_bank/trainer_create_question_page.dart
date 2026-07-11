@@ -9,16 +9,19 @@ import '../trainer_dashboard_page.dart';
 import '../trainer_exams_page.dart';
 import 'trainer_question_bank_page.dart';
 import '../../../../services/hango_api.dart';
+import 'models/trainer_question.dart';
 
 class OptionState {
+  int? id;
   TextEditingController textController = TextEditingController();
   bool isCorrect;
-  OptionState({String text = '', this.isCorrect = false}) {
+  OptionState({this.id, String text = '', this.isCorrect = false}) {
     textController.text = text;
   }
 }
 
 class QuestionState {
+  int? id;
   TextEditingController questionTextController = TextEditingController();
   TextEditingController explanationController = TextEditingController();
   int? selectedSkillId;
@@ -36,7 +39,16 @@ class QuestionState {
 }
 
 class TrainerCreateQuestionPage extends StatefulWidget {
-  const TrainerCreateQuestionPage({Key? key}) : super(key: key);
+  final TrainerQuestion? question;
+  final bool isReadOnly;
+  final bool isEdit;
+
+  const TrainerCreateQuestionPage({
+    Key? key,
+    this.question,
+    this.isReadOnly = false,
+    this.isEdit = false,
+  }) : super(key: key);
 
   @override
   State<TrainerCreateQuestionPage> createState() => _TrainerCreateQuestionPageState();
@@ -57,6 +69,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
   List<Map<String, dynamic>> _difficulties = [];
 
   int? _selectedGroupTypeId;
+  String _status = 'PRIVATE';
 
   final TextEditingController _passageController = TextEditingController();
   List<QuestionState> _questions = [QuestionState()];
@@ -99,6 +112,16 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       final difficulties = await api.getSystemParameters('DIFFICULTY');
       final groupTypes = await api.getQuestionCategories();
 
+      Map<String, dynamic>? detail;
+      if (widget.question != null) {
+        final q = widget.question!;
+        try {
+          detail = await api.getTrainerQuestionDetail(q.id, isGroup: q.isGroup);
+        } catch (e) {
+          print("Error loading detail: $e");
+        }
+      }
+
       setState(() {
         _skills = skills;
         _difficulties = difficulties;
@@ -116,9 +139,60 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
         }
         if (_groupTypes.isNotEmpty) _selectedGroupTypeId = _groupTypes.first['id'] as int;
 
+        if (widget.question != null) {
+          final q = widget.question!;
+          _isQuestionGroup = q.isGroup;
+          
+          if (detail != null) {
+            _selectedGroupTypeId = detail['categoryId'] as int?;
+            
+            if (q.isGroup) {
+              _passageController.text = detail['passageText'] ?? '';
+            }
+
+            final subQList = detail['subQuestions'] as List? ?? [];
+            _questions = [];
+            for (var subQ in subQList) {
+              final qs = QuestionState();
+              qs.id = subQ['id'] as int?;
+              qs.questionTextController.text = subQ['questionText'] ?? '';
+              qs.explanationController.text = subQ['explanation'] ?? '';
+              qs.selectedSkillId = subQ['skillParamId'] as int? ?? (_skills.isNotEmpty ? _skills.first['id'] : null);
+              qs.selectedDifficultyId = subQ['difficultyId'] as int? ?? (_difficulties.isNotEmpty ? _difficulties.first['id'] : null);
+              
+              final optsList = subQ['options'] as List? ?? [];
+              qs.options = [];
+              for (var opt in optsList) {
+                qs.options.add(OptionState(
+                  id: opt['id'] as int?,
+                  text: opt['optionText'] ?? '',
+                  isCorrect: opt['isCorrect'] as bool? ?? false,
+                ));
+              }
+              // Fallback if empty options
+              if (qs.options.isEmpty) {
+                qs.options = [
+                  OptionState(text: '', isCorrect: true),
+                  OptionState(text: '', isCorrect: false),
+                  OptionState(text: '', isCorrect: false),
+                  OptionState(text: '', isCorrect: false),
+                ];
+              }
+              _questions.add(qs);
+            }
+            _status = detail['status'] ?? 'PRIVATE';
+          } else {
+            // Fallback to simple data
+            _questions = [QuestionState()];
+            _questions[0].questionTextController.text = widget.question!.questionText;
+            _status = widget.question!.status;
+          }
+        }
+
         _isLoadingMetadata = false;
       });
     } catch (e) {
+      print('Error loading metadata: $e');
       setState(() => _isLoadingMetadata = false);
       if (mounted) {
         ToastHelper.show(context, 'Failed to load metadata: $e', isError: true);
@@ -154,14 +228,18 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
     setState(() => _isSaving = true);
     try {
       final payload = {
+        if (widget.question != null) 'id': widget.question!.id,
         'categoryId': _selectedGroupTypeId,
+        'status': _status,
         'passageText': _isQuestionGroup ? _passageController.text : null,
         'subQuestions': _questions.map((q) => {
+          if (q.id != null) 'id': q.id,
           'questionText': q.questionTextController.text,
           'explanation': q.explanationController.text,
           'skillParamId': q.selectedSkillId,
           'difficultyId': q.selectedDifficultyId,
           'options': q.options.map((o) => {
+            if (o.id != null) 'id': o.id,
             'optionText': o.textController.text,
             'isCorrect': o.isCorrect,
           }).toList()
@@ -169,7 +247,11 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       };
 
       final api = await _getApi();
-      await api.createTrainerQuestionGroup(payload);
+      if (widget.question != null) {
+        await api.updateTrainerQuestionGroup(widget.question!.id, payload, isGroup: widget.question!.isGroup);
+      } else {
+        await api.createTrainerQuestionGroup(payload);
+      }
 
       if (mounted) {
         ToastHelper.show(context, 'Question saved successfully!');
@@ -232,9 +314,9 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Create Question',
-            style: TextStyle(
+          Text(
+            widget.isReadOnly ? 'View Question' : (widget.isEdit ? 'Edit Question' : 'Create Question'),
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Color(0xFF1E293B),
@@ -299,19 +381,21 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
           ),
           child: const Text('Back', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Outfit')),
         ),
-        const SizedBox(width: 16),
-        ElevatedButton(
-          onPressed: _isSaving ? null : _handleSave,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF38C9A6),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            elevation: 0,
+        if (!widget.isReadOnly) ...[
+          const SizedBox(width: 16),
+          ElevatedButton(
+            onPressed: _isSaving ? null : _handleSave,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF38C9A6),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            child: _isSaving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
           ),
-          child: _isSaving
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
-        ),
+        ],
       ],
     );
   }
@@ -352,6 +436,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
           TextFormField(
             controller: controller,
             maxLines: 15,
+            readOnly: widget.isReadOnly,
             decoration: InputDecoration(
               hintText: hint,
               border: OutlineInputBorder(
@@ -367,7 +452,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                 borderSide: const BorderSide(color: Color(0xFF38C9A6)),
               ),
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: widget.isReadOnly ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
             ),
           ),
         ],
@@ -396,7 +481,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                       _buildDropdown(
                         value: _questions.isNotEmpty ? _questions[0].selectedSkillId : null,
                         items: _skills,
-                        onChanged: (val) {
+                        onChanged: widget.isReadOnly ? null : (val) {
                           if (_questions.isNotEmpty) {
                             setState(() => _questions[0].selectedSkillId = val);
                           }
@@ -415,7 +500,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                       _buildDropdown(
                         value: _selectedGroupTypeId,
                         items: _groupTypes,
-                        onChanged: (val) => setState(() => _selectedGroupTypeId = val),
+                        onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
                         displayKey: 'name',
                       ),
                     ],
@@ -434,7 +519,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                       _buildDropdown(
                         value: _questions.isNotEmpty ? _questions[0].selectedDifficultyId : null,
                         items: _difficulties,
-                        onChanged: (val) {
+                        onChanged: widget.isReadOnly ? null : (val) {
                           if (_questions.isNotEmpty) {
                             setState(() => _questions[0].selectedDifficultyId = val);
                           }
@@ -451,14 +536,26 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                     children: [
                       _buildLabel('STATUS'),
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
+                          color: widget.isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _status,
+                            isExpanded: true,
+                            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                            onChanged: widget.isReadOnly ? null : (val) {
+                              if (val != null) setState(() => _status = val);
+                            },
+                            items: const [
+                              DropdownMenuItem(value: 'PRIVATE', child: Text('Private')),
+                              DropdownMenuItem(value: 'PUBLIC', child: Text('Public')),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -476,7 +573,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                       _buildDropdown(
                         value: _selectedGroupTypeId,
                         items: _groupTypes,
-                        onChanged: (val) => setState(() => _selectedGroupTypeId = val),
+                        onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
                         displayKey: 'name',
                       ),
                     ],
@@ -489,14 +586,26 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                     children: [
                       _buildLabel('STATUS'),
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
+                          color: widget.isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        child: const Text('Draft', style: TextStyle(color: Color(0xFF475569), fontSize: 14)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _status,
+                            isExpanded: true,
+                            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                            onChanged: widget.isReadOnly ? null : (val) {
+                              if (val != null) setState(() => _status = val);
+                            },
+                            items: const [
+                              DropdownMenuItem(value: 'PRIVATE', child: Text('Private')),
+                              DropdownMenuItem(value: 'PUBLIC', child: Text('Public')),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -512,7 +621,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
   Widget _buildDropdown({
     required int? value,
     required List<Map<String, dynamic>> items,
-    required Function(int?) onChanged,
+    required Function(int?)? onChanged,
     required String displayKey,
   }) {
     return Container(
@@ -557,10 +666,9 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                 title: 'Question Group',
                 icon: Icons.check_box_outlined,
                 isActive: _isQuestionGroup,
-                onTap: () {
+                onTap: widget.isReadOnly ? () {} : () {
                   setState(() {
                     _isQuestionGroup = true;
-                    // Reset to 1 empty question if switching to single? Keep data for now.
                   });
                 },
               ),
@@ -569,7 +677,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                 title: 'Single Question',
                 icon: Icons.edit_note_outlined,
                 isActive: !_isQuestionGroup,
-                onTap: () {
+                onTap: widget.isReadOnly ? () {} : () {
                   setState(() {
                     _isQuestionGroup = false;
                     if (_questions.length > 1) {
@@ -627,36 +735,37 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
           const SizedBox(height: 12),
         ],
         // Add Answer Set Button
-        InkWell(
-          onTap: () {
-            setState(() {
-              final newQ = QuestionState();
-              if (_skills.isNotEmpty) newQ.selectedSkillId = _skills.first['id'] as int;
-              if (_difficulties.isNotEmpty) newQ.selectedDifficultyId = _difficulties.first['id'] as int;
-              _questions.add(newQ);
-            });
-          },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5), 
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.add, size: 20, color: Color(0xFF475569)),
-                SizedBox(width: 8),
-                Text(
-                  'Add Answer Set',
-                  style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold),
-                ),
-              ],
+        if (!widget.isReadOnly)
+          InkWell(
+            onTap: () {
+              setState(() {
+                final newQ = QuestionState();
+                if (_skills.isNotEmpty) newQ.selectedSkillId = _skills.first['id'] as int;
+                if (_difficulties.isNotEmpty) newQ.selectedDifficultyId = _difficulties.first['id'] as int;
+                _questions.add(newQ);
+              });
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5), 
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.add, size: 20, color: Color(0xFF475569)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Add Answer Set',
+                    style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -698,7 +807,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                       fontSize: 14,
                     ),
                   ),
-                  if (_questions.length > 1)
+                  if (_questions.length > 1 && !widget.isReadOnly)
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
                       padding: EdgeInsets.zero,
@@ -730,7 +839,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                             _buildDropdown(
                               value: qState.selectedSkillId,
                               items: _skills,
-                              onChanged: (val) => setState(() => qState.selectedSkillId = val),
+                              onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedSkillId = val),
                               displayKey: 'paramValue',
                             ),
                           ],
@@ -745,7 +854,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                             _buildDropdown(
                               value: qState.selectedDifficultyId,
                               items: _difficulties,
-                              onChanged: (val) => setState(() => qState.selectedDifficultyId = val),
+                              onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedDifficultyId = val),
                               displayKey: 'paramValue',
                             ),
                           ],
@@ -759,11 +868,14 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                   _buildLabel('QUESTION'),
                   TextField(
                     controller: qState.questionTextController,
-                    decoration: const InputDecoration(
+                    readOnly: widget.isReadOnly,
+                    decoration: InputDecoration(
                       hintText: 'Enter question text...',
                       isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      border: OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      border: const OutlineInputBorder(),
+                      fillColor: widget.isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
+                      filled: widget.isReadOnly,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -778,11 +890,14 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                 TextField(
                   controller: qState.explanationController,
                   maxLines: 2,
-                  decoration: const InputDecoration(
+                  readOnly: widget.isReadOnly,
+                  decoration: InputDecoration(
                     hintText: 'Add explanation...',
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    border: const OutlineInputBorder(),
+                    fillColor: widget.isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
+                    filled: widget.isReadOnly,
                   ),
                 ),
               ],
@@ -799,7 +914,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
     return Row(
       children: [
         InkWell(
-          onTap: () {
+          onTap: widget.isReadOnly ? null : () {
             setState(() {
               for (var o in qState.options) {
                 o.isCorrect = false;
@@ -830,6 +945,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
         Expanded(
           child: TextField(
             controller: option.textController,
+            readOnly: widget.isReadOnly,
             decoration: InputDecoration(
               hintText: 'Option $letter',
               isDense: true,
@@ -840,8 +956,8 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
               enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: option.isCorrect ? const Color(0xFF38C9A6) : const Color(0xFFE2E8F0)),
               ),
-              filled: option.isCorrect,
-              fillColor: option.isCorrect ? const Color(0xFFE2F9F3) : Colors.white,
+              filled: option.isCorrect || widget.isReadOnly,
+              fillColor: option.isCorrect ? const Color(0xFFE2F9F3) : (widget.isReadOnly ? const Color(0xFFF1F5F9) : Colors.white),
             ),
           ),
         ),
