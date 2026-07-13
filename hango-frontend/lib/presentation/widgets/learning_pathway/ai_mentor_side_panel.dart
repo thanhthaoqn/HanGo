@@ -39,11 +39,13 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   @override
   void didUpdateWidget(AIMentorSidePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedNode != null && widget.selectedNode != oldWidget.selectedNode) {
+    if (widget.selectedNode != null &&
+        widget.selectedNode != oldWidget.selectedNode) {
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content': 'About ${widget.selectedNode!.courseTitle}:\n\n${widget.selectedNode!.reasonWhy}',
+          'content':
+              'About ${widget.selectedNode!.courseTitle}:\n\n${widget.selectedNode!.reasonWhy}',
         });
       });
       _scrollToBottom();
@@ -94,7 +96,8 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content': 'AI Mentor is unavailable right now. Please try again later.',
+          'content':
+              'AI Mentor is unavailable right now. Please try again later.',
         });
       });
     } finally {
@@ -132,13 +135,16 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
     setState(() => _isRerouting = true);
     try {
-      final updatedPathway = await _repository.reroutePathway(pathwayId: widget.pathway.pathwayId);
+      final updatedPathway = await _repository.suggestReroute(
+        pathwayId: widget.pathway.pathwayId,
+      );
       widget.onPathwayUpdated?.call(updatedPathway);
       if (!mounted) return;
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content': 'I updated the recommendation using your latest exam signal and current lesson progress.',
+          'content':
+              'I updated the recommendation using your latest exam signal and current lesson progress.',
         });
       });
     } catch (_) {
@@ -146,7 +152,8 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content': 'I could not adjust the pathway right now. Please try again later.',
+          'content':
+              'I could not adjust the pathway right now. Please try again later.',
         });
       });
     } finally {
@@ -178,7 +185,8 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           _buildHeader(dark),
           Divider(height: 1, color: border),
           Expanded(child: _buildChatList(dark)),
-          if (widget.selectedNode != null && widget.selectedNode!.status != NodeStatus.locked)
+          if (widget.selectedNode != null &&
+              widget.selectedNode!.status != NodeStatus.locked)
             _buildActionArea(dark),
           Divider(height: 1, color: border),
           _buildChatInput(dark),
@@ -205,12 +213,15 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
             tween: Tween(begin: 0.94, end: 1),
             duration: const Duration(milliseconds: 900),
             curve: Curves.easeInOut,
-            builder: (context, value, child) => Transform.scale(scale: value, child: child),
+            builder: (context, value, child) =>
+                Transform.scale(scale: value, child: child),
             child: Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF28B79B)]),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF28B79B)],
+                ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
@@ -220,7 +231,11 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 22),
+              child: const Icon(
+                Icons.smart_toy_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -233,7 +248,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
+                    color: dark
+                        ? const Color(0xFFF0F6FC)
+                        : const Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -243,7 +260,11 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                     SizedBox(width: 6),
                     Text(
                       'Online and pathway-aware',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF10B981),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -273,13 +294,18 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: Row(
-            mainAxisAlignment: isMentor ? MainAxisAlignment.start : MainAxisAlignment.end,
+            mainAxisAlignment: isMentor
+                ? MainAxisAlignment.start
+                : MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Flexible(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 11,
+                  ),
                   decoration: BoxDecoration(
                     color: bubbleColor,
                     borderRadius: BorderRadius.only(
@@ -289,19 +315,43 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                       bottomRight: Radius.circular(isMentor ? 14 : 4),
                     ),
                     border: isMentor
-                        ? Border.all(color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0))
+                        ? Border.all(
+                            color: dark
+                                ? const Color(0xFF30363D)
+                                : const Color(0xFFE2E8F0),
+                          )
                         : null,
                   ),
                   child: isMentor
                       ? MarkdownBody(
                           data: message['content'] ?? '',
-                          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                            p: TextStyle(color: textColor, fontSize: 14, height: 1.45),
-                            strong: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-                            code: const TextStyle(color: Color(0xFF6366F1), fontSize: 13),
-                          ),
+                          styleSheet:
+                              MarkdownStyleSheet.fromTheme(
+                                Theme.of(context),
+                              ).copyWith(
+                                p: TextStyle(
+                                  color: textColor,
+                                  fontSize: 14,
+                                  height: 1.45,
+                                ),
+                                strong: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                code: const TextStyle(
+                                  color: Color(0xFF6366F1),
+                                  fontSize: 13,
+                                ),
+                              ),
                         )
-                      : Text(message['content'] ?? '', style: TextStyle(color: textColor, fontSize: 14, height: 1.45)),
+                      : Text(
+                          message['content'] ?? '',
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 14,
+                            height: 1.45,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -311,7 +361,157 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     );
   }
 
+  Widget _buildRerouteActionArea(bool dark) {
+    final suggestion = widget.pathway.pendingRerouteSuggestion;
+    if (suggestion == null) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _isRerouting ? null : _confirmReroute,
+          icon: _isRerouting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.auto_awesome_rounded),
+          label: const Text('Suggest adjustment'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF6366F1),
+            side: const BorderSide(color: Color(0xFF6366F1)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF111827) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pathway update suggestion',
+                style: TextStyle(
+                  color: dark
+                      ? const Color(0xFFF0F6FC)
+                      : const Color(0xFF0F172A),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                suggestion.rerouteReason ?? 'No reason provided.',
+                style: TextStyle(
+                  color: dark
+                      ? const Color(0xFF8B949E)
+                      : const Color(0xFF475569),
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isRerouting
+                ? null
+                : () async {
+                    setState(() => _isRerouting = true);
+                    try {
+                      final updatedPathway = await _repository.acceptReroute(pathwayId: widget.pathway.pathwayId);
+                      widget.onPathwayUpdated?.call(updatedPathway);
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to accept: $e')),
+                      );
+                    } finally {
+                      if (mounted) setState(() => _isRerouting = false);
+                    }
+                  },
+            icon: _isRerouting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_rounded),
+            label: const Text('Accept'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF28B79B),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _isRerouting
+                ? null
+                : () async {
+                    setState(() => _isRerouting = true);
+                    try {
+                      final updatedPathway = await _repository.declineReroute(pathwayId: widget.pathway.pathwayId);
+                      widget.onPathwayUpdated?.call(updatedPathway);
+
+                      setState(() {
+                        _messages.add({
+                          'role': 'mentor',
+                          'content': 'Kept current route as requested.',
+                        });
+                      });
+                      _scrollToBottom();
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to decline: $e')),
+                      );
+                    } finally {
+                      if (mounted) setState(() => _isRerouting = false);
+                    }
+                  },
+            icon: const Icon(Icons.pause_circle_filled_rounded),
+            label: const Text('Keep current'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              side: const BorderSide(color: Color(0xFF64748B)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildActionArea(bool dark) {
+    // Deprecated: kept for backward compatibility.
+    // FE-11 uses _buildRerouteActionArea.
+
     return Container(
       padding: const EdgeInsets.all(14),
       color: dark ? const Color(0xFF0D1117) : const Color(0xFFF8FAFC),
@@ -325,7 +525,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                 if (node == null || node.courseId <= 0) return;
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => CourseDetailPage(courseId: node.courseId)),
+                  MaterialPageRoute(
+                    builder: (_) => CourseDetailPage(courseId: node.courseId),
+                  ),
                 );
               },
               icon: const Icon(Icons.arrow_forward_rounded),
@@ -334,28 +536,15 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                 backgroundColor: const Color(0xFF28B79B),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 0,
               ),
             ),
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _isRerouting ? null : _confirmReroute,
-              icon: _isRerouting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.auto_awesome_rounded),
-              label: const Text('Suggest adjustment'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF6366F1),
-                side: const BorderSide(color: Color(0xFF6366F1)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
+          _buildRerouteActionArea(dark),
         ],
       ),
     );
@@ -371,14 +560,26 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(24)),
+              decoration: BoxDecoration(
+                color: inputBg,
+                borderRadius: BorderRadius.circular(24),
+              ),
               child: TextField(
                 controller: _chatController,
-                style: TextStyle(color: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A)),
+                style: TextStyle(
+                  color: dark
+                      ? const Color(0xFFF0F6FC)
+                      : const Color(0xFF0F172A),
+                ),
                 decoration: InputDecoration(
                   hintText: 'Ask AI Mentor about this pathway...',
                   border: InputBorder.none,
-                  hintStyle: TextStyle(color: dark ? const Color(0xFF8B949E) : const Color(0xFF94A3B8), fontSize: 14),
+                  hintStyle: TextStyle(
+                    color: dark
+                        ? const Color(0xFF8B949E)
+                        : const Color(0xFF94A3B8),
+                    fontSize: 14,
+                  ),
                 ),
                 onSubmitted: (_) => _sendMessage(),
               ),
@@ -387,13 +588,26 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           const SizedBox(width: 10),
           DecoratedBox(
             decoration: BoxDecoration(
-              color: _isSending ? const Color(0xFF94A3B8) : const Color(0xFF28B79B),
+              color: _isSending
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFF28B79B),
               shape: BoxShape.circle,
             ),
             child: IconButton(
               icon: _isSending
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
               onPressed: _isSending ? null : _sendMessage,
             ),
           ),
