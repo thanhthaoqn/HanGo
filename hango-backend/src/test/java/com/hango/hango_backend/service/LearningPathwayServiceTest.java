@@ -13,6 +13,8 @@ import com.hango.hango_backend.exeption.ApiException;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
 import com.hango.hango_backend.repository.LearningPathwayRepository;
+import com.hango.hango_backend.repository.LessonProgressRepository;
+import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.Test;
@@ -67,6 +69,12 @@ class LearningPathwayServiceTest {
 
     @Mock
     private ExamResultAnalyzerService examResultAnalyzerService;
+
+    @Mock
+    private LessonProgressRepository lessonProgressRepository;
+
+    @Mock
+    private LessonRepository lessonRepository;
 
     @InjectMocks
     private LearningPathwayService learningPathwayService;
@@ -179,7 +187,13 @@ class LearningPathwayServiceTest {
         when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
         when(learningPathwayRepository.save(any(LearningPathway.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        LearningPathwayResponseDTO result = learningPathwayService.reroutePathway(10L, 1L, 42);
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+        when(lessonRepository.countByCourseId(1L)).thenReturn(4L);
+        when(lessonRepository.countByCourseId(2L)).thenReturn(4L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 1L)).thenReturn(1L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 2L)).thenReturn(0L);
+
+        LearningPathwayResponseDTO result = learningPathwayService.reroutePathway(10L, 1L);
 
         // Nội dung mentorSummary hiện tại đã đổi theo text tiếng Việt nên không thể assert theo chuỗi cũ.
         assertTrue(result.getMentorSummary().contains("Hệ thống") || result.getMentorSummary().contains("điểm") || result.getMentorSummary().contains("Dynamic"));

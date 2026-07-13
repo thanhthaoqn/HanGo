@@ -14,5 +14,5 @@ import java.util.Map;
 @AllArgsConstructor
 public class ExamAttemptRequestDTO {
     private BigDecimal score;
-    private Map<String, Integer> answers;
+    private Map<String, Object> answers;
 }

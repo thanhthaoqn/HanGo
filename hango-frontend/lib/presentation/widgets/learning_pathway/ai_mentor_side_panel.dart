@@ -8,12 +8,14 @@ class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
   final PathwayNode? selectedNode;
   final ValueChanged<LearningPathway>? onPathwayUpdated;
+  final bool isDarkMode;
 
   const AIMentorSidePanel({
     super.key,
     required this.pathway,
     this.selectedNode,
     this.onPathwayUpdated,
+    this.isDarkMode = false,
   });
 
   @override
@@ -26,30 +28,33 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   final PathwayRepository _repository = PathwayRepository();
   final List<Map<String, String>> _messages = [];
   bool _isSending = false;
+  bool _isRerouting = false;
 
   @override
   void initState() {
     super.initState();
-    // Add welcome message
-    _messages.add({
-      'role': 'mentor',
-      'content': widget.pathway.mentorSummary,
-    });
+    _messages.add({'role': 'mentor', 'content': widget.pathway.mentorSummary});
   }
 
   @override
   void didUpdateWidget(AIMentorSidePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selectedNode != null && widget.selectedNode != oldWidget.selectedNode) {
-      // Add a message explaining the selected node
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content': 'Về ${widget.selectedNode!.courseTitle}:\n\n${widget.selectedNode!.reasonWhy}',
+          'content': 'About ${widget.selectedNode!.courseTitle}:\n\n${widget.selectedNode!.reasonWhy}',
         });
       });
       _scrollToBottom();
     }
+  }
+
+  @override
+  void dispose() {
+    _chatController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _scrollToBottom() {
@@ -57,8 +62,8 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
         );
       }
     });
@@ -80,122 +85,165 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
         pathwayId: widget.pathway.pathwayId,
         message: text,
       );
-      if (mounted) {
-        setState(() {
-          _messages.add({'role': 'mentor', 'content': response});
-          _isSending = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _messages.add({'role': 'mentor', 'content': response});
+      });
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _messages.add({
-            'role': 'mentor',
-            'content': 'Hiện chưa thể kết nối AI Mentor. Vui lòng thử lại sau.',
-          });
-          _isSending = false;
+      if (!mounted) return;
+      setState(() {
+        _messages.add({
+          'role': 'mentor',
+          'content': 'AI Mentor is unavailable right now. Please try again later.',
         });
-      }
+      });
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+      _scrollToBottom();
     }
-    _scrollToBottom();
   }
 
-  @override
-  void dispose() {
-    _chatController.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _confirmReroute() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Adjust this pathway?'),
+        content: const Text(
+          'AI Mentor will use your latest exam result and real course progress to suggest a smoother route.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep current'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF28B79B),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Adjust'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isRerouting = true);
+    try {
+      final updatedPathway = await _repository.reroutePathway(pathwayId: widget.pathway.pathwayId);
+      widget.onPathwayUpdated?.call(updatedPathway);
+      if (!mounted) return;
+      setState(() {
+        _messages.add({
+          'role': 'mentor',
+          'content': 'I updated the recommendation using your latest exam signal and current lesson progress.',
+        });
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add({
+          'role': 'mentor',
+          'content': 'I could not adjust the pathway right now. Please try again later.',
+        });
+      });
+    } finally {
+      if (mounted) setState(() => _isRerouting = false);
+      _scrollToBottom();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final dark = widget.isDarkMode;
+    final surface = dark ? const Color(0xFF161B22) : Colors.white;
+    final border = dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(
-          left: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-        ),
+        color: surface,
+        border: Border(left: BorderSide(color: border)),
         boxShadow: [
-          const BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.02),
-            blurRadius: 10,
-            offset: Offset(-5, 0),
+          BoxShadow(
+            color: Colors.black.withOpacity(dark ? 0.24 : 0.04),
+            blurRadius: 18,
+            offset: const Offset(-6, 0),
           ),
         ],
       ),
       child: Column(
         children: [
-          _buildHeader(),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          Expanded(
-            child: _buildChatList(),
-          ),
+          _buildHeader(dark),
+          Divider(height: 1, color: border),
+          Expanded(child: _buildChatList(dark)),
           if (widget.selectedNode != null && widget.selectedNode!.status != NodeStatus.locked)
-            _buildActionArea(),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          _buildChatInput(),
+            _buildActionArea(dark),
+          Divider(height: 1, color: border),
+          _buildChatInput(dark),
         ],
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+  Widget _buildHeader(bool dark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: dark
+              ? const [Color(0xFF1E293B), Color(0xFF111827)]
+              : const [Color(0xFFF8FAFC), Color(0xFFEFF6FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.94, end: 1),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeInOut,
+            builder: (context, value, child) => Transform.scale(scale: value, child: child),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF28B79B)]),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.28),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color.fromRGBO(79, 70, 229, 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 22),
             ),
-            child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 28),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'AI Mentor',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 2),
-                Row(
+                const Row(
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF10B981),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Đang trực tuyến',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF10B981),
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Icon(Icons.circle, size: 8, color: Color(0xFF10B981)),
+                    SizedBox(width: 6),
+                    Text(
+                      'Online and pathway-aware',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -207,153 +255,103 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     );
   }
 
-  Widget _buildChatList() {
+  Widget _buildChatList(bool dark) {
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[index];
         final isMentor = message['role'] == 'mentor';
+        final bubbleColor = isMentor
+            ? (dark ? const Color(0xFF21262D) : const Color(0xFFF8FAFC))
+            : const Color(0xFF28B79B);
+        final textColor = isMentor
+            ? (dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155))
+            : Colors.white;
 
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.only(bottom: 14),
           child: Row(
             mainAxisAlignment: isMentor ? MainAxisAlignment.start : MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (isMentor) ...[
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEEF2FF),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4F46E5), size: 16),
-                ),
-                const SizedBox(width: 12),
-              ],
               Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
                   decoration: BoxDecoration(
-                    color: isMentor ? const Color(0xFFF8FAFC) : const Color(0xFF4F46E5),
+                    color: bubbleColor,
                     borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isMentor ? 4 : 16),
-                      bottomRight: Radius.circular(isMentor ? 16 : 4),
+                      topLeft: const Radius.circular(14),
+                      topRight: const Radius.circular(14),
+                      bottomLeft: Radius.circular(isMentor ? 4 : 14),
+                      bottomRight: Radius.circular(isMentor ? 14 : 4),
                     ),
-                    border: isMentor ? Border.all(color: const Color(0xFFE2E8F0)) : null,
+                    border: isMentor
+                        ? Border.all(color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0))
+                        : null,
                   ),
                   child: isMentor
                       ? MarkdownBody(
                           data: message['content'] ?? '',
                           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                            p: const TextStyle(color: Color(0xFF334155), fontSize: 14, height: 1.5),
-                            strong: const TextStyle(color: Color(0xFF334155), fontWeight: FontWeight.bold),
-                            code: const TextStyle(color: Color(0xFF4F46E5), fontSize: 13),
+                            p: TextStyle(color: textColor, fontSize: 14, height: 1.45),
+                            strong: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+                            code: const TextStyle(color: Color(0xFF6366F1), fontSize: 13),
                           ),
                         )
-                      : Text(
-                          message['content'] ?? '',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            height: 1.5,
-                          ),
-                        ),
+                      : Text(message['content'] ?? '', style: TextStyle(color: textColor, fontSize: 14, height: 1.45)),
                 ),
               ),
-              if (!isMentor) const SizedBox(width: 40),
-              if (isMentor) const SizedBox(width: 40),
             ],
           ),
         );
       },
     );
   }
-  
-  Widget _buildActionArea() {
+
+  Widget _buildActionArea(bool dark) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      color: const Color(0xFFF8FAFC),
+      padding: const EdgeInsets.all(14),
+      color: dark ? const Color(0xFF0D1117) : const Color(0xFFF8FAFC),
       child: Column(
         children: [
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () async {
-                if (widget.selectedNode != null && widget.selectedNode!.courseId > 0) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CourseDetailPage(courseId: widget.selectedNode!.courseId),
-                    ),
-                  );
-                }
+            child: ElevatedButton.icon(
+              onPressed: () {
+                final node = widget.selectedNode;
+                if (node == null || node.courseId <= 0) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CourseDetailPage(courseId: node.courseId)),
+                );
               },
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('Start learning'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
+                backgroundColor: const Color(0xFF28B79B),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Bắt đầu học ngay',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, size: 20),
-                ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () async {
-                try {
-                  final updatedPathway = await _repository.reroutePathway(
-                    pathwayId: widget.pathway.pathwayId,
-                    quizScore: 42,
-                  );
-                  widget.onPathwayUpdated?.call(updatedPathway);
-                  if (mounted) {
-                    setState(() {
-                      _messages.add({
-                        'role': 'mentor',
-                        'content': 'Đã kích hoạt Dynamic Re-routing vì điểm quiz gần đây thấp. Lộ trình mới đã được cập nhật.',
-                      });
-                    });
-                    _scrollToBottom();
-                  }
-                } catch (_) {
-                  if (mounted) {
-                    setState(() {
-                      _messages.add({
-                        'role': 'mentor',
-                        'content': 'Không thể tái lập lộ trình lúc này. Vui lòng thử lại sau.',
-                      });
-                    });
-                    _scrollToBottom();
-                  }
-                }
-              },
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Tái lập lộ trình'),
+              onPressed: _isRerouting ? null : _confirmReroute,
+              icon: _isRerouting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.auto_awesome_rounded),
+              label: const Text('Suggest adjustment'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF4F46E5),
-                side: const BorderSide(color: Color(0xFF4F46E5)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                foregroundColor: const Color(0xFF6366F1),
+                side: const BorderSide(color: Color(0xFF6366F1)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
@@ -363,34 +361,33 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     );
   }
 
-  Widget _buildChatInput() {
+  Widget _buildChatInput(bool dark) {
+    final inputBg = dark ? const Color(0xFF21262D) : const Color(0xFFF1F5F9);
     return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      padding: const EdgeInsets.all(12),
+      color: dark ? const Color(0xFF161B22) : Colors.white,
       child: Row(
         children: [
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(24),
-              ),
+              decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(24)),
               child: TextField(
                 controller: _chatController,
-                decoration: const InputDecoration(
-                  hintText: 'Hỏi AI Mentor về lộ trình...',
+                style: TextStyle(color: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A)),
+                decoration: InputDecoration(
+                  hintText: 'Ask AI Mentor about this pathway...',
                   border: InputBorder.none,
-                  hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                  hintStyle: TextStyle(color: dark ? const Color(0xFF8B949E) : const Color(0xFF94A3B8), fontSize: 14),
                 ),
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Container(
+          const SizedBox(width: 10),
+          DecoratedBox(
             decoration: BoxDecoration(
-              color: _isSending ? const Color(0xFF94A3B8) : const Color(0xFF4F46E5),
+              color: _isSending ? const Color(0xFF94A3B8) : const Color(0xFF28B79B),
               shape: BoxShape.circle,
             ),
             child: IconButton(

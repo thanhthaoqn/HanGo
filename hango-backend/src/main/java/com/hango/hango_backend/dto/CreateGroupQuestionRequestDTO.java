@@ -11,12 +11,14 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateGroupQuestionRequestDTO {
+    private Long id;
     private Long sectionId;
     private String passageText;
     private String explanation;
     private Long categoryId;
     private Long skillParamId; // REQUIRED by DB (skill-param-id)
     private Long difficultyId;
+    private String status;
     private List<CreateSubQuestionDTO> subQuestions;
 }
 

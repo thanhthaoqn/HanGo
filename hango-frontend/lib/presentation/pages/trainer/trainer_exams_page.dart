@@ -7,8 +7,8 @@ import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
-import 'trainer_tasks_page.dart';
 import 'trainer_create_exam_page.dart';
+import 'trainer_edit_exam_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -32,6 +32,21 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
+  // Tab Status Filters
+  String _selectedStatus = 'ALL'; 
+
+  // Status Counts
+  int _allCount = 0;
+  int _draftCount = 0;
+  int _publishedCount = 0;
+  int _hiddenCount = 0;
+  int _pendingCount = 0;
+
+  // Filter values
+  final TextEditingController _searchController = TextEditingController();
+  String _selectedSortBy = 'NEWEST';
+  String _selectedTimePeriod = 'ALL';
+
   String get apiBaseUrl {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:8080/api/v1';
@@ -44,6 +59,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     super.initState();
     _loadTrainerInfo();
     _fetchExamsData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchExamsData() async {
@@ -59,7 +80,17 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         throw Exception('Authentication token not found');
       }
 
-      final uri = Uri.parse('$apiBaseUrl/trainer/exams');
+      final searchVal = _searchController.text.trim();
+      final queryParams = <String, String>{
+        'status': _selectedStatus,
+        'sortBy': _selectedSortBy,
+        'timePeriod': _selectedTimePeriod,
+      };
+      if (searchVal.isNotEmpty) {
+        queryParams['search'] = searchVal;
+      }
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/exams').replace(queryParameters: queryParams);
       final response = await http.get(
         uri,
         headers: {
@@ -71,7 +102,21 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         setState(() {
-          _examsList = data;
+          if (data is Map) {
+            _allCount = (data['allCount'] ?? 0) as int;
+            _draftCount = (data['draftCount'] ?? 0) as int;
+            _publishedCount = (data['publishedCount'] ?? 0) as int;
+            _hiddenCount = (data['hiddenCount'] ?? 0) as int;
+            _pendingCount = (data['pendingCount'] ?? 0) as int;
+            _examsList = data['exams'] ?? [];
+          } else if (data is List) {
+            _examsList = data;
+            _allCount = data.length;
+            _draftCount = 0;
+            _publishedCount = 0;
+            _hiddenCount = 0;
+            _pendingCount = 0;
+          }
           _isLoading = false;
         });
       } else {
@@ -89,6 +134,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
   void _loadMockFallback() {
     setState(() {
+      _allCount = 1;
+      _draftCount = 0;
+      _publishedCount = 1;
+      _hiddenCount = 0;
+      _pendingCount = 0;
       _examsList = [
         {
           'id': 1,
@@ -165,36 +215,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Create New Exam button on top right
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
-                              );
-                              _fetchExamsData();
-                            },
-                            icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                            label: const Text(
-                              'Create New Exam',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF38C9A6), // matches mockup
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 0,
-                            ),
-                          ),
-                        ),
+                        _buildWelcomeSection(),
+                        const SizedBox(height: 24),
+                        _buildFilterContainer(),
                         const SizedBox(height: 24),
                         if (_isLoading)
                           const Center(
@@ -213,6 +236,284 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeSection() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Exam Management',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
+            );
+            _fetchExamsData();
+          },
+          icon: const Icon(Icons.add, color: Colors.white, size: 18),
+          label: const Text(
+            'Create New Exam',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Outfit',
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF38C9A6),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterContainer() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEFF2F5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildStatusTab('All', 'ALL', _allCount),
+                const SizedBox(width: 8),
+                _buildStatusTab('Draft', 'DRAFT', _draftCount),
+                const SizedBox(width: 8),
+                _buildStatusTab('Published', 'PUBLISHED', _publishedCount),
+                const SizedBox(width: 8),
+                _buildStatusTab('Hidden', 'HIDDEN', _hiddenCount),
+                const SizedBox(width: 8),
+                _buildStatusTab('Pending', 'PENDING', _pendingCount),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final useRow = constraints.maxWidth > 768;
+
+              final searchField = TextField(
+                controller: _searchController,
+                onChanged: (val) => _fetchExamsData(),
+                decoration: InputDecoration(
+                  hintText: 'Search for exams...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF94A3B8),
+                    size: 20,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF38C9A6)),
+                  ),
+                ),
+              );
+
+              final sortByDropdown = _buildDropdown(
+                value: _selectedSortBy,
+                items: const [
+                  DropdownMenuItem(
+                    value: 'NEWEST',
+                    child: Text('Sort by: Newest'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'OLDEST',
+                    child: Text('Sort by: Oldest'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'ALPHABETICAL',
+                    child: Text('Sort by: Alphabetical'),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedSortBy = val);
+                    _fetchExamsData();
+                  }
+                },
+              );
+
+              final timePeriodDropdown = _buildDropdown(
+                value: _selectedTimePeriod,
+                items: const [
+                  DropdownMenuItem(
+                    value: 'ALL',
+                    child: Text('Time Period: All'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'THIS_WEEK',
+                    child: Text('Time Period: This Week'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'THIS_MONTH',
+                    child: Text('Time Period: This Month'),
+                  ),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedTimePeriod = val);
+                    _fetchExamsData();
+                  }
+                },
+              );
+
+              if (useRow) {
+                return Row(
+                  children: [
+                    Expanded(flex: 3, child: searchField),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 1, child: sortByDropdown),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 1, child: timePeriodDropdown),
+                  ],
+                );
+              } else {
+                return Column(
+                  children: [
+                    searchField,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: sortByDropdown),
+                        const SizedBox(width: 12),
+                        Expanded(child: timePeriodDropdown),
+                      ],
+                    ),
+                  ],
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusTab(String label, String statusKey, int count) {
+    final isActive = _selectedStatus == statusKey;
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedStatus = statusKey);
+        _fetchExamsData();
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFE6FFFA) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? const Color(0xFF38C9A6) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive
+                    ? const Color(0xFF38C9A6)
+                    : const Color(0xFF4B5563),
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? const Color(0xFF38C9A6)
+                    : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: isActive ? Colors.white : const Color(0xFF64748B),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          items: items,
+          onChanged: onChanged,
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: Color(0xFF64748B),
+            size: 18,
+          ),
+          style: const TextStyle(
+            color: Color(0xFF1E293B),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            fontFamily: 'Outfit',
+          ),
+        ),
       ),
     );
   }
@@ -425,7 +726,17 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
-                  onPressed: () {},
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                        examId: exam['id'],
+                        examTitle: exam['title'] ?? 'Untitled',
+                        examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                      )),
+                    );
+                    _fetchExamsData();
+                  },
                   splashRadius: 20,
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -641,14 +952,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               context,
               MaterialPageRoute(
                 builder: (context) => const TrainerQuestionBankPage(),
-              ),
-            );
-          }),
-          _buildSidebarItem(Icons.task_alt_outlined, 'Task', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerTasksPage(),
               ),
             );
           }),

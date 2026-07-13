@@ -1733,10 +1733,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       if (quizScorePercent < 60) {
         final pathwayRepository = PathwayRepository();
         final pathway = await pathwayRepository.getMyPathway();
-        await pathwayRepository.reroutePathway(
-          pathwayId: pathway.pathwayId,
-          quizScore: quizScorePercent,
-        );
+        await pathwayRepository.reroutePathway(pathwayId: pathway.pathwayId);
       }
     } catch (e) {
       debugPrint('Error syncing quiz attempt or rerouting pathway: $e');

@@ -5,315 +5,494 @@ class InteractiveNodeTree extends StatelessWidget {
   final List<PathwayNode> nodes;
   final Function(PathwayNode) onNodeTap;
   final PathwayNode? selectedNode;
+  final bool isDarkMode;
 
   const InteractiveNodeTree({
-    Key? key,
+    super.key,
     required this.nodes,
     required this.onNodeTap,
     this.selectedNode,
-  }) : super(key: key);
+    this.isDarkMode = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
       itemCount: nodes.length,
       itemBuilder: (context, index) {
         final node = nodes[index];
         final isLast = index == nodes.length - 1;
+        final alignLeft = index.isEven;
 
-        // Zig-zag alignment: Left, Center, Right, Center, Left...
-        // For simplicity, alternating left and right slightly
-        final alignment = index % 2 == 0
-            ? Alignment.centerLeft
-            : Alignment.centerRight;
-        final paddingHorizontal = index % 2 == 0
-            ? const EdgeInsets.only(left: 40, right: 80)
-            : const EdgeInsets.only(left: 80, right: 40);
-
-        return _buildNodeItem(
-          context,
-          node,
-          isLast,
-          alignment,
-          paddingHorizontal,
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: Duration(milliseconds: 280 + index * 70),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, 18 * (1 - value)),
+                child: child,
+              ),
+            );
+          },
+          child: _NodeRow(
+            node: node,
+            isLast: isLast,
+            alignLeft: alignLeft,
+            isSelected: selectedNode?.step == node.step,
+            isDarkMode: isDarkMode,
+            onTap: () => onNodeTap(node),
+          ),
         );
       },
     );
   }
+}
 
-  Widget _buildNodeItem(
-    BuildContext context,
-    PathwayNode node,
-    bool isLast,
-    Alignment alignment,
-    EdgeInsets padding,
-  ) {
-    final isSelected = selectedNode?.step == node.step;
+class _NodeRow extends StatelessWidget {
+  final PathwayNode node;
+  final bool isLast;
+  final bool alignLeft;
+  final bool isSelected;
+  final bool isDarkMode;
+  final VoidCallback onTap;
 
-    return Stack(
-      alignment: Alignment.topCenter,
-      children: [
-        // Connecting Line
-        if (!isLast)
+  const _NodeRow({
+    required this.node,
+    required this.isLast,
+    required this.alignLeft,
+    required this.isSelected,
+    required this.isDarkMode,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isCompact = width < 720;
+    final cardWidth = isCompact ? double.infinity : 310.0;
+    final connectorColor = node.status == NodeStatus.completed
+        ? const Color(0xFF10B981)
+        : isDarkMode
+        ? const Color(0xFF30363D)
+        : const Color(0xFFD7DEE8);
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 168),
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
           Positioned(
-            top: 60,
-            bottom: -60,
-            child: Container(
-              width: 4,
-              color: node.status == NodeStatus.completed
-                  ? const Color(0xFF10B981) // Green
-                  : const Color(0xFFE2E8F0), // Gray
+            top: 36,
+            bottom: isLast ? null : -8,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: 3,
+              height: isLast ? 44 : null,
+              decoration: BoxDecoration(
+                color: connectorColor,
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
           ),
-
-        // Node Content
-        Align(
-          alignment: alignment,
-          child: Padding(
-            padding: padding,
-            child: GestureDetector(
-              onTap: () => onNodeTap(node),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 60),
-                width: 280,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF3B82F6) // Selected Blue
-                        : _getBorderColor(node.status),
-                    width: isSelected ? 2 : 1.5,
-                  ),
-                  boxShadow: [
-                    if (node.status == NodeStatus.inProgress || isSelected)
-                      BoxShadow(
-                        color: _getShadowColor(node.status, isSelected),
-                        blurRadius: 20,
-                        spreadRadius: 2,
+          Align(
+            alignment: isCompact
+                ? Alignment.center
+                : alignLeft
+                ? Alignment.centerLeft
+                : Alignment.centerRight,
+            child: Padding(
+              padding: isCompact
+                  ? const EdgeInsets.only(bottom: 38)
+                  : EdgeInsets.only(
+                      left: alignLeft ? 28 : 96,
+                      right: alignLeft ? 96 : 28,
+                      bottom: 24,
+                    ),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: onTap,
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    scale: isSelected ? 1.025 : 1,
+                    child: SizedBox(
+                      width: cardWidth,
+                      child: _NodeCard(
+                        node: node,
+                        isSelected: isSelected,
+                        isDarkMode: isDarkMode,
                       ),
-                    if (node.status != NodeStatus.inProgress && !isSelected)
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: _buildStatusBadge(node.status),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Step ${node.step}',
-                            style: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        node.courseTitle,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: node.status == NodeStatus.locked
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF1E293B),
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: node.tags
-                            .map((tag) => _buildTag(tag, node.status))
-                            .toList(),
-                      ),
-                      if (node.status == NodeStatus.inProgress) ...[
-                        const SizedBox(height: 16),
-                        _buildProgressBar(node.progressPercent),
-                      ],
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+          _StepBadge(node: node, isDarkMode: isDarkMode),
+        ],
+      ),
     );
   }
+}
 
-  Color _getBorderColor(NodeStatus status) {
-    switch (status) {
-      case NodeStatus.completed:
-        return const Color(0xFF10B981);
-      case NodeStatus.inProgress:
-        return const Color(0xFF3B82F6);
-      case NodeStatus.locked:
-        return const Color(0xFFE2E8F0);
-    }
-  }
+class _NodeCard extends StatelessWidget {
+  final PathwayNode node;
+  final bool isSelected;
+  final bool isDarkMode;
 
-  Color _getShadowColor(NodeStatus status, bool isSelected) {
-    if (isSelected) return const Color(0xFF3B82F6).withOpacity(0.3);
-    if (status == NodeStatus.inProgress)
-      return const Color(0xFF3B82F6).withOpacity(0.2);
-    return Colors.transparent;
-  }
+  const _NodeCard({
+    required this.node,
+    required this.isSelected,
+    required this.isDarkMode,
+  });
 
-  Widget _buildStatusBadge(NodeStatus status) {
-    switch (status) {
-      case NodeStatus.completed:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.check_circle, size: 14, color: Color(0xFF10B981)),
-              SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  'Completed',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Color(0xFF10B981),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      case NodeStatus.inProgress:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF3B82F6).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.play_circle_fill, size: 14, color: Color(0xFF3B82F6)),
-              SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  'In Progress',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Color(0xFF3B82F6),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      case NodeStatus.locked:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.lock, size: 14, color: Color(0xFF94A3B8)),
-              SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  'Locked',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-    }
-  }
+  @override
+  Widget build(BuildContext context) {
+    final palette = _NodePalette.forStatus(node.status, isDarkMode);
+    final effectiveProgress = node.status == NodeStatus.completed
+        ? 100
+        : node.progressPercent.clamp(0, 100);
+    final lessonText = node.totalLessons > 0
+        ? '${node.completedLessons}/${node.totalLessons} lessons'
+        : 'Course step';
 
-  Widget _buildTag(String tag, NodeStatus status) {
-    final isLocked = status == NodeStatus.locked;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isLocked ? const Color(0xFFF8FAFC) : const Color(0xFFEEF2FF),
-        borderRadius: BorderRadius.circular(6),
+        gradient: palette.gradient,
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isSelected ? const Color(0xFF28B79B) : palette.border,
+          width: isSelected ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isSelected ? const Color(0xFF28B79B) : palette.glow)
+                .withOpacity(isSelected ? 0.28 : 0.14),
+            blurRadius: isSelected || node.status == NodeStatus.inProgress
+                ? 22
+                : 10,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              _StatusPill(status: node.status, isDarkMode: isDarkMode),
+              const Spacer(),
+              Text(
+                'Step ${node.step}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: palette.muted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            node.courseTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              height: 1.25,
+              color: palette.text,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            lessonText,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: palette.muted,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ...node.tags
+                  .take(3)
+                  .map(
+                    (tag) => _SkillTag(
+                      label: tag,
+                      status: node.status,
+                      isDarkMode: isDarkMode,
+                    ),
+                  ),
+              if (node.skillType != null && node.tags.isEmpty)
+                _SkillTag(
+                  label: node.skillType!,
+                  status: node.status,
+                  isDarkMode: isDarkMode,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _ProgressBar(
+            percent: effectiveProgress,
+            status: node.status,
+            isDarkMode: isDarkMode,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepBadge extends StatelessWidget {
+  final PathwayNode node;
+  final bool isDarkMode;
+
+  const _StepBadge({required this.node, required this.isDarkMode});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (node.status) {
+      NodeStatus.completed => const Color(0xFF10B981),
+      NodeStatus.inProgress => const Color(0xFF28B79B),
+      NodeStatus.locked =>
+        isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
+    };
+    final icon = switch (node.status) {
+      NodeStatus.completed => Icons.check_rounded,
+      NodeStatus.inProgress => Icons.play_arrow_rounded,
+      NodeStatus.locked => Icons.lock_rounded,
+    };
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isDarkMode ? const Color(0xFF0D1117) : Colors.white,
+          width: 4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Icon(icon, color: Colors.white, size: 22),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final NodeStatus status;
+  final bool isDarkMode;
+
+  const _StatusPill({required this.status, required this.isDarkMode});
+
+  @override
+  Widget build(BuildContext context) {
+    late final String label;
+    late final IconData icon;
+    late final Color color;
+    switch (status) {
+      case NodeStatus.completed:
+        label = 'Completed';
+        icon = Icons.check_circle_rounded;
+        color = const Color(0xFF10B981);
+        break;
+      case NodeStatus.inProgress:
+        label = 'In Progress';
+        icon = Icons.play_circle_fill_rounded;
+        color = const Color(0xFF28B79B);
+        break;
+      case NodeStatus.locked:
+        label = 'Locked';
+        icon = Icons.lock_rounded;
+        color = const Color(0xFF94A3B8);
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(isDarkMode ? 0.18 : 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkillTag extends StatelessWidget {
+  final String label;
+  final NodeStatus status;
+  final bool isDarkMode;
+
+  const _SkillTag({
+    required this.label,
+    required this.status,
+    required this.isDarkMode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final locked = status == NodeStatus.locked;
+    final color = locked ? const Color(0xFF94A3B8) : const Color(0xFF6366F1);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(isDarkMode ? 0.16 : 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.22)),
       ),
       child: Text(
-        tag,
+        label,
         style: TextStyle(
-          color: isLocked ? const Color(0xFF94A3B8) : const Color(0xFF4F46E5),
+          color: color,
           fontSize: 11,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
+}
 
-  Widget _buildProgressBar(int percent) {
+class _ProgressBar extends StatelessWidget {
+  final int percent;
+  final NodeStatus status;
+  final bool isDarkMode;
+
+  const _ProgressBar({
+    required this.percent,
+    required this.status,
+    required this.isDarkMode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = status == NodeStatus.completed
+        ? const Color(0xFF10B981)
+        : const Color(0xFF28B79B);
+    final track = isDarkMode
+        ? const Color(0xFF30363D)
+        : const Color(0xFFE2E8F0);
+
+    // Keep the progress height controlled via a parent SizedBox/ClipRRect instead.
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
           '$percent%',
-          style: const TextStyle(
+          style: TextStyle(
+            color: color,
             fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF3B82F6),
+            fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 4),
-        Container(
-          height: 6,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE0E7FF),
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: percent / 100,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF3B82F6),
-                borderRadius: BorderRadius.circular(3),
+        const SizedBox(height: 5),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: percent / 100),
+            duration: const Duration(milliseconds: 520),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => SizedBox(
+              height: 7,
+              child: LinearProgressIndicator(
+                value: value,
+                backgroundColor: track,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NodePalette {
+  final Color surface;
+  final Color border;
+  final Color text;
+  final Color muted;
+  final Color glow;
+  final Gradient? gradient;
+
+  const _NodePalette({
+    required this.surface,
+    required this.border,
+    required this.text,
+    required this.muted,
+    required this.glow,
+    this.gradient,
+  });
+
+  static _NodePalette forStatus(NodeStatus status, bool dark) {
+    if (status == NodeStatus.completed) {
+      return _NodePalette(
+        surface: const Color(0xFF063F32),
+        border: const Color(0xFF10B981),
+        text: Colors.white,
+        muted: const Color(0xFFD1FAE5),
+        glow: const Color(0xFF10B981),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F766E), Color(0xFF10B981)],
+        ),
+      );
+    }
+    if (status == NodeStatus.inProgress) {
+      return _NodePalette(
+        surface: dark ? const Color(0xFF12332F) : Colors.white,
+        border: const Color(0xFF28B79B),
+        text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
+        muted: dark ? const Color(0xFFB7C4D3) : const Color(0xFF64748B),
+        glow: const Color(0xFF28B79B),
+        gradient: dark
+            ? const LinearGradient(
+                colors: [Color(0xFF12332F), Color(0xFF161B22)],
+              )
+            : null,
+      );
+    }
+    return _NodePalette(
+      surface: dark ? const Color(0xFF161B22) : Colors.white,
+      border: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0),
+      text: dark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
+      muted: const Color(0xFF94A3B8),
+      glow: dark ? Colors.black : const Color(0xFFCBD5E1),
     );
   }
 }
