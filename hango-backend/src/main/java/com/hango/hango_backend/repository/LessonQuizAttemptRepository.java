@@ -10,4 +10,5 @@ import java.util.List;
 public interface LessonQuizAttemptRepository extends JpaRepository<LessonQuizAttempt, Long> {
     List<LessonQuizAttempt> findByLessonIdAndStudentIdOrderByAttemptNumberAsc(Long lessonId, Long studentId);
     int countByLessonIdAndStudentId(Long lessonId, Long studentId);
+    List<LessonQuizAttempt> findByStudentIdAndLessonSectionCourseIdOrderBySubmittedAtDesc(Long studentId, Long courseId);
 }

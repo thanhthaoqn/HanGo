@@ -3,6 +3,7 @@ package com.hango.hango_backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
+import com.hango.hango_backend.dto.PathwayGenerateRequestDTO;
 import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.dto.PathwayNodeDTO;
 import com.hango.hango_backend.entity.Course;
@@ -28,6 +29,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.hango.hango_backend.dto.PathwayScheduleRequestDTO;
+import com.hango.hango_backend.service.PathwayTimeboxingScheduler;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -46,7 +54,8 @@ public class LearningPathwayService {
 
 
     @Transactional
-    public LearningPathwayResponseDTO generatePathway(Long studentId, Long examAttemptId) {
+    public LearningPathwayResponseDTO generatePathway(Long studentId, PathwayGenerateRequestDTO requestDTO) {
+        Long examAttemptId = requestDTO.getExamAttemptId();
         User student = userRepository.findByIdForUpdate(studentId)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
 
@@ -156,6 +165,10 @@ public class LearningPathwayService {
                         ? responseDto.getMentorSummary()
                         : "Tôi đã xây dựng một lộ trình từ kết quả bài kiểm tra của bạn bằng cách sử dụng các khóa học hiện có trong HanGo.")
                 .status("ACTIVE")
+                .goalName(requestDTO.getGoalName())
+                .targetDate(requestDTO.getTargetDate())
+                .hoursPerWeek(requestDTO.getHoursPerWeek())
+                .scheduleStatus(requestDTO.getTargetDate() != null ? "ON_TRACK" : null)
                 .build();
 
         if (responseDto.getNodes() != null) {
@@ -182,6 +195,10 @@ public class LearningPathwayService {
 
         if (newPathway.getNodes().isEmpty()) {
             addFallbackNodes(newPathway, examAttempt, availableCourses);
+        }
+
+        if (requestDTO.getTargetDate() != null && requestDTO.getHoursPerWeek() != null && requestDTO.getHoursPerWeek() > 0) {
+            applyTimeboxing(newPathway, requestDTO.getTargetDate(), requestDTO.getHoursPerWeek(), requestDTO.getPreferredStudyDays());
         }
 
         LearningPathway savedPathway = learningPathwayRepository.save(newPathway);
@@ -313,6 +330,66 @@ public class LearningPathwayService {
         return geminiClientService.generateChatResponse(systemPrompt, chatHistory);
     }
 
+    @Transactional
+    public LearningPathwayResponseDTO applySchedule(Long pathwayId, Long studentId, PathwayScheduleRequestDTO requestDTO) {
+        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(studentId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        pathway.setGoalName(requestDTO.getGoalName());
+        pathway.setTargetDate(requestDTO.getTargetDate());
+        pathway.setHoursPerWeek(requestDTO.getHoursPerWeek());
+        pathway.setScheduleStatus("ON_TRACK");
+
+        applyTimeboxing(pathway, requestDTO.getTargetDate(), requestDTO.getHoursPerWeek(), requestDTO.getPreferredStudyDays());
+
+        LearningPathway savedPathway = learningPathwayRepository.save(pathway);
+        return toResponseDto(savedPathway, studentId);
+    }
+
+    @Transactional(readOnly = true)
+    public String getScheduleStatus(Long pathwayId, Long studentId) {
+        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(studentId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        return pathway.getScheduleStatus() != null ? pathway.getScheduleStatus() : "NONE";
+    }
+
+    private void applyTimeboxing(LearningPathway pathway, LocalDate targetDate, Integer hoursPerWeek, List<Integer> preferredStudyDays) {
+        if (pathway.getNodes() == null || pathway.getNodes().isEmpty()) return;
+
+        List<Integer> estimatedHoursPerNode = pathway.getNodes().stream()
+                .map(node -> {
+                    long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+                    return totalLessons == 0 ? 3 : (int) (totalLessons * 2); // default 2 hours per lesson if missing data
+                }).toList();
+
+        List<PathwayTimeboxingScheduler.NodeSchedule> schedule = PathwayTimeboxingScheduler.schedule(
+                targetDate,
+                hoursPerWeek,
+                preferredStudyDays,
+                estimatedHoursPerNode,
+                pathway.getNodes().size()
+        );
+
+        for (int i = 0; i < pathway.getNodes().size(); i++) {
+            PathwayNode node = pathway.getNodes().get(i);
+            PathwayTimeboxingScheduler.NodeSchedule nodeSchedule = schedule.get(i);
+            
+            node.setStartDate(nodeSchedule.getStartDate() != null ? nodeSchedule.getStartDate().atStartOfDay() : null);
+            node.setDeadline(nodeSchedule.getDeadline() != null ? nodeSchedule.getDeadline().atTime(23, 59) : null);
+            node.setEstimatedHours(nodeSchedule.getEstimatedHours());
+            node.setScheduleStatus(nodeSchedule.getDeadline() != null && nodeSchedule.getDeadline().isBefore(LocalDate.now()) && !"COMPLETED".equalsIgnoreCase(node.getStatus()) ? "BEHIND" : "ON_TRACK");
+        }
+    }
+
     private LearningPathwayResponseDTO toResponseDto(LearningPathway pathway, Long studentId) {
         List<PathwayNodeDTO> nodeDTOs = pathway.getNodes().stream().map(node -> {
             int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
@@ -343,6 +420,10 @@ public class LearningPathwayService {
                     .tags(node.getCourse().getCategory() != null
                             ? List.of("#" + node.getCourse().getCategory().getParamValue())
                             : Collections.emptyList())
+                    .startDate(node.getStartDate() != null ? node.getStartDate().toString() : null)
+                    .deadline(node.getDeadline() != null ? node.getDeadline().toString() : null)
+                    .estimatedHours(node.getEstimatedHours())
+                    .scheduleStatus(node.getScheduleStatus())
                     .build();
         }).toList();
 
@@ -376,6 +457,10 @@ public class LearningPathwayService {
                 .totalSteps(totalSteps)
                 .completedSteps(completedSteps)
                 .weakSkills(weakSkills)
+                .goalName(pathway.getGoalName())
+                .targetDate(pathway.getTargetDate() != null ? pathway.getTargetDate().toString() : null)
+                .hoursPerWeek(pathway.getHoursPerWeek())
+                .scheduleStatus(pathway.getScheduleStatus())
                 .build();
     }
 

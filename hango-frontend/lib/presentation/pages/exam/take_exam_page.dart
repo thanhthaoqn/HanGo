@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../data/repositories/pathway_repository.dart';
+import '../../widgets/learning_pathway/pathway_setup_dialog.dart';
 import '../../../utils/fullscreen_helper.dart';
 import 'exam_result_page.dart';
 
@@ -455,8 +456,20 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
     if (!mounted) return;
     if (!hasCurrentPathway) {
+      final setupData = await showDialog<Map<String, dynamic>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PathwaySetupDialog(examAttemptId: attemptId),
+      );
+      if (setupData == null) return; // Cancelled
+
       try {
-        await pathwayRepository.generatePathway(examAttemptId: attemptId);
+        await pathwayRepository.generatePathway(
+          examAttemptId: attemptId,
+          goalName: setupData['goalName'],
+          targetDate: setupData['targetDate'],
+          hoursPerWeek: setupData['hoursPerWeek'],
+        );
       } catch (e) {
         debugPrint("Error generating first pathway: $e");
       }
@@ -532,8 +545,20 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     );
 
     if (shouldRefresh == true) {
+      final setupData = await showDialog<Map<String, dynamic>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PathwaySetupDialog(examAttemptId: attemptId),
+      );
+      if (setupData == null) return; // Cancelled
+
       try {
-        await pathwayRepository.generatePathway(examAttemptId: attemptId);
+        await pathwayRepository.generatePathway(
+          examAttemptId: attemptId,
+          goalName: setupData['goalName'],
+          targetDate: setupData['targetDate'],
+          hoursPerWeek: setupData['hoursPerWeek'],
+        );
       } catch (e) {
         debugPrint("Error refreshing pathway after exam: $e");
       }

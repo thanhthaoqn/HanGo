@@ -245,6 +245,8 @@ class _NodeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          _ScheduleChip(node: node, isDarkMode: isDarkMode),
+          const SizedBox(height: 10),
           _ProgressBar(
             percent: effectiveProgress,
             status: node.status,
@@ -262,8 +264,23 @@ class _StepBadge extends StatelessWidget {
 
   const _StepBadge({required this.node, required this.isDarkMode});
 
+  String _nodeTypeLabel(NodeType type) {
+    switch (type) {
+      case NodeType.fastTrackSkipped:
+        return 'Fast-track';
+      case NodeType.detourRemedial:
+        return 'Detour';
+      case NodeType.merged:
+        return 'Merged';
+      case NodeType.normal:
+      default:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final nodeTypeLabel = _nodeTypeLabel(node.nodeType);
     final color = switch (node.status) {
       NodeStatus.completed => const Color(0xFF10B981),
       NodeStatus.inProgress => const Color(0xFF28B79B),
@@ -295,7 +312,24 @@ class _StepBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(icon, color: Colors.white, size: 22),
+      child: nodeTypeLabel.isEmpty
+          ? Icon(icon, color: Colors.white, size: 22)
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 3),
+                Text(
+                  nodeTypeLabel,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -382,6 +416,78 @@ class _SkillTag extends StatelessWidget {
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduleChip extends StatelessWidget {
+  final PathwayNode node;
+  final bool isDarkMode;
+
+  const _ScheduleChip({required this.node, required this.isDarkMode});
+
+  String _formatDate(DateTime d) {
+    final day = d.day.toString().padLeft(2, '0');
+    final month = d.month.toString().padLeft(2, '0');
+    return '$day/$month';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final deadline = node.deadline;
+    if (deadline == null) return const SizedBox.shrink();
+
+    final status = node.scheduleStatus ?? ScheduleStatus.onTrack;
+
+    Color bg;
+    Color fg;
+    String label;
+
+    switch (status) {
+      case ScheduleStatus.behind:
+        bg = const Color(0xFFDC2626);
+        fg = Colors.white;
+        label = 'Behind';
+        break;
+      case ScheduleStatus.atRisk:
+        bg = const Color(0xFFF59E0B);
+        fg = Colors.black;
+        label = 'At risk';
+        break;
+      case ScheduleStatus.completed:
+        bg = const Color(0xFF10B981);
+        fg = Colors.white;
+        label = 'Completed';
+        break;
+      case ScheduleStatus.onTrack:
+      default:
+        bg = const Color(0xFF28B79B);
+        fg = Colors.white;
+        label = 'On track';
+        break;
+    }
+
+    final hours = node.estimatedHours;
+    final hoursText = hours != null ? ' • ${hours}h' : '';
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg.withOpacity(isDarkMode ? 0.26 : 0.16),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: bg.withOpacity(0.45)),
+        ),
+        child: Text(
+          '$label • ${_formatDate(deadline)}$hoursText',
+          style: TextStyle(
+            color: fg,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import '../../widgets/learning_pathway/interactive_node_tree.dart';
 import '../../widgets/learning_pathway/ai_mentor_side_panel.dart';
 import '../../widgets/learning_pathway/pathway_summary_header.dart';
 import '../../widgets/learning_pathway/skill_analysis_panel.dart';
+import '../../widgets/learning_pathway/merge_preview_dialog.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 
@@ -88,6 +89,49 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
+  Future<void> _handleMergeGoals() async {
+    final pathway = _pathway;
+    if (pathway == null) return;
+
+    final uncompletedCourseIds = pathway.nodes
+        .where((n) => n.status != NodeStatus.completed)
+        .map((n) => n.courseId)
+        .toList();
+
+    if (uncompletedCourseIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active steps available to merge.')),
+      );
+      return;
+    }
+
+    try {
+      final preview = await _repository.mergePreview(uncompletedCourseIds);
+      if (!mounted) return;
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => MergePreviewDialog(preview: preview),
+      );
+
+      if (confirmed == true && mounted) {
+        final updatedPathway = await _repository.mergeConfirm(pathway.pathwayId, preview);
+        setState(() {
+          _pathway = updatedPathway;
+          _selectedNode = updatedPathway.nodes.isNotEmpty ? updatedPathway.nodes.first : null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Goals merged successfully!')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not generate merge preview: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -130,6 +174,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           pathway: _pathway!,
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
+          onMergePressed: _handleMergeGoals,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
@@ -168,6 +213,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           pathway: _pathway!,
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
+          onMergePressed: _handleMergeGoals,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
