@@ -19,4 +19,5 @@ public class QuestionDTO {
     private String creatorName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean isGroup;
 }

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -102,7 +103,7 @@ public class ExamService {
         String answersJson = null;
         try {
             if (request.getAnswers() != null) {
-                answersJson = objectMapper.writeValueAsString(request.getAnswers());
+                answersJson = objectMapper.writeValueAsString(enrichAnswers(request.getAnswers()));
             }
         } catch (Exception e) {
             answersJson = "{}";
@@ -118,6 +119,59 @@ public class ExamService {
 
         ExamAttempt saved = examAttemptRepository.save(attempt);
         return mapToAttemptDTO(saved, nextAttemptNumber);
+    }
+
+    private List<Map<String, Object>> enrichAnswers(Map<String, Object> rawAnswers) {
+        return rawAnswers.entrySet().stream()
+                .sorted((left, right) -> {
+                    int leftKey = parseQuestionNumber(left.getKey());
+                    int rightKey = parseQuestionNumber(right.getKey());
+                    return Integer.compare(leftKey, rightKey);
+                })
+                .map(entry -> toAnswerRecord(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toAnswerRecord(String questionNumber, Object rawValue) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("questionId", Long.valueOf(parseQuestionNumber(questionNumber)));
+
+        if (rawValue instanceof Map<?, ?> rawMap) {
+            Map<String, Object> answerMap = (Map<String, Object>) rawMap;
+            Object selected = answerMap.get("selectedOption");
+            Object correct = answerMap.get("isCorrect");
+            Object skill = answerMap.get("skill");
+            Object topic = answerMap.get("topic");
+
+            record.put("userAnswer", selected == null ? null : selected.toString());
+            record.put("isCorrect", correct instanceof Boolean ? correct : Boolean.valueOf(String.valueOf(correct)));
+            record.put("skill", normalizeSkill(skill));
+            record.put("topic", topic == null || topic.toString().isBlank() ? normalizeSkill(skill) : topic.toString());
+        } else {
+            record.put("userAnswer", rawValue == null ? null : rawValue.toString());
+            record.put("isCorrect", null);
+            record.put("skill", null);
+            record.put("topic", null);
+        }
+
+        return record;
+    }
+
+    private int parseQuestionNumber(String key) {
+        try {
+            return Integer.parseInt(key);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private String normalizeSkill(Object rawSkill) {
+        if (rawSkill == null) {
+            return null;
+        }
+        String skill = rawSkill.toString().trim();
+        return skill.isBlank() ? null : skill;
     }
 
     private ExamAttemptResponseDTO mapToAttemptDTO(ExamAttempt attempt, int attemptNumber) {

@@ -8,6 +8,7 @@ import '../../login_page.dart';
 import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
 import '../trainer_exams_page.dart';
+import 'trainer_create_question_page.dart';
 import 'models/trainer_question.dart';
 import 'widgets/question_filter_pane.dart';
 import 'widgets/question_search_bar.dart';
@@ -30,7 +31,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _errorMessage = '';
 
   // Filter States
-  String _selectedType = 'QUIZ';
+  String _selectedType = 'ALL';
   String _selectedGroupType = 'Choose Group Type';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
@@ -103,146 +104,15 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       });
     } catch (e) {
       debugPrint('Error fetching questions from database: $e');
-      // If DB fails, load beautiful Mock Data that aligns exactly with the design to keep it interactive
-      _loadMockQuestions();
+      setState(() {
+        _allQuestions = [];
+        _isLoading = false;
+        _errorMessage = 'Failed to load questions. Please try again.';
+      });
     }
   }
 
-  void _loadMockQuestions() {
-    // Generate beautiful mock data matching the screenshot
-    final now = DateTime.now();
-    final List<TrainerQuestion> mocks = [];
 
-    if (_selectedType == 'QUIZ') {
-      mocks.addAll([
-        TrainerQuestion(
-          id: 1,
-          questionText: 'Which of the following is an example of an oxymoron...',
-          categoryName: 'Grammar & Vocabulary',
-          difficultyName: 'Medium',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 224, hours: 3)),
-          updatedAt: now.subtract(const Duration(days: 213, hours: 1)),
-        ),
-        TrainerQuestion(
-          id: 2,
-          questionText: 'Identify the main theme in the provided paragraph regarding environmental policy...',
-          categoryName: 'Reading Comprehension',
-          difficultyName: 'Hard',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 223, hours: 8)),
-          updatedAt: now.subtract(const Duration(days: 213, hours: 7)),
-        ),
-        TrainerQuestion(
-          id: 3,
-          questionText: 'Complete the sentence with the most appropriate modal verb...',
-          categoryName: 'Grammar & Vocabulary',
-          difficultyName: 'Easy',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 223, hours: 9)),
-          updatedAt: now.subtract(const Duration(days: 223, hours: 9)),
-        ),
-        TrainerQuestion(
-          id: 4,
-          questionText: "Select the correct synonym for the word 'ubiquitous' in the context...",
-          categoryName: 'Grammar & Vocabulary',
-          difficultyName: 'Easy',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 222, hours: 11)),
-          updatedAt: now.subtract(const Duration(days: 222, hours: 11)),
-        ),
-        TrainerQuestion(
-          id: 5,
-          questionText: 'Analyze the rhetorical devices used by the author in Chapter 5...',
-          categoryName: 'Reading Comprehension',
-          difficultyName: 'Hard',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 221, hours: 14)),
-          updatedAt: now.subtract(const Duration(days: 221, hours: 13)),
-        ),
-        TrainerQuestion(
-          id: 6,
-          questionText: 'Vietnam\nInternational Art\nExhibition 2025 - A\nLandmark Cultural\nEvent',
-          categoryName: 'Reading Comprehension',
-          difficultyName: 'Medium',
-          status: 'APPROVED',
-          creatorName: _trainerName,
-          createdAt: now.subtract(const Duration(days: 44, hours: 3)),
-          updatedAt: now.subtract(const Duration(days: 33, hours: 1)),
-        ),
-      ]);
-    } else {
-      // EXAM Mock Data
-      if (_selectedGroupType == 'Choose Group Type') {
-        mocks.addAll([
-          TrainerQuestion(
-            id: 1,
-            displayNo: '1-6',
-            questionText: 'Vietnam International Art Exhibition 2025 - A Landmark Cultural Event',
-            categoryName: 'Reading Comprehension',
-            difficultyName: 'Medium',
-            status: 'APPROVED',
-            creatorName: _trainerName,
-            createdAt: now.subtract(const Duration(days: 44, hours: 3)),
-            updatedAt: now.subtract(const Duration(days: 33, hours: 1)),
-          ),
-          TrainerQuestion(
-            id: 2,
-            displayNo: '7-14',
-            questionText: 'The concept of project farming, where farmers come together.....',
-            categoryName: 'Reading Comprehension',
-            difficultyName: 'Medium',
-            status: 'APPROVED',
-            creatorName: _trainerName,
-            createdAt: now.subtract(const Duration(days: 43, hours: 7)),
-            updatedAt: now.subtract(const Duration(days: 43, hours: 7)),
-          ),
-        ]);
-      } else {
-        // Mock data for a specific group type
-        mocks.addAll(List.generate(6, (index) {
-          return TrainerQuestion(
-            id: 100 + index,
-            displayNo: '${index + 1}',
-            questionText: 'Mock question for $_selectedGroupType (${index + 1})',
-            categoryName: _selectedGroupType,
-            difficultyName: 'Medium',
-            status: 'APPROVED',
-            creatorName: _trainerName,
-            createdAt: now.subtract(Duration(days: index)),
-            updatedAt: now.subtract(Duration(days: index)),
-          );
-        }));
-      }
-    }
-
-    // Client-side search filtering on mocks
-    final search = _searchQuery.trim().toLowerCase();
-    List<TrainerQuestion> filtered = mocks;
-    if (search.isNotEmpty) {
-      filtered = mocks.where((q) {
-        return q.questionText.toLowerCase().contains(search) ||
-            q.categoryName.toLowerCase().contains(search);
-      }).toList();
-    }
-
-    // Client-side sorting on mocks
-    if (_sortBy == 'NEWEST') {
-      filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    } else {
-      filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    }
-
-    setState(() {
-      _allQuestions = filtered;
-      _isLoading = false;
-    });
-  }
 
   void _handleSearch(String query) {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
@@ -258,7 +128,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   void _handleTypeChanged(String type) {
     setState(() {
       _selectedType = type;
-      _selectedGroupType = 'Choose Group Type';
       _currentPage = 1;
     });
     _fetchQuestions();
@@ -339,9 +208,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                                 sortBy: _sortBy,
                                 onSortChanged: _handleSortChanged,
                                 onCreatePressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Create Question flow is under construction')),
-                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const TrainerCreateQuestionPage()),
+                                  ).then((_) => _fetchQuestions());
                                 },
                                 onImportPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -363,19 +233,51 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                                   });
                                 },
                                 onViewPressed: (q) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Viewing question: ${q.questionText}')),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                                      question: q,
+                                      isReadOnly: true,
+                                    )),
                                   );
                                 },
                                 onEditPressed: (q) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Editing question: ${q.questionText}')),
-                                  );
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                                      question: q,
+                                      isEdit: true,
+                                    )),
+                                  ).then((_) => _fetchQuestions());
                                 },
-                                onDeletePressed: (q) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Deleting question: ${q.questionText}')),
-                                  );
+                                onStatusToggled: (q, isPublic) async {
+                                  final oldStatus = q.status;
+                                  final newStatus = isPublic ? 'PUBLIC' : 'PRIVATE';
+                                  
+                                  // Optimistic UI Update
+                                  setState(() {
+                                    q.status = newStatus;
+                                  });
+
+                                  try {
+                                    final token = await _authService.getToken();
+                                    if (token != null) {
+                                      final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+                                      await api.toggleQuestionStatus(q.id, newStatus, isGroup: q.isGroup);
+                                    } else {
+                                      throw Exception('No token');
+                                    }
+                                  } catch (e) {
+                                    // Revert on failure
+                                    setState(() {
+                                      q.status = oldStatus;
+                                    });
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Failed to update status: $e')),
+                                      );
+                                    }
+                                  }
                                 },
                               ),
                             ],
