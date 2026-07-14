@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
@@ -251,48 +251,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
     }
   }
 
-  Future<void> _handleImportExcel() async {
-    // 1. Pick Excel file
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
 
-    final pickedFile = result.files.first;
-    if (pickedFile.bytes == null) {
-      if (mounted)
-        ToastHelper.show(context, 'Cannot read file bytes.', isError: true);
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    try {
-      final api = await _getApi();
-      final response = await api.importExamExcel(
-        widget.examId,
-        pickedFile.bytes!,
-        pickedFile.name,
-      );
-
-      final int count = response['totalQuestions'] as int? ?? 0;
-      if (mounted) {
-        ToastHelper.show(context, 'Đã import $count câu hỏi thành công!');
-        // Reload questions from server
-        setState(() {
-          _blocks.clear();
-        });
-        await _loadQuestions();
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted)
-        ToastHelper.show(context, 'Import thất bại: $e', isError: true);
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
 
   Future<void> _handleSave() async {
     // Basic validation
@@ -827,63 +786,6 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                 ),
               ],
               const Spacer(),
-              SizedBox(
-                width: 140,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () {
-                    ToastHelper.show(context, 'Not implemented yet!');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF38C9A6),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_circle_outline, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        'Choose Question\nfrom Question Bank',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 100,
-                height: 44,
-                child: OutlinedButton(
-                  onPressed: _isSaving ? null : _handleImportExcel,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF64748B),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.upload_file, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        'Import\nfrom Excel',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 24),
