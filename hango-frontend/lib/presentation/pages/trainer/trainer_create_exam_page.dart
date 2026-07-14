@@ -10,6 +10,9 @@ import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
 import 'trainer_exams_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
+import 'trainer_exam_import_excel_page.dart';
+import 'trainer_exam_ai_generate_page.dart';
+import 'trainer_exam_matrix_page.dart';
 
 class TrainerCreateExamPage extends StatefulWidget {
   const TrainerCreateExamPage({super.key});
@@ -33,6 +36,7 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
   final _durationController = TextEditingController();
 
   bool _isSubmitting = false;
+  String _currentView = 'selection';
 
   String get apiBaseUrl {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -157,154 +161,328 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
                 _buildHeader(context, !isDesktop),
                 Expanded(
                   child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Container(
-            constraints: const BoxConstraints(maxWidth: 800),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            padding: const EdgeInsets.all(32.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Create New Exam',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  _buildLabel('EXAM TITLE'),
-                  _buildTextField(
-                    controller: _titleController,
-                    hintText: 'Đề thi THPTQG môn tiếng anh năm 2025',
-                    validator: (val) => val == null || val.isEmpty ? 'Title is required' : null,
-                  ),
-                  const SizedBox(height: 24),
-
-                  _buildLabel('EXAM DESCRIPTION'),
-                  _buildTextField(
-                    controller: _descriptionController,
-                    hintText: 'Briefly describe what this quiz covers...',
-                    maxLines: 4,
-                  ),
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('NUMBER OF QUESTION'),
-                            _buildTextField(
-                              controller: _questionsController,
-                              hintText: '50',
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('CREATE DATE'),
-                            _buildTextField(
-                              controller: _dateController,
-                              readOnly: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('PASSING SCORE (%)'),
-                            _buildTextField(
-                              controller: _passingScoreController,
-                              hintText: '70',
-                              keyboardType: TextInputType.number,
-                              suffixText: '%',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('TIME LIMIT (MINUTES)'),
-                            _buildTextField(
-                              controller: _durationController,
-                              hintText: '60',
-                              keyboardType: TextInputType.number,
-                              suffixText: 'min',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 48),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton(
-                        onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF64748B),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Outfit')),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submitForm,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF20B486),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 0,
-                        ),
-                        child: _isSubmitting
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text('Create Exam', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-                      ),
-                    ),
+                    child: _buildCurrentView(),
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCurrentView() {
+    final onBack = () {
+      setState(() {
+        _currentView = 'selection';
+      });
+    };
+
+    switch (_currentView) {
+      case 'form':
+        return _buildExamForm();
+      case 'import':
+        return TrainerExamImportExcelPage(onBack: onBack);
+      case 'matrix':
+        return TrainerExamMatrixPage(onBack: onBack);
+      case 'ai':
+        return TrainerExamAiGeneratePage(onBack: onBack);
+      case 'selection':
+      default:
+        return _buildMethodSelection();
+    }
+  }
+
+  Widget _buildMethodSelection() {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 1000),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(height: 40),
+          const Text(
+            'Choose Creation Method',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Select how you want to build your new exam.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF64748B),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 48),
+          Wrap(
+            spacing: 24,
+            runSpacing: 24,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildMethodCard(
+                title: 'Import by Excel',
+                description: 'Upload an Excel file containing questions and answers based on our template.',
+                icon: Icons.table_chart_outlined,
+                color: const Color(0xFF3B82F6),
+                onTap: () {
+                  setState(() => _currentView = 'import');
+                },
+              ),
+              _buildMethodCard(
+                title: 'Create by Exam Matrix',
+                description: 'Define an exam matrix structure and pick questions manually from bank.',
+                icon: Icons.grid_view_outlined,
+                color: const Color(0xFF20B486),
+                onTap: () {
+                  setState(() => _currentView = 'matrix');
+                },
+              ),
+              _buildMethodCard(
+                title: 'Generate with AI',
+                description: 'Use AI to automatically generate a complete exam based on your criteria.',
+                icon: Icons.auto_awesome_outlined,
+                color: const Color(0xFF8B5CF6),
+                onTap: () {
+                  setState(() => _currentView = 'ai');
+                },
+              ),
+            ],
+          ),
+
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMethodCard({
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 32),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExamForm() {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 800),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(32.0),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF64748B)),
+                      onPressed: () => setState(() => _currentView = 'selection'),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 16),
+                    const Text(
+                      'Select Creation Method',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                  onPressed: () {
+                    setState(() => _currentView = 'selection');
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            _buildLabel('EXAM TITLE'),
+            _buildTextField(
+              controller: _titleController,
+              hintText: 'Đề thi THPTQG môn tiếng anh năm 2025',
+              validator: (val) => val == null || val.isEmpty ? 'Title is required' : null,
+            ),
+            const SizedBox(height: 24),
+            _buildLabel('EXAM DESCRIPTION'),
+            _buildTextField(
+              controller: _descriptionController,
+              hintText: 'Briefly describe what this quiz covers...',
+              maxLines: 4,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('NUMBER OF QUESTION'),
+                      _buildTextField(
+                        controller: _questionsController,
+                        hintText: '50',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('CREATE DATE'),
+                      _buildTextField(
+                        controller: _dateController,
+                        readOnly: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('PASSING SCORE (%)'),
+                      _buildTextField(
+                        controller: _passingScoreController,
+                        hintText: '70',
+                        keyboardType: TextInputType.number,
+                        suffixText: '%',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('TIME LIMIT (MINUTES)'),
+                      _buildTextField(
+                        controller: _durationController,
+                        hintText: '60',
+                        keyboardType: TextInputType.number,
+                        suffixText: 'min',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 48),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: _isSubmitting ? null : () => setState(() => _currentView = 'selection'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF64748B),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Outfit')),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: _isSubmitting ? null : _submitForm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20B486),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Create Exam', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

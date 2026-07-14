@@ -358,25 +358,51 @@ class HangoApi {
   Future<Map<String, dynamic>> importExamExcel(int examId, Uint8List fileBytes, String fileName) async {
     final uri = _uri('/api/v1/trainer/exams/$examId/import-excel');
     final request = http.MultipartRequest('POST', uri);
-    // Add auth header
-    if (_headers.containsKey('Authorization')) {
-      request.headers['Authorization'] = _headers['Authorization']!;
+    if (token != null && token!.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
     }
-    request.files.add(http.MultipartFile.fromBytes(
-      'file',
-      fileBytes,
-      filename: fileName,
-    ));
+    
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        fileBytes,
+        filename: fileName,
+      ),
+    );
+
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode >= 400) {
-      throw ApiFailure('Import failed: ${response.body}', statusCode: response.statusCode);
+    
+    final body = response.body.isEmpty ? null : jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiFailure(_errorMessage(body), statusCode: response.statusCode);
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return body as Map<String, dynamic>;
   }
 
-  /// Download the Excel import template for exam questions.
-  Future<Uint8List> downloadImportTemplate() async {
+  Future<int> createDraftExam(String title) async {
+    final payload = {
+      'title': title,
+      'description': 'Imported from Excel',
+      'expectedQuestionCount': 0,
+      'passingScore': 0.0,
+      'durationMinutes': 0,
+    };
+    final body = await _send(
+      http.post(
+        _uri('/api/v1/trainer/exams'),
+        headers: _headers,
+        body: jsonEncode(payload),
+      ),
+    );
+    // Assuming backend returns the created exam with an 'id' field
+    if (body != null && body is Map<String, dynamic> && body.containsKey('id')) {
+      return body['id'] as int;
+    }
+    throw const ApiFailure('Cannot retrieve ID of created exam');
+  }
+
+  Future<Uint8List> downloadExamTemplate() async {
     final response = await http.get(
       _uri('/api/v1/trainer/exams/import-excel/template'),
       headers: _headers,

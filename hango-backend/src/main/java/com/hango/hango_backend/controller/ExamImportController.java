@@ -178,43 +178,6 @@ public class ExamImportController {
                 sheet.setColumnWidth(i, 5500);
             }
 
-            String passage = "The Amazon rainforest covers over 5.5 million square kilometres.";
-            Row r1 = sheet.createRow(1);
-            r1.createCell(0).setCellValue("");
-            r1.createCell(1).setCellValue("What is the capital of France?");
-            r1.createCell(2).setCellValue("Paris");
-            r1.createCell(3).setCellValue("London");
-            r1.createCell(4).setCellValue("Tokyo");
-            r1.createCell(5).setCellValue("Berlin");
-            r1.createCell(6).setCellValue("A");
-            r1.createCell(7).setCellValue("READING");
-            r1.createCell(8).setCellValue("EASY");
-            r1.createCell(9).setCellValue("Grammar");
-
-            Row r2 = sheet.createRow(2);
-            r2.createCell(0).setCellValue(passage);
-            r2.createCell(1).setCellValue("What type of forest is the Amazon?");
-            r2.createCell(2).setCellValue("Tropical");
-            r2.createCell(3).setCellValue("Temperate");
-            r2.createCell(4).setCellValue("Boreal");
-            r2.createCell(5).setCellValue("Mangrove");
-            r2.createCell(6).setCellValue("A");
-            r2.createCell(7).setCellValue("READING");
-            r2.createCell(8).setCellValue("MEDIUM");
-            r2.createCell(9).setCellValue("Reading Comprehension");
-
-            Row r3 = sheet.createRow(3);
-            r3.createCell(0).setCellValue(passage);
-            r3.createCell(1).setCellValue("How large is the Amazon rainforest?");
-            r3.createCell(2).setCellValue("2.5 million km2");
-            r3.createCell(3).setCellValue("5.5 million km2");
-            r3.createCell(4).setCellValue("8.0 million km2");
-            r3.createCell(5).setCellValue("1.2 million km2");
-            r3.createCell(6).setCellValue("B");
-            r3.createCell(7).setCellValue("READING");
-            r3.createCell(8).setCellValue("MEDIUM");
-            r3.createCell(9).setCellValue("Reading Comprehension");
-
             java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
             workbook.write(bos);
 
