@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
@@ -10,6 +11,7 @@ import 'trainer_exams_page.dart';
 
 import 'create_course_page.dart';
 import 'edit_course_page.dart';
+import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 
@@ -46,6 +48,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
 
   // Courses List
   List<dynamic> _coursesList = [];
+  bool _isDownloadingTemplate = false;
+  bool _isImportingExcel = false;
 
   String get apiBaseUrl {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -176,6 +180,142 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     }
   }
 
+  Future<void> _downloadImportTemplate() async {
+    setState(() {
+      _isDownloadingTemplate = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+
+      final response = await http.get(
+        Uri.parse('$apiBaseUrl/trainer/courses/import/template'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        downloadBytes(
+          bytes: response.bodyBytes,
+          filename: 'Hango_Course_Import_Template.xlsx',
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Course import template downloaded');
+        }
+      } else {
+        throw Exception('Failed to download template: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error downloading course import template: $e');
+      if (mounted) {
+        ToastHelper.showError(context, 'Error downloading template: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDownloadingTemplate = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _importCourseExcel() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['xlsx'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final pickedFile = result.files.single;
+      final bytes = pickedFile.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Selected file is empty');
+      }
+
+      setState(() {
+        _isImportingExcel = true;
+      });
+
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+
+      final request =
+          http.MultipartRequest(
+              'POST',
+              Uri.parse('$apiBaseUrl/trainer/courses/import'),
+            )
+            ..headers['Authorization'] = 'Bearer $token'
+            ..files.add(
+              http.MultipartFile.fromBytes(
+                'file',
+                bytes,
+                filename: pickedFile.name,
+              ),
+            );
+
+      final streamedResponse = await request.send();
+      final responseBody = await streamedResponse.stream.bytesToString();
+
+      if (streamedResponse.statusCode == 200 ||
+          streamedResponse.statusCode == 201) {
+        final data = jsonDecode(responseBody) as Map<String, dynamic>;
+        final importedCourses = data['importedCourses'] ?? 0;
+        final importedSections = data['importedSections'] ?? 0;
+        final importedLessons = data['importedLessons'] ?? 0;
+        final warnings = data['warnings'];
+
+        if (mounted) {
+          setState(() {
+            _selectedStatus = 'ALL';
+          });
+          await _fetchCoursesData();
+          final warningText = warnings is List && warnings.isNotEmpty
+              ? ' Warning: ${warnings.first}'
+              : '';
+          if (mounted) {
+            ToastHelper.showSuccess(
+              context,
+              'Imported $importedCourses course, $importedSections sections, $importedLessons lessons.$warningText',
+            );
+          }
+        }
+      } else {
+        throw Exception(_extractErrorMessage(responseBody));
+      }
+    } catch (e) {
+      debugPrint('Error importing course Excel: $e');
+      if (mounted) {
+        ToastHelper.showError(context, 'Error importing Excel: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isImportingExcel = false;
+        });
+      }
+    }
+  }
+
+  String _extractErrorMessage(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      if (data is Map && data['error'] != null) {
+        return data['error'].toString();
+      }
+    } catch (_) {
+      // Fall back to the raw response below.
+    }
+    return responseBody.isEmpty ? 'Import failed' : responseBody;
+  }
+
   String _formatDate(dynamic dateStr) {
     if (dateStr == null) return 'Updated June 3, 2026';
     try {
@@ -293,28 +433,47 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             },
           ),
           _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
-            );
-          }),
+          _buildSidebarItem(
+            Icons.assignment_outlined,
+            'Exam',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerExamsPage(),
+                ),
+              );
+            },
+          ),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerQuestionBankPage(),
-              ),
-            );
-          }),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            'Question Bank',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerQuestionBankPage(),
+                ),
+              );
+            },
+          ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(Icons.help_outline, 'Help Center', onTap: () {
-            ToastHelper.show(context, 'Help Center is under construction');
-          }),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
+          _buildSidebarItem(
+            Icons.help_outline,
+            'Help Center',
+            onTap: () {
+              ToastHelper.show(context, 'Help Center is under construction');
+            },
+          ),
+          _buildSidebarItem(
+            Icons.logout,
+            'Logout',
+            color: Colors.redAccent,
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
@@ -493,16 +652,67 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   }
 
   Widget _buildWelcomeSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final actions = Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: WrapAlignment.end,
       children: [
-        const Text(
-          'Course Management',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
-            fontFamily: 'Outfit',
+        OutlinedButton.icon(
+          onPressed: _isDownloadingTemplate ? null : _downloadImportTemplate,
+          icon: _isDownloadingTemplate
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF20B486),
+                  ),
+                )
+              : const Icon(
+                  Icons.download_outlined,
+                  color: Color(0xFF20B486),
+                  size: 18,
+                ),
+          label: const Text(
+            'Download Template',
+            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF20B486),
+            side: const BorderSide(color: Color(0xFF20B486)),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _isImportingExcel ? null : _importCourseExcel,
+          icon: _isImportingExcel
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF20B486),
+                  ),
+                )
+              : const Icon(
+                  Icons.upload_file_outlined,
+                  color: Color(0xFF20B486),
+                  size: 18,
+                ),
+          label: const Text(
+            'Import Excel',
+            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF20B486),
+            side: const BorderSide(color: Color(0xFF99F6E4)),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
         ElevatedButton.icon(
@@ -531,6 +741,37 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           ),
         ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useRow = constraints.maxWidth > 820;
+        const title = Text(
+          'Course Management',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+            fontFamily: 'Outfit',
+          ),
+        );
+
+        if (useRow) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              title,
+              Flexible(child: actions),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [title, const SizedBox(height: 16), actions],
+        );
+      },
     );
   }
 
@@ -1030,7 +1271,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               _buildActionButton(
                 icon: Icons.remove_red_eye_outlined,
                 onTap: () {
-                  ToastHelper.show(context, 'View course $title details is under construction');
+                  ToastHelper.show(
+                    context,
+                    'View course $title details is under construction',
+                  );
                 },
               ),
             ],
