@@ -7,6 +7,7 @@ class PathwaySummaryHeader extends StatelessWidget {
   final bool isDarkMode;
   final VoidCallback? onAnalysisPressed;
   final VoidCallback? onReroutePressed;
+  final VoidCallback? onMergePressed;
   final VoidCallback? onThemeToggle;
 
   const PathwaySummaryHeader({
@@ -15,6 +16,7 @@ class PathwaySummaryHeader extends StatelessWidget {
     this.isDarkMode = false,
     this.onAnalysisPressed,
     this.onReroutePressed,
+    this.onMergePressed,
     this.onThemeToggle,
   });
 
@@ -124,6 +126,15 @@ class PathwaySummaryHeader extends StatelessWidget {
                   color: Colors.white,
                   onPressed: onAnalysisPressed,
                 ),
+                if (onMergePressed != null) ...[
+                  const SizedBox(width: 6),
+                  _HeaderIconButton(
+                    tooltip: isVi ? 'Gộp mục tiêu' : 'Merge goals',
+                    icon: Icons.call_merge_rounded,
+                    color: Colors.white,
+                    onPressed: onMergePressed,
+                  ),
+                ],
                 const SizedBox(width: 6),
                 _HeaderIconButton(
                   tooltip: isDarkMode

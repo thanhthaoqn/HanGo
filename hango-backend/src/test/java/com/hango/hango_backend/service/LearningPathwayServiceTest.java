@@ -2,6 +2,8 @@ package com.hango.hango_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
+import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
+import com.hango.hango_backend.dto.PathwayGenerateRequestDTO;
 import com.hango.hango_backend.dto.PathwayNodeDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.ExamAttempt;
@@ -147,7 +149,9 @@ class LearningPathwayServiceTest {
             return pathway;
         });
 
-        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, 5L);
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(5L);
+        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, req);
 
         assertEquals(1, result.getNodes().size());
         assertEquals(10L, result.getNodes().get(0).getCourseId());
@@ -209,8 +213,10 @@ class LearningPathwayServiceTest {
         when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(student));
         when(examAttemptRepository.findById(999L)).thenReturn(Optional.empty());
 
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(999L);
         ApiException exception = assertThrows(ApiException.class,
-                () -> learningPathwayService.generatePathway(1L, 999L));
+                () -> learningPathwayService.generatePathway(1L, req));
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
         assertEquals("Exam Attempt not found", exception.getMessage());
@@ -240,7 +246,9 @@ class LearningPathwayServiceTest {
             return pathway;
         });
 
-        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, 5L);
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(5L);
+        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, req);
 
         assertEquals(101L, result.getPathwayId());
         // Khi AI generation bị fail/null, backend sẽ fallback deterministic pathway và mentorSummary sẽ là tiếng Việt.
@@ -310,11 +318,29 @@ class LearningPathwayServiceTest {
             return pathway;
         });
 
-        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, 5L);
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(5L);
+        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, req);
 
         assertEquals("ARCHIVED", existing.getStatus());
         assertEquals(120L, result.getPathwayId());
         assertEquals(1, result.getNodes().size());
+    }
+
+    @Test
+    void applyScheduleShouldRejectOtherLearnersPathway() {
+        LearningPathway pathway = LearningPathway.builder()
+                .id(10L)
+                .student(User.builder().id(2L).build())
+                .status("ACTIVE")
+                .build();
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> learningPathwayService.applySchedule(10L, 1L, new com.hango.hango_backend.dto.PathwayScheduleRequestDTO()));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+        assertEquals("Access denied", exception.getMessage());
     }
 
     @Test
