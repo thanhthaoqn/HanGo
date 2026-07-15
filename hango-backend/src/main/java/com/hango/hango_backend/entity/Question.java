@@ -19,7 +19,7 @@ public class Question {
     private User createdBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "category_id", referencedColumnName = "id", nullable = true)
     private QuestionCategory category;
 
     // @Column(name = "group_id")

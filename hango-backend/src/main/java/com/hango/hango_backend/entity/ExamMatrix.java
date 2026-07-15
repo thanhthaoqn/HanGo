@@ -5,44 +5,22 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "exams")
+@Table(name = "exam_matrices")
 @Data
-public class Exam {
+public class ExamMatrix {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String title;
 
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "duration_minutes")
-    private Integer durationMinutes;
-
-    private String status;
-
-    @Column(length = 20)
-    private String version = "v0.1";
-
-
-    @Column(name = "passing_score")
-    private Double passingScore;
-
-    @Column(name = "expected_question_count")
-    private Integer expectedQuestionCount;
-
-    private String visibility = "PRIVATE";
-
-    @Column(name = "thumbnail_url")
-    private String thumbnailUrl;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by", referencedColumnName = "id")
+    @JoinColumn(name = "created_by", referencedColumnName = "id", nullable = false)
     private User createdBy;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

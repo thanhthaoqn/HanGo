@@ -70,6 +70,7 @@ public class ExamService {
                 .durationMinutes(exam.getDurationMinutes())
                 .rating(Math.round(mockRating * 10.0) / 10.0)
                 .learnerCountFormatted(formattedLearners)
+                .thumbnailUrl(exam.getThumbnailUrl())
                 .build();
     }
 

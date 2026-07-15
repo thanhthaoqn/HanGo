@@ -19,4 +19,6 @@ public interface TrainerDashboardService {
     com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO getExamQuestions(Long examId, String email);
     
     void updateExamStatus(Long examId, String email, String status);
+    
+    void deleteTrainerExam(Long examId, String email);
 }

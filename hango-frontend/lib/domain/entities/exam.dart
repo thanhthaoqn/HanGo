@@ -8,6 +8,7 @@ class Exam {
   final int durationMinutes;
   final double rating;
   final String learnerCountFormatted;
+  final String thumbnailUrl;
 
   Exam({
     required this.id,
@@ -19,5 +20,6 @@ class Exam {
     required this.durationMinutes,
     required this.rating,
     required this.learnerCountFormatted,
+    this.thumbnailUrl = '',
   });
 }

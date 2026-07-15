@@ -1,0 +1,166 @@
+package com.hango.hango_backend.service;
+
+import com.hango.hango_backend.dto.ExamMatrixCreateRequestDTO;
+import com.hango.hango_backend.dto.ExamMatrixDTO;
+import com.hango.hango_backend.dto.ExamMatrixDetailDTO;
+import com.hango.hango_backend.entity.Exam;
+import com.hango.hango_backend.entity.ExamMatrix;
+import com.hango.hango_backend.entity.ExamMatrixDetail;
+import com.hango.hango_backend.entity.ExamQuestion;
+import com.hango.hango_backend.entity.ExamQuestionId;
+import com.hango.hango_backend.entity.Question;
+import com.hango.hango_backend.entity.QuestionCategory;
+import com.hango.hango_backend.entity.SystemParameter;
+import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.repository.ExamMatrixDetailRepository;
+import com.hango.hango_backend.repository.ExamMatrixRepository;
+import com.hango.hango_backend.repository.ExamQuestionRepository;
+import com.hango.hango_backend.repository.ExamRepository;
+import com.hango.hango_backend.repository.QuestionCategoryRepository;
+import com.hango.hango_backend.repository.QuestionRepository;
+import com.hango.hango_backend.repository.SystemParameterRepository;
+import com.hango.hango_backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class TrainerExamMatrixServiceImpl implements TrainerExamMatrixService {
+
+    private final ExamMatrixRepository examMatrixRepository;
+    private final ExamMatrixDetailRepository examMatrixDetailRepository;
+    private final UserRepository userRepository;
+    private final SystemParameterRepository systemParameterRepository;
+    private final QuestionCategoryRepository questionCategoryRepository;
+    private final QuestionRepository questionRepository;
+    private final ExamRepository examRepository;
+    private final ExamQuestionRepository examQuestionRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ExamMatrixDTO> getAllExamMatrices() {
+        return examMatrixRepository.findAllByOrderByCreatedAtDesc().stream().map(matrix -> {
+            List<ExamMatrixDetailDTO> details = examMatrixDetailRepository.findByMatrixId(matrix.getId()).stream().map(detail ->
+                ExamMatrixDetailDTO.builder()
+                        .id(detail.getId())
+                        .skillParamId(detail.getSkillParam().getId())
+                        .skillParamName(detail.getSkillParam().getParamValue())
+                        .difficultyParamId(detail.getDifficultyParam().getId())
+                        .difficultyParamName(detail.getDifficultyParam().getParamValue())
+                        .categoryId(detail.getCategory().getId())
+                        .categoryName(detail.getCategory().getName())
+                        .quantity(detail.getQuantity())
+                        .build()
+            ).collect(Collectors.toList());
+
+            return ExamMatrixDTO.builder()
+                    .id(matrix.getId())
+                    .title(matrix.getTitle())
+                    .description(matrix.getDescription())
+                    .createdBy(matrix.getCreatedBy().getId())
+                    .createdAt(matrix.getCreatedAt())
+                    .details(details)
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void createExamMatrix(String email, ExamMatrixCreateRequestDTO request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        ExamMatrix matrix = new ExamMatrix();
+        matrix.setTitle(request.getTitle());
+        matrix.setDescription(request.getDescription());
+        matrix.setCreatedBy(user);
+        final ExamMatrix savedMatrix = examMatrixRepository.save(matrix);
+
+        if (request.getDetails() != null) {
+            for (ExamMatrixCreateRequestDTO.DetailRequest detailReq : request.getDetails()) {
+                SystemParameter skill = systemParameterRepository.findById(detailReq.getSkillParamId())
+                        .orElseThrow(() -> new RuntimeException("Skill not found: " + detailReq.getSkillParamId()));
+                SystemParameter diff = systemParameterRepository.findById(detailReq.getDifficultyParamId())
+                        .orElseThrow(() -> new RuntimeException("Difficulty not found: " + detailReq.getDifficultyParamId()));
+                QuestionCategory cat = questionCategoryRepository.findById(detailReq.getCategoryId())
+                        .orElseThrow(() -> new RuntimeException("Category not found: " + detailReq.getCategoryId()));
+
+                ExamMatrixDetail detail = new ExamMatrixDetail();
+                detail.setMatrix(savedMatrix);
+                detail.setSkillParam(skill);
+                detail.setDifficultyParam(diff);
+                detail.setCategory(cat);
+                detail.setQuantity(detailReq.getQuantity());
+                examMatrixDetailRepository.save(detail);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public Long generateExamFromMatrix(Long matrixId, String examTitle, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        ExamMatrix matrix = examMatrixRepository.findById(matrixId)
+                .orElseThrow(() -> new RuntimeException("Matrix not found: " + matrixId));
+
+        List<ExamMatrixDetail> details = examMatrixDetailRepository.findByMatrixId(matrixId);
+
+        // Calculate expected question count
+        int totalQuestions = details.stream().mapToInt(ExamMatrixDetail::getQuantity).sum();
+
+        // Create new DRAFT exam
+        Exam exam = new Exam();
+        exam.setTitle(examTitle != null && !examTitle.isBlank() ? examTitle : matrix.getTitle() + " - Generated");
+        exam.setDescription("Generated from matrix: " + matrix.getTitle());
+        exam.setExpectedQuestionCount(totalQuestions);
+        exam.setStatus("DRAFT");
+        exam.setVisibility("PRIVATE");
+        exam.setCreatedBy(user);
+        exam.setCreatedAt(LocalDateTime.now());
+        Exam savedExam = examRepository.save(exam);
+
+        int currentOrder = 1;
+
+        for (ExamMatrixDetail detail : details) {
+            int requiredQty = detail.getQuantity();
+            if (requiredQty <= 0) continue;
+
+            List<Question> randomQuestions = questionRepository.findRandomQuestionsByCriteria(
+                    detail.getSkillParam().getId(),
+                    detail.getDifficultyParam().getId(),
+                    detail.getCategory().getId(),
+                    requiredQty
+            );
+
+            if (randomQuestions.size() < requiredQty) {
+                throw new RuntimeException(String.format(
+                        "Not enough questions in bank for criteria: Skill='%s', Difficulty='%s', Type='%s'. Required: %d, Found: %d",
+                        detail.getSkillParam().getParamValue(),
+                        detail.getDifficultyParam().getParamValue(),
+                        detail.getCategory().getName(),
+                        requiredQty,
+                        randomQuestions.size()
+                ));
+            }
+
+            for (Question q : randomQuestions) {
+                ExamQuestion eq = new ExamQuestion();
+                ExamQuestionId id = new ExamQuestionId();
+                id.setExamId(savedExam.getId());
+                id.setQuestionId(q.getId());
+                eq.setId(id);
+                eq.setQuestionOrder(currentOrder++);
+                examQuestionRepository.save(eq);
+            }
+        }
+
+        return savedExam.getId();
+    }
+}

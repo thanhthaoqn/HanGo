@@ -20,4 +20,5 @@ public class TrainerExamResponseDTO {
     private String status;
     private String visibility;
     private Integer expectedQuestionCount;
+    private String thumbnailUrl;
 }

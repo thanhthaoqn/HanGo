@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'trainer_edit_exam_page.dart';
+import '../../../services/hango_api.dart';
+import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
-
+import 'package:flutter/foundation.dart';
 class TrainerExamMatrixPage extends StatefulWidget {
   final VoidCallback onBack;
   const TrainerExamMatrixPage({super.key, required this.onBack});
@@ -11,7 +13,47 @@ class TrainerExamMatrixPage extends StatefulWidget {
 }
 
 class _TrainerExamMatrixPageState extends State<TrainerExamMatrixPage> {
-  String? _selectedMatrix;
+  final _authService = AuthService();
+  late HangoApi _api;
+  List<Map<String, dynamic>> _matrices = [];
+  bool _isLoading = true;
+  String? _selectedMatrixId;
+
+  String get apiBaseUrl {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080';
+    }
+    return 'http://localhost:8080';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initApi();
+  }
+
+  Future<void> _initApi() async {
+    final token = await _authService.getToken();
+    _api = HangoApi(baseUrl: apiBaseUrl, token: token);
+    _fetchMatrices();
+  }
+
+  Future<void> _fetchMatrices() async {
+    try {
+      final data = await _api.getExamMatrices();
+      if (mounted) {
+        setState(() {
+          _matrices = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ToastHelper.show(context, 'Failed to load matrices: $e', isError: true);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,20 +131,22 @@ class _TrainerExamMatrixPageState extends State<TrainerExamMatrixPage> {
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: DropdownButtonHideUnderline(
+                      child: _isLoading 
+                        ? const Center(child: CircularProgressIndicator()) 
+                        : DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: _selectedMatrix,
+                          value: _selectedMatrixId,
                           hint: const Text('Choose a matrix...'),
                           isExpanded: true,
-                          items: ['Matrix 1 (TOEIC)', 'Matrix 2 (IELTS)']
+                          items: _matrices
                               .map((e) => DropdownMenuItem(
-                                    value: e,
-                                    child: Text(e, style: const TextStyle(fontFamily: 'Outfit')),
+                                    value: e['id'].toString(),
+                                    child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit')),
                                   ))
                               .toList(),
                           onChanged: (val) {
                             if (val != null) {
-                              setState(() => _selectedMatrix = val);
+                              setState(() => _selectedMatrixId = val);
                             }
                           },
                         ),
@@ -112,22 +156,34 @@ class _TrainerExamMatrixPageState extends State<TrainerExamMatrixPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _selectedMatrix == null
+                        onPressed: _selectedMatrixId == null
                             ? null
-                            : () {
+                            : () async {
                                 ToastHelper.show(
-                                    context, 'Generating based on $_selectedMatrix...');
-                                Future.delayed(const Duration(milliseconds: 800), () {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const TrainerEditExamPage(
-                                        examId: 3, // Dummy ID
-                                        examTitle: 'Matrix Exam',
-                                      ),
-                                    ),
+                                    context, 'Generating exam...');
+                                try {
+                                  final examId = await _api.generateExamFromMatrix(
+                                    int.parse(_selectedMatrixId!),
+                                    null,
                                   );
-                                });
+                                  if (mounted) {
+                                    ToastHelper.show(context, 'Exam generated successfully!');
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => TrainerEditExamPage(
+                                          examId: examId,
+                                          examTitle: 'Generated Exam',
+                                          examExpectedCount: 0,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ToastHelper.show(context, 'Generation failed: $e', isError: true);
+                                  }
+                                }
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF20B486),

@@ -250,4 +250,21 @@ public class TrainerDashboardController {
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/exams/{id}")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> deleteTrainerExam(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.deleteTrainerExam(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Exam deleted successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
 }

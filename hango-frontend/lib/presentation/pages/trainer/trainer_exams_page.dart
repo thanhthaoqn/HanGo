@@ -11,6 +11,7 @@ import 'trainer_create_exam_page.dart';
 import 'trainer_edit_exam_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../../../utils/toast_helper.dart';
+import 'matrix_management_page.dart';
 
 class TrainerExamsPage extends StatefulWidget {
   const TrainerExamsPage({super.key});
@@ -648,15 +649,46 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         children: [
           Expanded(
             flex: 3,
-            child: Text(
-              exam['title'],
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E293B),
-                fontSize: 15,
-                fontFamily: 'Outfit',
-                height: 1.5,
-              ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: exam['thumbnailUrl'] != null && exam['thumbnailUrl'].toString().isNotEmpty
+                      ? Image.network(
+                          exam['thumbnailUrl'],
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 48,
+                            height: 48,
+                            color: const Color(0xFFE2E8F0),
+                            child: const Icon(Icons.image_not_supported, color: Color(0xFF94A3B8)),
+                          ),
+                        )
+                      : Container(
+                          width: 48,
+                          height: 48,
+                          color: const Color(0xFFE2E8F0),
+                          child: const Icon(Icons.assignment, color: Color(0xFF94A3B8)),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    exam['title'] ?? 'Untitled',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                      fontSize: 15,
+                      fontFamily: 'Outfit',
+                      height: 1.5,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -741,13 +773,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Color(0xFF64748B), size: 20),
-                  onPressed: () {},
-                  splashRadius: 20,
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
               ],
             ),
           ),
@@ -755,6 +780,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       ),
     );
   }
+
 
   Widget _buildStatusChip(String status) {
     status = status.toUpperCase();
@@ -946,6 +972,19 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             );
           }),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: true),
+          _buildSidebarItem(Icons.grid_on, 'Matrix', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MatrixManagementPage(onBack: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
+                  );
+                }),
+              ),
+            );
+          }),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
           _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
             Navigator.pushReplacement(

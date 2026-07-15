@@ -258,14 +258,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
     for (var i = 0; i < _blocks.length; i++) {
       final block = _blocks[i];
 
-      if (block.selectedGroupTypeId == null) {
-        ToastHelper.show(
-          context,
-          'Khối ${i + 1}: Vui lòng chọn Danh mục (Category).',
-          isError: true,
-        );
-        return;
-      }
+
       if (block.isQuestionGroup &&
           block.passageController.text.trim().isEmpty) {
         ToastHelper.show(
@@ -1063,6 +1056,10 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
     required Function(int?) onChanged,
     required String displayKey,
   }) {
+    // Fix Dropdown crash: verify if the value actually exists in the items list
+    bool valueExists = value != null && items.any((item) => (item['id'] as int) == value);
+    final int? safeValue = valueExists ? value : null;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1072,14 +1069,14 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
-          value: value,
+          value: safeValue,
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
           items: items.map((item) {
             return DropdownMenuItem<int>(
               value: item['id'] as int,
               child: Text(
-                item[displayKey] ?? '',
+                item[displayKey]?.toString() ?? '',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
               ),
             );

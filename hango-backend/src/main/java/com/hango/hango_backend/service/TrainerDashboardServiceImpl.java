@@ -322,8 +322,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         Long trainerId = user.getId();
-
-        List<com.hango.hango_backend.entity.Exam> exams = examRepository.findByCreatedByIdAndDeletedAtIsNull(trainerId);
+        List<com.hango.hango_backend.entity.Exam> exams = examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(trainerId);
 
         return exams.stream().map(exam -> {
             int questionCount = examQuestionRepository.countByIdExamId(exam.getId());
@@ -336,6 +335,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .durationMinutes(exam.getDurationMinutes())
                     .status(exam.getStatus() != null ? exam.getStatus() : "private")
                     .visibility(exam.getVisibility() != null ? exam.getVisibility() : "PRIVATE")
+                    .thumbnailUrl(exam.getThumbnailUrl())
                     .build();
         }).collect(Collectors.toList());
     }
@@ -352,6 +352,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         exam.setExpectedQuestionCount(request.getExpectedQuestionCount());
         exam.setPassingScore(request.getPassingScore());
         exam.setDurationMinutes(request.getDurationMinutes());
+        exam.setThumbnailUrl(request.getThumbnailUrl());
         
         exam.setStatus("DRAFT");
         exam.setVisibility("PRIVATE");
@@ -466,6 +467,23 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
         
         exam.setStatus(status);
+        examRepository.save(exam);
+    }
+
+    @Override
+    @Transactional
+    public void deleteTrainerExam(Long examId, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+                
+        if (!exam.getCreatedBy().getId().equals(user.getId())) {
+            throw new RuntimeException("User is not authorized to delete this exam");
+        }
+        
+        exam.setDeletedAt(java.time.LocalDateTime.now());
         examRepository.save(exam);
     }
 }
