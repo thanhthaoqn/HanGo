@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.util.List;
 
 @Data
@@ -13,20 +14,66 @@ import java.util.List;
 @AllArgsConstructor
 public class PathwayNodeDTO {
     private Integer step;
+
     @JsonProperty("course_id")
     private Long courseId;
+
     @JsonProperty("course_title")
     private String courseTitle;
+
     private List<String> tags;
+
     private String status;
+
     @JsonProperty("reason_why")
     private String reasonWhy;
+
     @JsonProperty("progress_percent")
     private Integer progressPercent;
+
     @JsonProperty("skill_type")
     private String skillType;
+
     @JsonProperty("total_lessons")
     private Integer totalLessons;
+
     @JsonProperty("completed_lessons")
     private Integer completedLessons;
+
+    // FE-11 agentic upgrade metadata (nullable; backend may not fully support yet)
+    @JsonProperty("node_type")
+    private String nodeType;
+
+    @JsonProperty("reroute_reason")
+    private String rerouteReason;
+
+    // Feature C: Multi-goal merge metadata
+    @JsonProperty("source_goal_labels")
+    private List<String> sourceGoalLabels;
+
+    @JsonProperty("merge_reason")
+    private String mergeReason;
+
+    @JsonProperty("is_optional")
+    private Boolean isOptional;
+
+    @JsonProperty("skipped_at")
+    private String skippedAt;
+
+    @JsonProperty("parent_node_id")
+    private Long parentNodeId;
+
+    // Smart time-boxing metadata (nullable for now)
+    @JsonProperty("start_date")
+    private String startDate;
+
+    @JsonProperty("deadline")
+    private String deadline;
+
+    @JsonProperty("estimated_hours")
+    private Integer estimatedHours;
+
+    @JsonProperty("schedule_status")
+    private String scheduleStatus;
 }
+

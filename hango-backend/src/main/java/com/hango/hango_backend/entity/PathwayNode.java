@@ -37,4 +37,44 @@ public class PathwayNode {
     @Builder.Default
     @Column(name = "progress_percent")
     private Integer progressPercent = 0;
+
+    // FE-11 agentic upgrade metadata (nullable; schema migration may be required)
+    @Column(name = "node_type", length = 40)
+    private String nodeType;
+
+    @Column(name = "reroute_reason", columnDefinition = "TEXT")
+    private String rerouteReason;
+
+    @Column(name = "is_optional")
+    private Boolean isOptional;
+
+    @Column(name = "skipped_at")
+    private java.time.LocalDateTime skippedAt;
+
+    @Column(name = "parent_node_id")
+    private Long parentNodeId;
+
+    // Smart time-boxing metadata (nullable; schema migration may be required)
+    @Column(name = "start_date")
+    private java.time.LocalDateTime startDate;
+
+    @Column(name = "deadline")
+    private java.time.LocalDateTime deadline;
+
+    @Column(name = "estimated_hours")
+    private Integer estimatedHours;
+
+    @Column(name = "schedule_status", length = 30)
+    private String scheduleStatus;
+
+    // Feature C: Multi-goal merge metadata
+    /**
+     * JSON array of goal labels this node serves, e.g. ["THPT", "Communication"]
+     */
+    @Column(name = "source_goal_labels", columnDefinition = "TEXT")
+    private String sourceGoalLabels;
+
+    @Column(name = "merge_reason", columnDefinition = "TEXT")
+    private String mergeReason;
 }
+

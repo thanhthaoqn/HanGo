@@ -2,8 +2,12 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.TrainerDashboardSummaryDTO;
 import com.hango.hango_backend.dto.TrainerCoursesResponseDTO;
+import com.hango.hango_backend.dto.CourseImportResultDTO;
+import com.hango.hango_backend.service.CourseImportService;
 import com.hango.hango_backend.service.TrainerDashboardService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +34,7 @@ public class TrainerDashboardController {
 
     private final TrainerDashboardService trainerDashboardService;
     private final CloudinaryService cloudinaryService;
+    private final CourseImportService courseImportService;
 
     @PostMapping("/courses/upload")
     @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
@@ -37,6 +42,38 @@ public class TrainerDashboardController {
         try {
             String url = cloudinaryService.uploadImage(file);
             return ResponseEntity.ok("{\"url\": \"" + url + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/courses/import/template")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<byte[]> downloadCourseImportTemplate() {
+        try {
+            byte[] workbook = courseImportService.buildTemplateWorkbook();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Hango_Course_Import_Template.xlsx\"")
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(workbook);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/courses/import")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    public ResponseEntity<?> importCoursesFromExcel(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestPart("file") MultipartFile file) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            CourseImportResultDTO result = courseImportService.importWorkbook(userDetails.getUsername(), file);
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

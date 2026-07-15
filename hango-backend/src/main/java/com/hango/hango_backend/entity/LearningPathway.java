@@ -2,9 +2,11 @@ package com.hango.hango_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "learning_pathways")
@@ -34,6 +36,22 @@ public class LearningPathway {
     @Column(length = 30)
     private String status = "ACTIVE"; // ACTIVE, ARCHIVED
 
+    // Feature B: Smart Time-boxing metadata
+    @Column(name = "goal_name")
+    private String goalName;
+
+    @Column(name = "target_date")
+    private LocalDate targetDate;
+
+    @Column(name = "hours_per_week")
+    private Integer hoursPerWeek;
+
+    /**
+     * Schedule status: ON_TRACK, AT_RISK, BEHIND, COMPLETED
+     */
+    @Column(name = "schedule_status", length = 30)
+    private String scheduleStatus;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -43,6 +61,11 @@ public class LearningPathway {
     @OneToMany(mappedBy = "learningPathway", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PathwayNode> nodes = new ArrayList<>();
+
+    // Feature C: Multi-goal merging
+    @OneToMany(mappedBy = "learningPathway", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<LearningPathwayGoal> goals = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
@@ -60,3 +83,4 @@ public class LearningPathway {
         node.setLearningPathway(this);
     }
 }
+
