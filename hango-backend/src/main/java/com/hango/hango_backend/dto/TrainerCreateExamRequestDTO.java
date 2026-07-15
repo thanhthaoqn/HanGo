@@ -15,4 +15,5 @@ public class TrainerCreateExamRequestDTO {
     private Integer expectedQuestionCount;
     private Double passingScore;
     private Integer durationMinutes;
+    private String thumbnailUrl;
 }

@@ -5,6 +5,7 @@ class Exam {
     required this.durationMinutes,
     required this.status,
     required this.questions,
+    this.thumbnailUrl = '',
   });
 
   final int id;
@@ -12,6 +13,7 @@ class Exam {
   final int durationMinutes;
   final String status;
   final List<Question> questions;
+  final String thumbnailUrl;
 
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
@@ -23,6 +25,7 @@ class Exam {
           .whereType<Map<String, dynamic>>()
           .map(Question.fromJson)
           .toList(),
+      thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
     );
   }
 }

@@ -15,4 +15,5 @@ public class ExamResponseDTO {
     private Integer durationMinutes;
     private Double rating;
     private String learnerCountFormatted;
+    private String thumbnailUrl;
 }

@@ -15,6 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -24,175 +27,285 @@ public class ExamImportController {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @PostMapping("/{examId}/import-excel")
+    @PostMapping("/import-excel-multiple")
     @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
     @Transactional
-    public ResponseEntity<Map<String, Object>> importExcel(
+    public ResponseEntity<Map<String, Object>> importExcelMultiple(
             @AuthenticationPrincipal UserDetails userDetails,
-            @PathVariable Long examId,
             @RequestParam("file") MultipartFile file) {
 
-        if (userDetails == null) return ResponseEntity.status(401).build();
+        if (userDetails == null)
+            return ResponseEntity.status(401).build();
         Long userId = resolveUserId(userDetails.getUsername());
-        if (userId == null) return ResponseEntity.status(401).build();
+        if (userId == null)
+            return ResponseEntity.status(401).build();
 
-        List<Map<String, Object>> importedBlocks = new ArrayList<>();
-        int totalQuestions = 0;
+        int totalExamsCreated = 0;
+        int totalQuestionsImported = 0;
 
         try (InputStream is = file.getInputStream();
-             Workbook workbook = new XSSFWorkbook(is)) {
+                Workbook workbook = new XSSFWorkbook(is)) {
 
-            Sheet sheet = workbook.getSheetAt(0);
-            Map<String, List<Row>> passageGroups = new LinkedHashMap<>();
+            // --- 1. PARSE SHEET: EXAM ---
+            Sheet examSheet = workbook.getSheetAt(1); // Sheet 2 is EXAM
+            Map<String, Long> examCodeToId = new HashMap<>();
 
-            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
-                Row row = sheet.getRow(i);
-                if (row == null) continue;
-                String questionText = getCellString(row, 1);
-                if (questionText == null || questionText.isBlank()) continue;
-                String passageText = getCellString(row, 0);
-                String key = (passageText != null && !passageText.isBlank())
-                    ? passageText : ("__standalone__" + i);
-                passageGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+            for (int i = 1; i <= examSheet.getLastRowNum(); i++) {
+                Row row = examSheet.getRow(i);
+                if (row == null)
+                    continue;
+
+                String examCode = getCellString(row, 0);
+                if (examCode == null || examCode.isBlank() || examCode.equals("Exam Code"))
+                    continue; // Skip header or empty
+
+                String title = getCellString(row, 1);
+                String description = getCellString(row, 2);
+                String qCountStr = getCellString(row, 3);
+                String passingScoreStr = getCellString(row, 4);
+                String timeStr = getCellString(row, 5);
+                String thumbnailUrl = getCellString(row, 6);
+
+                if (title == null || title.isBlank())
+                    throw new IllegalArgumentException("Title is required at row " + (i + 1));
+                if (description == null || description.isBlank())
+                    throw new IllegalArgumentException("Description is required at row " + (i + 1));
+                if (qCountStr == null || qCountStr.isBlank())
+                    throw new IllegalArgumentException("Question Count is required at row " + (i + 1));
+                if (passingScoreStr == null || passingScoreStr.isBlank())
+                    throw new IllegalArgumentException("Passing Score is required at row " + (i + 1));
+                if (timeStr == null || timeStr.isBlank())
+                    throw new IllegalArgumentException("Time is required at row " + (i + 1));
+
+                Integer qCount = Integer.parseInt(qCountStr);
+                Double passingScore = Double.parseDouble(passingScoreStr);
+                Integer durationMinutes = Integer.parseInt(timeStr);
+                
+                if (durationMinutes <= 0)
+                    throw new IllegalArgumentException("Time must be greater than 0 at row " + (i + 1));
+
+                GeneratedKeyHolder examKh = new GeneratedKeyHolder();
+                jdbcTemplate.update(con -> {
+                    var ps = con.prepareStatement(
+                            "INSERT INTO exams (created_by, title, description, expected_question_count, passing_score, duration_minutes, thumbnail_url, status, version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFT', 'v0.1', NOW())",
+                            java.sql.Statement.RETURN_GENERATED_KEYS);
+                    ps.setLong(1, userId);
+                    ps.setString(2, title);
+                    ps.setString(3, description);
+                    ps.setInt(4, qCount);
+                    ps.setDouble(5, passingScore);
+                    ps.setInt(6, durationMinutes);
+                    if (thumbnailUrl != null)
+                        ps.setString(7, thumbnailUrl);
+                    else
+                        ps.setNull(7, java.sql.Types.VARCHAR);
+                    return ps;
+                }, examKh);
+
+                Number examKey = examKh.getKey();
+                if (examKey != null) {
+                    examCodeToId.put(examCode, examKey.longValue());
+                    totalExamsCreated++;
+                    System.out.println("Created exam: " + examCode + " with ID: " + examKey.longValue());
+                }
             }
 
-            for (Map.Entry<String, List<Row>> entry : passageGroups.entrySet()) {
-                String passageKey = entry.getKey();
-                List<Row> rows = entry.getValue();
-                boolean isGroup = !passageKey.startsWith("__standalone__");
+            System.out.println("Total exams created in EXAM sheet: " + totalExamsCreated);
+            if (examCodeToId.isEmpty()) {
+                throw new IllegalArgumentException("No valid exams found in the EXAM sheet");
+            }
 
-                Long groupId = null;
-                Row firstRow = rows.get(0);
-                Long skillParamId = resolveSystemParam(getCellString(firstRow, 7));
-                Long difficultyId = resolveSystemParam(getCellString(firstRow, 8));
-                Long categoryId = resolveCategory(getCellString(firstRow, 9));
-                if (skillParamId == null) skillParamId = 1L;
-                if (difficultyId == null) difficultyId = 14L;
-                if (categoryId == null) categoryId = 1L;
+            // --- 2. PARSE SHEET: QUESTIONS ---
+            Sheet questionSheet = workbook.getSheetAt(2); // Sheet 3 is QUESTIONS
+            // Map structure: ExamCode -> PassageText -> List of Question Rows
+            Map<String, Map<String, List<Row>>> examPassageGroups = new LinkedHashMap<>();
 
-                if (isGroup) {
-                    final String passageText = passageKey;
-                    GeneratedKeyHolder kh = new GeneratedKeyHolder();
-                    jdbcTemplate.update(con -> {
-                        var ps = con.prepareStatement(
-                            "INSERT INTO question_groups (title, group_type_param_id, context_text) VALUES (?, ?, ?)",
-                            java.sql.Statement.RETURN_GENERATED_KEYS);
-                        ps.setString(1, "Imported Group");
-                        ps.setLong(2, 17L);
-                        ps.setString(3, passageText);
-                        return ps;
-                    }, kh);
-                    Number k = kh.getKey();
-                    if (k != null) groupId = k.longValue();
+            for (int i = 1; i <= questionSheet.getLastRowNum(); i++) {
+                Row row = questionSheet.getRow(i);
+                if (row == null)
+                    continue;
+
+                String examCode = getCellString(row, 0);
+                if (examCode == null || examCode.isBlank() || examCode.equals("Exam Code"))
+                    continue;
+                if (!examCodeToId.containsKey(examCode)) {
+                    throw new IllegalArgumentException(
+                            "Question at row " + (i + 1) + " has unknown Exam Code: " + examCode);
                 }
 
-                List<Long> questionIds = new ArrayList<>();
-                for (Row row : rows) {
-                    String qt = getCellString(row, 1);
-                    String optA = getCellString(row, 2);
-                    String optB = getCellString(row, 3);
-                    String optC = getCellString(row, 4);
-                    String optD = getCellString(row, 5);
-                    String correct = getCellString(row, 6);
+                String passageText = getCellString(row, 2);
+                String key = (passageText != null && !passageText.isBlank()) ? passageText : ("__standalone__" + i);
 
-                    final Long fGroupId = groupId;
-                    final Long fSkill = skillParamId;
-                    final Long fDiff = difficultyId;
-                    final Long fCat = categoryId;
-                    GeneratedKeyHolder qkh = new GeneratedKeyHolder();
-                    jdbcTemplate.update(con -> {
-                        var ps = con.prepareStatement(
-                            "INSERT INTO questions (created_by, category_id, question_text, difficulty_param_id, status, group_id, skill_param_id) VALUES (?, ?, ?, ?, 'PRIVATE', ?, ?)",
-                            java.sql.Statement.RETURN_GENERATED_KEYS);
-                        ps.setLong(1, userId);
-                        ps.setLong(2, fCat);
-                        ps.setString(3, qt);
-                        ps.setLong(4, fDiff);
-                        if (fGroupId != null) ps.setLong(5, fGroupId);
-                        else ps.setNull(5, java.sql.Types.BIGINT);
-                        ps.setLong(6, fSkill);
-                        return ps;
-                    }, qkh);
-                    Number qk = qkh.getKey();
-                    if (qk == null) continue;
-                    long questionId = qk.longValue();
-                    questionIds.add(questionId);
+                examPassageGroups.computeIfAbsent(examCode, k -> new LinkedHashMap<>())
+                        .computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+            }
 
-                    String[] optTexts = {optA, optB, optC, optD};
-                    String[] optLabels = {"A", "B", "C", "D"};
-                    for (int oi = 0; oi < 4; oi++) {
-                        String ot = optTexts[oi];
-                        if (ot == null || ot.isBlank()) continue;
-                        boolean isCorrect = optLabels[oi].equalsIgnoreCase(correct != null ? correct.trim() : "");
-                        jdbcTemplate.update(
-                            "INSERT INTO question_options (question_id, option_text, is_correct) VALUES (?, ?, ?)",
-                            questionId, ot, isCorrect ? 1 : 0);
+            for (Map.Entry<String, Map<String, List<Row>>> examEntry : examPassageGroups.entrySet()) {
+                String currentExamCode = examEntry.getKey();
+                Long examId = examCodeToId.get(currentExamCode);
+
+                for (Map.Entry<String, List<Row>> passageEntry : examEntry.getValue().entrySet()) {
+                    String passageKey = passageEntry.getKey();
+                    List<Row> rows = passageEntry.getValue();
+                    boolean isGroup = !passageKey.startsWith("__standalone__");
+
+                    Long groupId = null;
+                    Row firstRow = rows.get(0);
+
+                    String skillStr = getCellString(firstRow, 10);
+                    String diffStr = getCellString(firstRow, 11);
+                    String groupTypeStr = getCellString(firstRow, 12);
+
+                    Long skillParamId = resolveSystemParam(skillStr);
+                    Long difficultyId = resolveSystemParam(diffStr);
+                    Long categoryId = resolveCategory(groupTypeStr);
+
+                    if (skillParamId == null)
+                        throw new IllegalArgumentException(
+                                "Invalid Skill Type '" + skillStr + "' at Exam " + currentExamCode);
+                    if (difficultyId == null)
+                        throw new IllegalArgumentException(
+                                "Invalid Difficulty '" + diffStr + "' at Exam " + currentExamCode);
+
+                    if (isGroup) {
+                        if (categoryId == null)
+                            throw new IllegalArgumentException(
+                                    "Invalid Group Type '" + groupTypeStr + "' for passage at Exam " + currentExamCode);
+
+                        final String passageText = passageKey;
+                        GeneratedKeyHolder kh = new GeneratedKeyHolder();
+                        jdbcTemplate.update(con -> {
+                            var ps = con.prepareStatement(
+                                    "INSERT INTO question_groups (context_text, group_type_param_id) VALUES (?, 17)",
+                                    java.sql.Statement.RETURN_GENERATED_KEYS);
+                            ps.setString(1, passageText);
+                            return ps;
+                        }, kh);
+                        Number k = kh.getKey();
+                        if (k != null)
+                            groupId = k.longValue();
                     }
 
-                    int nextOrder = jdbcTemplate.queryForObject(
-                        "SELECT COALESCE(MAX(question_order), 0) + 1 FROM exam_questions WHERE exam_id = ?",
-                        Integer.class, examId);
-                    jdbcTemplate.update(
-                        "INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES (?, ?, ?)",
-                        examId, questionId, nextOrder);
-                    totalQuestions++;
-                }
+                    for (Row row : rows) {
+                        String orderStr = getCellString(row, 1);
+                        String qt = getCellString(row, 3);
+                        String optA = getCellString(row, 4);
+                        String optB = getCellString(row, 5);
+                        String optC = getCellString(row, 6);
+                        String optD = getCellString(row, 7);
+                        String correct = getCellString(row, 8);
+                        String explanation = getCellString(row, 9);
 
-                Map<String, Object> block = new HashMap<>();
-                block.put("groupId", groupId);
-                block.put("isGroup", isGroup);
-                block.put("questionIds", questionIds);
-                importedBlocks.add(block);
+                        if (qt == null || qt.isBlank())
+                            throw new IllegalArgumentException("Question Text missing in Exam " + currentExamCode);
+                        if (correct == null || correct.isBlank() || !correct.matches("(?i)^[A-D]$")) {
+                            throw new IllegalArgumentException(
+                                    "Correct Answer must be A, B, C, or D in Exam " + currentExamCode);
+                        }
+
+                        final Long fGroupId = groupId;
+                        final Long fSkill = skillParamId;
+                        final Long fDiff = difficultyId;
+
+                        final Long fCategory = categoryId;
+                        GeneratedKeyHolder qkh = new GeneratedKeyHolder();
+                        jdbcTemplate.update(con -> {
+                            var ps = con.prepareStatement(
+                                    "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, group_id, skill_param_id) VALUES (?, ?, ?, ?, ?, 'PRIVATE', ?, ?)",
+                                    java.sql.Statement.RETURN_GENERATED_KEYS);
+                            ps.setLong(1, userId);
+                            if (fCategory != null) ps.setLong(2, fCategory);
+                            else ps.setNull(2, java.sql.Types.BIGINT);
+                            ps.setString(3, qt);
+                            if (explanation != null)
+                                ps.setString(4, explanation);
+                            else
+                                ps.setNull(4, java.sql.Types.VARCHAR);
+                            ps.setLong(5, fDiff);
+                            if (fGroupId != null)
+                                ps.setLong(6, fGroupId);
+                            else
+                                ps.setNull(6, java.sql.Types.BIGINT);
+                            ps.setLong(7, fSkill);
+                            return ps;
+                        }, qkh);
+                        Number qk = qkh.getKey();
+                        if (qk == null)
+                            continue;
+                        long questionId = qk.longValue();
+
+                        String[] optTexts = { optA, optB, optC, optD };
+                        String[] optLabels = { "A", "B", "C", "D" };
+                        for (int oi = 0; oi < 4; oi++) {
+                            String ot = optTexts[oi];
+                            if (ot == null || ot.isBlank())
+                                continue;
+                            boolean isCorrect = optLabels[oi].equalsIgnoreCase(correct.trim());
+                            jdbcTemplate.update(
+                                    "INSERT INTO question_options (question_id, option_text, is_correct) VALUES (?, ?, ?)",
+                                    questionId, ot, isCorrect ? 1 : 0);
+                        }
+
+                        int orderIndex = (orderStr != null && !orderStr.isBlank()) ? Integer.parseInt(orderStr) : 0;
+                        jdbcTemplate.update(
+                                "INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES (?, ?, ?)",
+                                examId, questionId, orderIndex);
+
+                        totalQuestionsImported++;
+                    }
+                }
             }
 
+            System.out.println("Total questions imported: " + totalQuestionsImported);
+            workbook.close();
+        } catch (IllegalArgumentException e) {
+            // Throw custom validation message
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to parse Excel: " + e.getMessage()));
         }
 
         return ResponseEntity.ok(Map.of(
-            "message", "Import successful",
-            "totalQuestions", totalQuestions,
-            "blocks", importedBlocks
-        ));
+                "message", "Import successful",
+                "totalExamsCreated", totalExamsCreated,
+                "totalQuestionsImported", totalQuestionsImported));
     }
 
     @GetMapping("/import-excel/template")
     @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
     public ResponseEntity<byte[]> downloadTemplate() {
-        try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("Questions");
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font font = workbook.createFont();
-            font.setBold(true);
-            headerStyle.setFont(font);
-            headerStyle.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
-            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-
-            Row header = sheet.createRow(0);
-            String[] headers = {"passage_text","question_text","option_a","option_b","option_c","option_d","correct_answer (A/B/C/D)","skill_type","difficulty","category"};
-            for (int i = 0; i < headers.length; i++) {
-                Cell c = header.createCell(i);
-                c.setCellValue(headers[i]);
-                c.setCellStyle(headerStyle);
-                sheet.setColumnWidth(i, 5500);
+        try {
+            String fileName = "Hango_Exam_Import_Template.xlsx";
+            List<Path> candidates = List.of(
+                    Paths.get("doc", "templates", fileName),
+                    Paths.get("..", "doc", "templates", fileName),
+                    Paths.get("doc", "specs", "templates", fileName),
+                    Paths.get("..", "doc", "specs", "templates", fileName));
+            byte[] bytes = null;
+            for (Path p : candidates) {
+                if (Files.isRegularFile(p)) {
+                    bytes = Files.readAllBytes(p);
+                    break;
+                }
             }
-
-            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
-            workbook.write(bos);
-
+            if (bytes == null) {
+                throw new java.io.IOException("Template not found");
+            }
             return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=exam_questions_template.xlsx")
-                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                .body(bos.toByteArray());
+                    .header("Content-Disposition", "attachment; filename=" + fileName)
+                    .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    .body(bytes);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }
 
     private String getCellString(Row row, int col) {
         Cell cell = row.getCell(col, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-        if (cell == null) return null;
+        if (cell == null)
+            return null;
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue().trim();
             case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
@@ -202,25 +315,27 @@ public class ExamImportController {
     }
 
     private Long resolveSystemParam(String paramValue) {
-        if (paramValue == null || paramValue.isBlank()) return null;
+        if (paramValue == null || paramValue.isBlank())
+            return null;
         List<Long> ids = jdbcTemplate.query(
-            "SELECT id FROM system_parameters WHERE LOWER(param_value) = LOWER(?) LIMIT 1",
-            (rs, rn) -> rs.getLong("id"), paramValue.trim());
+                "SELECT id FROM system_parameters WHERE LOWER(param_value) = LOWER(?) LIMIT 1",
+                (rs, rn) -> rs.getLong("id"), paramValue.trim());
         return ids.isEmpty() ? null : ids.get(0);
     }
 
     private Long resolveCategory(String categoryName) {
-        if (categoryName == null || categoryName.isBlank()) return null;
+        if (categoryName == null || categoryName.isBlank())
+            return null;
         List<Long> ids = jdbcTemplate.query(
-            "SELECT id FROM question_categories WHERE LOWER(name) = LOWER(?) LIMIT 1",
-            (rs, rn) -> rs.getLong("id"), categoryName.trim());
+                "SELECT id FROM question_categories WHERE LOWER(name) = LOWER(?) LIMIT 1",
+                (rs, rn) -> rs.getLong("id"), categoryName.trim());
         return ids.isEmpty() ? null : ids.get(0);
     }
 
     private Long resolveUserId(String email) {
         List<Long> ids = jdbcTemplate.query(
-            "SELECT id FROM users WHERE email = ?",
-            (rs, rn) -> rs.getLong("id"), email);
+                "SELECT id FROM users WHERE email = ?",
+                (rs, rn) -> rs.getLong("id"), email);
         return ids.isEmpty() ? null : ids.get(0);
     }
 }
