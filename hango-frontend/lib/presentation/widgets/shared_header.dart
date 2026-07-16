@@ -5,14 +5,19 @@ import '../pages/login_page.dart';
 import '../pages/register_page.dart';
 import '../pages/exam/list_exams_page.dart';
 import '../pages/course/list_courses_page.dart';
+import '../pages/course/cart_page.dart';
+import '../pages/course/course_detail_page.dart';
 import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/learner/my_learning_page.dart';
+import '../../../data/repositories/course_repository.dart';
+import '../../../domain/model/course.dart';
 
 import '../../utils/toast_helper.dart';
 import '../../utils/language_manager.dart';
+import '../../utils/cart_manager.dart';
 
 class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isDesktop;
@@ -43,6 +48,15 @@ class _SharedHeaderState extends State<SharedHeader> {
   String _userInitials = 'L';
   String _userAvatarUrl = '';
   bool _isVietnamese = true;
+  int _cartCount = 0;
+
+  List<Course> _allCourses = [];
+  List<String> _cartIds = [];
+
+  OverlayEntry? _cartOverlayEntry;
+  final LayerLink _cartLink = LayerLink();
+  bool _isHoveringCartIcon = false;
+  bool _isHoveringCartPopup = false;
 
   @override
   void initState() {
@@ -50,6 +64,11 @@ class _SharedHeaderState extends State<SharedHeader> {
     _loadUserInfo();
     _isVietnamese = LanguageManager.isVi;
     LanguageManager.isVietnamese.addListener(_onLanguageChanged);
+    CartManager.cartCountNotifier.addListener(_onCartChanged);
+    CartManager.updateCount();
+
+    _loadCartIds();
+    _fetchAllCoursesForDropdowns();
   }
 
   void _onLanguageChanged() {
@@ -60,10 +79,279 @@ class _SharedHeaderState extends State<SharedHeader> {
     }
   }
 
+  void _onCartChanged() {
+    if (mounted) {
+      setState(() {
+        _cartCount = CartManager.cartCountNotifier.value;
+      });
+      _loadCartIds();
+    }
+  }
+
+  Future<void> _loadCartIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _cartIds = prefs.getStringList('cart_course_ids') ?? [];
+      });
+    }
+  }
+
+  Future<void> _fetchAllCoursesForDropdowns() async {
+    try {
+      final courses = await CourseRepository().fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
+      if (mounted) {
+        setState(() {
+          _allCourses = courses;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   @override
   void dispose() {
+    _hideCartOverlay();
     LanguageManager.isVietnamese.removeListener(_onLanguageChanged);
+    CartManager.cartCountNotifier.removeListener(_onCartChanged);
     super.dispose();
+  }
+
+  String _getCoursePrice(Course course) {
+    final title = course.title.toLowerCase();
+    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+      return 'Miễn phí';
+    }
+    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
+    return prices[course.id % prices.length];
+  }
+
+  int _parsePriceInt(String priceStr) {
+    if (priceStr == 'Miễn phí' || priceStr.toLowerCase() == 'free') return 0;
+    final cleaned = priceStr.replaceAll('.', '').replaceAll('đ', '').trim();
+    return int.tryParse(cleaned) ?? 0;
+  }
+
+  String _formatPrice(int price) {
+    return price.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.') + 'đ';
+  }
+
+  void _showCartOverlay() {
+    _hideCartOverlay();
+    if (!mounted) return;
+
+    _cartOverlayEntry = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          width: 320,
+          child: CompositedTransformFollower(
+            link: _cartLink,
+            showWhenUnlinked: false,
+            offset: const Offset(-280, 40),
+            child: MouseRegion(
+              onEnter: (_) {
+                _isHoveringCartPopup = true;
+              },
+              onExit: (_) {
+                _isHoveringCartPopup = false;
+                _scheduleHideOverlays();
+              },
+              child: _buildCartDropdown(),
+            ),
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(_cartOverlayEntry!);
+  }
+
+  void _hideCartOverlay() {
+    if (_cartOverlayEntry != null) {
+      _cartOverlayEntry!.remove();
+      _cartOverlayEntry = null;
+    }
+  }
+
+  void _scheduleHideOverlays() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!_isHoveringCartIcon && !_isHoveringCartPopup) {
+        _hideCartOverlay();
+      }
+    });
+  }
+
+
+
+  Widget _buildCartDropdown() {
+    final isVi = _isVietnamese;
+    final cartCourses = _allCourses.where((c) => _cartIds.contains(c.id.toString())).toList();
+
+    int totalVal = 0;
+    for (final c in cartCourses) {
+      totalVal += _parsePriceInt(_getCoursePrice(c));
+    }
+
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isVi ? 'Giỏ hàng' : 'Cart',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Outfit'),
+                ),
+                InkWell(
+                  onTap: () {
+                    _hideCartOverlay();
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                  },
+                  child: Text(
+                    isVi ? 'Xem giỏ hàng' : 'View cart',
+                    style: const TextStyle(color: Color(0xFF28B79B), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            const SizedBox(height: 8),
+            if (cartCourses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24.0),
+                child: Text(
+                  isVi ? 'Giỏ hàng trống.' : 'Cart is empty.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
+                ),
+              )
+            else ...[
+              Container(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: cartCourses.length > 3 ? 3 : cartCourses.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final course = cartCourses[index];
+                    return _buildDropdownItem(course);
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isVi ? 'Tổng cộng:' : 'Total:',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                  ),
+                  Text(
+                    _formatPrice(totalVal),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 38,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF28B79B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    _hideCartOverlay();
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                  },
+                  child: Text(
+                    isVi ? 'Thanh toán' : 'Checkout',
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownItem(Course course) {
+    final isVi = _isVietnamese;
+    final priceStr = _getCoursePrice(course);
+    final displayPrice = priceStr == 'Miễn phí' ? (isVi ? 'Miễn phí' : 'Free') : priceStr;
+
+    return InkWell(
+      onTap: () {
+        _hideCartOverlay();
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => CourseDetailPage(courseId: course.id)),
+        );
+      },
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              width: 44,
+              height: 44,
+              color: const Color(0xFFF1F5F9),
+              child: course.thumbnailUrl.isNotEmpty
+                  ? Image.network(course.thumbnailUrl, fit: BoxFit.cover)
+                  : const Icon(Icons.school_rounded, color: Color(0xFF94A3B8), size: 20),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  course.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  course.creatorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  displayPrice,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: priceStr == 'Miễn phí' ? const Color(0xFF28B79B) : const Color(0xFF1E293B),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -74,12 +362,15 @@ class _SharedHeaderState extends State<SharedHeader> {
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    final cartList = prefs.getStringList('cart_course_ids') ?? [];
+    final cartCount = cartList.length;
     final token = prefs.getString('auth_token');
 
     if (token == null) {
       if (mounted) {
         setState(() {
           _isLoggedIn = false;
+          _cartCount = cartCount;
         });
       }
       return;
@@ -104,6 +395,7 @@ class _SharedHeaderState extends State<SharedHeader> {
         _userEmail = email;
         _userInitials = initials;
         _userAvatarUrl = avatarUrl;
+        _cartCount = cartCount;
       });
     }
   }
@@ -175,34 +467,6 @@ class _SharedHeaderState extends State<SharedHeader> {
     );
   }
 
-  Widget _buildTeachingButton() {
-    return TextButton.icon(
-      onPressed: () {
-        ToastHelper.show(context, _isVietnamese ? 'Chuyển sang giao diện giảng dạy' : 'Switch to teaching interface');
-      },
-      icon: const Icon(
-        Icons.school_outlined,
-        size: 18,
-        color: Color(0xFF4B5563),
-      ),
-      label: Text(
-        _isVietnamese ? 'Dạy học' : 'Teach',
-        style: const TextStyle(
-          color: Color(0xFF4B5563),
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-          fontFamily: 'Outfit',
-        ),
-      ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-    );
-  }
-
   Widget _buildLanguageSwitcher() {
     return Container(
       height: 32,
@@ -265,61 +529,64 @@ class _SharedHeaderState extends State<SharedHeader> {
     );
   }
 
-  Widget _buildWishlistButton() {
-    return IconButton(
-      icon: const Icon(
-        Icons.favorite_border_rounded,
-        color: Color(0xFF4B5563),
-        size: 24,
-      ),
-      onPressed: () {
-        ToastHelper.show(context, 'Danh sách yêu thích');
-      },
-      tooltip: 'Danh sách yêu thích',
-    );
-  }
+
 
   Widget _buildCartButton() {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        IconButton(
-          icon: const Icon(
-            Icons.shopping_cart_outlined,
-            color: Color(0xFF4B5563),
-            size: 24,
-          ),
-          onPressed: () {
-            ToastHelper.show(context, 'Giỏ hàng của bạn');
-          },
-          tooltip: 'Giỏ hàng',
-        ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF05A22),
-              shape: BoxShape.circle,
+    return CompositedTransformTarget(
+      link: _cartLink,
+      child: MouseRegion(
+        onEnter: (_) {
+          _isHoveringCartIcon = true;
+          _showCartOverlay();
+        },
+        onExit: (_) {
+          _isHoveringCartIcon = false;
+          _scheduleHideOverlays();
+        },
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.shopping_cart_outlined,
+                color: Color(0xFF4B5563),
+                size: 24,
+              ),
+              onPressed: () {
+                _hideCartOverlay();
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+              },
+              tooltip: _isVietnamese ? 'Giỏ hàng' : 'Cart',
             ),
-            constraints: const BoxConstraints(
-              minWidth: 16,
-              minHeight: 16,
-            ),
-            child: const Center(
-              child: Text(
-                '3',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
+            if (_cartCount > 0)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF9333EA),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$_cartCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -458,57 +725,85 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                if (!widget.hideCommerceActions) ...[
-                  _buildTeachingButton(),
-                  const SizedBox(width: 4),
-                ],
                 _buildLanguageSwitcher(),
                 const SizedBox(width: 4),
                 if (!widget.hideCommerceActions) ...[
-                  _buildWishlistButton(),
-                  const SizedBox(width: 2),
                   _buildCartButton(),
                   const SizedBox(width: 2),
                 ],
               ],
               // Notification Bell
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.notifications_none_outlined,
-                      color: Color(0xFF4B5563),
-                      size: 24,
-                    ),
-                    onPressed: widget.hideNavLinks
-                        ? null
-                        : () {
-                            ToastHelper.show(context, _isVietnamese ? 'Không có thông báo mới' : 'No new notifications');
-                          },
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
+              PopupMenuButton<void>(
+                enabled: !widget.hideNavLinks,
+                offset: const Offset(0, 50),
+                color: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                icon: const Icon(
+                  Icons.notifications_none_outlined,
+                  color: Color(0xFF4B5563),
+                  size: 24,
+                ),
+                itemBuilder: (context) => [
+                  PopupMenuItem<void>(
+                    enabled: false,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF05A22),
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: const Center(
-                        child: Text(
-                          '3',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
+                      width: 280,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _isVietnamese ? 'Thông báo' : 'Notifications',
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF8FAFC),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.notifications_off_outlined,
+                              size: 40,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _isVietnamese ? 'Không có thông báo mới' : 'No new notifications',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _isVietnamese 
+                                ? 'Chúng tôi sẽ thông báo khi có hoạt động mới.' 
+                                : 'We\'ll let you know when something comes up.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                       ),
                     ),
                   ),
@@ -540,10 +835,6 @@ class _SharedHeaderState extends State<SharedHeader> {
                     );
                   } else if (val == 'cart') {
                     ToastHelper.show(context, _isVietnamese ? 'Mở giỏ hàng của bạn' : 'Opening your cart');
-                  } else if (val == 'wishlist') {
-                    ToastHelper.show(context, _isVietnamese ? 'Mở danh sách mong ước của bạn' : 'Opening your wishlist');
-                  } else if (val == 'instructor_dashboard') {
-                    ToastHelper.show(context, _isVietnamese ? 'Mở bảng điều khiển giảng viên' : 'Opening instructor dashboard');
                   } else if (val == 'purchase_history') {
                     ToastHelper.show(context, _isVietnamese ? 'Mở lịch sử mua hàng' : 'Opening purchase history');
                   } else if (val == 'notifications') {
@@ -719,56 +1010,8 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'wishlist',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.favorite_border_rounded,
-                            size: 18,
-                            color: Color(0xFF4B5563),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _isVietnamese ? 'Danh sách mong ước' : 'Wishlist',
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Color(0xFF1E293B),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'instructor_dashboard',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.dashboard_outlined,
-                            size: 18,
-                            color: Color(0xFF4B5563),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _isVietnamese ? 'Bảng điều khiển của giảng viên' : 'Instructor Dashboard',
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Color(0xFF1E293B),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+
+
                   PopupMenuItem(
                     value: 'purchase_history',
                     child: Container(
@@ -783,32 +1026,6 @@ class _SharedHeaderState extends State<SharedHeader> {
                           const SizedBox(width: 12),
                           Text(
                             _isVietnamese ? 'Lịch sử mua hàng' : 'Purchase History',
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Color(0xFF1E293B),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const PopupMenuDivider(height: 1),
-                  PopupMenuItem(
-                    value: 'notifications',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.notifications_none_outlined,
-                            size: 18,
-                            color: Color(0xFF4B5563),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _isVietnamese ? 'Thông báo' : 'Notifications',
                             style: const TextStyle(
                               fontFamily: 'Outfit',
                               color: Color(0xFF1E293B),
@@ -894,12 +1111,8 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                _buildTeachingButton(),
-                const SizedBox(width: 8),
                 _buildLanguageSwitcher(),
                 const SizedBox(width: 8),
-                _buildWishlistButton(),
-                const SizedBox(width: 4),
                 _buildCartButton(),
                 const SizedBox(width: 8),
               ],
@@ -1006,6 +1219,64 @@ class _SharedHeaderState extends State<SharedHeader> {
               : [logoWidget, rightActionsWidget],
         ),
       ),
+    );
+  }
+
+  Widget _buildNotificationItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String description,
+    required String time,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: bgColor,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 16, color: iconColor),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                time,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -26,8 +26,26 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isVerifying = false;
   bool _isResending = false;
   Timer? _verificationTimer;
+  String _selectedRole = 'LEARNER'; // 'LEARNER' or 'TRAINER'
 
   final _authService = AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPreselectedRole();
+  }
+
+  void _checkPreselectedRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final preselected = prefs.getString('preselected_register_role');
+    if (preselected != null && (preselected == 'LEARNER' || preselected == 'TRAINER')) {
+      setState(() {
+        _selectedRole = preselected;
+      });
+      await prefs.remove('preselected_register_role');
+    }
+  }
 
   @override
   void dispose() {
@@ -54,7 +72,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    final result = await _authService.register(name, email, password);
+    final result = await _authService.register(name, email, password, _selectedRole);
 
     setState(() {
       _isLoading = false;
@@ -300,7 +318,18 @@ class _RegisterPageState extends State<RegisterPage> {
                               color: Color(0xFF1F2937),
                             ),
                           ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 20),
+
+                          // Role Selector Toggle
+                          RoleToggleSelector(
+                            selectedRole: _selectedRole,
+                            onRoleChanged: (role) {
+                              setState(() {
+                                _selectedRole = role;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 24),
 
                           // Full Name Field
                           const Text(
@@ -873,6 +902,102 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class RoleToggleSelector extends StatelessWidget {
+  final String selectedRole;
+  final Function(String) onRoleChanged;
+
+  const RoleToggleSelector({
+    super.key,
+    required this.selectedRole,
+    required this.onRoleChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 52,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onRoleChanged('LEARNER'),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selectedRole == 'LEARNER'
+                      ? const Color(0xFF20B486)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: selectedRole == 'LEARNER'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'Learner',
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: selectedRole == 'LEARNER'
+                        ? Colors.white
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onRoleChanged('TRAINER'),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selectedRole == 'TRAINER'
+                      ? const Color(0xFF20B486)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: selectedRole == 'TRAINER'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'Trainer',
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: selectedRole == 'TRAINER'
+                        ? Colors.white
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

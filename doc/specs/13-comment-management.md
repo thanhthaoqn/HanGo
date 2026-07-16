@@ -1,32 +1,32 @@
 # Feature Specification: FT-11 - Comment Management
 
 ## 1. Business Context
-Learning requires interaction (Community). The Comment System allows Learners to ask questions and discuss directly under each lesson, receiving answers from Trainers or other Learners. This feature establishes a Q&A model similar to major MOOC platforms (Udemy, Coursera).
+Learning requires interaction (Community). The Comment System allows Learners to ask questions and discuss directly under each lesson, receiving answers from Trainers or other Learners. This feature establishes a Q&A model similar to major MOOC platforms.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Comment list interface below the lesson.
-- [ ] Input field for comment text (with character limit), Submit button.
-- [ ] Display nested comments (Root Comment -> Replies).
-- [ ] "Delete" or "Edit" button if the current user is the author of that comment.
+- [ ] Comment list interface below the lesson/quiz.
+- [ ] Input field for comment text, Submit button.
+- [ ] Display nested comments (Root Comment -> Replies), supporting likes/unlikes.
+- [ ] Admin panel interface to review and moderate comments.
 
 **Backend (Spring Boot):**
-- [ ] API `POST /api/v1/lessons/{id}/comments` to write a root comment.
-- [ ] API `POST /api/v1/comments/{id}/replies` to reply to a comment.
-- [ ] API `GET /api/v1/lessons/{id}/comments` with pagination (Pageable) including nested replies.
-- [ ] Authorization: Trainer/Lead has the right to delete any comment within their course. Learners can only delete their own comments.
+- [ ] API `GET /api/v1/comments/lesson/{lessonId}` to fetch the comment thread (uses `JOIN FETCH` to prevent N+1 queries).
+- [ ] API `POST /api/v1/comments/lesson/{lessonId}` to post a comment or reply (with user ID).
+- [ ] API `PUT /api/v1/comments/{commentId}` and `DELETE /api/v1/comments/{commentId}` to edit/delete.
+- [ ] API `POST /api/v1/comments/{commentId}/like` and `POST /api/v1/comments/{commentId}/unlike`.
+- [ ] Admin APIs: `GET /api/admin/comments` (list all comments) and `PUT /api/admin/comments/{id}/status` to approve/reject comments.
 
 ## 3. Technical Constraints
-- **Database:** The `comments` table must support a tree structure using a `parent_id` column (Self-referencing relationship).
-- **Frontend:** Rendering nested comments can use a Recursive Widget or limit the depth to just 1 level of replies to simplify the UI.
-- **Backend:** Map data from DB (Flat list) into a Nested DTO (Parent comment containing a list of child comments) before returning. Avoid N+1 query issues by using `JOIN FETCH` or graph libraries.
+- **Database Schema:** The `comments` table supports self-referential tree structure using `parent_comment_id`. It maps to `user_id` and `lesson_id` (or course rating entities).
+- **Backend Optimization:** Queries must load recursively or map flat results into tree DTO structures (containing child comments) before returning to the UI to optimize performance.
+- **XSS Prevention:** Escape input strings and sanitize content before persisting to prevent HTML/Javascript injection attacks.
 
 ## 4. Edge Cases
-- **Toxic Content:** The system blocks prohibited keywords (Bad words filter) at the Backend before saving to the DB.
-- **Deleting a parent comment:** How should child comments (Replies) be handled? (Option 1: Domino effect deletion - Cascade. Option 2: Hide the parent comment text as "This comment has been deleted" but keep the child comments. *Recommendation: Use Option 2 via Soft Delete*).
-- **Comment Spamming:** Set a limit where 1 user can post a maximum of 3 comments per minute (Rate limit).
+- **Deleted Parent Comment:** Keep the parent comment node to preserve the tree structure but mask the content as "This comment has been deleted".
+- **Spam Control:** Enforce basic rate-limiting rules.
 
 ## 5. Non-functional Requirements
-- **Performance:** Loading the comment page must not be slower than loading the lesson video. (API response < 300ms).
-- **Security:** Incoming DTOs must use a library to escape HTML/Javascript (preventing XSS Attacks). Never trust user input.
+- **Performance:** Fetching thread comments must respond in `< 300ms`.
+

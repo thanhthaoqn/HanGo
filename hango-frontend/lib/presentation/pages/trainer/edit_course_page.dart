@@ -933,7 +933,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: null, // Disabled in mock
+                onPressed: _publishCourse,
                 icon: const Icon(Icons.play_arrow, size: 16),
                 label: const Text(
                   'Submit for Review',
@@ -944,9 +944,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20B486).withOpacity(0.5),
-                  disabledBackgroundColor: const Color(0xFF20B486).withOpacity(0.4),
-                  disabledForegroundColor: Colors.white.withOpacity(0.8),
+                  backgroundColor: const Color(0xFF20B486),
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -1489,6 +1488,85 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 ),
         ),
       ],
+    );
+  }
+
+  Future<void> _publishCourse() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF20B486)),
+      ),
+    );
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) throw Exception('No token found');
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/courses/${widget.courseId}/publish');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+      }
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Course published successfully!');
+        }
+      } else {
+        final data = jsonDecode(response.body);
+        final errorMsg = data['error'] ?? response.body;
+        
+        if (errorMsg.contains('phê duyệt') || errorMsg.contains('hoàn thiện')) {
+          _showPublishWarningPopup();
+        } else {
+          ToastHelper.showError(context, errorMsg);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ToastHelper.showError(context, 'Lỗi kết nối máy chủ: $e');
+      }
+    }
+  }
+
+  void _showPublishWarningPopup() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
+            SizedBox(width: 12),
+            Text('Yêu cầu phê duyệt', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+          ],
+        ),
+        content: const Text(
+          'Bạn cần hoàn thiện hồ sơ và được Admin phê duyệt để bắt đầu bán khóa học.',
+          style: TextStyle(fontSize: 14, height: 1.5, fontFamily: 'Outfit'),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Đã hiểu', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+          ),
+        ],
+      ),
     );
   }
 }
