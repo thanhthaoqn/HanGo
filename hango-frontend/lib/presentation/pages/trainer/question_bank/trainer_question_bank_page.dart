@@ -9,6 +9,9 @@ import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
 import '../trainer_exams_page.dart';
 import 'trainer_create_question_page.dart';
+import '../../learner/learner_home_page.dart';
+import '../../../../utils/language_manager.dart';
+import '../trainer_profile_page.dart';
 import 'models/trainer_question.dart';
 import 'widgets/question_filter_pane.dart';
 import 'widgets/question_search_bar.dart';
@@ -27,6 +30,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
+  String _trainerAvatarUrl = '';
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -66,6 +70,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -76,6 +81,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
+      _trainerAvatarUrl = avatarUrl;
     });
   }
 
@@ -371,6 +377,12 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             'Question Bank',
             isActive: true,
           ),
+          _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+            );
+          }),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
@@ -513,26 +525,65 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           const SizedBox(width: 16),
           const VerticalDivider(width: 1, indent: 20, endIndent: 20, color: Color(0xFFE2E8F0)),
           const SizedBox(width: 16),
-          Text(
-            _trainerName,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1F2937),
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: const Color(0xFFE6FFFA),
-            child: Text(
-              _trainerInitials,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF20B486),
-                fontFamily: 'Outfit',
+          InkWell(
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+              );
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  Text(
+                    _trainerName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F2937),
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE2F9F3),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: _trainerAvatarUrl.isNotEmpty
+                        ? ClipOval(
+                            child: Image.network(
+                              _trainerAvatarUrl,
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Text(
+                                _trainerInitials,
+                                style: const TextStyle(
+                                  color: Color(0xFF20B486),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            _trainerInitials,
+                            style: const TextStyle(
+                              color: Color(0xFF20B486),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                  ),
+                ],
               ),
             ),
           ),

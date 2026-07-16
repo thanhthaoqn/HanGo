@@ -93,6 +93,7 @@ class AuthService {
     String fullName,
     String email,
     String password,
+    String role,
   ) async {
     try {
       final response = await http.post(
@@ -102,6 +103,7 @@ class AuthService {
           'email': email,
           'password': password,
           'fullName': fullName,
+          'role': role,
         }),
       );
 

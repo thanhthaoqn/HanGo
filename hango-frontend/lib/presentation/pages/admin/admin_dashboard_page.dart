@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'comment_management_page.dart';
+import 'admin_trainer_reviews_page.dart';
 import '../../../utils/toast_helper.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -1130,10 +1131,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   isMobileDrawer: isMobileDrawer,
                 ),
                 const SizedBox(height: 8),
-                _buildSidebarMenuItem(
+                 _buildSidebarMenuItem(
                   index: 4,
                   icon: Icons.comment_outlined,
                   title: 'Comment',
+                  isMobileDrawer: isMobileDrawer,
+                ),
+                const SizedBox(height: 8),
+                _buildSidebarMenuItem(
+                  index: 6,
+                  icon: Icons.rate_review_outlined,
+                  title: 'Approvals',
                   isMobileDrawer: isMobileDrawer,
                 ),
                 
@@ -1282,6 +1290,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         );
       case 5:
         return _buildProfileTab(isDesktop);
+      case 6:
+        return const AdminTrainerReviewsPage();
       default:
         return _buildDashboardTab(isDesktop);
     }
