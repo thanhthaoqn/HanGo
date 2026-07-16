@@ -12,6 +12,7 @@ import 'forgot_password_page.dart';
 import 'learner/learner_home_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'trainer/trainer_dashboard_page.dart';
+import 'course_manager/course_manager_dashboard_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -77,7 +78,8 @@ class _LoginPageState extends State<LoginPage> {
       if (result['success']) {
         final roles = List<String>.from(result['data']['roles'] ?? []);
         final isAdmin = roles.any((r) => r.contains('ADMIN'));
-        final isTrainer = roles.any((r) => r.contains('TRAINER'));
+        final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
+        final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
         debugPrint('Sign in success! Navigating. Admin: $isAdmin, Trainer: $isTrainer. Data: ${result['data']}');
         
         // Check if this was a new email registration to set the onboarding flag
@@ -94,6 +96,8 @@ class _LoginPageState extends State<LoginPage> {
         Widget destination;
         if (isAdmin) {
           destination = const AdminDashboardPage();
+        } else if (isTrainerLead) {
+          destination = const CourseManagerDashboardPage();
         } else if (isTrainer) {
           destination = const TrainerDashboardPage();
         } else {
@@ -142,11 +146,14 @@ class _LoginPageState extends State<LoginPage> {
           final String name = googleUser.displayName ?? 'Google User';
           final roles = List<String>.from(result['data']['roles'] ?? []);
           final isAdmin = roles.any((r) => r.contains('ADMIN'));
-          final isTrainer = roles.any((r) => r.contains('TRAINER'));
+          final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
+          final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
           ToastHelper.showSuccess(context, 'Sign in successful: Welcome, $name!');
           Widget destination;
           if (isAdmin) {
             destination = const AdminDashboardPage();
+          } else if (isTrainerLead) {
+            destination = const CourseManagerDashboardPage();
           } else if (isTrainer) {
             destination = const TrainerDashboardPage();
           } else {

@@ -61,4 +61,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<TrainerCourseDetailProjection> findTrainerCoursesDetailBase(@Param("trainerId") Long trainerId,
                                                                      @Param("status") String status,
                                                                      @Param("search") String search);
+
+    long countByStatus(String status);
 }

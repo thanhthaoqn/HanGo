@@ -461,13 +461,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(
-            Icons.help_outline,
-            'Help Center',
-            onTap: () {
-              ToastHelper.show(context, 'Help Center is under construction');
-            },
-          ),
+
           _buildSidebarItem(
             Icons.logout,
             'Logout',
