@@ -177,7 +177,7 @@ Backend **tự đánh giá quy mô Course** (số Lesson, số Quiz, thời lư�
 | **Backend** | **Java + Spring Boot**, REST API |
 | **Kiến trúc** | Monolith, layered / clean architecture |
 | **Database** | **MySQL 8.0** |
-| **Auth** | **JWT** (access token + refresh token); chỉ email/mật khẩu (không social login ở v1) |
+| **Auth** | **JWT** (access token + refresh token); đăng nhập email/mật khẩu, **và Google OAuth2** (Sign-in with Google) |
 | **Realtime** | **WebSocket** (dùng cho Notification) |
 | **Media / File** | **Cloudinary** (video, pdf, ảnh của Lesson) |
 | **Payment** | **VNPay** (tiền tệ **VND**) |
@@ -300,9 +300,11 @@ FE-14 Notification
 | FR-AUTH-04 | Quên mật khẩu → nhận OTP qua email. |
 | FR-AUTH-05 | Đặt lại mật khẩu sau khi xác minh OTP. |
 | FR-AUTH-06 | Đăng xuất, thu hồi token/session. |
+| FR-AUTH-07 | Đăng nhập bằng **Google OAuth2** (Sign-in with Google); nếu email chưa tồn tại → tự động tạo tài khoản (JIT provisioning) với role mặc định **Learner**. |
 
 **BR-AUTH-01:** email là định danh duy nhất.
 **BR-AUTH-02:** mật khẩu theo chuẩn phổ biến hiện nay (tối thiểu 8 ký tự, gồm chữ và số).
+**BR-AUTH-03:** tài khoản tạo qua Google OAuth2 coi email đã được Google xác thực → bỏ qua bước OTP, `isVerified = true` ngay khi tạo.
 
 ### 7.2 Profile Management (`PROF`)
 **Actors:** Learner, Trainer, Course Manager, Admin.
@@ -685,6 +687,7 @@ Course Manager: auto-generate Monthly Statement → Trainer Confirm
 | Doanh thu | Admin quản lý & chi trả; kỳ theo tháng (Asia/Ho_Chi_Minh), **cấu hình được** |
 | UI language | **English** |
 | Audit log | có (mức cơ bản) |
+| Login | email/mật khẩu **và Google OAuth2** (JIT provisioning, role mặc định Learner) — cập nhật 2026-07-11 để khớp code đã triển khai (`AuthService.googleLogin`, `POST /api/v1/auth/google`) |
 
 ### 15.2 Future phase (ngoài v1)
 

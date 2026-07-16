@@ -1,7 +1,9 @@
-# Feature Specification: 7.12 - Payment & Revenue
+# Feature Specification: FE-12 — Payment & Revenue
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.12 (PAY)
 
 ## 1. Business Context
-HanGo supports paid courses via VNPay integration. Learners purchase courses, creating an automated flow of Order -> Payment -> Auto-Enrollment. The revenue is split between the platform and the Trainer based on the configured revenue share rate, and Monthly Statements are generated for payouts.
+HanGo supports paid courses via VNPay integration. Learners purchase courses, creating an automated flow of Order -> Payment -> Auto-Enrollment. The revenue is split between the platform and the Trainer based on the configured revenue share rate (Teacher 70/30, Tutor 60/40), and Monthly Statements are auto-generated. Pay-in (purchase, revenue recording, statement generation) is fully automatic; payout (transferring money to the Trainer) is a **manual bank transfer recorded by the Course Manager** in v1 — Administrator is not involved in revenue/payout (separation of duties, BR-G11).
 
 ## 2. Acceptance Criteria
 

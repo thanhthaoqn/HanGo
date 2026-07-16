@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -89,6 +90,8 @@ public class AuthController {
                             "<p style='color: #9CA3AF; font-size: 13px;'>HanGo - Your trusted education partner</p>" +
                             "</div>" +
                             "</body></html>");
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("Error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -109,6 +112,8 @@ public class AuthController {
         try {
             authService.resendVerificationEmail(email);
             return ResponseEntity.ok("Verification email resent successfully");
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("Error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -120,19 +125,23 @@ public class AuthController {
         try {
             authService.resetPassword(request);
             return ResponseEntity.ok("Password updated successfully");
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("Error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
 
     @PostMapping("/profile/avatar")
-    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER') or hasRole('TRAINER_LEAD') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> uploadAvatar(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam("file") MultipartFile file) {
         try {
             UserResponse response = authService.updateAvatar(userDetails.getUsername(), file);
             return ResponseEntity.ok(response);
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("Error: " + e.getMessage());
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body("Error uploading image: " + e.getMessage());
         } catch (Exception e) {

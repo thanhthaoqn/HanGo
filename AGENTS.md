@@ -1,65 +1,163 @@
 # HanGo Project: AI Agents Coordination Protocol
 
-This document serves as the master orchestration protocol (Sơ đồ tổ chức & Giao thức điều phối) for all autonomous AI Agents working on the HanGo EdTech platform. It enforces strict boundaries, workflows, and quality gates to ensure seamless Multi-Agent collaboration and human-in-the-loop safety.
+> File này là **giao thức duy nhất** cho tất cả AI Agents làm việc trên repo HanGo.
+> Đặt ở **gốc repo** để IDE (Antigravity, Cursor, Copilot, Windsurf...) tự động đọc.
+> **Single Source of Truth cho requirement: [`/doc/HanGo_Documentation.md`](doc/HanGo_Documentation.md) v1.0**
 
-## 1. AI Team Composition & Capabilities (Sơ đồ nhân sự AI)
+---
 
-The HanGo virtual development team consists of three specialized AI Agents. Each agent is strictly confined to its specific domain and configuration.
+## 0. Nguyên tắc tối cao
 
-| Agent Role | Domain Directory | Core Tech Stack | Configuration Profile |
+1. **`/doc/HanGo_Documentation.md` v1.0 là nguồn chân lý cho requirement.** Code cũ là nguồn chân lý cho implementation đang chạy.
+2. Khi **code và doc mâu thuẫn**: **giữ nguyên code**, KHÔNG tự sửa code cho khớp doc. Báo lại theo mẫu §14.
+3. **Không tự quyết** khi gặp mơ hồ. Nêu rõ: (1) doc nói gì, (2) code hiện tại làm gì, (3) đề xuất — rồi **chờ xác nhận**.
+4. Ưu tiên **thay đổi nhỏ nhất, khu trú (minimal diff)**. Làm đúng task được giao, không hơn.
+
+---
+
+## 1. AI Team Composition & Capabilities
+
+Ba Agent chuyên biệt; mỗi Agent bị giới hạn chặt trong domain của mình:
+
+| Agent Role | Domain Directory | Core Tech Stack | Config Profile |
 | :--- | :--- | :--- | :--- |
-| **Backend Agent** | `/hango-backend/` | Java 21, Spring Boot, Spring Data JPA, MySQL | [`/agents/backend.md`](agents/backend.md) |
-| **Frontend Agent** | `/hango-frontend/` | Flutter, Dart `^3.12.0`, Dio, Clean Architecture | [`/agents/frontend.md`](agents/frontend.md) |
-| **QA Agent** | Global (Test suites) | JUnit/Mockito (Backend), `flutter_test` (Frontend) | [`/agents/qa.md`](agents/qa.md) |
+| **Backend Agent** | `/hango-backend/` | Java 21, Spring Boot, Spring Data JPA, MySQL | [`/doc/agent_backend.md`](doc/agent_backend.md) |
+| **Frontend Agent** | `/hango-frontend/` | Flutter, Dart `^3.12.0`, Dio, Clean Architecture | [`/doc/agent_frontend.md`](doc/agent_frontend.md) |
+| **QA Agent** | Global (Test suites) | JUnit 5/Mockito (BE), `flutter_test` (FE) | [`/doc/agent_qa.md`](doc/agent_qa.md) |
 
-> **Constraint:** An Agent MUST NOT modify files outside its assigned `Domain Directory` unless explicitly coordinating a full-stack integration under Human supervision.
+> **Constraint:** Agent KHÔNG ĐƯỢC sửa file ngoài domain được giao, trừ khi có sự giám sát rõ ràng của Human.
 
-## 2. Multi-Agent Collaboration Workflow & Hand-off Protocol (Giao thức phối hợp)
+---
 
-To implement any of the 14 features defined in `/HanGo_Documentation.md`, Agents must execute the following **Mockup-Driven (Frontend-First)** workflow. This ensures UI can be built and reviewed rapidly based on Figma designs before locking down the Backend.
+## 2. Context Initialization (Nạp ngữ cảnh khi bắt đầu session)
 
-1. **Human Trigger:** Human assigns a specific screen/feature, provides a Figma mockup link or image, and specifies the Agent role.
-2. **Phase 1 - Frontend UI & Mock Data (Frontend Agent):**
-   - Reads the Spec and studies the Figma design.
-   - Builds the UI components pixel-perfectly in Flutter.
-   - Implements repositories returning **Mock Data (Fake JSON)** to ensure the UI is fully interactive without a real API.
-   - *Hand-off:* Frontend Agent updates `/TODO.md` marking the UI and Mock Data as `Done`.
-3. **Phase 2 - Backend Execution & API Design (Backend Agent):**
-   - Analyzes the Mock Data JSON structure created by the Frontend Agent and reads the Spec.
-   - Designs Database Schema & Entities to support this data structure.
-   - Builds API Contracts (DTOs & Controllers) and implements Service logic in Spring Boot.
-   - *Hand-off:* Backend Agent updates `/TODO.md` marking API endpoints as `Done`.
-4. **Phase 3 - Integration (Frontend Agent):**
-   - Replaces the Mock Repositories with real `dio` API calls connecting to the Backend endpoints.
-   - *Hand-off:* Frontend Agent marks Integration as `Done` in `/TODO.md`.
-5. **Phase 4 - Quality Assurance (QA Agent):**
-   - Reads the Spec's Acceptance Criteria and Edge Cases.
-   - Generates and executes Unit/Integration/Widget tests for both Backend and Frontend.
+Khi bắt đầu session mới hoặc tiếp nhận task, Agent **PHẢI** đọc theo đúng thứ tự:
 
-## 3. Global Definition of Done - DoD (Tiêu chuẩn hoàn thành chung)
+1. **Security & Principles:** [`/doc/CONSTITUTION.md`](doc/CONSTITUTION.md)
+2. **System Architecture:** [`/doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md)
+3. **Business Requirements:** [`/doc/HanGo_Documentation.md`](doc/HanGo_Documentation.md) ← v1.0, ưu tiên tuyệt đối
+4. **Current State:** [`/TODO.md`](TODO.md)
+5. **Feature Spec** (nếu có): `/doc/specs/0X-<tên-module>.md`
 
-An AI Agent is **NOT** allowed to check off `[x] Done` in `/TODO.md` unless the following Validation Gates are passed:
+---
 
-- [ ] **Compilation:** Code compiles with exactly `0` errors. (Dart analysis 0 issues, Maven build success).
-- [ ] **Linting:** Code passes all linting rules (`flutter_lints` for FE, standard Java conventions for BE).
-- [ ] **Test Coverage:** All newly generated logic must be covered by Tests (Backend Unit Test coverage >= 80%). Tests must execute and `PASS 100%`.
-- [ ] **Security:** No raw secrets/API keys are hardcoded. JWT validation and RBAC `@PreAuthorize` are enforced on all new APIs.
-- [ ] **Version Control:** If committing, the commit message strictly follows Conventional Commits (e.g., `feat(auth): add login endpoint`).
+## 3. Multi-Agent Workflow & Hand-off Protocol
 
-## 4. Context Initialization Rules (Quy tắc nạp ngữ cảnh)
+Để implement bất kỳ feature nào trong 14 module (`§6` của doc), Agent thực hiện theo workflow **Frontend-First**:
 
-When an Agent starts a new session or takes over a task, it **MUST** forcibly load its memory context in the following exact sequence:
+1. **Human Trigger:** Human giao task + Figma mockup + chỉ định Agent role.
+2. **Phase 1 — Frontend UI & Mock Data (Frontend Agent):**
+   - Đọc Spec trong `/doc/specs/` và nghiên cứu Figma.
+   - Build UI components trong Flutter đúng pixel.
+   - Implement repositories trả **Mock Data (Fake JSON)** để UI hoàn chỉnh chạy được mà không cần API thật.
+   - *Hand-off:* Cập nhật `/TODO.md` đánh dấu UI & Mock Data là `Done`.
+3. **Phase 2 — Backend API Design (Backend Agent):**
+   - Phân tích cấu trúc Mock Data JSON, đọc Spec.
+   - Thiết kế DB Schema & Entities.
+   - Build API Contracts (DTOs + Controllers) và implement Service logic trong Spring Boot.
+   - *Hand-off:* Cập nhật `/TODO.md` đánh dấu API endpoints là `Done`.
+4. **Phase 3 — Integration (Frontend Agent):**
+   - Thay thế Mock Repositories bằng `dio` API calls thực.
+   - *Hand-off:* Cập nhật `/TODO.md` đánh dấu Integration là `Done`.
+5. **Phase 4 — QA (QA Agent):**
+   - Đọc Acceptance Criteria & Edge Cases trong Spec.
+   - Sinh và chạy Unit/Integration/Widget tests theo `/doc/TESTING.md` và `/doc/specs/unit_test_plan.md`.
 
-1. **Read Security Constitution:** [`/CONSTITUTION.md`](CONSTITUTION.md) (To internalize security rules and constraints).
-2. **Read System Architecture:** [`/ARCHITECTURE.md`](ARCHITECTURE.md) (To understand the Clean Architecture and N-Tier layers).
-3. **Read Baseline Requirements:** [`/HanGo_Documentation.md`](HanGo_Documentation.md) (To understand business requirements, workflows, and specifications).
-4. **Read Current State:** [`/TODO.md`](TODO.md) (To identify what is `In Progress` and what remains to be done).
+---
 
-## 5. Escalation Boundaries (Lằn ranh đỏ gọi Con người)
+## 4. Global Definition of Done (Tiêu chuẩn hoàn thành)
 
-AI Agents operate autonomously but must strictly obey the **Human-in-the-loop** escalation protocol. An Agent **MUST STOP**, revert to the last stable state, and log the issue in the `🛑 Escalated to Human` section of `/TODO.md` if:
+Agent **KHÔNG ĐƯỢC** check `[x] Done` trong `/TODO.md` nếu chưa pass tất cả:
 
-- **The 3-Attempt Rule:** The Agent fails to fix a compilation error, failing test, or bug after 3 consecutive attempts.
-- **Dependency Modification:** The Agent realizes a new, unapproved third-party library (Pub package/Maven dependency) needs to be installed.
-- **Architectural Conflict:** The Agent detects a contradiction between the `/doc/specs/` document and the actual Database Schema or `/doc/ARCHITECTURE.md`.
-- **Destructive Action:** The task requires dropping a Database table, force-deleting core modules, or rewriting global configurations (`pom.xml`, `pubspec.yaml`).
+- [ ] **Compilation:** `0` errors. (Dart analysis 0 issues; Maven build `SUCCESS`).
+- [ ] **Linting:** Pass `flutter_lints` (FE); standard Java conventions (BE).
+- [ ] **Test Coverage:** Logic mới phải có test; Backend coverage ≥ 80%; tests `PASS 100%`.
+- [ ] **Security:** Không hardcode secrets/API keys. JWT + RBAC `@PreAuthorize` trên mọi API mới.
+- [ ] **Commit:** Theo Conventional Commits: `feat(auth): add login endpoint`.
+
+---
+
+## 5. Coding Conventions
+
+> Quy tắc chi tiết (kiến trúc N-Tier, Lombok/DTO/MapStruct, màu sắc & responsive Flutter, Riverpod, Null Safety...) đã định nghĩa đầy đủ tại [`CONSTITUTION.md`](doc/CONSTITUTION.md) §2–5, bổ sung theo domain tại [`agent_backend.md`](doc/agent_backend.md) / [`agent_frontend.md`](doc/agent_frontend.md). Agent đã đọc các file này ở bước Context Initialization (§2) — **không lặp lại nội dung ở đây**, chỉ cross-check khi có nghi vấn.
+
+---
+
+## 6. Security — Bắt buộc
+
+> Quy tắc đầy đủ tại [`CONSTITUTION.md`](doc/CONSTITUTION.md) §6. Nhắc nhanh 2 điểm agent hay quên:
+- Secrets (DB password, JWT secret, VNPay hash secret, Cloudinary key, AI key) đọc từ **biến môi trường** — không hardcode, không commit vào Git.
+- **VNPay:** xử lý nghiệp vụ ở **IPN** (không phải return URL), luôn verify checksum + amount, IPN phải **idempotent**.
+
+---
+
+## 7. Database
+
+> Quy tắc naming/relationship tại [`CONSTITUTION.md`](doc/CONSTITUTION.md) §5. Riêng cho multi-agent workflow:
+- Dùng **migration** (Flyway/Liquibase) cho mọi thay đổi schema — không sửa DB tay; không sửa migration đã merge/chạy trên môi trường chung.
+- Tôn trọng **versioning** của Course/Exam ([`HanGo_Documentation.md`](doc/HanGo_Documentation.md) §9): sửa nội dung đã Published tạo version mới, không ghi đè bản live.
+
+---
+
+## 8. Testing & Error Handling
+
+- Ưu tiên có test cho logic quan trọng: payment, grading, RBAC, revenue split (xem thứ tự ưu tiên đầy đủ tại [`agent_qa.md`](doc/agent_qa.md) §3).
+- Dùng **global exception handler** thống nhất; không nuốt lỗi im lặng (`catch` rỗng); không để lộ stack trace ra response cho client.
+- Chi tiết chiến lược & test cases: [`TESTING.md`](doc/TESTING.md) và [`specs/unit_test_plan.md`](doc/specs/unit_test_plan.md).
+
+---
+
+## 9. Git
+
+> Branching model & commit convention đầy đủ tại [`CONSTITUTION.md`](doc/CONSTITUTION.md) §8. Riêng cho multi-agent workflow:
+- Không commit: file build, `.env`/secret, `target/` `build/` `.dart_tool/`, file IDE cá nhân.
+- Trước khi kết thúc task: liệt kê những file đã đổi và tóm tắt thay đổi.
+
+---
+
+## 10. Không tự ý — Phải xin xác nhận
+
+Các hành động sau **luôn phải xin xác nhận trước**, kể cả khi có vẻ hợp lý:
+
+- Thêm / gỡ / nâng version **dependency** (Maven `pom.xml`, `pubspec.yaml`).
+- Thay đổi **DB schema** hoặc tạo/sửa **migration**.
+- Đổi **cấu trúc thư mục / package**, đổi tên class/interface public.
+- Đổi **config hạ tầng** (`application.yml`, CORS, security config, VNPay/Cloudinary/JWT).
+- Thay đổi **API contract** (path, method, request/response shape) của endpoint đã có.
+- Chạy lệnh có tác dụng phụ (migration lên DB thật, xóa dữ liệu, deploy).
+
+---
+
+## 11. Escalation Boundaries (Lằn ranh đỏ — Dừng lại và gọi Human)
+
+Agent **PHẢI DỪNG**, revert về trạng thái ổn định cuối cùng, và log vào mục `🛑 Escalated to Human` của `/TODO.md` nếu:
+
+- **3-Attempt Rule:** Agent thất bại 3 lần liên tiếp fix cùng một compilation error / failing test / bug.
+- **Dependency Modification:** Cần cài library mới chưa được phê duyệt.
+- **Architectural Conflict:** Phát hiện mâu thuẫn giữa doc spec và DB Schema thực tế / `/doc/ARCHITECTURE.md`.
+- **Destructive Action:** Task yêu cầu drop DB table, xóa core module, rewrite global config (`pom.xml`, `pubspec.yaml`).
+
+---
+
+## 12. Cập nhật tài liệu
+
+- Chỉ cập nhật `/doc/HanGo_Documentation.md` khi **được yêu cầu** hoặc khi **một quyết định trong doc đã thực sự bị code thay đổi**.
+- Khi cập nhật: **chỉ sửa đúng mục liên quan**, giữ nguyên cấu trúc & style; không viết lại toàn bộ file.
+- Ghi mọi thay đổi quyết định vào **§14 Decision Log** kèm ngày và lý do ngắn.
+- Không tự động cập nhật doc sau mỗi lần chạm code (gây nhiễu).
+
+---
+
+## 13. Khi gặp khác biệt Doc vs Code (Mẫu phản hồi)
+
+```
+⚠️ Phát hiện khác biệt:
+- Doc (§...) nói: ...
+- Code hiện tại: ...
+- Đề xuất: [A] sửa code theo doc / [B] cập nhật doc theo code / [C] khác
+→ Chọn hướng nào?
+```
+
+---
+
+*AGENTS.md — HanGo v1.0. Cập nhật khi convention team thay đổi.*

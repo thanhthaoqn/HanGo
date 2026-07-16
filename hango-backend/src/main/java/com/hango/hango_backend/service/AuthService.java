@@ -20,11 +20,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.beans.factory.annotation.Value;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
 
 import com.hango.hango_backend.dto.ForgotPasswordRequest;
 import com.hango.hango_backend.dto.VerifyOtpRequest;
@@ -38,6 +35,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -67,8 +65,8 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
-    @Value("${google.client-id}")
-    private String googleClientId;
+    @Autowired
+    private GoogleIdTokenVerifier googleIdTokenVerifier;
 
     public LoginResponse authenticateUser(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
@@ -188,9 +186,14 @@ public class AuthService {
     }
 
 
+    private static final long MAX_AVATAR_SIZE_BYTES = 2L * 1024 * 1024;
+    private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/jpg");
+
     public UserResponse updateAvatar(String email, MultipartFile file) throws IOException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        validateAvatarFile(file);
 
         String imageUrl = cloudinaryService.uploadImage(file);
         user.setAvatarUrl(imageUrl);
@@ -199,17 +202,24 @@ public class AuthService {
         return mapToUserResponse(updatedUser);
     }
 
+    private void validateAvatarFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Error: Avatar file is required.");
+        }
+        if (file.getSize() > MAX_AVATAR_SIZE_BYTES) {
+            throw new IllegalArgumentException("Error: Avatar file must not exceed 2MB.");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_AVATAR_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Error: Avatar must be a .jpg, .jpeg, or .png image.");
+        }
+    }
+
     @org.springframework.transaction.annotation.Transactional
     public LoginResponse googleLogin(com.hango.hango_backend.dto.GoogleLoginRequest googleLoginRequest) {
         String idTokenString = googleLoginRequest.getIdToken();
         try {
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
-                    new NetHttpTransport(),
-                    new GsonFactory())
-                    .setAudience(Collections.singletonList(googleClientId))
-                    .build();
-
-            GoogleIdToken idToken = verifier.verify(idTokenString);
+            GoogleIdToken idToken = googleIdTokenVerifier.verify(idTokenString);
             if (idToken != null) {
                 GoogleIdToken.Payload payload = idToken.getPayload();
 
@@ -396,6 +406,7 @@ public class AuthService {
                 throw new IllegalArgumentException("Error: Email is already in use!");
             }
             user.setEmail(request.getEmail());
+            user.setIsVerified(false);
         }
 
         User updatedUser = userRepository.save(user);

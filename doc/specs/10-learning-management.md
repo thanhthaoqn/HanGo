@@ -1,14 +1,17 @@
-# Feature Specification: FT-09 - Learning Progress
+# Feature Specification: FE-10 — Learning Management
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.10 (LRN)
 
 ## 1. Business Context
-The system needs to provide Learners with the ability to track the Learning Progress of each course they are enrolled in. This helps motivate learning (Gamification), ensuring learners know exactly what percentage they have completed and what part they need to study next. For the Trainer/Lead, this is core data to evaluate course effectiveness.
+The system needs to provide Learners with the ability to track the Learning Progress of each course they are enrolled in, ensuring learners know exactly what percentage they have completed and what part they need to study next. Learning is **strictly sequential by Lesson** — completing Lesson N unlocks Lesson N+1 (Quiz completion is not required to unlock the next Lesson — BR-LRN-02). Course access, once purchased/enrolled, is **lifetime** (BR-LRN-05). Gamification is explicitly out of scope for v1. For the Trainer, this is core data to evaluate course effectiveness.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] "My Courses" screen displaying the list of enrolled courses along with a Progress Bar (completion percentage).
+- [ ] "My Learning" screen displaying the list of enrolled courses along with a Progress Bar (% = completed Lessons / total Lessons).
 - [ ] Lesson details interface features a "Mark as Completed" button.
-- [ ] Auto-navigate to the next lesson when marked as completed successfully, unlocking the next lesson sequence.
+- [ ] Auto-navigate to the next lesson (Next Lesson) when marked as completed successfully; Lesson N+1 stays locked until Lesson N is completed, regardless of Quiz result.
+- [ ] "Continue Learning" — resume from the last accessed position.
 
 **Backend (Spring Boot):**
 - [ ] API `POST /api/v1/courses/{id}/enroll` to enroll (insert into `enrollments` table).

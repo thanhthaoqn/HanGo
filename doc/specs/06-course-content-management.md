@@ -1,32 +1,37 @@
-# Feature Specification: FT-04 - Course Content Management
+# Feature Specification: FE-06 — Course Content Management
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.6 (CNT). Course **metadata**/review-publish workflow lives in [05-course-management.md](05-course-management.md) (FE-05) — not duplicated here.
 
 ## 1. Business Context
-Once the course structure is defined, Trainers need to populate it with actual content. Course Content Management allows Trainers to compose structured lesson content using **LessonBlocks** (supporting combinations of text blocks, video clips, PDF guides, or images in sequential order) and upload these media files to Cloudinary. It also provides bulk importing of lessons/quizzes via Excel templates.
+Once a Course version exists, Trainers populate it with structure and content, owned exclusively by them (BR-G06): manage **Section** (create/edit/delete/reorder), manage **Lesson** within a Section (create/edit/delete/reorder), and author Lesson content as **LessonBlocks** — text-first, with optional inserted video/pdf/image blocks (not a single freeform rich-text document per lesson). Each Lesson can also have a **Quiz**, built from questions pulled from the Trainer's reusable Question Bank (FR-CNT-03, BR-G07 — Quiz questions are reusable, unlike Exam questions which are locked to the Exam). Bulk authoring is supported via **Excel (.xlsx) import** (FR-CNT-05). Structure: `Course version → Section → Lesson → (LessonBlock, Quiz)` — BR-CNT-01.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Dynamic Syllabus editor allowing Trainers to manage Sections and Lessons.
-- [ ] Lesson content composer utilizing **LessonBlocks** (allows adding, deleting, and reordering multiple content blocks like Text, Video, PDF, and Image).
-- [ ] File picker with Progress Bar for video/image uploads.
-- [ ] Excel Import interface to download template and upload bulk data (.xlsx).
+- [ ] Syllabus editor: Section CRUD + reorder, Lesson CRUD + reorder within a Section (drag-and-drop, updates `order_index`).
+- [ ] Lesson editor built around **LessonBlock**: add/reorder blocks of type Text (primary), Video, PDF, Image — not a single rich-text body.
+- [ ] Quiz builder inside a Lesson: create Quiz, pick questions from the Trainer's Question Bank (see [07-question-bank-management.md](07-question-bank-management.md)).
+- [ ] File picker for Video/PDF/Image block uploads with a visible progress bar.
+- [ ] "Import from Excel" flow: download template, pick `.xlsx` file, upload, show per-row success/error report.
 
 **Backend (Spring Boot):**
-- [ ] API endpoints to create, update, delete, and reorder Sections, Lessons, and nested LessonBlocks.
-- [ ] API endpoint to upload media files directly to Cloudinary and retrieve secure URLs.
-- [ ] API `POST /api/v1/lessons/import` to parse bulk upload Excel files (.xlsx) using Apache POI.
-- [ ] Support reordering sections and lessons (updating `order_index` fields).
+- [ ] `sections`, `lessons`, `lesson_blocks` (`type`: Text/Video/PDF/Image) tables under a Course version.
+- [ ] API `PUT /api/v1/sections/{id}/reorder` / `PUT /api/v1/sections/{id}/lessons/reorder` to persist `order_index`.
+- [ ] API to attach a Quiz + selected Question Bank question IDs to a Lesson.
+- [ ] API `POST /api/v1/lessons/{id}/media` to receive `MultipartFile` uploads, pushed to Cloudinary asynchronously (`@Async`); DB stores only the returned URL.
+- [ ] API `POST /api/v1/courses/{id}/import` to parse an `.xlsx` file (Apache POI) into Sections/Lessons/LessonBlocks/Quiz in bulk, inside a single `@Transactional` batch.
 
 ## 3. Technical Constraints
-- **Lesson Content Layout:** Content must map to the `lesson_blocks` table with fields `id`, `lesson_id`, `block_type` (Text, Video, PDF, Image), `content` (for text markup), `media_url` (Cloudinary file link), and `display_order`.
-- **Asynchronous Cloudinary Uploads:** Keep media uploads isolated. Large file handling should be configured safely on the server side.
-- **Security:** Sanitize text inputs inside LessonBlocks on the backend to prevent Cross-Site Scripting (XSS). Parse Excel files securely to avoid XML External Entity (XXE) injection vulnerabilities.
+- **Asynchronous Processing:** Video uploads to Cloudinary can take time; return an "Uploading" status immediately and process asynchronously to avoid HTTP timeouts.
+- **Security:** Guard Apache POI parsing against XXE; validate MIME types so only legitimate `.mp4`/`.pdf`/image formats are accepted for LessonBlock media; reject executables.
+- **Frontend Reordering:** Update local state first, then silently sync the new `order_index` array to the backend.
 
 ## 4. Edge Cases
-- **Missing or Invalid Excel Formats:** Rollback database transactions entirely if any row of the imported Excel has formatting/validation errors to preserve relational integrity.
-- **Broken Media Link:** If media upload fails, prompt the user with detailed error notes instead of saving broken block references.
+- **Network Interruptions:** If the connection drops mid-upload, offer a "Retry" button; don't lose already-entered Lesson content.
+- **XSS in Text LessonBlock:** Sanitize text-block content on the backend before saving.
+- **Invalid Excel data:** Row missing a required field, or referencing a non-existent Question Bank question ID → report the row and either skip it or roll back the whole import (Trainer's choice / documented default).
+- **Invalid Reorder Data:** Reject incomplete/duplicate ID arrays for reordering to protect data integrity.
 
 ## 5. Non-functional Requirements
-- **Performance:** Bulk Excel import processing must execute in `< 3000ms` for up to 1000 rows using Hibernate batch insertions.
-- **Scalability:** Offloading heavy media storage to Cloudinary ensures the main application server does not run out of disk space.
-
+- **User Experience:** Upload progress bar must reflect real progress.
+- **Scalability:** Offloading media storage to Cloudinary keeps the app server stateless regarding file storage.

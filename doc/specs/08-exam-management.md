@@ -1,23 +1,24 @@
-# Feature Specification: FT-06 - Exam Management
+# Feature Specification: FE-08 — Exam Management
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.8 (EXM)
 
 ## 1. Business Context
-The Exam Management feature is a tool to measure and evaluate the competency of Learners. In contrast to quizzes, Exams are simulated English THPTQG mock tests, utilizing dedicated exam questions that are private and not reusable in standard courses. For the Learner, this is an interface featuring a countdown timer, test execution, and automatic scoring immediately upon submission.
+Exam is **independent of Course** — it simulates the latest THPTQG English exam and is created by **Trainer or Course Manager** (Course Manager can self-publish; Trainer's exam needs Course Manager approval — FR-EXM-01/03). Exam Questions are **created specifically for the Exam** — they are *not* pulled from / shared with the reusable Question Bank used by Quiz (BR-G07). Format is **fixed, not configurable**: **40 questions / 50 minutes / scale of 10** (0.25 pt per question), single-choice (BR-EXM-01). There is no pass/fail threshold — only a numeric score. For the Learner, this is an interface featuring a countdown timer, test execution, and automatic scoring immediately upon submission, with **unlimited retakes** (BR-G08).
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Exam listing screen displaying available exams.
-- [ ] Exam Builder interface for Course Managers/Trainers to create exams and attach dedicated questions.
-- [ ] Exam Execution interface for Learners: 50-minute countdown timer. Auto-submit when time is up.
-- [ ] Local caching of answers (SharedPreferences) to prevent data loss if the app crashes during the exam.
-- [ ] Result screen displaying the score on a 10-point scale, total correct/incorrect answers, and explanations.
+- [ ] Exam Builder interface for Trainer/Course Manager: author exam-specific questions (not reused from the shared Question Bank); duration/question-count are fixed at 40Q/50min, not editable per exam.
+- [ ] Exam Execution interface for Learners: Display countdown timer synced against server `end_time`. Auto-submit when time is up.
+- [ ] Local caching of answers (Local Storage/SharedPreferences) to prevent data loss if the app crashes during the exam.
+- [ ] Result screen displaying the score (0–10 scale), correct/incorrect per question, and explanations.
+- [ ] Attempt history view within the Exam detail page (unlimited retakes).
 
 **Backend (Spring Boot):**
-- [ ] API `GET /api/v1/exams` to retrieve the list of exams.
-- [ ] API `GET /api/v1/exams/{id}/attempts` and `/api/v1/exams/my-attempts` to fetch learner attempts.
-- [ ] API `POST /api/v1/exams/{id}/submit` receiving the array of user answers in an `ExamAttemptRequestDTO`.
-- [ ] Auto-grading logic: each correct answer yields exactly 0.25 points (40 questions total, max score 10).
-- [ ] Record the attempt details in the `exam_attempts` table (with score, start time, and submission time).
+- [ ] API `POST /api/v1/exams` to create the exam structure (`exams`, `exam_versions`, `exam_questions` — private to the Exam).
+- [ ] API `POST /api/v1/exams/{id}/submit` to receive the array of user answers (`learner_id`, `question_id`, `chosen_answer_id`).
+- [ ] Auto-grading logic based on the `is_correct` field, 0.25 pt/question, scale of 10.
+- [ ] Record the results into the `exam_attempts` table (score on a 0–10 scale, per-question correctness — no PASS/FAIL status).
 
 ## 3. Technical Constraints
 - **Exam Question Privacy:** Exam questions must have `Visibility = Private` and be scoped strictly to a specific `ExamVersion` (mapped via `exam_version_id`), ensuring they cannot be pulled into general course quizzes.
