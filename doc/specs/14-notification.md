@@ -1,30 +1,32 @@
 # Feature Specification: FT-14 - Notification
 
 ## 1. Business Context
-The Notification system helps retain users (Retention) by reminding them of important events. The system will send notifications when a new course is published, when a Task deadline is approaching, or when someone replies to your comment.
+The Notification system helps retain users (Retention) by reminding them of important events. The system will send notifications when a new course is published, when a payment succeeds, when someone replies to your comment, or when monthly statements/onboardings status are updated.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
 - [ ] Notification Bell Icon on the AppBar, attaching a red Badge counting the number of unread notifications.
-- [ ] Clicking the Bell opens a notification list screen/BottomSheet.
-- [ ] Unread notifications are bolded or have a different background color. Clicking a notification marks it as "Read" and navigates to the corresponding screen.
+- [ ] Clicking the Bell opens a notification list screen.
+- [ ] Real-time STOMP/WebSocket client connection to listen to user-specific queues.
+- [ ] Clicking a notification marks it as "Read" and triggers navigation.
 
 **Backend (Spring Boot):**
-- [ ] `notifications` table containing columns: `id`, `user_id`, `title`, `content`, `type` (COURSE, TASK, COMMENT), `is_read`, `created_at`.
+- [ ] `notifications` table containing columns: `id`, `user_id`, `title`, `content`, `type`, `is_read`, `created_at`.
+- [ ] WebSocket config using STOMP message broker.
 - [ ] API `GET /api/v1/notifications` (Fetch paginated list of notifications for the current user).
 - [ ] API `PUT /api/v1/notifications/{id}/read` (Mark as read).
-- [ ] Automated Notification Logic: e.g., when a Lead creates a new Task -> Auto-insert 1 row into the `notifications` table for the `assigned_to` user.
+- [ ] Event-driven notification publisher: send notifications asynchronously (`@Async`) when database triggers occur (PurchaseSuccess, CourseUpdated, CommentReply, NewEnrollment, ContentApproved, ContentRejected, StatementReady).
+- [ ] Send async emails using `JavaMailSender` for OTP verify, password reset, purchase confirmations, and trainer activation.
 
 ## 3. Technical Constraints
-- **Backend Design:** Avoid tightly coupling notification generation logic with the main business logic. Must use **Spring ApplicationEventPublisher** (Observer Pattern) to publish notification events asynchronously (`@Async`), avoiding slowing down the main API.
-- **Frontend:** Counting unread notifications can be done periodically (Polling) every 1 minute using a Flutter `Timer`, or via WebSocket/SSE for Real-time. Temporarily prioritize Polling for easier initial deployment.
+- **Backend Design:** Avoid tightly coupling notification generation logic with the main business logic. Must use **Spring ApplicationEventPublisher** (Observer Pattern) to publish notification events asynchronously (`@Async`).
+- **Real-time Transport:** Standard transport must use WebSockets with automatic connection recovery under network loss. Polling is kept as a fallback logic.
 
 ## 4. Edge Cases
-- **Too Many Unread Notifications:** The counter badge on the Bell maxes out at `99+` to prevent UI layout breaking.
-- **Deleted Resources Linked to Notifications:** e.g., Notification says "Course A released", but Course A is subsequently deleted. Clicking the notification causes an error.
-  - *Solution:* Frontend needs to wrap navigation in a `try-catch` block. If the API returns 404 Not Found, show a Toast: "This content no longer exists."
+- **Deleted Resources Linked to Notifications:** If resources are deleted, wrap navigation in try-catch on the frontend and show a toast warning.
 
 ## 5. Non-functional Requirements
-- **Performance:** Fetch notification APIs must be extremely lightweight (< 100ms) because they are called very frequently whenever the User opens the app.
-- **Scalability:** The current In-app notification system is designed so that a Push Notification module (FCM - Firebase Cloud Messaging) can be easily attached later to push notifications outside to the phone's lock screen.
+- **Performance:** WebSocket notifications must trigger in `< 500ms` of event publication.
+- **Asynchronous Execution:** Email delivery tasks must run in isolated thread pools so they do not block main API request/response threads.
+

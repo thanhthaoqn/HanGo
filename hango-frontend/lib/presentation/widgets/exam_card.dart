@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../domain/entities/exam.dart';
+import '../../../utils/language_manager.dart';
 import '../pages/exam/exam_detail_history_page.dart';
 
 class ExamCard extends StatefulWidget {
@@ -11,13 +12,18 @@ class ExamCard extends StatefulWidget {
 }
 
 class _ExamCardState extends State<ExamCard> {
-  bool isHovered = false;
+  bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
+    final isVi = LanguageManager.isVi;
+    final isMinhHoa = widget.exam.title.toLowerCase().contains('minh họa') || 
+                      widget.exam.title.toLowerCase().contains('minh hoa');
+
     return MouseRegion(
-      onEnter: (_) => setState(() => isHovered = true),
-      onExit: (_) => setState(() => isHovered = false),
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
           Navigator.push(
@@ -28,132 +34,124 @@ class _ExamCardState extends State<ExamCard> {
           );
         },
         child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        transform: Matrix4.translationValues(0, isHovered ? -8 : 0, 0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: isHovered
-                  ? Colors.black.withOpacity(0.12)
-                  : Colors.black.withOpacity(0.05),
-              blurRadius: isHovered ? 20 : 10,
-              offset: Offset(0, isHovered ? 10 : 4),
-            )
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Card Header with Banner Style
-            Container(
-              height: 100,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF1E8D77), Color(0xFF0F5A47)],
-                ),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 12.0, right: 12.0, top: 28.0, bottom: 12.0),
-                    child: Text(
-                      widget.exam.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-
-                  // EXAM Badge
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          duration: const Duration(milliseconds: 200),
+          transform: _isHovered
+              ? (Matrix4.identity()
+                  ..translate(0, -6, 0)
+                  ..scale(1.02))
+              : Matrix4.identity(),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _isHovered ? const Color(0xFF28B79B) : const Color(0xFFE5E7EB),
+              width: _isHovered ? 1.5 : 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _isHovered ? const Color(0x1A28B79B) : const Color(0x0A000000),
+                blurRadius: _isHovered ? 12 : 6,
+                offset: _isHovered ? const Offset(0, 8) : const Offset(0, 3),
+              )
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tag Header Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
+                        color: const Color(0xFFE6FFFA),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
-                        'EXAM',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 12,
+                            color: Color(0xFF28B79B),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isMinhHoa
+                                ? (isVi ? 'Đề minh họa' : 'Mock exam')
+                                : (isVi ? 'Đề chính thức' : 'Official exam'),
+                            style: const TextStyle(
+                              color: Color(0xFF137333),
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                  
-                  // Mortarboard watermark icon
-                  Positioned(
-                    bottom: -10,
-                    right: -10,
-                    child: Icon(
-                      Icons.assignment_outlined,
-                      size: 68,
-                      color: Colors.white.withOpacity(0.1),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Card Body
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Created By: ${widget.exam.creatorName}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF9CA3AF),
-                      ),
-                    ),
-                    const Spacer(),
-                    
-                    // Question / Sentence count & time duration details
-                    Row(
-                      children: [
-                        const Icon(Icons.menu_book_outlined, size: 13, color: Color(0xFF6B7280)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${widget.exam.questionCount} sentences',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-                        ),
-                        const Spacer(),
-                        const Icon(Icons.timer_outlined, size: 13, color: Color(0xFF6B7280)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${widget.exam.durationMinutes} minute',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
-            )
-          ],
+                const SizedBox(height: 16),
+
+                // Title Section
+                Expanded(
+                  child: Text(
+                    widget.exam.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                      fontFamily: 'Outfit',
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Card Footer with question count and duration details
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.menu_book_outlined,
+                      size: 14,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isVi ? '${widget.exam.questionCount} câu hỏi' : '${widget.exam.questionCount} questions',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      Icons.timer_outlined,
+                      size: 14,
+                      color: Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isVi ? '${widget.exam.durationMinutes} phút' : '${widget.exam.durationMinutes} mins',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

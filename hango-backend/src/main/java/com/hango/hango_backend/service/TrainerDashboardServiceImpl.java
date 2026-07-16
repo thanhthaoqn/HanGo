@@ -31,6 +31,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final LessonRepository lessonRepository;
     private final TrainerQuestionService trainerQuestionService;
     private final QuestionRepository questionRepository;
+    private final TrainerProfileRepository trainerProfileRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -485,5 +486,24 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         
         exam.setDeletedAt(java.time.LocalDateTime.now());
         examRepository.save(exam);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void publishTrainerCourse(Long id, String email) {
+        com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+
+        if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
+            throw new RuntimeException("You are not authorized to publish this course");
+        }
+
+        com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
+        if (profile == null || !"VERIFIED".equalsIgnoreCase(profile.getStatus())) {
+            throw new IllegalStateException("Bạn cần hoàn thiện hồ sơ và được Admin phê duyệt để bắt đầu bán khóa học.");
+        }
+
+        course.setStatus("PUBLISHED");
+        courseRepository.save(course);
     }
 }

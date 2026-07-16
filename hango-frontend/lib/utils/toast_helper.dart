@@ -51,9 +51,9 @@ class ToastHelper {
     _timer?.cancel();
     _timer = null;
     if (_currentEntry != null) {
-      if (_currentEntry!.mounted) {
+      try {
         _currentEntry!.remove();
-      }
+      } catch (_) {}
       _currentEntry = null;
     }
   }
@@ -160,18 +160,18 @@ class _AnimatedToastState extends State<_AnimatedToast> with SingleTickerProvide
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
+              IconButton(
+                onPressed: () {
                   ToastHelper.dismiss();
                 },
-                child: Icon(
-                  Icons.close,
-                  color: widget.isError
-                      ? const Color(0xFF991B1B).withOpacity(0.6)
-                      : const Color(0xFF065F46).withOpacity(0.6),
-                  size: 16,
-                ),
+                icon: const Icon(Icons.close),
+                iconSize: 16,
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+                splashRadius: 18,
+                color: widget.isError
+                    ? const Color(0xFF991B1B).withOpacity(0.6)
+                    : const Color(0xFF065F46).withOpacity(0.6),
               ),
             ],
           ),

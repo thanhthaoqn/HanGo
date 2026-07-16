@@ -14,6 +14,8 @@ import 'edit_course_page.dart';
 import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
 import 'question_bank/trainer_question_bank_page.dart';
+import '../../../utils/language_manager.dart';
+import 'trainer_profile_page.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
   const TrainerCoursesPage({super.key});
@@ -446,18 +448,22 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             },
           ),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(
-            Icons.question_answer_outlined,
-            'Question Bank',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerQuestionBankPage(),
-                ),
-              );
-            },
-          ),
+          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerQuestionBankPage(),
+              ),
+            );
+          }),
+          _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerProfilePage(),
+              ),
+            );
+          }),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
@@ -581,34 +587,55 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           ),
           const SizedBox(width: 16),
           // User profile widget
-          Row(
-            children: [
-              Text(
-                _trainerName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE2F9F3),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: _trainerAvatarUrl.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          _trainerAvatarUrl,
-                          width: 32,
-                          height: 32,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Text(
+          InkWell(
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+              );
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  Text(
+                    _trainerName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                      fontSize: 14,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE2F9F3),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: _trainerAvatarUrl.isNotEmpty
+                        ? ClipOval(
+                            child: Image.network(
+                              _trainerAvatarUrl,
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Text(
+                                _trainerInitials,
+                                style: const TextStyle(
+                                  color: Color(0xFF20B486),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            ),
+                          )
+                        : Text(
                             _trainerInitials,
                             style: const TextStyle(
                               color: Color(0xFF20B486),
@@ -617,28 +644,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                               fontFamily: 'Outfit',
                             ),
                           ),
-                        ),
-                      )
-                    : Text(
-                        _trainerInitials,
-                        style: const TextStyle(
-                          color: Color(0xFF20B486),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 4),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF20B486),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),

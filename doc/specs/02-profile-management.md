@@ -13,12 +13,12 @@ Account Management allows users to view and update their personal information (P
 
 **Backend (Spring Boot):**
 - [ ] API `GET /api/v1/users/me` and `PUT /api/v1/users/me` for profile CRUD.
-- [ ] API `GET /api/v1/users` for Admin (supports pagination, filtering by role).
-- [ ] API `PUT /api/v1/users/{id}/status` to lock/unlock accounts.
+- [ ] API `GET /api/admin/users` for Admin (supports pagination, search, and filtering by role).
+- [ ] API `PUT /api/admin/users/{id}/status` to lock/unlock accounts.
 - [ ] Integrate Cloudinary API for storing Avatar images and returning secure URLs.
 
 ## 3. Technical Constraints
-- **Backend Authorization:** Admin APIs must be strictly protected with `@PreAuthorize("hasRole('ADMIN')")`.
+- **Backend Authorization:** Admin APIs must be strictly protected with `@PreAuthorize("hasRole('ADMINISTRATOR')")`.
 - **Image Upload:** Restrict avatar file size to max 2MB. Only accept `.jpg`, `.png`, `.jpeg` formats.
 - **Frontend:** Profile state must be managed globally (e.g., using Riverpod) so that the avatar updates instantly across all screens after a successful change.
 
@@ -30,3 +30,4 @@ Account Management allows users to view and update their personal information (P
 ## 5. Non-functional Requirements
 - **Performance:** Avatar images should be fetched using optimized Cloudinary URLs (compressed and resized).
 - **Usability:** Provide instant visual feedback (Toast/Snackbar) when profile update succeeds or fails.
+

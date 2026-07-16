@@ -13,6 +13,12 @@ import 'learner/learner_home_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'trainer/trainer_dashboard_page.dart';
 import 'course_manager/course_manager_dashboard_page.dart';
+import 'trainer/onboarding/trainer_type_selection_page.dart';
+import 'trainer/onboarding/trainer_onboarding_status_page.dart';
+import 'trainer/onboarding/trainer_onboarding_details_page.dart';
+import 'trainer/onboarding/trainer_onboarding_agreement_page.dart';
+import 'trainer/onboarding/trainer_payout_details_page.dart';
+import '../../data/services/trainer_onboarding_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -93,25 +99,162 @@ class _LoginPageState extends State<LoginPage> {
         });
 
         ToastHelper.showSuccess(context, 'Sign in successful!');
-        Widget destination;
-        if (isAdmin) {
-          destination = const AdminDashboardPage();
-        } else if (isTrainerLead) {
-          destination = const CourseManagerDashboardPage();
-        } else if (isTrainer) {
-          destination = const TrainerDashboardPage();
-        } else {
-          destination = const LearnerHomePage();
-        }
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => destination,
-          ),
-        );
+        _navigateAfterSuccess(roles);
       } else {
         debugPrint('Sign in failed! Error: ${result['message']}');
         ToastHelper.showError(context, result['message'] ?? 'Sign in failed. Please try again.');
+      }
+    }
+  }
+
+  void _navigateAfterSuccess(List<String> roles) async {
+    final prefs = await SharedPreferences.getInstance();
+    final redirectFlag = prefs.getBool('redirect_to_trainer_onboarding') ?? false;
+    
+    if (redirectFlag) {
+      await prefs.setBool('redirect_to_trainer_onboarding', false);
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const TrainerTypeSelectionPage()),
+        );
+      }
+      return;
+    }
+
+    final isAdmin = roles.any((r) => r.contains('ADMIN'));
+    final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
+    final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
+    
+    if (isAdmin) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+        );
+      }
+    } else if (isTrainerLead) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
+        );
+      }
+    } else if (isTrainer) {
+      _checkStatusAndRouteForLogin();
+    } else {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+        );
+      }
+    }
+  }
+
+  void _checkStatusAndRouteForLogin() async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+      ),
+    );
+
+    try {
+      final onboardingService = TrainerOnboardingService();
+      final result = await onboardingService.getTrainerProfile();
+      
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+      }
+
+      if (result['success'] == true) {
+        final profile = result['data'];
+        final status = profile['status'] ?? 'PENDING_VERIFICATION';
+        final trainerType = profile['trainerType'];
+        final agreementSigned = profile['agreementSigned'] ?? false;
+        final bankAccount = profile['bankAccount'] ?? '';
+
+        if (status == 'VERIFIED') {
+          if (!agreementSigned) {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TrainerOnboardingAgreementPage(
+                    profilePayload: profile,
+                    trainerType: trainerType ?? 'PROFESSIONAL',
+                  ),
+                ),
+              );
+            }
+          } else if (bankAccount.toString().trim().isEmpty) {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TrainerPayoutDetailsPage(initialProfile: profile),
+                ),
+              );
+            }
+          } else {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
+              );
+            }
+          }
+        } else if (status == 'AWAITING_APPROVAL' ||
+            status == 'SUSPENDED' ||
+            (status == 'PENDING_VERIFICATION' &&
+                profile['adminNotes'] != null &&
+                profile['adminNotes'].toString().trim().isNotEmpty)) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TrainerOnboardingStatusPage(initialProfile: profile),
+              ),
+            );
+          }
+        } else {
+          // PENDING_VERIFICATION (Draft)
+          if (trainerType == null) {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TrainerTypeSelectionPage()),
+              );
+            }
+          } else {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TrainerOnboardingDetailsPage(initialProfile: profile),
+                ),
+              );
+            }
+          }
+        }
+      } else {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const TrainerTypeSelectionPage()),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
+        );
       }
     }
   }
@@ -149,22 +292,7 @@ class _LoginPageState extends State<LoginPage> {
           final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
           final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
           ToastHelper.showSuccess(context, 'Sign in successful: Welcome, $name!');
-          Widget destination;
-          if (isAdmin) {
-            destination = const AdminDashboardPage();
-          } else if (isTrainerLead) {
-            destination = const CourseManagerDashboardPage();
-          } else if (isTrainer) {
-            destination = const TrainerDashboardPage();
-          } else {
-            destination = const LearnerHomePage();
-          }
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => destination,
-            ),
-          );
+          _navigateAfterSuccess(roles);
         } else {
           ToastHelper.showError(context, result['message'] ?? 'Google Sign In failed.');
         }
@@ -630,7 +758,7 @@ class _LoginPageState extends State<LoginPage> {
                                   baseline: TextBaseline.alphabetic,
                                   child: GestureDetector(
                                     onTap: () {
-                                      Navigator.push(
+                                      Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) => const RegisterPage(),
