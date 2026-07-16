@@ -183,6 +183,7 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
   Widget _buildCourseManagerSidebar(BuildContext context) {
     return Container(
       color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -192,6 +193,7 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
               MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
             );
           }),
+          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {}),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
             Navigator.pushReplacement(
               context,

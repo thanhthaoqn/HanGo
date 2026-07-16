@@ -31,24 +31,27 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isLoading = false;
-  
+
   final _authService = AuthService();
-  
+
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: '793292778359-frlad2ktuqo6mo27fkilqbjqcdqbqko1.apps.googleusercontent.com',
+    clientId:
+        '793292778359-frlad2ktuqo6mo27fkilqbjqcdqbqko1.apps.googleusercontent.com',
     scopes: const ['email', 'profile'],
   );
-  
+
   StreamSubscription<GoogleSignInAccount?>? _googleSignInSubscription;
 
   @override
   void initState() {
     super.initState();
-    _googleSignInSubscription = _googleSignIn.onCurrentUserChanged.listen((GoogleSignInAccount? account) {
+    _googleSignInSubscription = _googleSignIn.onCurrentUserChanged.listen((
+      GoogleSignInAccount? account,
+    ) {
       if (account != null) {
         _handleGoogleSignInSuccess(account);
       }
@@ -66,7 +69,7 @@ class _LoginPageState extends State<LoginPage> {
 
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -85,9 +88,12 @@ class _LoginPageState extends State<LoginPage> {
         final roles = List<String>.from(result['data']['roles'] ?? []);
         final isAdmin = roles.any((r) => r.contains('ADMIN'));
         final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
-        final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
-        debugPrint('Sign in success! Navigating. Admin: $isAdmin, Trainer: $isTrainer. Data: ${result['data']}');
-        
+        final isTrainer =
+            roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
+        debugPrint(
+          'Sign in success! Navigating. Admin: $isAdmin, Trainer: $isTrainer. Data: ${result['data']}',
+        );
+
         // Check if this was a new email registration to set the onboarding flag
         SharedPreferences.getInstance().then((prefs) async {
           final isNewReg = prefs.getBool('is_new_registration_$email') ?? false;
@@ -102,21 +108,27 @@ class _LoginPageState extends State<LoginPage> {
         _navigateAfterSuccess(roles);
       } else {
         debugPrint('Sign in failed! Error: ${result['message']}');
-        ToastHelper.showError(context, result['message'] ?? 'Sign in failed. Please try again.');
+        ToastHelper.showError(
+          context,
+          result['message'] ?? 'Sign in failed. Please try again.',
+        );
       }
     }
   }
 
   void _navigateAfterSuccess(List<String> roles) async {
     final prefs = await SharedPreferences.getInstance();
-    final redirectFlag = prefs.getBool('redirect_to_trainer_onboarding') ?? false;
-    
+    final redirectFlag =
+        prefs.getBool('redirect_to_trainer_onboarding') ?? false;
+
     if (redirectFlag) {
       await prefs.setBool('redirect_to_trainer_onboarding', false);
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const TrainerTypeSelectionPage()),
+          MaterialPageRoute(
+            builder: (context) => const TrainerTypeSelectionPage(),
+          ),
         );
       }
       return;
@@ -125,7 +137,7 @@ class _LoginPageState extends State<LoginPage> {
     final isAdmin = roles.any((r) => r.contains('ADMIN'));
     final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
     final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
-    
+
     if (isAdmin) {
       if (mounted) {
         Navigator.pushReplacement(
@@ -137,7 +149,8 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
+          MaterialPageRoute(
+              builder: (context) => const CourseManagerDashboardPage()),
         );
       }
     } else if (isTrainer) {
@@ -165,7 +178,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final onboardingService = TrainerOnboardingService();
       final result = await onboardingService.getTrainerProfile();
-      
+
       if (mounted) {
         Navigator.pop(context); // Close loading
       }
@@ -195,7 +208,8 @@ class _LoginPageState extends State<LoginPage> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TrainerPayoutDetailsPage(initialProfile: profile),
+                  builder: (context) =>
+                      TrainerPayoutDetailsPage(initialProfile: profile),
                 ),
               );
             }
@@ -203,7 +217,9 @@ class _LoginPageState extends State<LoginPage> {
             if (mounted) {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
+                MaterialPageRoute(
+                  builder: (context) => const TrainerDashboardPage(),
+                ),
               );
             }
           }
@@ -216,7 +232,8 @@ class _LoginPageState extends State<LoginPage> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => TrainerOnboardingStatusPage(initialProfile: profile),
+                builder: (context) =>
+                    TrainerOnboardingStatusPage(initialProfile: profile),
               ),
             );
           }
@@ -226,7 +243,9 @@ class _LoginPageState extends State<LoginPage> {
             if (mounted) {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const TrainerTypeSelectionPage()),
+                MaterialPageRoute(
+                  builder: (context) => const TrainerTypeSelectionPage(),
+                ),
               );
             }
           } else {
@@ -234,7 +253,8 @@ class _LoginPageState extends State<LoginPage> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => TrainerOnboardingDetailsPage(initialProfile: profile),
+                  builder: (context) =>
+                      TrainerOnboardingDetailsPage(initialProfile: profile),
                 ),
               );
             }
@@ -244,7 +264,9 @@ class _LoginPageState extends State<LoginPage> {
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const TrainerTypeSelectionPage()),
+            MaterialPageRoute(
+              builder: (context) => const TrainerTypeSelectionPage(),
+            ),
           );
         }
       }
@@ -265,7 +287,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final String? idToken = googleAuth.idToken;
 
       if (idToken == null) {
@@ -273,7 +296,10 @@ class _LoginPageState extends State<LoginPage> {
           _isLoading = false;
         });
         if (mounted) {
-          ToastHelper.showError(context, 'Failed to retrieve ID Token from Google.');
+          ToastHelper.showError(
+            context,
+            'Failed to retrieve ID Token from Google.',
+          );
         }
         return;
       }
@@ -290,11 +316,18 @@ class _LoginPageState extends State<LoginPage> {
           final roles = List<String>.from(result['data']['roles'] ?? []);
           final isAdmin = roles.any((r) => r.contains('ADMIN'));
           final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
-          final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
-          ToastHelper.showSuccess(context, 'Sign in successful: Welcome, $name!');
+          final isTrainer =
+              roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
+          ToastHelper.showSuccess(
+            context,
+            'Sign in successful: Welcome, $name!',
+          );
           _navigateAfterSuccess(roles);
         } else {
-          ToastHelper.showError(context, result['message'] ?? 'Google Sign In failed.');
+          ToastHelper.showError(
+            context,
+            result['message'] ?? 'Google Sign In failed.',
+          );
         }
       }
     } catch (e) {
@@ -302,7 +335,10 @@ class _LoginPageState extends State<LoginPage> {
         _isLoading = false;
       });
       if (mounted) {
-        ToastHelper.showError(context, 'Google Sign In failed: ${e.toString()}');
+        ToastHelper.showError(
+          context,
+          'Google Sign In failed: ${e.toString()}',
+        );
       }
     }
   }
@@ -326,26 +362,27 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Error rendering GIS button: $e');
       }
     }
-    
+
     // Fallback for non-web or if platform rendering fails
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: OutlinedButton(
-        onPressed: _isLoading ? null : () async {
-          try {
-            final GoogleSignInAccount? account = await _googleSignIn.signIn();
-            if (account != null) {
-              _handleGoogleSignInSuccess(account);
-            }
-          } catch (e) {
-            debugPrint('Google Sign In Error: $e');
-          }
-        },
+        onPressed: _isLoading
+            ? null
+            : () async {
+                try {
+                  final GoogleSignInAccount? account = await _googleSignIn
+                      .signIn();
+                  if (account != null) {
+                    _handleGoogleSignInSuccess(account);
+                  }
+                } catch (e) {
+                  debugPrint('Google Sign In Error: $e');
+                }
+              },
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           side: const BorderSide(color: Color(0xFFE5E7EB)),
         ),
         child: Row(
@@ -433,11 +470,19 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         Row(
                           children: [
-                            Icon(Icons.verified_user_outlined, color: Colors.white70, size: 20),
+                            Icon(
+                              Icons.verified_user_outlined,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
                             SizedBox(width: 12),
-                            Icon(Icons.school_outlined, color: Colors.white70, size: 20),
+                            Icon(
+                              Icons.school_outlined,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ],
@@ -445,7 +490,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ],
-          
+
           // Right Panel: Form
           Expanded(
             child: SingleChildScrollView(
@@ -512,7 +557,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                         const SizedBox(height: 48),
-                        
+
                         // Sign In Title
                         const Text(
                           'Sign In',
@@ -523,7 +568,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 32),
-                        
+
                         // Email Field
                         const Text(
                           'Email',
@@ -539,24 +584,43 @@ class _LoginPageState extends State<LoginPage> {
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             hintText: 'Enter your email address',
-                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                            prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 20),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF9CA3AF),
+                              fontSize: 14,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.mail_outline,
+                              color: Color(0xFF9CA3AF),
+                              size: 20,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFD1D5DB),
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE5E7EB),
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF28B79B),
+                                width: 1.5,
+                              ),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.redAccent),
+                              borderSide: const BorderSide(
+                                color: Colors.redAccent,
+                              ),
                             ),
                           ),
                           validator: (value) {
@@ -571,7 +635,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                         const SizedBox(height: 20),
-                        
+
                         // Password Field
                         const Text(
                           'Password',
@@ -587,11 +651,20 @@ class _LoginPageState extends State<LoginPage> {
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             hintText: 'Enter your password',
-                            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                            prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF9CA3AF),
+                              fontSize: 14,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline,
+                              color: Color(0xFF9CA3AF),
+                              size: 20,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
                                 color: const Color(0xFF9CA3AF),
                                 size: 20,
                               ),
@@ -601,22 +674,34 @@ class _LoginPageState extends State<LoginPage> {
                                 });
                               },
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFD1D5DB),
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE5E7EB),
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF28B79B),
+                                width: 1.5,
+                              ),
                             ),
                             errorBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Colors.redAccent),
+                              borderSide: const BorderSide(
+                                color: Colors.redAccent,
+                              ),
                             ),
                           ),
                           validator: (value) {
@@ -630,7 +715,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Remember me & Forgot password
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -665,7 +750,8 @@ class _LoginPageState extends State<LoginPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const ForgotPasswordPage(),
+                                    builder: (context) =>
+                                        const ForgotPasswordPage(),
                                   ),
                                 );
                               },
@@ -681,7 +767,7 @@ class _LoginPageState extends State<LoginPage> {
                           ],
                         ),
                         const SizedBox(height: 28),
-                        
+
                         // Sign In Button
                         SizedBox(
                           width: double.infinity,
@@ -716,13 +802,17 @@ class _LoginPageState extends State<LoginPage> {
                                         ),
                                       ),
                                       SizedBox(width: 8),
-                                      Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                                      Icon(
+                                        Icons.arrow_forward,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
                                     ],
                                   ),
                           ),
                         ),
                         const SizedBox(height: 24),
-                        
+
                         // Divider
                         Row(
                           children: const [
@@ -731,18 +821,21 @@ class _LoginPageState extends State<LoginPage> {
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
                                 'or continue with',
-                                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                                style: TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                             Expanded(child: Divider(color: Color(0xFFE5E7EB))),
                           ],
                         ),
                         const SizedBox(height: 24),
-                        
+
                         // Google Sign In Button
                         _buildGoogleSignInButton(),
                         const SizedBox(height: 36),
-                        
+
                         // Sign Up Link
                         Center(
                           child: RichText(
@@ -761,7 +854,8 @@ class _LoginPageState extends State<LoginPage> {
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => const RegisterPage(),
+                                          builder: (context) =>
+                                              const RegisterPage(),
                                         ),
                                       );
                                     },
