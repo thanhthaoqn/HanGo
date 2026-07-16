@@ -1,34 +1,35 @@
 # Feature Specification: FT-06 - Exam Management
 
 ## 1. Business Context
-The Exam Management feature is a tool to measure and evaluate the competency of Learners. It allows linking questions from the Question Bank into an exam, defining time limits, and setting passing scores. For the Learner, this is an interface featuring a countdown timer, test execution, and automatic scoring immediately upon submission.
+The Exam Management feature is a tool to measure and evaluate the competency of Learners. In contrast to quizzes, Exams are simulated English THPTQG mock tests, utilizing dedicated exam questions that are private and not reusable in standard courses. For the Learner, this is an interface featuring a countdown timer, test execution, and automatic scoring immediately upon submission.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Exam Builder interface for Trainers (select questions from the Bank, set time, passing score).
-- [ ] Exam Execution interface for Learners: Display countdown timer. Auto-submit when time is up.
-- [ ] Local caching of answers (Local Storage/SharedPreferences) to prevent data loss if the app crashes during the exam.
-- [ ] Result screen displaying the score, total correct/incorrect, and detailed explanations (if configured to allow).
+- [ ] Exam listing screen displaying available exams.
+- [ ] Exam Builder interface for Course Managers/Trainers to create exams and attach dedicated questions.
+- [ ] Exam Execution interface for Learners: 50-minute countdown timer. Auto-submit when time is up.
+- [ ] Local caching of answers (SharedPreferences) to prevent data loss if the app crashes during the exam.
+- [ ] Result screen displaying the score on a 10-point scale, total correct/incorrect answers, and explanations.
 
 **Backend (Spring Boot):**
-- [ ] API `POST /api/v1/exams` to create the exam structure (`exams` and `exam_questions`).
-- [ ] API `POST /api/v1/exams/{id}/submit` to receive the array of user answers (`learner_id`, `question_id`, `chosen_answer_id`).
-- [ ] Auto-grading logic based on the `is_correct` field in the `answers` table.
-- [ ] Record the results into the `exam_attempts` table (score, PASS/FAIL status).
+- [ ] API `GET /api/v1/exams` to retrieve the list of exams.
+- [ ] API `GET /api/v1/exams/{id}/attempts` and `/api/v1/exams/my-attempts` to fetch learner attempts.
+- [ ] API `POST /api/v1/exams/{id}/submit` receiving the array of user answers in an `ExamAttemptRequestDTO`.
+- [ ] Auto-grading logic: each correct answer yields exactly 0.25 points (40 questions total, max score 10).
+- [ ] Record the attempt details in the `exam_attempts` table (with score, start time, and submission time).
 
 ## 3. Technical Constraints
-- **Frontend:** The countdown timer must calculate the time difference against the `end_time` returned by the server, not relying entirely on the local device time to prevent Learners from hacking by rewinding the device clock.
-- **Backend:** 
-  - The Submit API must lock the attempt data to prevent a user from submitting twice for the same exam attempt.
-  - Must clearly separate the Request DTO containing chosen answers from the system's server-side verification of correct answers (Never send correct answers to the Client during an exam).
+- **Exam Question Privacy:** Exam questions must have `Visibility = Private` and be scoped strictly to a specific `ExamVersion` (mapped via `exam_version_id`), ensuring they cannot be pulled into general course quizzes.
+- **Backend Scoring Validation:** The Submit API must evaluate options using the `is_correct` field in the `question_options` table.
+- **Frontend Security:** The countdown timer must calculate the remaining duration based on the server-provided start time, not trusting the client device clock.
 
 ## 4. Edge Cases
-- **Loss of Connection During Exam:** Cache answers locally. When the connection is restored, silently sync answers to the server (if Auto-save is designed) or allow submission when the connection is stable.
-- **Time's Up but Not Submitted:** The Flutter Timer function automatically triggers an API `submit` call with the answers currently in the Cache.
-- **Submitting Beyond the Time Limit:** The server checks `current_time` against `start_time + time_limit`. If it exceeds the allowed tolerance (e.g., 1 minute for network delay), mark the exam Invalid or score 0 for the late submission.
+- **Loss of Connection During Exam:** Cache answers locally. When the connection is restored, sync answers or submit on connection recovery.
+- **Time's Up auto-submit:** The client must trigger an API submission immediately when the timer expires. The server will reject submissions that exceed the duration window by more than 1 minute.
+- **Double Submit:** Prevent a learner from submitting the same exam attempt twice via locks.
 
 ## 5. Non-functional Requirements
-- **Performance:** The Submit API must process and return the score instantaneously in `< 1000ms`.
-- **Concurrency (Load Bearing):** Capable of handling hundreds of concurrent submit requests when a common exam ends (Effectively utilizing Connection Pooling in the database).
-- **Security:** Strictly prohibit any API calls attempting to fetch question details meant for Admin/Trainers while the account role is Learner.
+- **Performance:** Submit and scoring API must return the results in `< 1000ms`.
+- **Security:** Do not expose the correct options/answers payload in the API response while the exam attempt is still in progress.
+

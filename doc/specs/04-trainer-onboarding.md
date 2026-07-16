@@ -6,26 +6,29 @@ To become a Trainer on HanGo, standard Learners or Guests must submit an applica
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Trainer Application form for Learners: Select Type (Teacher / Tutor).
-- [ ] Input fields for personal info, phone, and banking details.
-- [ ] File/Image upload for credentials and proofs (using Cloudinary).
-- [ ] Status tracking screen for submitted applications.
-- [ ] Admin interface to view pending applications and Approve/Reject with notes.
+- [ ] Onboarding application form: select role type (Professional Trainer vs Peer Tutor), fill in phone number, CCCD/National ID, and bank details.
+- [ ] Document proof upload section (diplomas, certificates, transcripts).
+- [ ] Application tracking page displaying status (Draft, Submitted, Approved, Rejected) and reject notes.
+- [ ] Admin panel view displaying all applications, document links, and actions to Approve or Reject.
 
 **Backend (Spring Boot):**
-- [ ] *Note:* The `TrainerApplication` entity does not currently exist in the database and MUST be created (`id`, `user_id`, `trainer_type`, `banking_info`, `proof_urls`, `status`, `admin_notes`).
-- [ ] API `POST /api/v1/trainer-applications` to submit the form.
-- [ ] API `GET /api/v1/admin/trainer-applications` for Admin review.
-- [ ] API `PUT /api/v1/admin/trainer-applications/{id}/approve` (or reject).
-- [ ] Upon approval, the backend must dynamically assign the `TRAINER` role to the user's `User` entity and save `RevenueShareRate`.
+- [ ] API `POST /api/v1/trainers/become-trainer` to initialize/request trainer status.
+- [ ] API `GET /api/v1/trainers/profile` to get current onboarding trainer profile.
+- [ ] API `PUT /api/v1/trainers/profile` to save trainer application details as a draft.
+- [ ] API `POST /api/v1/trainers/profile/submit` to submit the profile details for Admin review.
+- [ ] API `GET /api/v1/admin/trainer-profiles` (Admin only) to list/search trainer profile applications.
+- [ ] API `PUT /api/v1/admin/trainer-profiles/{id}/review` (Admin only) to approve or reject with comments.
+- [ ] Automatically upgrade user role to `ROLE_TRAINER` on approval, setting `TrainerType` and corresponding `RevenueShareRate`.
 
 ## 3. Technical Constraints
-- **Database:** The application must link to the `User` entity. Cloudinary URLs should be stored as JSON arrays or a separate linked table if multiple documents are allowed.
-- **Workflow:** An approved application triggers an event that modifies the `roles` set in the `User` entity.
+- **Security:** Strict authorization using `@PreAuthorize("hasRole('ADMINISTRATOR')")` for review endpoints.
+- **Database:** `trainer_profiles` table maps to user ID, status, documents (Cloudinary links), bank info, and timestamps.
+- **File Storage:** Verification documents must be uploaded directly to Cloudinary and database stores secure HTTPS links.
 
 ## 4. Edge Cases
-- **Pending Application:** If a user already has a pending application, block them from submitting a new one.
-- **Role Re-assignment:** If a user is already a Trainer, they cannot submit an onboarding application.
+- **Missing Proof Document:** Prevent application submission if no document link is uploaded.
+- **Resubmission:** If an application is rejected, allow the user to modify and resubmit, resetting status to `SUBMITTED`.
+- **First Course Constraint:** Approved Trainers must publish their first course for free (`BR-G02`).
 
 ## 5. Non-functional Requirements
-- **Security:** Banking information must be stored securely and only accessible to authorized Admins and the user themselves.
+- **Performance:** Application status updates should trigger real-time notifications to the user.

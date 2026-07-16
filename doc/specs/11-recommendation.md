@@ -1,33 +1,35 @@
 # Feature Specification: FT-07 - Recommendation System
 
 ## 1. Business Context
-To personalize learning paths, the Recommendation System analyzes exam results or a Learner's learning history to suggest the next lessons, flashcards, or courses. This is an advanced (Rule-based) feature that intelligently helps Learners patch knowledge gaps, increasing user retention rates.
+To personalize learning paths, the Recommendation System analyzes exam results or a Learner's learning history to generate recommendations. This includes standard rule-based course recommendations and a dynamic, personalized **Adaptive Learning Pathway** (visual node tree roadmap) monitored by an **AI Mentor** agent.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] The Dashboard screen or Exam Result screen features a "Suggested for you" section.
-- [ ] Display a list of courses or lessons as a Card Carousel.
-- [ ] Call the API to get recommendations and handle the Empty State (If the system lacks sufficient data to make suggestions).
+- [ ] "Suggested for you" Carousel on the Learner Dashboard.
+- [ ] Adaptative Learning Pathway Page showing an Interactive Node Tree (Duolingo-style node statuses: locked/gray, in-progress/glowing, completed/green).
+- [ ] AI Mentor Side Panel featuring a chat interface (markdown response rendering, typing indicator, free text input).
 
 **Backend (Spring Boot):**
-- [ ] API `GET /api/v1/recommendations` returns a list of Courses/Lessons.
-- [ ] Rule-based Engine Logic: 
-  - Analyze the `exam_attempts` and `exam_results` tables.
-  - If the exam score in a specific subject (Skill/Category) is < 50%, suggest a Basic level course in that Category.
-  - If the score is >= 80%, suggest an Advanced level course or a new trending course.
-- [ ] Map the response via a standard DTO.
+- [ ] API endpoints `/api/v1/pathways/generate` and `/api/v1/pathways/me` to retrieve/construct node structures.
+- [ ] API `/api/v1/pathways/{id}/chat` to exchange messages with the AI Mentor.
+- [ ] Rule-based Engine Logic: evaluates `exam_attempts` and maps low scoring SkillTypes (< 50%) to beginner courses (max 3 SkillTypes per course mapping).
+- [ ] AI Pathway Generation Service: constructs a structured roadmap JSON outlining learning steps.
 
 ## 3. Technical Constraints
-- **Backend:** The Rule-based algorithm should be isolated into a dedicated `@Service` component (e.g., `RecommendationEngineService`) to easily upgrade to Machine Learning in the future without affecting the Controller's business logic.
-- **Database:** Analytical queries on historical data must be optimized (Using JOINs and INDEXes on the `learner_id` and `category_id` columns) to prevent database bottlenecking.
+- **Agentic Upgrade (Function Calling):** The AI Mentor must use Gemini Function Calling to execute backend tools dynamically, specifically:
+  - `triggerReroute(pathwayId, reason)` to restructure nodes if lessons are "too hard" or "too easy".
+  - `getPathwayById(id)` to query current structures.
+  - `getUserProgressSnapshot(userId)` to evaluate learner performance.
+- **Long-term Memory & Cache:**
+  - Store chat histories in `ai_chat_histories` table with context truncation (keeping last 5-10 messages and system instructions).
+  - Cache learner profiles (strengths and weaknesses) in the database to optimize AI prompt injections.
+- **Database:** Optimize queries on `exam_attempts` and `enrollments` tables.
 
 ## 4. Edge Cases
-- **Brand New User (Cold Start Problem):** No exam history available.
-  - *Solution:* Suggest the highest-rated courses (Top Rated) or "For Beginners" courses.
-- **System Suggests Completed Courses:** 
-  - *Solution:* The Backend must exclude (`NOT IN`) the list of courses where `status = COMPLETED` in the `learner_courses` table.
+- **Off-topic Prompts:** The AI Mentor prompt must include strict directives to detect non-educational requests (`wasOutOfScope`) and respond with a friendly educational-only guardrail template.
+- **Review Loop Flagging:** If a pathway is rerouted $\ge 3$ times, flag it for manual Course Manager review and prompt a "Report bad roadmap" feedback link.
 
 ## 5. Non-functional Requirements
-- **Performance:** Recommendation calculations (Based on SQL rules) can be heavy, requiring a Caching mechanism (e.g., Spring Cache or Memcached/Redis if available) to store suggestion results for 1-2 hours. API response time should be `< 500ms`.
-- **User Experience:** Thumbnail images for suggested courses must be loaded asynchronously (Cached Network Image in Flutter).
+- **Performance:** Pathway generation and AI responses must render with friendly loading placeholders. Chat API response time target `< 1500ms` for streaming or non-streaming responses.
+

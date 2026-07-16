@@ -110,10 +110,21 @@ public class AuthService {
             throw new IllegalArgumentException("Error: Email is already in use!");
         }
 
-        // Default role: LEARNER
-        Role userRole = roleRepository.findByRoleName("LEARNER")
+        String targetRoleName = registerRequest.getRole();
+        if (targetRoleName == null || targetRoleName.trim().isEmpty()) {
+            targetRoleName = "LEARNER";
+        } else {
+            targetRoleName = targetRoleName.trim().toUpperCase();
+        }
+
+        if (!targetRoleName.equals("LEARNER") && !targetRoleName.equals("TRAINER")) {
+            throw new IllegalArgumentException("Error: Invalid registration role!");
+        }
+
+        final String finalRoleName = targetRoleName;
+        Role userRole = roleRepository.findByRoleName(finalRoleName)
                 .orElseGet(() -> {
-                    Role newRole = Role.builder().roleName("LEARNER").build();
+                    Role newRole = Role.builder().roleName(finalRoleName).build();
                     return roleRepository.save(newRole);
                 });
 

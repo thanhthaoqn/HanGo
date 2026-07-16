@@ -78,8 +78,8 @@ public class AuthController {
         try {
             authService.verifyAccount(email);
             return ResponseEntity.ok()
-                    .header("Content-Type", "text/html")
-                    .body("<html><body style='font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #F9FAFB;'>" +
+                    .header("Content-Type", "text/html; charset=UTF-8")
+                    .body("<html><head><meta charset='UTF-8'></head><body style='font-family: Arial, sans-serif; text-align: center; margin-top: 100px; background-color: #F9FAFB;'>" +
                             "<div style='display: inline-block; padding: 40px; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); max-width: 450px;'>" +
                             "<div style='width: 60px; height: 60px; background-color: #E6FDF9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;'>" +
                             "<span style='color: #28B79B; font-size: 32px; font-weight: bold;'>✓</span>" +

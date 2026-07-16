@@ -67,19 +67,19 @@ This file is the official roadmap and checklist for the HanGo platform developme
 
 ## 🚀 [FE-04] Trainer Onboarding (NEW)
 ### 🎨 Phase 1: Frontend UI & Mock Data
-- [ ] Build Trainer Application Form UI (allow selecting Professional / Peer Tutor).
-- [ ] Add fields for personal info, bank details, and Document file picker (for certificates/transcripts).
-- [ ] Build Admin Trainer Applications Queue view (allows review, approve, reject with notes).
+- [x] Build Trainer Application Form UI (allow selecting Professional / Peer Tutor).
+- [x] Add fields for personal info, bank details, and Document file picker (for certificates/transcripts).
+- [x] Build Admin Trainer Applications Queue view (allows review, approve, reject with notes).
 
 ### ⚙️ Phase 2: Backend Execution & API Design
-- [ ] Set up `trainer_applications` table with status (Draft, Submitted, Approved, Rejected).
-- [ ] Create API `POST /api/v1/trainers/apply` (receive files and upload to Cloudinary).
-- [ ] Create Admin review APIs (`GET /api/v1/admin/trainer-applications`, `PUT /api/v1/admin/trainer-applications/{id}/review`).
-- [ ] Write logic to update `User` role to `Trainer`, set TrainerType and default revenue split rate upon approval.
+- [x] Set up `trainer_applications` table with status (Draft, Submitted, Approved, Rejected).
+- [x] Create API `POST /api/v1/trainers/apply` (receive files and upload to Cloudinary).
+- [x] Create Admin review APIs (`GET /api/v1/admin/trainer-applications`, `PUT /api/v1/admin/trainer-applications/{id}/review`).
+- [x] Write logic to update `User` role to `Trainer`, set TrainerType and default revenue split rate upon approval.
 
 ### 🔌 Phase 3: Integration
-- [ ] Connect Trainer onboarding flow and application submission to backend.
-- [ ] Integrate Admin application review actions.
+- [x] Connect Trainer onboarding flow and application submission to backend.
+- [x] Integrate Admin application review actions.
 
 ### 🚨 Phase 4: Quality Assurance
 - [ ] Ensure non-registered/non-learner users cannot submit application (HTTP 403).

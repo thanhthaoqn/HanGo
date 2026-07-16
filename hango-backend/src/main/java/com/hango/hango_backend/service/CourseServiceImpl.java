@@ -17,6 +17,7 @@ import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.CourseRating;
 import com.hango.hango_backend.repository.CourseRatingRepository;
+import com.hango.hango_backend.repository.TrainerProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,7 @@ public class CourseServiceImpl implements CourseService {
     private final UserRepository userRepository;
     private final LessonProgressRepository lessonProgressRepository;
     private final CourseRatingRepository courseRatingRepository;
+    private final TrainerProfileRepository trainerProfileRepository;
 
     @Override
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
@@ -195,6 +197,13 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
+
+        if (course.getCreator() != null) {
+            com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
+            if (profile == null || !"VERIFIED".equalsIgnoreCase(profile.getStatus())) {
+                throw new RuntimeException("Khóa học chưa được xuất bản hoặc giáo viên chưa được phê duyệt.");
+            }
+        }
 
         Enrollment enrollment = Enrollment.builder()
                 .user(user)

@@ -34,11 +34,11 @@ public class ExamService {
     public List<ExamResponseDTO> getAllExams(String status) {
         List<Exam> exams;
         if (status != null && !status.isEmpty() && !status.equalsIgnoreCase("All")) {
-            exams = examRepository.findByDeletedAtIsNullAndStatus(status);
-        } else {
-            exams = examRepository.findAll().stream()
-                    .filter(e -> e.getDeletedAt() == null)
+            exams = examRepository.findByDeletedAtIsNullAndStatus(status).stream()
+                    .filter(e -> "PUBLISHED".equalsIgnoreCase(e.getStatus()))
                     .collect(Collectors.toList());
+        } else {
+            exams = examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED");
         }
 
         return exams.stream().map(this::mapToDTO).collect(Collectors.toList());
