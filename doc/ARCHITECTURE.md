@@ -1,5 +1,7 @@
 # HanGo System Architecture
 
+> Tài liệu này mô tả chi tiết kiến trúc kỹ thuật. Cho business requirements, xem [`HanGo_Documentation.md`](HanGo_Documentation.md) v1.0 §5.
+
 ## 1. System Overview & Monitored Context
 
 **System Overview:**

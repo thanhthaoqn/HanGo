@@ -1,4 +1,6 @@
-# Feature Specification: 7.4 - Trainer Onboarding
+# Feature Specification: FE-04 — Trainer Onboarding
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.4 (TRN)
 
 ## 1. Business Context
 To become a Trainer on HanGo, standard Learners or Guests must submit an application containing their credentials, banking info, and chosen Trainer type (Teacher or Tutor). Administrators review these applications to maintain the quality of instruction on the platform.

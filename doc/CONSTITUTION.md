@@ -1,5 +1,7 @@
 # HanGo Project Constitution
 
+> This is the canonical, detailed source for architecture principles, coding conventions, security rules, and git workflow. [`AGENTS.md`](../AGENTS.md) (protocol/workflow), [`agent_backend.md`](agent_backend.md) and [`agent_frontend.md`](agent_frontend.md) (domain quick-reference) all point back here instead of restating these rules — treat this file as the single place to update them.
+
 This document is the "Constitution" of the HanGo EdTech Platform project. All AI Coding Agents (such as Cursor, GitHub Copilot, Windsurf, etc.) and Developers participating in the project's development must strictly adhere to the rules and principles defined below.
 
 ## 1. Project Context & Vision
@@ -73,6 +75,7 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 ## 9. Testing Requirements
 - **Frontend:** Write Unit Tests and Widget Tests for important components and features.
 - **Backend:** Mandatory Unit Tests using JUnit 5 and Mockito. Integrate Testcontainers for Integration Tests and database checking.
+- Full strategy, priorities and test case catalogue: [`TESTING.md`](TESTING.md), [`agent_qa.md`](agent_qa.md), [`specs/unit_test_plan.md`](specs/unit_test_plan.md).
 
 ## 10. AI Prompting Workflow
 When a Developer assigns a task to AI, Context must be provided in the following standard format:

@@ -1,6 +1,6 @@
 # TODO - HanGo Project Roadmap (Aligned with HanGo_Documentation.md)
 
-This file is the official roadmap and checklist for the HanGo platform development. It is structured around the 14 functional modules defined in [HanGo_Documentation.md](file:///d:/FPT-All-Semester/kì_9_su2026/DOAN/HangoTT/HanGo/HanGo_Documentation.md).
+This file is the official roadmap and checklist for the HanGo platform development. It is structured around the 14 functional modules defined in [HanGo_Documentation.md](doc/HanGo_Documentation.md).
 
 ---
 
@@ -20,7 +20,7 @@ This file is the official roadmap and checklist for the HanGo platform developme
 - [x] Call real REST APIs via `dio`, securely save JWT into `shared_preferences` and navigate to Dashboard.
 
 ### 🚨 Phase 4: Quality Assurance
-- [ ] Backend: Unit test password hashing and token parsing.
+- [x] Backend: Unit test `AuthService` (login, register, forgot/verify/reset password, verify account, resend verification, `isAccountVerified`) + `UserDetailsServiceImpl.loadUserByUsername` — 30 tests passed, see `hango-backend/src/test/java/.../AuthServiceTest.java` + `UserDetailsServiceImplTest.java` and [`doc/specs/unit_test_plan.md`](doc/specs/unit_test_plan.md) §3.1/§3.2/§3.2b. Found during testing: (1) `googleLogin`'s JIT-provisioning happy path can't be unit-tested without refactoring `GoogleIdTokenVerifier` to be injectable; (2) no `refreshToken`/`logout` endpoint exists despite doc claiming "access + refresh token"; (3) `authenticateUser` only blocks status `"INACTIVE"` — a `"LOCKED"` status logs in fine today.
 - [ ] Frontend: Widget Test for invalid email form error.
 - [ ] Simulate expired JWT error (401) to automatically push back to Login screen.
 

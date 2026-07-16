@@ -1,4 +1,6 @@
-# Feature Specification: 7.3 - Role & Permission Management (RBAC) & Dashboard
+# Feature Specification: FE-03 — Role & Permission Management (RBAC) & Dashboard
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.3 (RBAC)
 
 ## 1. Business Context
 Role-Based Access Control (RBAC) ensures the right people have the right access. Administrators can manage users, roles, and platform permissions. Additionally, this module encompasses the Analytics Dashboard, providing Admins with visual reports (Charts, Statistics) on the system's operational performance, AI usage, and audit logs.

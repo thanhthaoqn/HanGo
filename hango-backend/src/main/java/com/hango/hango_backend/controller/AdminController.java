@@ -12,6 +12,8 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -202,14 +204,27 @@ public class AdminController {
         }
     }
 
+    private static final Set<String> ALLOWED_USER_STATUSES = Set.of("ACTIVE", "INACTIVE");
+
     @PutMapping("/users/{id}/status")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
-    public ResponseEntity<?> updateUserStatus(@PathVariable Long id, @RequestParam String status) {
+    public ResponseEntity<?> updateUserStatus(@PathVariable Long id, @RequestParam String status,
+            @AuthenticationPrincipal UserDetails currentAdmin) {
         try {
+            String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
+            if (!ALLOWED_USER_STATUSES.contains(normalizedStatus)) {
+                return ResponseEntity.badRequest().body("Error: status must be one of " + ALLOWED_USER_STATUSES);
+            }
+
             Optional<User> userOpt = userRepository.findById(id);
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
-                user.setStatus(status.toUpperCase());
+
+                if (currentAdmin != null && currentAdmin.getUsername().equalsIgnoreCase(user.getEmail())) {
+                    return ResponseEntity.badRequest().body("Error: Admin cannot change the status of their own account");
+                }
+
+                user.setStatus(normalizedStatus);
                 userRepository.save(user);
                 return ResponseEntity.ok(Map.of("success", true, "message", "User status updated successfully"));
             } else {
