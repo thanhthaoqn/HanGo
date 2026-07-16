@@ -1058,7 +1058,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            _isVietnamese ? 'Thông tin của tôi' : 'My Information',
+                            widget.hideCommerceActions
+                                ? 'My information'
+                                : (_isVietnamese ? 'Thông tin của tôi' : 'My Information'),
                             style: const TextStyle(
                               fontFamily: 'Outfit',
                               color: Color(0xFF1E293B),
@@ -1091,7 +1093,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            _isVietnamese ? 'Đăng xuất' : 'Logout',
+                            widget.hideCommerceActions
+                                ? 'Log out'
+                                : (_isVietnamese ? 'Đăng xuất' : 'Logout'),
                             style: const TextStyle(
                               fontFamily: 'Outfit',
                               color: Colors.redAccent,

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'presentation/pages/learner/learner_home_page.dart';
+import 'presentation/pages/course_manager/course_manager_dashboard_page.dart';
 import 'presentation/pages/admin/admin_dashboard_page.dart';
 import 'presentation/pages/trainer/trainer_dashboard_page.dart';
 import 'presentation/pages/trainer/onboarding/trainer_type_selection_page.dart';
@@ -70,6 +71,8 @@ class MyApp extends StatelessWidget {
               final role = appState.session?.role;
               if (role == 'ADMIN') {
                 return const AdminDashboardPage();
+              } else if (role == 'TRAINER_LEAD') {
+                return const CourseManagerDashboardPage();
               } else if (role == 'TRAINER') {
                 return const TrainerRouteGate();
               }
