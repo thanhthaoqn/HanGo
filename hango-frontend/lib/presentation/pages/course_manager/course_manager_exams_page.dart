@@ -2,32 +2,26 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
-import '../login_page.dart';
-import 'trainer_dashboard_page.dart';
-import 'trainer_courses_page.dart';
-import 'trainer_create_exam_page.dart';
-import 'trainer_edit_exam_page.dart';
-import 'question_bank/trainer_question_bank_page.dart';
-import '../../../utils/toast_helper.dart';
-import 'matrix_management_page.dart';
+import 'course_manager_dashboard_page.dart';
+import '../trainer/trainer_create_exam_page.dart';
+import '../trainer/trainer_edit_exam_page.dart';
+import 'course_manager_question_bank_page.dart';
+import '../../widgets/shared_header.dart';
+import '../trainer/matrix_management_page.dart';
 
-class TrainerExamsPage extends StatefulWidget {
-  const TrainerExamsPage({super.key});
+class CourseManagerExamsPage extends StatefulWidget {
+  const CourseManagerExamsPage({super.key});
 
   @override
-  State<TrainerExamsPage> createState() => _TrainerExamsPageState();
+  State<CourseManagerExamsPage> createState() => _CourseManagerExamsPageState();
 }
 
-class _TrainerExamsPageState extends State<TrainerExamsPage> {
+class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   final _authService = AuthService();
-  String _trainerName = 'Thảo';
-  String _trainerInitials = 'T';
-  String _trainerAvatarUrl = '';
-
   bool _isLoading = true;
   String _errorMessage = '';
+  bool _isSidebarVisible = true;
   List<dynamic> _examsList = [];
   
   int _currentPage = 1;
@@ -58,7 +52,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   @override
   void initState() {
     super.initState();
-    _loadTrainerInfo();
     _fetchExamsData();
   }
 
@@ -165,34 +158,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     }
   }
 
-  Future<void> _loadTrainerInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Thảo';
-    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
-    });
-  }
 
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -201,15 +169,21 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      appBar: SharedHeader(
+        isDesktop: isDesktop,
+        activeTab: '',
+        hideNavLinks: true,
+        hideCommerceActions: true,
+      ),
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop && _isSidebarVisible) SizedBox(width: 240, child: _buildSidebar(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                _buildContentHeader(context, isDesktop),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
@@ -920,37 +894,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6FFFA),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.school,
-                    size: 18,
-                    color: Color(0xFF38C9A6),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'HanGo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
           _buildSidebarItem(
             Icons.dashboard_outlined,
             'Dashboard',
@@ -958,46 +901,36 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const TrainerDashboardPage(),
+                  builder: (context) => const CourseManagerDashboardPage(),
                 ),
               );
             },
           ),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerCoursesPage(),
-              ),
-            );
-          }),
+          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {}),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: true),
-          _buildSidebarItem(Icons.grid_on, 'Matrix', onTap: () {
+          _buildSidebarItem(Icons.grid_on, 'Exam Matrix', onTap: () {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
                 builder: (context) => MatrixManagementPage(onBack: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
+                    MaterialPageRoute(builder: (context) => const CourseManagerExamsPage()),
                   );
                 }),
               ),
             );
           }),
-          _buildSidebarItem(Icons.people_outline, 'Learner'),
+
           _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => const TrainerQuestionBankPage(),
+                builder: (context) => const CourseManagerQuestionBankPage(),
               ),
             );
           }),
           const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
         ],
       ),
     );
@@ -1046,122 +979,36 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
-    return Container(
-      color: Colors.white,
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+  Widget _buildContentHeader(BuildContext context, bool isDesktop) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       child: Row(
         children: [
-          if (showMenuButton) ...[
+          if (!isDesktop) ...[
             IconButton(
               icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 12),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
+              onPressed: () {
+                setState(() {
+                  _isSidebarVisible = !_isSidebarVisible;
+                });
+              },
+            ),
+            const SizedBox(width: 12),
           ],
-          Row(
-            children: const [
-              Icon(Icons.chevron_right, size: 16, color: Color(0xFF38C9A6)),
-              SizedBox(width: 4),
-              Text(
-                'Exam',
-                style: TextStyle(
-                  color: Color(0xFF38C9A6),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_none_outlined,
-                  color: Color(0xFF4B5563),
-                  size: 24,
-                ),
-                onPressed: () {
-                  ToastHelper.show(context, 'No new notifications');
-                },
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: Colors.redAccent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Row(
-            children: [
-              Text(
-                _trainerName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE2F9F3),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: _trainerAvatarUrl.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          _trainerAvatarUrl,
-                          width: 32,
-                          height: 32,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            _trainerInitials,
-                            style: const TextStyle(
-                              color: Color(0xFF38C9A6),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ),
-                      )
-                    : Text(
-                        _trainerInitials,
-                        style: const TextStyle(
-                          color: Color(0xFF38C9A6),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF38C9A6),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
+          const Text(
+            'Exam',
+            style: TextStyle(
+              color: Color(0xFF20B486),
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              fontFamily: 'Outfit',
+            ),
           ),
         ],
       ),

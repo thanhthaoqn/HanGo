@@ -1,34 +1,32 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
-import '../../login_page.dart';
-import '../trainer_courses_page.dart';
-import '../trainer_dashboard_page.dart';
-import '../trainer_exams_page.dart';
-import 'trainer_create_question_page.dart';
-import 'models/trainer_question.dart';
-import 'widgets/question_filter_pane.dart';
-import 'widgets/question_search_bar.dart';
-import 'widgets/question_table.dart';
+import 'course_manager_dashboard_page.dart';
+import 'course_manager_exams_page.dart';
+import '../trainer/matrix_management_page.dart';
+import '../../widgets/shared_header.dart';
+import '../trainer/question_bank/widgets/question_filter_pane.dart';
+import '../trainer/question_bank/widgets/question_search_bar.dart';
+import '../trainer/question_bank/widgets/question_table.dart';
+import '../trainer/question_bank/trainer_create_question_page.dart';
+import '../trainer/question_bank/models/trainer_question.dart';
 
-class TrainerQuestionBankPage extends StatefulWidget {
-  const TrainerQuestionBankPage({Key? key}) : super(key: key);
+class CourseManagerQuestionBankPage extends StatefulWidget {
+  const CourseManagerQuestionBankPage({Key? key}) : super(key: key);
 
   @override
-  State<TrainerQuestionBankPage> createState() => _TrainerQuestionBankPageState();
+  State<CourseManagerQuestionBankPage> createState() => _CourseManagerQuestionBankPageState();
 }
 
-class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
+class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBankPage> {
   final _authService = AuthService();
   final _searchController = TextEditingController();
   
-  String _trainerName = 'Thảo';
-  String _trainerInitials = 'T';
   bool _isLoading = true;
   String _errorMessage = '';
+  bool _isSidebarVisible = true;
 
   // Filter States
   String _selectedType = 'ALL';
@@ -49,10 +47,8 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     return 'http://localhost:8080';
   }
 
-  @override
   void initState() {
     super.initState();
-    _loadTrainerInfo();
     _fetchQuestions();
   }
 
@@ -63,21 +59,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     super.dispose();
   }
 
-  Future<void> _loadTrainerInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Thảo';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-    });
-  }
+
 
   Future<void> _fetchQuestions() async {
     setState(() {
@@ -149,16 +131,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     _fetchQuestions();
   }
 
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -174,15 +147,21 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      appBar: SharedHeader(
+        isDesktop: isDesktop,
+        activeTab: '',
+        hideNavLinks: true,
+        hideCommerceActions: true,
+      ),
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop && _isSidebarVisible) SizedBox(width: 240, child: _buildSidebar(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                _buildContentHeader(context, isDesktop),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
@@ -302,38 +281,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6FFFA),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.school,
-                    size: 18,
-                    color: Color(0xFF20B486),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'HanGo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
           // Sidebar menu items
           _buildSidebarItem(
             Icons.dashboard_outlined,
@@ -342,7 +289,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const TrainerDashboardPage(),
+                  builder: (context) => const CourseManagerDashboardPage(),
                 ),
               );
             },
@@ -350,37 +297,33 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           _buildSidebarItem(
             Icons.book_outlined,
             'Courses',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerCoursesPage(),
-                ),
-              );
-            },
+            onTap: () {},
           ),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
+              MaterialPageRoute(builder: (context) => const CourseManagerExamsPage()),
             );
           }),
-          _buildSidebarItem(Icons.people_outline, 'Learner'),
+          _buildSidebarItem(Icons.grid_on, 'Exam Matrix', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MatrixManagementPage(onBack: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CourseManagerQuestionBankPage()),
+                  );
+                }),
+              ),
+            );
+          }),
           _buildSidebarItem(
             Icons.question_answer_outlined,
             'Question Bank',
             isActive: true,
           ),
           const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-
-          _buildSidebarItem(
-            Icons.logout,
-            'Logout',
-            color: Colors.redAccent,
-            onTap: _handleLogout,
-          ),
         ],
       ),
     );
@@ -433,17 +376,25 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
-    return Container(
-      color: Colors.white,
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+  Widget _buildContentHeader(BuildContext context, bool isDesktop) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       child: Row(
         children: [
-          if (showMenuButton) ...[
+          if (!isDesktop) ...[
             IconButton(
               icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
               onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+            const SizedBox(width: 12),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
+              onPressed: () {
+                setState(() {
+                  _isSidebarVisible = !_isSidebarVisible;
+                });
+              },
             ),
             const SizedBox(width: 12),
           ],
@@ -472,59 +423,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 ),
               ),
             ],
-          ),
-          const Spacer(),
-          // Actions
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none, color: Color(0xFF4B5563)),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notifications feature is under construction')),
-                  );
-                },
-              ),
-              Positioned(
-                right: 12,
-                top: 12,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.redAccent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 16),
-          const VerticalDivider(width: 1, indent: 20, endIndent: 20, color: Color(0xFFE2E8F0)),
-          const SizedBox(width: 16),
-          Text(
-            _trainerName,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1F2937),
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: const Color(0xFFE6FFFA),
-            child: Text(
-              _trainerInitials,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF20B486),
-                fontFamily: 'Outfit',
-              ),
-            ),
           ),
         ],
       ),

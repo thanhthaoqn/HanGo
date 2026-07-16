@@ -8,6 +8,7 @@ import '../pages/course/list_courses_page.dart';
 import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
+import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/learner/my_learning_page.dart';
 
 import '../../utils/toast_helper.dart';
@@ -17,12 +18,14 @@ class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isDesktop;
   final String activeTab;
   final bool hideNavLinks;
+  final bool hideCommerceActions;
 
   const SharedHeader({
     Key? key,
     required this.isDesktop,
     this.activeTab = 'Courses',
     this.hideNavLinks = false,
+    this.hideCommerceActions = false,
   }) : super(key: key);
 
   @override
@@ -455,14 +458,18 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                _buildTeachingButton(),
-                const SizedBox(width: 4),
+                if (!widget.hideCommerceActions) ...[
+                  _buildTeachingButton(),
+                  const SizedBox(width: 4),
+                ],
                 _buildLanguageSwitcher(),
                 const SizedBox(width: 4),
-                _buildWishlistButton(),
-                const SizedBox(width: 2),
-                _buildCartButton(),
-                const SizedBox(width: 2),
+                if (!widget.hideCommerceActions) ...[
+                  _buildWishlistButton(),
+                  const SizedBox(width: 2),
+                  _buildCartButton(),
+                  const SizedBox(width: 2),
+                ],
               ],
               // Notification Bell
               Stack(
@@ -511,7 +518,7 @@ class _SharedHeaderState extends State<SharedHeader> {
 
               // User profile with Popup Menu
               PopupMenuButton<String>(
-                enabled: !widget.hideNavLinks,
+                enabled: true,
                 onSelected: (val) {
                   if (val == 'logout') {
                     _handleLogout();
@@ -519,7 +526,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const MyInformationPage(),
+                        builder: (context) => widget.hideCommerceActions
+                            ? const CourseManagerMyInformationPage()
+                            : const MyInformationPage(),
                       ),
                     );
                   } else if (val == 'learning') {
@@ -642,8 +651,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'learning',
+                  if (!widget.hideCommerceActions) ...[
+                    PopupMenuItem(
+                      value: 'learning',
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
@@ -810,7 +820,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     ),
                   ),
-                  const PopupMenuDivider(height: 1),
+                  ],
                   PopupMenuItem(
                     value: 'my_info',
                     child: Container(
