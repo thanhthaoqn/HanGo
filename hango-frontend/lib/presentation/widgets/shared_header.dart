@@ -481,7 +481,6 @@ class _SharedHeaderState extends State<SharedHeader> {
           GestureDetector(
             onTap: () {
               LanguageManager.setLanguage(true);
-              ToastHelper.show(context, 'Đã chuyển sang Tiếng Việt');
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -504,7 +503,6 @@ class _SharedHeaderState extends State<SharedHeader> {
           GestureDetector(
             onTap: () {
               LanguageManager.setLanguage(false);
-              ToastHelper.show(context, 'Switched to English');
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -726,11 +724,14 @@ class _SharedHeaderState extends State<SharedHeader> {
             children: [
               if (widget.isDesktop) ...[
                 _buildLanguageSwitcher(),
-                const SizedBox(width: 4),
+                const SizedBox(width: 8),
                 if (!widget.hideCommerceActions) ...[
                   _buildCartButton(),
-                  const SizedBox(width: 2),
+                  const SizedBox(width: 8),
                 ],
+              ] else ...[
+                _buildLanguageSwitcher(),
+                const SizedBox(width: 8),
               ],
               // Notification Bell
               PopupMenuButton<void>(
@@ -1074,6 +1075,81 @@ class _SharedHeaderState extends State<SharedHeader> {
                   ),
 
                   PopupMenuItem(
+                    enabled: false,
+                    child: StatefulBuilder(
+                      builder: (context, setMenuState) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.language_rounded,
+                                size: 18,
+                                color: Color(0xFF4B5563),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _isVietnamese ? 'Ngôn ngữ:' : 'Language:',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 14,
+                                  color: Color(0xFF1E293B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              InkWell(
+                                onTap: () {
+                                  LanguageManager.setLanguage(true);
+                                  Navigator.pop(context);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _isVietnamese ? const Color(0xFF28B79B) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'VI',
+                                    style: TextStyle(
+                                      color: _isVietnamese ? Colors.white : const Color(0xFF475569),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () {
+                                  LanguageManager.setLanguage(false);
+                                  Navigator.pop(context);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: !_isVietnamese ? const Color(0xFF28B79B) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'EN',
+                                    style: TextStyle(
+                                      color: !_isVietnamese ? Colors.white : const Color(0xFF475569),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    ),
+                  ),
+                  PopupMenuItem(
                     value: 'logout',
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1118,6 +1194,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                 _buildLanguageSwitcher(),
                 const SizedBox(width: 8),
                 _buildCartButton(),
+                const SizedBox(width: 12),
+              ] else ...[
+                _buildLanguageSwitcher(),
                 const SizedBox(width: 8),
               ],
               TextButton(

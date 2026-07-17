@@ -75,6 +75,7 @@ class LessonDetail {
   final List<LessonComment> comments;
   final List<QuizQuestion> questions;
   final bool isCompleted;
+  final int? estimatedTime;
 
   LessonDetail({
     required this.id,
@@ -85,6 +86,7 @@ class LessonDetail {
     required this.comments,
     required this.questions,
     this.isCompleted = false,
+    this.estimatedTime,
   });
 
   factory LessonDetail.fromJson(Map<String, dynamic> json) {
@@ -103,6 +105,7 @@ class LessonDetail {
       comments: comments,
       questions: questions,
       isCompleted: json['isCompleted'] as bool? ?? false,
+      estimatedTime: json['estimatedTime'] as int?,
     );
   }
 }

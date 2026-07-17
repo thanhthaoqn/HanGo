@@ -5,6 +5,7 @@ class CourseLesson {
   final String? itemType;
   final int? examId;
   final int? questionCount;
+  final int? estimatedTime;
   final bool isCompleted;
 
   CourseLesson({
@@ -15,6 +16,7 @@ class CourseLesson {
     this.examId,
     this.questionCount,
     this.isCompleted = false,
+    this.estimatedTime,
   });
 
   factory CourseLesson.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class CourseLesson {
       examId: json['examId'] as int?,
       questionCount: json['questionCount'] as int?,
       isCompleted: json['isCompleted'] as bool? ?? false,
+      estimatedTime: json['estimatedTime'] as int?,
     );
   }
 }
@@ -66,6 +69,8 @@ class CourseDetail {
   final String? description;
   final String? objectives;
   final bool isEnrolled;
+  final String? thumbnailUrl;
+  final int? estimatedDuration;
   final List<CourseSession> sessions;
 
   CourseDetail({
@@ -78,6 +83,8 @@ class CourseDetail {
     this.description,
     this.objectives,
     required this.isEnrolled,
+    this.thumbnailUrl,
+    this.estimatedDuration,
     required this.sessions,
   });
 
@@ -95,6 +102,8 @@ class CourseDetail {
       description: json['description'] as String?,
       objectives: json['objectives'] as String?,
       isEnrolled: json['isEnrolled'] as bool? ?? false,
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      estimatedDuration: json['estimatedDuration'] as int?,
       sessions: sessionsList,
     );
   }
@@ -109,6 +118,8 @@ class CourseDetail {
     String? description,
     String? objectives,
     bool? isEnrolled,
+    String? thumbnailUrl,
+    int? estimatedDuration,
     List<CourseSession>? sessions,
   }) {
     return CourseDetail(
@@ -121,6 +132,8 @@ class CourseDetail {
       description: description ?? this.description,
       objectives: objectives ?? this.objectives,
       isEnrolled: isEnrolled ?? this.isEnrolled,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      estimatedDuration: estimatedDuration ?? this.estimatedDuration,
       sessions: sessions ?? this.sessions,
     );
   }

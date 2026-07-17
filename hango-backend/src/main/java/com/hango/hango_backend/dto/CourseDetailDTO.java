@@ -21,5 +21,6 @@ public class CourseDetailDTO {
     private String categoryName;
     private String difficultyKey;
     private String thumbnailUrl;
+    private Integer estimatedDuration;
     private List<CourseSessionDTO> sessions;
 }

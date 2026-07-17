@@ -12,6 +12,7 @@ import '../exam/list_exams_page.dart';
 import '../exam/exam_detail_history_page.dart';
 import '../course/list_courses_page.dart';
 import '../course/course_detail_page.dart';
+import '../course/lesson_detail_page.dart';
 import '../../widgets/shared_header.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_footer.dart';
@@ -35,6 +36,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   final _courseRepository = CourseRepository();
   final _examRepository = ExamRepository();
 
+  bool _isLoggedIn = false;
   String _userFullName = 'Learner';
   String _userEmail = '';
   String _userInitials = 'L';
@@ -54,6 +56,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   void _startBannerTimer() {
     _bannerTimer?.cancel();
+    if (_isLoggedIn) return;
     _bannerTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
       if (mounted) {
         setState(() {
@@ -81,6 +84,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   // Fetch logged in user info from SharedPreferences
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
     final fullName = prefs.getString('user_fullname') ?? 'Learner';
     final email = prefs.getString('user_email') ?? '';
     final userId = prefs.getInt('user_id') ?? 0;
@@ -94,10 +98,20 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     }
 
     setState(() {
+      _isLoggedIn = token != null;
       _userFullName = fullName;
       _userEmail = email;
       _userInitials = initials;
     });
+
+    if (_isLoggedIn) {
+      _bannerTimer?.cancel();
+      setState(() {
+        _currentBannerIndex = 0;
+      });
+    } else {
+      _startBannerTimer();
+    }
 
     if (userId != 0) {
       final showOnboardingKey = 'show_onboarding_for_$userId';
@@ -552,8 +566,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         const SizedBox(height: 60),
 
                         // 4. Trở thành giảng viên Section
-                        _buildTeacherSection(isDesktop),
-                        const SizedBox(height: 60),
+                        if (!_isLoggedIn) ...[
+                          _buildTeacherSection(isDesktop),
+                          const SizedBox(height: 60),
+                        ],
 
                         // 5. Testimonial Section
                         _buildTestimonialSection(isDesktop),
@@ -658,6 +674,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   Widget _buildHeroBanner(bool isDesktop) {
     final isVi = LanguageManager.isVi;
+
+    if (_isLoggedIn) {
+      return _buildStudentHeroBanner(isDesktop, isVi);
+    }
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 800),
@@ -1336,24 +1356,26 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         _fetchCourses();
                       },
                     ),
-                    const SizedBox(width: 24),
-                    _buildTabSelector(
-                      isVi ? 'Đang học' : 'In progress',
-                      active: _activeCourseTab == 'in_progress',
-                      onTap: () {
-                        setState(() => _activeCourseTab = 'in_progress');
-                        _fetchCourses();
-                      },
-                    ),
-                    const SizedBox(width: 24),
-                    _buildTabSelector(
-                      isVi ? 'Đã hoàn thành' : 'Completed',
-                      active: _activeCourseTab == 'completed',
-                      onTap: () {
-                        setState(() => _activeCourseTab = 'completed');
-                        _fetchCourses();
-                      },
-                    ),
+                    if (_isLoggedIn) ...[
+                      const SizedBox(width: 24),
+                      _buildTabSelector(
+                        isVi ? 'Đang học' : 'In progress',
+                        active: _activeCourseTab == 'in_progress',
+                        onTap: () {
+                          setState(() => _activeCourseTab = 'in_progress');
+                          _fetchCourses();
+                        },
+                      ),
+                      const SizedBox(width: 24),
+                      _buildTabSelector(
+                        isVi ? 'Đã hoàn thành' : 'Completed',
+                        active: _activeCourseTab == 'completed',
+                        onTap: () {
+                          setState(() => _activeCourseTab = 'completed');
+                          _fetchCourses();
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1845,15 +1867,17 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       _fetchExams();
                     },
                   ),
-                  const SizedBox(width: 24),
-                  _buildTabSelector(
-                    isVi ? 'Đã hoàn thành' : 'Completed',
-                    active: _activeExamTab == 'completed',
-                    onTap: () {
-                      setState(() => _activeExamTab = 'completed');
-                      _fetchExams();
-                    },
-                  ),
+                  if (_isLoggedIn) ...[
+                    const SizedBox(width: 24),
+                    _buildTabSelector(
+                      isVi ? 'Đã hoàn thành' : 'Completed',
+                      active: _activeExamTab == 'completed',
+                      onTap: () {
+                        setState(() => _activeExamTab = 'completed');
+                        _fetchExams();
+                      },
+                    ),
+                  ],
                 ],
               ),
               if (!isDesktop)

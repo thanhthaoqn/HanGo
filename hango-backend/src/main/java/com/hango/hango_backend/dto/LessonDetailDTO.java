@@ -20,4 +20,5 @@ public class LessonDetailDTO {
     private List<CommentDTO> comments;
     private List<QuizQuestionDTO> questions;
     private Boolean isCompleted;
+    private Integer estimatedTime;
 }

@@ -13,17 +13,20 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/string_utils.dart';
 import '../../widgets/lesson_ai_chatbox.dart';
 import 'package:provider/provider.dart';
+import 'course_detail_page.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
   final int lessonId;
   final bool startQuizImmediately;
+  final bool cameFromCourseDetail;
 
   const LessonDetailPage({
     Key? key,
     required this.courseId,
     required this.lessonId,
     this.startQuizImmediately = false,
+    this.cameFromCourseDetail = false,
   }) : super(key: key);
 
   @override
@@ -116,6 +119,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_lesson_id_for_${widget.courseId}', _currentLessonId);
+      _saveLastVisitedSession(_currentLessonId, _isDoingQuiz);
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -176,6 +180,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_lesson_id_for_${widget.courseId}', lessonId);
+      _saveLastVisitedSession(lessonId, startQuiz);
       if (startQuiz) {
         toggleFullscreen(true);
       } else {
@@ -208,11 +213,26 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     _loadCurrentUserId();
     _loadData();
+    _saveLastVisitedSession(widget.lessonId, widget.startQuizImmediately);
     if (widget.startQuizImmediately) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         toggleFullscreen(true);
       });
     }
+  }
+
+  Future<void> _saveLastVisitedSession(int lessonId, bool isDoingQuiz) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_visited_course_id', widget.courseId);
+    await prefs.setInt('last_visited_lesson_id', lessonId);
+    await prefs.setBool('last_visited_quiz_immediately', isDoingQuiz);
+  }
+
+  void _clearLastVisitedSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_visited_course_id');
+    await prefs.remove('last_visited_lesson_id');
+    await prefs.remove('last_visited_quiz_immediately');
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -237,6 +257,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   void dispose() {
     _commentController.dispose();
     _editCommentController.dispose();
+    _clearLastVisitedSession();
     super.dispose();
   }
 
@@ -523,11 +544,13 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: 'Courses',
-        hideNavLinks: showHideNavLinks,
-      ),
+      appBar: _isDoingQuiz
+          ? null
+          : SharedHeader(
+              isDesktop: isDesktop,
+              activeTab: 'Courses',
+              hideNavLinks: showHideNavLinks,
+            ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
@@ -630,7 +653,21 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 child: Row(
                   children: [
                     InkWell(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () async {
+                        _clearLastVisitedSession();
+                        if (widget.cameFromCourseDetail) {
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CourseDetailPage(
+                                courseId: widget.courseId,
+                              ),
+                            ),
+                          );
+                        }
+                      },
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -801,6 +838,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           return Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
+              key: ValueKey('session_${session.id}_${session.lessons.any((l) => l.id == _currentLessonId)}'),
               initiallyExpanded: session.lessons.any(
                 (l) => l.id == _currentLessonId,
               ),
@@ -857,6 +895,18 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                               : FontWeight.w500,
                         ),
                       ),
+                      subtitle: l.estimatedTime != null
+                          ? Text(
+                              '${l.estimatedTime} mins',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isCurrent
+                                    ? const Color(0xFF28B79B).withOpacity(0.8)
+                                    : const Color(0xFF94A3B8),
+                                fontFamily: 'Outfit',
+                              ),
+                            )
+                          : null,
                       trailing: l.isCompleted
                           ? const Icon(
                               Icons.check_circle_rounded,

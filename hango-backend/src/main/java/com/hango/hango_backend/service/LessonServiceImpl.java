@@ -100,6 +100,10 @@ public class LessonServiceImpl implements LessonService {
             isCompleted = lessonProgressRepository.existsByUserIdAndLessonIdAndIsCompletedTrue(userId, lessonId);
         }
 
+        int qCount = questions != null ? questions.size() : 0;
+        int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime() 
+                      : ("quiz".equalsIgnoreCase(lesson.getLessonType()) ? (10 + qCount * 2) : 15);
+
         return LessonDetailDTO.builder()
                 .id(lesson.getId())
                 .title(lesson.getTitle())
@@ -110,6 +114,7 @@ public class LessonServiceImpl implements LessonService {
                 .comments(comments)
                 .questions(questions)
                 .isCompleted(isCompleted)
+                .estimatedTime(estTime)
                 .build();
     }
 

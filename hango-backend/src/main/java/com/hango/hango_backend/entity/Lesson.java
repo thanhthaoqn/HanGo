@@ -49,6 +49,9 @@ public class Lesson {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "estimated_time")
+    private Integer estimatedTime;
+
     @Column(name = "pdf_name")
     private String pdfName;
 
