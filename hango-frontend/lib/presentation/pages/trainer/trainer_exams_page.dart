@@ -12,6 +12,7 @@ import 'trainer_edit_exam_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../../../utils/toast_helper.dart';
 import 'matrix_management_page.dart';
+import 'trainer_profile_page.dart';
 
 class TrainerExamsPage extends StatefulWidget {
   const TrainerExamsPage({super.key});
@@ -1105,25 +1106,20 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             );
           }),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: true),
-          _buildSidebarItem(Icons.grid_on, 'Matrix', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MatrixManagementPage(onBack: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
-                  );
-                }),
-              ),
-            );
-          }),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
           _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
                 builder: (context) => const TrainerQuestionBankPage(),
+              ),
+            );
+          }),
+          _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerProfilePage(),
               ),
             );
           }),

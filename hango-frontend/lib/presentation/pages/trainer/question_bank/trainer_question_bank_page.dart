@@ -13,7 +13,6 @@ import '../../learner/learner_home_page.dart';
 import '../../../../utils/language_manager.dart';
 import '../trainer_profile_page.dart';
 import 'models/trainer_question.dart';
-import 'widgets/question_filter_pane.dart';
 import 'widgets/question_search_bar.dart';
 import 'widgets/question_table.dart';
 
@@ -35,8 +34,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _errorMessage = '';
 
   // Filter States
-  String _selectedType = 'ALL';
-  String _selectedGroupType = 'Choose Group Type';
+  String _selectedType = 'PUBLIC';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
   int _currentPage = 1;
@@ -139,14 +137,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     _fetchQuestions();
   }
 
-  void _handleGroupTypeChanged(String groupType) {
-    setState(() {
-      _selectedGroupType = groupType;
-      _currentPage = 1;
-    });
-    _fetchQuestions();
-  }
-
   void _handleSortChanged(String sort) {
     setState(() {
       _sortBy = sort;
@@ -195,15 +185,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Left pane: SELECT TYPE dropdown
-                        QuestionFilterPane(
-                          selectedType: _selectedType,
-                          onTypeChanged: _handleTypeChanged,
-                          selectedGroupType: _selectedGroupType,
-                          onGroupTypeChanged: _handleGroupTypeChanged,
-                        ),
-                        const SizedBox(width: 24),
-                        // Right pane: Search bar and Table
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -211,6 +192,8 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                               QuestionSearchBar(
                                 searchController: _searchController,
                                 onSearchChanged: _handleSearch,
+                                selectedType: _selectedType,
+                                onTypeChanged: _handleTypeChanged,
                                 sortBy: _sortBy,
                                 onSortChanged: _handleSortChanged,
                                 onCreatePressed: () {

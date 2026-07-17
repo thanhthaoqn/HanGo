@@ -24,6 +24,7 @@ class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final String activeTab;
   final bool hideNavLinks;
   final bool hideCommerceActions;
+  final bool hideLanguageSwitcher;
 
   const SharedHeader({
     Key? key,
@@ -31,6 +32,7 @@ class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
     this.activeTab = 'Courses',
     this.hideNavLinks = false,
     this.hideCommerceActions = false,
+    this.hideLanguageSwitcher = false,
   }) : super(key: key);
 
   @override
@@ -723,15 +725,19 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 8),
+                if (!widget.hideLanguageSwitcher) ...[
+                  _buildLanguageSwitcher(),
+                  const SizedBox(width: 8),
+                ],
                 if (!widget.hideCommerceActions) ...[
                   _buildCartButton(),
                   const SizedBox(width: 8),
                 ],
               ] else ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 8),
+                if (!widget.hideLanguageSwitcher) ...[
+                  _buildLanguageSwitcher(),
+                  const SizedBox(width: 8),
+                ],
               ],
               // Notification Bell
               PopupMenuButton<void>(
@@ -1074,8 +1080,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
 
-                  PopupMenuItem(
-                    enabled: false,
+                  if (!widget.hideLanguageSwitcher)
+                    PopupMenuItem(
+                      enabled: false,
                     child: StatefulBuilder(
                       builder: (context, setMenuState) {
                         return Padding(
@@ -1191,13 +1198,17 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 8),
+                if (!widget.hideLanguageSwitcher) ...[
+                  _buildLanguageSwitcher(),
+                  const SizedBox(width: 8),
+                ],
                 _buildCartButton(),
                 const SizedBox(width: 12),
               ] else ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 8),
+                if (!widget.hideLanguageSwitcher) ...[
+                  _buildLanguageSwitcher(),
+                  const SizedBox(width: 8),
+                ],
               ],
               TextButton(
                 onPressed: () {

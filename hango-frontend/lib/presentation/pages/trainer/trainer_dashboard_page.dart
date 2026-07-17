@@ -94,7 +94,9 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           _isLoading = false;
         });
       } else {
-        throw Exception('Failed to load dashboard data: ${response.statusCode}');
+        throw Exception(
+          'Failed to load dashboard data: ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
@@ -118,8 +120,8 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           'title': 'Grammar 8+',
           'learnersCount': 4,
           'lessonsCount': 1,
-          'thumbnailUrl': null
-        }
+          'thumbnailUrl': null,
+        },
       ];
     });
   }
@@ -225,42 +227,81 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           ),
           const SizedBox(height: 40),
           // Sidebar menu items
-          _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerCoursesPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
-            );
-          }),
+          _buildSidebarItem(
+            Icons.dashboard_outlined,
+            'Dashboard',
+            isActive: true,
+          ),
+          _buildSidebarItem(
+            Icons.book_outlined,
+            'Courses',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerCoursesPage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.assignment_outlined,
+            'Exam',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerExamsPage(),
+                ),
+              );
+            },
+          ),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
-            );
-          }),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            'Question Bank',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerQuestionBankPage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.person_outline,
+            'My Profile',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerProfilePage(),
+                ),
+              );
+            },
+          ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
+          _buildSidebarItem(
+            Icons.logout,
+            'Logout',
+            color: Colors.redAccent,
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -277,14 +318,18 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
+                color: isActive
+                    ? Colors.white
+                    : (color ?? const Color(0xFF4B5563)),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
+                  color: isActive
+                      ? Colors.white
+                      : (color ?? const Color(0xFF1F2937)),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',
@@ -362,7 +407,9 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             onTap: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+                MaterialPageRoute(
+                  builder: (context) => const TrainerProfilePage(),
+                ),
               );
             },
             borderRadius: BorderRadius.circular(20),
@@ -395,15 +442,16 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                               width: 32,
                               height: 32,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Text(
-                                _trainerInitials,
-                                style: const TextStyle(
-                                  color: Color(0xFF20B486),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Text(
+                                    _trainerInitials,
+                                    style: const TextStyle(
+                                      color: Color(0xFF20B486),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
                             ),
                           )
                         : Text(
@@ -454,9 +502,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   Widget _buildOverviewTabs() {
     return Container(
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
       ),
       child: Row(
         children: [
@@ -585,7 +631,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             color: const Color.fromRGBO(0, 0, 0, 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Row(
@@ -594,7 +640,8 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center, // Center contents vertically
+              mainAxisAlignment:
+                  MainAxisAlignment.center, // Center contents vertically
               children: [
                 Text(
                   title,
@@ -643,14 +690,10 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                   color: const Color.fromRGBO(0, 0, 0, 0.04),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
-                )
+                ),
               ],
             ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 20,
-            ),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
         ],
       ),
@@ -776,8 +819,11 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                     child: Image.network(
                       thumbnail,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.school, color: Color(0xFF20B486), size: 24),
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.school,
+                        color: Color(0xFF20B486),
+                        size: 24,
+                      ),
                     ),
                   )
                 : const Icon(Icons.school, color: Color(0xFF20B486), size: 24),
@@ -800,7 +846,11 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.person_outline, size: 14, color: Color(0xFF94A3B8)),
+                    const Icon(
+                      Icons.person_outline,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '$learners Learners',
@@ -820,7 +870,11 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Icon(Icons.class_outlined, size: 14, color: Color(0xFF94A3B8)),
+                    const Icon(
+                      Icons.class_outlined,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '$lessons lesson',
@@ -867,7 +921,11 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.chevron_left, size: 16, color: Color(0xFF94A3B8)),
+            child: const Icon(
+              Icons.chevron_left,
+              size: 16,
+              color: Color(0xFF94A3B8),
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -897,7 +955,11 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
+            child: const Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: Color(0xFF94A3B8),
+            ),
           ),
         ),
       ],

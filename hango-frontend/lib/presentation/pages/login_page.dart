@@ -130,9 +130,16 @@ class _LoginPageState extends State<LoginPage> {
 
     // Determine role flags
     final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
-    final isTrainerLead = roles.any((r) => r.toUpperCase().contains('TRAINER_LEAD'));
-    final isCourseManager = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
-    final isTrainer = roles.any((r) => r.toUpperCase().contains('TRAINER')) && !isTrainerLead && !isCourseManager;
+    final isTrainerLead = roles.any(
+      (r) => r.toUpperCase().contains('TRAINER_LEAD'),
+    );
+    final isCourseManager = roles.any(
+      (r) => r.toUpperCase().contains('COURSE_MANAGER'),
+    );
+    final isTrainer =
+        roles.any((r) => r.toUpperCase().contains('TRAINER')) &&
+        !isTrainerLead &&
+        !isCourseManager;
 
     if (isAdmin) {
       if (mounted) {
@@ -146,7 +153,8 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => const CourseManagerDashboardPage()),
+            builder: (context) => const CourseManagerDashboardPage(),
+          ),
         );
       }
     } else if (isTrainer) {
