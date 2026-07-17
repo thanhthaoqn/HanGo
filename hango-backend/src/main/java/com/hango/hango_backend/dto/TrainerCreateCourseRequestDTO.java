@@ -10,6 +10,7 @@ import java.util.List;
 @AllArgsConstructor
 public class TrainerCreateCourseRequestDTO {
     private String title;
+    private String code;
     private String description;
     private String categoryKey;
     private String difficultyKey;
@@ -17,5 +18,6 @@ public class TrainerCreateCourseRequestDTO {
     private BigDecimal price;
     private String version;
     private String objectives;
+    private Integer estimatedDuration;
     private List<CourseSessionDTO> sessions;
 }

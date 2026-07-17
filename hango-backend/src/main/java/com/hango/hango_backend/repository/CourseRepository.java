@@ -63,4 +63,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                                                      @Param("search") String search);
 
     long countByStatus(String status);
+
+    List<Course> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String status);
+
+    long countByStatusAndDeletedAtIsNull(String status);
+
+    boolean existsByCodeIgnoreCase(String code);
 }

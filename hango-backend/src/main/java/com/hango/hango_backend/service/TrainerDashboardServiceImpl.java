@@ -176,11 +176,16 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         com.hango.hango_backend.entity.Course course = com.hango.hango_backend.entity.Course.builder()
                 .title(request.getTitle())
+                .code(request.getCode())
                 .description(request.getDescription())
+                .objectives(request.getObjectives())
                 .creator(user)
                 .category(category)
                 .difficulty(difficulty)
                 .thumbnailUrl(request.getThumbnailUrl())
+                .price(request.getPrice())
+                .version(request.getVersion())
+                .estimatedDuration(request.getEstimatedDuration())
                 .status("DRAFT")
                 .build();
 
@@ -225,9 +230,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
 
         course.setTitle(request.getTitle());
+        course.setCode(request.getCode());
         course.setDescription(request.getDescription());
+        course.setObjectives(request.getObjectives());
         course.setCategory(category);
         course.setDifficulty(difficulty);
+        course.setPrice(request.getPrice());
+        course.setVersion(request.getVersion());
+        course.setEstimatedDuration(request.getEstimatedDuration());
         if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isEmpty()) {
             course.setThumbnailUrl(request.getThumbnailUrl());
         }

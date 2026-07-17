@@ -46,7 +46,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
     {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
     {'paramKey': 'VOCABULARY', 'paramValue': 'Vocabulary'},
     {'paramKey': 'LISTENING', 'paramValue': 'Listening'},
-    {'paramKey': 'READING_COMPREHENSION', 'paramValue': 'Reading Comprehension'},
+    {
+      'paramKey': 'READING_COMPREHENSION',
+      'paramValue': 'Reading Comprehension',
+    },
     {'paramKey': 'WRITING', 'paramValue': 'Writing'},
     {'paramKey': 'PRONUNCIATION', 'paramValue': 'Pronunciation'},
   ];
@@ -57,7 +60,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
   ];
   String _selectedCategoryKey = 'GRAMMAR';
   String _selectedLevelKey = 'BASIC';
-  final TextEditingController _versionController = TextEditingController(text: 'v1.0');
+  final TextEditingController _versionController = TextEditingController(
+    text: 'v1.0',
+  );
 
   // Image Upload state variables
   String? _uploadedImageUrl;
@@ -115,34 +120,57 @@ class _EditCoursePageState extends State<EditCoursePage> {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      final catUri = Uri.parse('$apiBaseUrl/trainer/system-parameters?type=course_category');
-      final catResponse = await http.get(catUri, headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      });
+      final catUri = Uri.parse(
+        '$apiBaseUrl/trainer/system-parameters?type=course_category',
+      );
+      final catResponse = await http.get(
+        catUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
 
-      final levelUri = Uri.parse('$apiBaseUrl/trainer/system-parameters?type=academic_level');
-      final levelResponse = await http.get(levelUri, headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      });
+      final levelUri = Uri.parse(
+        '$apiBaseUrl/trainer/system-parameters?type=academic_level',
+      );
+      final levelResponse = await http.get(
+        levelUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
 
       if (catResponse.statusCode == 200 && levelResponse.statusCode == 200) {
-        final List<dynamic> catData = jsonDecode(utf8.decode(catResponse.bodyBytes));
-        final List<dynamic> levelData = jsonDecode(utf8.decode(levelResponse.bodyBytes));
+        final List<dynamic> catData = jsonDecode(
+          utf8.decode(catResponse.bodyBytes),
+        );
+        final List<dynamic> levelData = jsonDecode(
+          utf8.decode(levelResponse.bodyBytes),
+        );
 
         setState(() {
-          _dbCategories = catData.map((e) => Map<String, dynamic>.from(e)).toList();
-          _dbLevels = levelData.map((e) => Map<String, dynamic>.from(e)).toList();
+          _dbCategories = catData
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          _dbLevels = levelData
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
 
           if (_dbCategories.isNotEmpty) {
-            final hasSelectedCat = _dbCategories.any((e) => e['paramKey'] == _selectedCategoryKey);
+            final hasSelectedCat = _dbCategories.any(
+              (e) => e['paramKey'] == _selectedCategoryKey,
+            );
             if (!hasSelectedCat) {
-              _selectedCategoryKey = _dbCategories.first['paramKey'] ?? 'GRAMMAR';
+              _selectedCategoryKey =
+                  _dbCategories.first['paramKey'] ?? 'GRAMMAR';
             }
           }
           if (_dbLevels.isNotEmpty) {
-            final hasSelectedLevel = _dbLevels.any((e) => e['paramKey'] == _selectedLevelKey);
+            final hasSelectedLevel = _dbLevels.any(
+              (e) => e['paramKey'] == _selectedLevelKey,
+            );
             if (!hasSelectedLevel) {
               _selectedLevelKey = _dbLevels.first['paramKey'] ?? 'BASIC';
             }
@@ -185,10 +213,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _priceController.text = data['price']?.toString() ?? '0';
           _objectivesController.text = data['objectives'] ?? '';
 
-          if (data['categoryKey'] != null && data['categoryKey'].toString().isNotEmpty) {
+          if (data['categoryKey'] != null &&
+              data['categoryKey'].toString().isNotEmpty) {
             _selectedCategoryKey = data['categoryKey'].toString().toUpperCase();
           }
-          if (data['difficultyKey'] != null && data['difficultyKey'].toString().isNotEmpty) {
+          if (data['difficultyKey'] != null &&
+              data['difficultyKey'].toString().isNotEmpty) {
             _selectedLevelKey = data['difficultyKey'].toString().toUpperCase();
           }
 
@@ -201,18 +231,19 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _isLoadingCourse = false;
         });
       } else {
-        throw Exception('Failed to load course details: ${response.statusCode}');
+        throw Exception(
+          'Failed to load course details: ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error loading course details: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingCourse = false;
       });
-        ToastHelper.showError(context, 'Error loading course details: $e');
+      ToastHelper.showError(context, 'Error loading course details: $e');
     }
   }
-
-
 
   Future<void> _pickAndUploadImage() async {
     try {
@@ -224,14 +255,18 @@ class _EditCoursePageState extends State<EditCoursePage> {
         _uploadStatusText = 'Uploading...';
       });
 
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      );
       final request = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          picked.bytes,
-          filename: picked.name,
-        ));
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            picked.bytes,
+            filename: picked.name,
+          ),
+        );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
@@ -243,7 +278,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _isUploadingImage = false;
         });
       } else {
-        throw Exception('Cloudinary upload failed with status: ${response.statusCode}');
+        throw Exception(
+          'Cloudinary upload failed with status: ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -278,7 +315,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'description': _descriptionController.text.trim(),
         'version': _versionController.text.trim(),
         'code': _codeController.text.trim(),
-        'price': double.tryParse(_priceController.text.trim().isEmpty ? '0' : _priceController.text.trim()) ?? 0,
+        'price':
+            double.tryParse(
+              _priceController.text.trim().isEmpty
+                  ? '0'
+                  : _priceController.text.trim(),
+            ) ??
+            0,
         'objectives': _objectivesController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
@@ -323,7 +366,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      final uri = Uri.parse('$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}');
+      final uri = Uri.parse(
+        '$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}',
+      );
       final response = await http.get(
         uri,
         headers: {
@@ -365,7 +410,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'description': _descriptionController.text.trim(),
         'version': _versionController.text.trim(),
         'code': _codeController.text.trim(),
-        'price': double.tryParse(_priceController.text.trim().isEmpty ? '0' : _priceController.text.trim()) ?? 0,
+        'price':
+            double.tryParse(
+              _priceController.text.trim().isEmpty
+                  ? '0'
+                  : _priceController.text.trim(),
+            ) ??
+            0,
         'objectives': _objectivesController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
@@ -411,69 +462,34 @@ class _EditCoursePageState extends State<EditCoursePage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildHeader(context, false),
-                Expanded(
-                  child: _isLoadingCourse
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF20B486),
-                          ),
-                        )
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
+          Expanded(
+            child: _isLoadingCourse
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF20B486)),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTitleSection(),
+                          const SizedBox(height: 24),
+                          if (isDesktop)
+                            Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildTitleSection(),
-                                const SizedBox(height: 24),
-                                if (isDesktop)
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                SizedBox(
+                                  width: 280,
+                                  child: _buildLeftPanel(context),
+                                ),
+                                const SizedBox(width: 24),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
-                                      SizedBox(width: 280, child: _buildLeftPanel(context)),
-                                      const SizedBox(width: 24),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                                          children: [
-                                            if (_activeStep == 1) ...[
-                                              _buildGeneralInfoCard(),
-                                              const SizedBox(height: 24),
-                                              _buildMediaCard(),
-                                            ] else ...[
-                                              CreateSectionPage(
-                                                courseId: widget.courseId,
-                                                courseTitle: _titleController.text,
-                                                trainerName: _trainerName,
-                                                trainerInitials: _trainerInitials,
-                                                sections: _sections,
-                                                onSectionsChanged: (updatedSections) async {
-                                                  setState(() {
-                                                    _sections = updatedSections;
-                                                  });
-                                                  await _autoSaveCourse();
-                                                },
-                                                onStepChanged: (step) {
-                                                  setState(() {
-                                                    _activeStep = step;
-                                                  });
-                                                },
-                                              ),
-                                            ],
-                                            const SizedBox(height: 24),
-                                            _buildActionsRow(),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                else
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      _buildLeftPanel(context),
-                                      const SizedBox(height: 24),
                                       if (_activeStep == 1) ...[
                                         _buildGeneralInfoCard(),
                                         const SizedBox(height: 24),
@@ -485,12 +501,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                           trainerName: _trainerName,
                                           trainerInitials: _trainerInitials,
                                           sections: _sections,
-                                          onSectionsChanged: (updatedSections) async {
-                                             setState(() {
-                                               _sections = updatedSections;
-                                             });
-                                             await _autoSaveCourse();
-                                           },
+                                          onSectionsChanged:
+                                              (updatedSections) async {
+                                                setState(() {
+                                                  _sections = updatedSections;
+                                                });
+                                                await _autoSaveCourse();
+                                              },
                                           onStepChanged: (step) {
                                             setState(() {
                                               _activeStep = step;
@@ -502,17 +519,52 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                       _buildActionsRow(),
                                     ],
                                   ),
+                                ),
+                              ],
+                            )
+                          else
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildLeftPanel(context),
+                                const SizedBox(height: 24),
+                                if (_activeStep == 1) ...[
+                                  _buildGeneralInfoCard(),
+                                  const SizedBox(height: 24),
+                                  _buildMediaCard(),
+                                ] else ...[
+                                  CreateSectionPage(
+                                    courseId: widget.courseId,
+                                    courseTitle: _titleController.text,
+                                    trainerName: _trainerName,
+                                    trainerInitials: _trainerInitials,
+                                    sections: _sections,
+                                    onSectionsChanged: (updatedSections) async {
+                                      setState(() {
+                                        _sections = updatedSections;
+                                      });
+                                      await _autoSaveCourse();
+                                    },
+                                    onStepChanged: (step) {
+                                      setState(() {
+                                        _activeStep = step;
+                                      });
+                                    },
+                                  ),
+                                ],
+                                const SizedBox(height: 24),
+                                _buildActionsRow(),
                               ],
                             ),
-                          ),
-                        ),
-                ),
-              ],
-            ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
-
-
 
   Widget _buildHeader(BuildContext context, bool showMenuButton) {
     return Container(
@@ -556,7 +608,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ),
               const SizedBox(width: 4),
               Text(
-                _titleController.text.isNotEmpty ? _titleController.text : 'Course Details',
+                _titleController.text.isNotEmpty
+                    ? _titleController.text
+                    : 'Course Details',
                 style: const TextStyle(
                   color: Color(0xFF475569),
                   fontWeight: FontWeight.w500,
@@ -672,7 +726,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   color: Color(0xFF20B486),
                   shape: BoxShape.circle,
                 ),
-              )
+              ),
             ],
           ),
         ],
@@ -730,7 +784,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ),
             ),
           ],
-        )
+        ),
       ],
     );
   }
@@ -783,13 +837,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
                             left: 0,
                             top: 0,
                             bottom: 0,
-                            child: Container(
-                              width: 4,
-                              color: activeColor,
-                            ),
+                            child: Container(width: 4, color: activeColor),
                           ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                           child: Row(
                             children: [
                               Container(
@@ -799,7 +853,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                   color: Color(0xFF20B486),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.check, size: 14, color: Colors.white),
+                                child: const Icon(
+                                  Icons.check,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Column(
@@ -857,13 +915,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
                             left: 0,
                             top: 0,
                             bottom: 0,
-                            child: Container(
-                              width: 4,
-                              color: activeColor,
-                            ),
+                            child: Container(width: 4, color: activeColor),
                           ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                           child: Row(
                             children: [
                               Container(
@@ -872,7 +930,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                    color: _activeStep == 2 ? activeColor : const Color(0xFF94A3B8),
+                                    color: _activeStep == 2
+                                        ? activeColor
+                                        : const Color(0xFF94A3B8),
                                     width: 1.5,
                                   ),
                                   shape: BoxShape.circle,
@@ -882,7 +942,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: _activeStep == 2 ? activeColor : const Color(0xFF94A3B8),
+                                    color: _activeStep == 2
+                                        ? activeColor
+                                        : const Color(0xFF94A3B8),
                                     fontFamily: 'Outfit',
                                   ),
                                 ),
@@ -895,8 +957,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                     'Syllabus',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: _activeStep == 2 ? FontWeight.bold : FontWeight.w500,
-                                      color: _activeStep == 2 ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+                                      fontWeight: _activeStep == 2
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                      color: _activeStep == 2
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFF94A3B8),
                                       fontFamily: 'Outfit',
                                     ),
                                   ),
@@ -955,7 +1021,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: _publishCourse,
+                onPressed: _submitCourseForReview,
                 icon: const Icon(Icons.play_arrow, size: 16),
                 label: const Text(
                   'Submit for Review',
@@ -984,15 +1050,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   color: Color(0xFF94A3B8),
                   fontFamily: 'Outfit',
                 ),
-              )
+              ),
             ],
           ),
         ),
       ],
     );
   }
-
-
 
   Widget _buildGeneralInfoCard() {
     return Container(
@@ -1055,8 +1119,15 @@ class _EditCoursePageState extends State<EditCoursePage> {
             controller: _titleController,
             decoration: InputDecoration(
               hintText: 'Enter title of course....',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -1215,21 +1286,34 @@ class _EditCoursePageState extends State<EditCoursePage> {
                     DropdownButtonFormField<String>(
                       value: _selectedCategoryKey,
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF20B486)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF20B486),
+                          ),
                         ),
                       ),
-                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
                       items: _dbCategories.map((dynamic item) {
                         return DropdownMenuItem<String>(
                           value: item['paramKey'] as String,
@@ -1265,21 +1349,34 @@ class _EditCoursePageState extends State<EditCoursePage> {
                     DropdownButtonFormField<String>(
                       value: _selectedLevelKey,
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF20B486)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF20B486),
+                          ),
                         ),
                       ),
-                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
                       items: _dbLevels.map((dynamic item) {
                         return DropdownMenuItem<String>(
                           value: item['paramKey'] as String,
@@ -1315,17 +1412,36 @@ class _EditCoursePageState extends State<EditCoursePage> {
             controller: _versionController,
             decoration: InputDecoration(
               hintText: 'Enter version...',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               suffixIcon: PopupMenuButton<String>(
-                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                icon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: Color(0xFF64748B),
+                ),
                 onSelected: (value) {
                   _versionController.text = value;
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'v1.0', child: Text('v1.0', style: TextStyle(fontFamily: 'Outfit'))),
-                  const PopupMenuItem(value: 'v2.0', child: Text('v2.0', style: TextStyle(fontFamily: 'Outfit'))),
-                  const PopupMenuItem(value: 'v3.0', child: Text('v3.0', style: TextStyle(fontFamily: 'Outfit'))),
+                  const PopupMenuItem(
+                    value: 'v1.0',
+                    child: Text('v1.0', style: TextStyle(fontFamily: 'Outfit')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'v2.0',
+                    child: Text('v2.0', style: TextStyle(fontFamily: 'Outfit')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'v3.0',
+                    child: Text('v3.0', style: TextStyle(fontFamily: 'Outfit')),
+                  ),
                 ],
               ),
               border: OutlineInputBorder(
@@ -1341,7 +1457,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 borderSide: const BorderSide(color: Color(0xFF20B486)),
               ),
             ),
-            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+            ),
           ),
           const SizedBox(height: 20),
           // Course Description
@@ -1360,8 +1480,15 @@ class _EditCoursePageState extends State<EditCoursePage> {
             maxLines: 6,
             decoration: InputDecoration(
               hintText: 'Enter course description......',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -1449,7 +1576,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
         children: [
           Row(
             children: const [
-              Icon(Icons.photo_library_outlined, color: Color(0xFF20B486), size: 20),
+              Icon(
+                Icons.photo_library_outlined,
+                color: Color(0xFF20B486),
+                size: 20,
+              ),
               SizedBox(width: 8),
               Text(
                 'Course Media',
@@ -1548,7 +1679,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                   height: 24,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF20B486),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -1670,7 +1803,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     );
   }
 
-  Future<void> _publishCourse() async {
+  Future<void> _submitCourseForReview() async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1683,7 +1816,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
       final token = await _authService.getToken();
       if (token == null) throw Exception('No token found');
 
-      final uri = Uri.parse('$apiBaseUrl/trainer/courses/${widget.courseId}/publish');
+      final uri = Uri.parse(
+        '$apiBaseUrl/trainer/courses/${widget.courseId}/submit',
+      );
       final response = await http.post(
         uri,
         headers: {
@@ -1695,15 +1830,17 @@ class _EditCoursePageState extends State<EditCoursePage> {
       if (mounted) {
         Navigator.pop(context); // Close loading
       }
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
-        if (mounted) {
-          ToastHelper.showSuccess(context, 'Course published successfully!');
-        }
+        ToastHelper.showSuccess(
+          context,
+          'Course submitted for review successfully!',
+        );
       } else {
         final data = jsonDecode(response.body);
         final errorMsg = data['error'] ?? response.body;
-        
+
         if (errorMsg.contains('phê duyệt') || errorMsg.contains('hoàn thiện')) {
           _showPublishWarningPopup();
         } else {
@@ -1727,7 +1864,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
           children: const [
             Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
             SizedBox(width: 12),
-            Text('Yêu cầu phê duyệt', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+            Text(
+              'Yêu cầu phê duyệt',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
           ],
         ),
         content: const Text(
@@ -1740,9 +1883,17 @@ class _EditCoursePageState extends State<EditCoursePage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF20B486),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Đã hiểu', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+            child: const Text(
+              'Đã hiểu',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
           ),
         ],
       ),
@@ -1777,25 +1928,41 @@ class DashedBorderPainter extends CustomPainter {
 
     double x = 0;
     while (x < w) {
-      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth > w ? w : x + dashWidth, 0), paint);
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + dashWidth > w ? w : x + dashWidth, 0),
+        paint,
+      );
       x += dashWidth + dashSpace;
     }
 
     x = 0;
     while (x < w) {
-      canvas.drawLine(Offset(x, h), Offset(x + dashWidth > w ? w : x + dashWidth, h), paint);
+      canvas.drawLine(
+        Offset(x, h),
+        Offset(x + dashWidth > w ? w : x + dashWidth, h),
+        paint,
+      );
       x += dashWidth + dashSpace;
     }
 
     double y = 0;
     while (y < h) {
-      canvas.drawLine(Offset(0, y), Offset(0, y + dashWidth > h ? h : y + dashWidth), paint);
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(0, y + dashWidth > h ? h : y + dashWidth),
+        paint,
+      );
       y += dashWidth + dashSpace;
     }
 
     y = 0;
     while (y < h) {
-      canvas.drawLine(Offset(w, y), Offset(w, y + dashWidth > h ? h : y + dashWidth), paint);
+      canvas.drawLine(
+        Offset(w, y),
+        Offset(w, y + dashWidth > h ? h : y + dashWidth),
+        paint,
+      );
       y += dashWidth + dashSpace;
     }
   }
