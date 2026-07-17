@@ -6,7 +6,7 @@ import '../../../data/models/course_manager_dashboard_summary.dart';
 import 'course_manager_courses_page.dart';
 import 'course_manager_exams_page.dart';
 import 'course_manager_question_bank_page.dart';
-import '../trainer/matrix_management_page.dart';
+import 'course_manager_matrix_management_page.dart';
 
 class CourseManagerDashboardPage extends StatefulWidget {
   const CourseManagerDashboardPage({super.key});
@@ -104,18 +104,7 @@ class _CourseManagerDashboardPageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSidebarItem(Icons.dashboard, 'Dashboard', isActive: true),
-          _buildSidebarItem(
-            Icons.book_outlined,
-            'Courses',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CourseManagerCoursesPage(),
-                ),
-              );
-            },
-          ),
+          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {}),
           _buildSidebarItem(
             Icons.assignment_outlined,
             'Exam',
@@ -135,7 +124,7 @@ class _CourseManagerDashboardPageState
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => MatrixManagementPage(
+                  builder: (context) => CourseManagerMatrixManagementPage(
                     onBack: () {
                       Navigator.pushReplacement(
                         context,
