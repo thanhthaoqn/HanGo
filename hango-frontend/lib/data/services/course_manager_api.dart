@@ -117,8 +117,8 @@ class CourseManagerApi {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
-      final list = data is List ? data : data['courses'] as List? ?? const [];
-      return list
+      final list = data is List ? data : (data['courses'] as List?) ?? const [];
+      return (list as List)
           .map(
             (item) => CourseReviewCourse.fromJson(
               Map<String, dynamic>.from(item as Map),
@@ -165,6 +165,53 @@ class CourseManagerApi {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getExamMatrices() async {
+    final response = await _get('/matrices');
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return decoded.map((item) => item as Map<String, dynamic>).toList();
+    }
+
+    throw Exception(
+      'Failed to get exam matrices: ${response.statusCode} ${response.body}',
+    );
+  }
+
+  Future<void> createExamMatrix(Map<String, dynamic> data) async {
+    final response = await _post('/matrices', body: jsonEncode(data));
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(
+        'Failed to create exam matrix: ${response.statusCode} ${response.body}',
+      );
+    }
+  }
+
+  Future<int> countAvailableQuestions(
+    int skillId,
+    int diffId,
+    int catId,
+  ) async {
+    final response = await _get(
+      '/matrices/count-available',
+      queryParameters: {
+        'skillId': skillId.toString(),
+        'diffId': diffId.toString(),
+        'catId': catId.toString(),
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      return decoded['count'] as int;
+    }
+
+    throw Exception(
+      'Failed to count available questions: ${response.statusCode}',
+    );
+  }
+
   Future<http.Response> _get(
     String path, {
     Map<String, String>? queryParameters,
@@ -184,7 +231,7 @@ class CourseManagerApi {
     );
   }
 
-  Future<http.Response> _post(String path) async {
+  Future<http.Response> _post(String path, {Object? body}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
@@ -194,6 +241,7 @@ class CourseManagerApi {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
+      body: body,
     );
   }
 }

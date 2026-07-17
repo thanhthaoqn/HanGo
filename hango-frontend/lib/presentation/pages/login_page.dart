@@ -86,13 +86,7 @@ class _LoginPageState extends State<LoginPage> {
     if (mounted) {
       if (result['success']) {
         final roles = List<String>.from(result['data']['roles'] ?? []);
-        final isAdmin = roles.any((r) => r.contains('ADMIN'));
-        final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
-        final isTrainer =
-            roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
-        debugPrint(
-          'Sign in success! Navigating. Admin: $isAdmin, Trainer: $isTrainer. Data: ${result['data']}',
-        );
+        debugPrint('Sign in success! Roles: $roles');
 
         // Check if this was a new email registration to set the onboarding flag
         SharedPreferences.getInstance().then((prefs) async {
@@ -134,9 +128,11 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    final isAdmin = roles.any((r) => r.contains('ADMIN'));
-    final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
-    final isTrainer = roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
+    // Determine role flags
+    final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
+    final isTrainerLead = roles.any((r) => r.toUpperCase().contains('TRAINER_LEAD'));
+    final isCourseManager = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
+    final isTrainer = roles.any((r) => r.toUpperCase().contains('TRAINER')) && !isTrainerLead && !isCourseManager;
 
     if (isAdmin) {
       if (mounted) {
@@ -145,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
           MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
         );
       }
-    } else if (isTrainerLead) {
+    } else if (isCourseManager || isTrainerLead) {
       if (mounted) {
         Navigator.pushReplacement(
           context,
