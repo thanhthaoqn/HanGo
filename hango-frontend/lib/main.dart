@@ -71,6 +71,8 @@ class MyApp extends StatelessWidget {
               final role = appState.session?.role;
               if (role == 'ADMIN') {
                 return const AdminDashboardPage();
+              } else if (role == 'COURSE_MANAGER') {
+                return const CourseManagerDashboardPage();
               } else if (role == 'TRAINER_LEAD') {
                 return const CourseManagerDashboardPage();
               } else if (role == 'TRAINER') {

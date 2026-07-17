@@ -19,7 +19,7 @@ public class CourseManagerDashboardController {
     private final CourseManagerDashboardService courseManagerDashboardService;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasRole('TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> getDashboardSummary() {
         try {
             CourseManagerDashboardSummaryDTO summary = courseManagerDashboardService.getDashboardSummary();
