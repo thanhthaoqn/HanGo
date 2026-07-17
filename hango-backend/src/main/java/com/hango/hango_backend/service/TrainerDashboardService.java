@@ -11,6 +11,7 @@ public interface TrainerDashboardService {
     void createTrainerCourse(String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request);
     List<SystemParameter> getSystemParametersByType(String paramType);
     void updateTrainerCourse(Long id, String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request);
+    void submitTrainerCourse(Long id, String email);
     List<com.hango.hango_backend.dto.TrainerExamResponseDTO> getTrainerExams(String email);
     void createTrainerExam(String email, com.hango.hango_backend.dto.TrainerCreateExamRequestDTO request);
 

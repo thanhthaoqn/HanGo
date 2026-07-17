@@ -82,6 +82,12 @@ public class CourseServiceImpl implements CourseService {
             isEnrolled = enrollmentRepository.existsByUserIdAndCourseId(currentUserId, id);
         }
 
+        if (!"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
+            if (currentUserId == null || course.getCreator() == null || !course.getCreator().getId().equals(currentUserId)) {
+                throw new RuntimeException("Course not found");
+            }
+        }
+
         Set<Long> completedLessonIds = new HashSet<>();
         if (currentUserId != null) {
             completedLessonIds.addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
@@ -185,6 +191,8 @@ public class CourseServiceImpl implements CourseService {
                 .learnersCount(learnersCount)
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
+                .price(course.getPrice())
+                .version(course.getVersion())
                 .isEnrolled(isEnrolled)
                 .estimatedDuration(estimatedDuration)
                 .sessions(sessionDTOs)

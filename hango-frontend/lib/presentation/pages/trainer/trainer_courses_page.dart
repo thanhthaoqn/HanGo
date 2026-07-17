@@ -269,24 +269,49 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       if (streamedResponse.statusCode == 200 ||
           streamedResponse.statusCode == 201) {
         final data = jsonDecode(responseBody) as Map<String, dynamic>;
+
         final importedCourses = data['importedCourses'] ?? 0;
         final importedSections = data['importedSections'] ?? 0;
         final importedLessons = data['importedLessons'] ?? 0;
         final warnings = data['warnings'];
+
+        // CourseImportResultDTO: courseIds: List<Long>
+        final dynamic courseIdsRaw = data['courseIds'];
+        final List<int> courseIds = (courseIdsRaw is List)
+            ? courseIdsRaw
+                  .map((e) => e is int ? e : int.tryParse(e.toString()) ?? -1)
+                  .where((id) => id > 0)
+                  .toList()
+            : [];
 
         if (mounted) {
           setState(() {
             _selectedStatus = 'ALL';
           });
           await _fetchCoursesData();
+
           final warningText = warnings is List && warnings.isNotEmpty
               ? ' Warning: ${warnings.first}'
               : '';
+
           if (mounted) {
             ToastHelper.showSuccess(
               context,
               'Imported $importedCourses course, $importedSections sections, $importedLessons lessons.$warningText',
             );
+          }
+
+          if (courseIds.isNotEmpty) {
+            // Navigate to edit page for the first imported course
+            final firstCourseId = courseIds.first;
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditCoursePage(courseId: firstCourseId),
+                ),
+              );
+            }
           }
         }
       } else {
@@ -448,22 +473,30 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             },
           ),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerQuestionBankPage(),
-              ),
-            );
-          }),
-          _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerProfilePage(),
-              ),
-            );
-          }),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            'Question Bank',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerQuestionBankPage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.person_outline,
+            'My Profile',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerProfilePage(),
+                ),
+              );
+            },
+          ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
@@ -591,7 +624,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             onTap: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+                MaterialPageRoute(
+                  builder: (context) => const TrainerProfilePage(),
+                ),
               );
             },
             borderRadius: BorderRadius.circular(20),
@@ -624,15 +659,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                               width: 32,
                               height: 32,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Text(
-                                _trainerInitials,
-                                style: const TextStyle(
-                                  color: Color(0xFF20B486),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Text(
+                                    _trainerInitials,
+                                    style: const TextStyle(
+                                      color: Color(0xFF20B486),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
                             ),
                           )
                         : Text(

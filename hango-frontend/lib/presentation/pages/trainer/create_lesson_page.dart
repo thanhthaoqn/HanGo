@@ -45,8 +45,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
     _localSections = List.from(widget.sections);
     _activeSectionIndex = widget.selectedSectionIndex;
     _expandedIndices.add(widget.selectedSectionIndex);
-    if (_activeSectionIndex != null && _activeSectionIndex! < _localSections.length) {
-      final lessons = _localSections[_activeSectionIndex!]['lessons'] as List<dynamic>? ?? [];
+    if (_activeSectionIndex != null &&
+        _activeSectionIndex! < _localSections.length) {
+      final lessons =
+          _localSections[_activeSectionIndex!]['lessons'] as List<dynamic>? ??
+          [];
       _showTypeSelection = lessons.isEmpty;
     }
   }
@@ -65,7 +68,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      final uri = Uri.parse('$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}');
+      final uri = Uri.parse(
+        '$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}',
+      );
       final response = await http.get(
         uri,
         headers: {
@@ -100,10 +105,16 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             type == 'quiz' ? 'Add Quiz' : 'Add Lesson',
-            style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -111,16 +122,32 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
             children: [
               Text(
                 type == 'quiz' ? 'QUIZ TITLE *' : 'LESSON TITLE *',
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF64748B),
+                ),
               ),
               const SizedBox(height: 6),
               TextField(
                 controller: titleController,
                 decoration: InputDecoration(
-                  hintText: type == 'quiz' ? 'e.g. Grammar Quiz 1' : 'e.g. Nouns and Pronouns',
-                  hintStyle: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF94A3B8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  hintText: type == 'quiz'
+                      ? 'e.g. Grammar Quiz 1'
+                      : 'e.g. Nouns and Pronouns',
+                  hintStyle: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 14,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Color(0xFF20B486)),
@@ -134,33 +161,64 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
                 final text = titleController.text.trim();
                 if (text.isNotEmpty) {
                   setState(() {
-                    final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
+                    final lessons = List.from(
+                      _localSections[sectionIndex]['lessons'] ?? [],
+                    );
                     lessons.add({
                       'id': DateTime.now().millisecondsSinceEpoch,
+                      'lessonCode': '', // from import template (optional)
                       'title': text,
-                      'itemType': type,
-                      'displayOrder': lessons.length + 1,
+                      'lessonType': type,
+                      'displayOrder':
+                          lessons.length + 1, // align with import/display order
+                      'description': '',
+                      // fields below are filled by the corresponding create_*_page flows
+                      'content': '',
+                      'textContentMarkdown': '',
+                      'textContentHtml': '',
+                      'mediaFileUrl': '',
+                      'mediaType': '',
+                      'mediaDurationSeconds': 0,
+                      'mediaSizeBytes': 0,
+                      'learningObjectives': '',
+                      'estimatedTimeMinutes': 0,
+                      'version': 'v1.0',
                     });
                     _localSections[sectionIndex]['lessons'] = lessons;
                     _showTypeSelection = false;
                   });
-                   _notifyParent();
-                   Navigator.pop(context);
+                  _notifyParent();
+                  Navigator.pop(context);
                 }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF20B486),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: const Text('Add', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Add',
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -173,7 +231,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF20B486).withAlpha(51), width: 1.5),
+        border: Border.all(
+          color: const Color(0xFF20B486).withAlpha(51),
+          width: 1.5,
+        ),
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -360,7 +421,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF64748B),
                 side: const BorderSide(color: Color(0xFFCBD5E1)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -399,17 +463,23 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
   void _showEditLessonDialog(int sectionIndex, int lessonIndex) {
     final lesson = _localSections[sectionIndex]['lessons'][lessonIndex];
     final titleController = TextEditingController(text: lesson['title']);
-    String selectedType = lesson['itemType'] ?? 'video';
+    String selectedType = lesson['lessonType'] ?? lesson['itemType'] ?? 'video';
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: const Text(
                 'Edit Lesson',
-                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -417,16 +487,30 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 children: [
                   const Text(
                     'LESSON TITLE *',
-                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: titleController,
                     decoration: InputDecoration(
                       hintText: 'e.g. Nouns and Pronouns',
-                      hintStyle: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF94A3B8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      hintStyle: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                        color: Color(0xFF94A3B8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Color(0xFF20B486)),
@@ -438,23 +522,51 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                   const SizedBox(height: 16),
                   const Text(
                     'LESSON TYPE',
-                    style: TextStyle(fontFamily: 'Outfit', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
                     initialValue: selectedType,
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Color(0xFF20B486)),
                       ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'video', child: Text('Video Lecture', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
-                      DropdownMenuItem(value: 'text', child: Text('Document/Reading', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
-                      DropdownMenuItem(value: 'quiz', child: Text('Quiz/Assessment', style: TextStyle(fontFamily: 'Outfit', fontSize: 14))),
+                      DropdownMenuItem(
+                        value: 'video',
+                        child: Text(
+                          'Video Lecture',
+                          style: TextStyle(fontFamily: 'Outfit', fontSize: 14),
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'text',
+                        child: Text(
+                          'Document/Reading',
+                          style: TextStyle(fontFamily: 'Outfit', fontSize: 14),
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'quiz',
+                        child: Text(
+                          'Quiz/Assessment',
+                          style: TextStyle(fontFamily: 'Outfit', fontSize: 14),
+                        ),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -469,18 +581,27 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     final text = titleController.text.trim();
                     if (text.isNotEmpty) {
                       setState(() {
-                        final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
+                        final lessons = List.from(
+                          _localSections[sectionIndex]['lessons'] ?? [],
+                        );
                         lessons[lessonIndex] = {
                           ...lessons[lessonIndex],
                           'title': text,
-                          'itemType': selectedType,
+                          'lessonType': selectedType,
                         };
                         _localSections[sectionIndex]['lessons'] = lessons;
                       });
@@ -491,9 +612,17 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('Save', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Save',
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             );
@@ -633,7 +762,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF4B5563), size: 24),
+            icon: const Icon(
+              Icons.notifications_none_outlined,
+              color: Color(0xFF4B5563),
+              size: 24,
+            ),
             onPressed: () {},
           ),
           const SizedBox(width: 16),
@@ -724,7 +857,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               ),
             ),
           ],
-        )
+        ),
       ],
     );
   }
@@ -766,7 +899,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                     border: Border.all(color: const Color(0xFFEFF2F5)),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       Container(
@@ -776,7 +912,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                           color: Color(0xFF20B486),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.check, size: 14, color: Colors.white),
+                        child: const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Column(
@@ -821,13 +961,13 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                       left: 0,
                       top: 0,
                       bottom: 0,
-                      child: Container(
-                        width: 4,
-                        color: activeColor,
-                      ),
+                      child: Container(width: 4, color: activeColor),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Row(
                         children: [
                           Container(
@@ -929,7 +1069,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF20B486).withAlpha(102),
-                  disabledBackgroundColor: const Color(0xFF20B486).withAlpha(102),
+                  disabledBackgroundColor: const Color(
+                    0xFF20B486,
+                  ).withAlpha(102),
                   disabledForegroundColor: Colors.white.withAlpha(200),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -947,7 +1089,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                   color: Color(0xFF94A3B8),
                   fontFamily: 'Outfit',
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -959,7 +1101,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
     if (_activeSectionIndex != null) {
       final section = _localSections[_activeSectionIndex!];
       final lessons = section['lessons'] as List<dynamic>? ?? [];
-      debugPrint("BUILD MAIN CONTENT CARD: activeIndex = $_activeSectionIndex, section = $section, lessons length = ${lessons.length}, lessons = $lessons");
+      debugPrint(
+        "BUILD MAIN CONTENT CARD: activeIndex = $_activeSectionIndex, section = $section, lessons length = ${lessons.length}, lessons = $lessons",
+      );
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -995,7 +1139,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
+                      icon: const Icon(
+                        Icons.edit,
+                        color: Color(0xFFF59E0B),
+                        size: 20,
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () {
@@ -1004,7 +1152,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                     ),
                     const SizedBox(width: 16),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Color(0xFFEF4444),
+                        size: 20,
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () {
@@ -1034,7 +1186,8 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 },
                 onEditLessonPressed: (lessonIndex) {
                   final lesson = lessons[lessonIndex];
-                  if (lesson['itemType'] == 'quiz') {
+                  if (lesson['lessonType'] == 'quiz' ||
+                      lesson['itemType'] == 'quiz') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -1148,7 +1301,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE6FFFA),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1182,7 +1338,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
             final isExpanded = _expandedIndices.contains(index);
 
             final sectionCard = Container(
-              margin: EdgeInsets.only(bottom: index == _localSections.length - 1 ? 0 : 12),
+              margin: EdgeInsets.only(
+                bottom: index == _localSections.length - 1 ? 0 : 12,
+              ),
               decoration: BoxDecoration(
                 color: const Color(0xFFEDF5FF),
                 borderRadius: BorderRadius.circular(8),
@@ -1191,7 +1349,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         // Circle Index Badge
@@ -1240,7 +1401,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
+                          icon: const Icon(
+                            Icons.edit,
+                            color: Color(0xFFF59E0B),
+                            size: 20,
+                          ),
                           onPressed: () {
                             setState(() {
                               _activeSectionIndex = index;
@@ -1249,7 +1414,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Color(0xFFEF4444),
+                            size: 20,
+                          ),
                           onPressed: () {
                             setState(() {
                               _localSections.removeAt(index);
@@ -1262,7 +1431,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                         ),
                         IconButton(
                           icon: Icon(
-                            isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            isExpanded
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
                             color: const Color(0xFF64748B),
                             size: 22,
                           ),
@@ -1297,7 +1468,8 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (section['description'] != null && section['description'].toString().isNotEmpty) ...[
+                          if (section['description'] != null &&
+                              section['description'].toString().isNotEmpty) ...[
                             Text(
                               section['description'],
                               style: const TextStyle(
@@ -1329,14 +1501,19 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                               itemCount: lessons.length,
                               itemBuilder: (context, lessonIndex) {
                                 final lesson = lessons[lessonIndex];
-                                final itemType = lesson['itemType'] ?? 'video';
+                                final itemType =
+                                    lesson['lessonType'] ??
+                                    lesson['itemType'] ??
+                                    'video';
                                 IconData lessonIcon = Icons.play_circle_outline;
                                 String typeBadge = 'VIDEO';
-                                
-                                if (itemType == 'quiz' || itemType == 'practice') {
+
+                                if (itemType == 'quiz' ||
+                                    itemType == 'practice') {
                                   lessonIcon = Icons.assignment_outlined;
                                   typeBadge = 'QUIZ';
-                                } else if (itemType == 'document' || itemType == 'text') {
+                                } else if (itemType == 'document' ||
+                                    itemType == 'text') {
                                   lessonIcon = Icons.description_outlined;
                                   typeBadge = 'TEXT';
                                 }
@@ -1346,13 +1523,16 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: IntrinsicHeight(
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
                                         children: [
                                           // Leftmost solid green strip
                                           Container(
@@ -1367,61 +1547,98 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                               height: 36,
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFFE6FFFA),
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                               alignment: Alignment.center,
-                                              child: Icon(lessonIcon, color: const Color(0xFF20B486), size: 18),
+                                              child: Icon(
+                                                lessonIcon,
+                                                color: const Color(0xFF20B486),
+                                                size: 18,
+                                              ),
                                             ),
                                           ),
                                           const SizedBox(width: 16),
                                           // Title, Badge and Description
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 12.0,
+                                                  ),
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
                                                   Row(
                                                     children: [
                                                       Text(
-                                                        lesson['title'] ?? 'Untitled Lesson',
+                                                        lesson['title'] ??
+                                                            'Untitled Lesson',
                                                         style: const TextStyle(
                                                           fontSize: 14,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: Color(0xFF1E293B),
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Color(
+                                                            0xFF1E293B,
+                                                          ),
                                                           fontFamily: 'Outfit',
                                                         ),
                                                       ),
                                                       const SizedBox(width: 8),
                                                       // Badge
                                                       Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 2,
+                                                            ),
                                                         decoration: BoxDecoration(
-                                                          color: const Color(0xFFF1F5F9),
-                                                          borderRadius: BorderRadius.circular(4),
+                                                          color: const Color(
+                                                            0xFFF1F5F9,
+                                                          ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
                                                         ),
                                                         child: Text(
                                                           typeBadge,
-                                                          style: const TextStyle(
-                                                            fontSize: 9,
-                                                            fontWeight: FontWeight.bold,
-                                                            color: Color(0xFF475569),
-                                                            fontFamily: 'Outfit',
-                                                          ),
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 9,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: Color(
+                                                                  0xFF475569,
+                                                                ),
+                                                                fontFamily:
+                                                                    'Outfit',
+                                                              ),
                                                         ),
                                                       ),
                                                     ],
                                                   ),
-                                                  if (lesson['description'] != null && lesson['description'].toString().trim().isNotEmpty) ...[
+                                                  if (lesson['description'] !=
+                                                          null &&
+                                                      lesson['description']
+                                                          .toString()
+                                                          .trim()
+                                                          .isNotEmpty) ...[
                                                     const SizedBox(height: 4),
                                                     Text(
                                                       lesson['description'],
                                                       maxLines: 2,
-                                                      overflow: TextOverflow.ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                       style: const TextStyle(
                                                         fontSize: 12,
-                                                        color: Color(0xFF64748B),
+                                                        color: Color(
+                                                          0xFF64748B,
+                                                        ),
                                                         fontFamily: 'Outfit',
                                                       ),
                                                     ),
@@ -1435,14 +1652,29 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                           Row(
                                             children: [
                                               IconButton(
-                                                icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 18),
+                                                icon: const Icon(
+                                                  Icons.edit,
+                                                  color: Color(0xFFF59E0B),
+                                                  size: 18,
+                                                ),
                                                 tooltip: 'Edit Lesson',
-                                                onPressed: () => _showEditLessonDialog(index, lessonIndex),
+                                                onPressed: () =>
+                                                    _showEditLessonDialog(
+                                                      index,
+                                                      lessonIndex,
+                                                    ),
                                               ),
                                               IconButton(
-                                                icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  color: Color(0xFFEF4444),
+                                                  size: 18,
+                                                ),
                                                 tooltip: 'Delete Lesson',
-                                                onPressed: () => _deleteLesson(index, lessonIndex),
+                                                onPressed: () => _deleteLesson(
+                                                  index,
+                                                  lessonIndex,
+                                                ),
                                               ),
                                               const SizedBox(width: 8),
                                             ],
@@ -1471,7 +1703,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF20B486).withAlpha(77), width: 1.5),
+                      border: Border.all(
+                        color: const Color(0xFF20B486).withAlpha(77),
+                        width: 1.5,
+                      ),
                       boxShadow: const [
                         BoxShadow(
                           color: Color.fromRGBO(32, 180, 134, 0.05),
@@ -1502,23 +1737,28 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                   final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => CreateLessonTextPage(
-                                        courseId: widget.courseId,
-                                        courseTitle: widget.courseTitle,
-                                        trainerName: widget.trainerName,
-                                        trainerInitials: widget.trainerInitials,
-                                        sections: _localSections,
-                                        sectionIndex: index,
-                                        onSectionsChanged: (updatedSections) async {
-                                          setState(() {
-                                            _localSections = updatedSections;
-                                          });
-                                          await _notifyParent();
-                                        },
-                                      ),
+                                      builder: (context) =>
+                                          CreateLessonTextPage(
+                                            courseId: widget.courseId,
+                                            courseTitle: widget.courseTitle,
+                                            trainerName: widget.trainerName,
+                                            trainerInitials:
+                                                widget.trainerInitials,
+                                            sections: _localSections,
+                                            sectionIndex: index,
+                                            onSectionsChanged:
+                                                (updatedSections) async {
+                                                  setState(() {
+                                                    _localSections =
+                                                        updatedSections;
+                                                  });
+                                                  await _notifyParent();
+                                                },
+                                          ),
                                     ),
                                   );
-                                  if (result == 'goToIntroduction' && context.mounted) {
+                                  if (result == 'goToIntroduction' &&
+                                      context.mounted) {
                                     Navigator.pop(context, 'goToIntroduction');
                                   }
                                 },
@@ -1528,7 +1768,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -1537,7 +1779,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                         height: 40,
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFE6FFFA),
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: const Icon(
                                           Icons.description_outlined,
@@ -1546,7 +1790,8 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                       ),
                                       const SizedBox(width: 12),
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: const [
                                           Text(
                                             'Lesson',
@@ -1576,14 +1821,17 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                             const SizedBox(width: 16),
                             Expanded(
                               child: InkWell(
-                                onTap: () => _showAddLessonDialog(index, 'quiz'),
+                                onTap: () =>
+                                    _showAddLessonDialog(index, 'quiz'),
                                 borderRadius: BorderRadius.circular(12),
                                 child: Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -1592,7 +1840,9 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                         height: 40,
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFE6FFFA),
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: const Icon(
                                           Icons.help_outline,
@@ -1601,7 +1851,8 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                       ),
                                       const SizedBox(width: 12),
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: const [
                                           Text(
                                             'Quiz',
@@ -1650,7 +1901,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFF64748B),
                               side: const BorderSide(color: Color(0xFFCBD5E1)),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),

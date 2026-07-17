@@ -19,5 +19,6 @@ public class CourseSummaryDTO {
     private Long learnersCount;
     private String difficultyName;
     private String thumbnailUrl;
+    private BigDecimal price;
     private BigDecimal progressPercentage;
 }

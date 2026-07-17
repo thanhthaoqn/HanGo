@@ -30,8 +30,9 @@ class CreateSectionPage extends StatefulWidget {
 class _CreateSectionPageState extends State<CreateSectionPage> {
   late List<dynamic> _localSections;
   int? _editingIndex;
-  
+
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
   final Set<int> _expandedIndices = {};
 
@@ -63,6 +64,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _codeController.dispose();
     _descController.dispose();
     super.dispose();
   }
@@ -73,6 +75,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
 
   void _addSection() {
     final name = _nameController.text.trim();
+    final code = _codeController.text.trim();
     final desc = _descController.text.trim();
     if (name.isEmpty) {
       ToastHelper.showError(context, 'Please enter a section name');
@@ -83,14 +86,17 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       final newIndex = _localSections.length;
       _localSections.add({
         'id': DateTime.now().millisecondsSinceEpoch,
+        'code': code, // from import template: Section Code (optional)
         'title': name,
         'description': desc,
-        'orderIndex': newIndex + 1,
+        'displayOrder': newIndex + 1, // align with import/display order concept
+        'version': 'v1.0', // align with import template default
         'lessons': [],
       });
       // Expand the newly added section
       _expandedIndices.add(newIndex);
       _nameController.clear();
+      _codeController.clear();
       _descController.clear();
     });
     _notifyParent();
@@ -99,6 +105,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
 
   void _updateSection() {
     final name = _nameController.text.trim();
+    final code = _codeController.text.trim();
     final desc = _descController.text.trim();
     if (name.isEmpty) {
       ToastHelper.showError(context, 'Please enter a section name');
@@ -108,9 +115,11 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     if (_editingIndex != null && _editingIndex! < _localSections.length) {
       setState(() {
         _localSections[_editingIndex!]['title'] = name;
+        _localSections[_editingIndex!]['code'] = code;
         _localSections[_editingIndex!]['description'] = desc;
         _editingIndex = null;
         _nameController.clear();
+        _codeController.clear();
         _descController.clear();
       });
       _notifyParent();
@@ -122,6 +131,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     setState(() {
       _editingIndex = null;
       _nameController.clear();
+      _codeController.clear();
       _descController.clear();
     });
   }
@@ -132,11 +142,12 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       if (_editingIndex == index) {
         _editingIndex = null;
         _nameController.clear();
+        _codeController.clear();
         _descController.clear();
       } else if (_editingIndex != null && _editingIndex! > index) {
         _editingIndex = _editingIndex! - 1;
       }
-      
+
       // Update expanded indices map
       final Set<int> updatedExpanded = {};
       for (final expandedIndex in _expandedIndices) {
@@ -163,7 +174,6 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     });
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -189,7 +199,12 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
               width: 1.5,
             ),
           ),
-          padding: const EdgeInsets.only(left: 24, right: 24, top: 28, bottom: 20),
+          padding: const EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 28,
+            bottom: 20,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -208,9 +223,19 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                 controller: _nameController,
                 decoration: InputDecoration(
                   hintText: 'Section 1: Introduction to English Grammar',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  suffixIcon: const Icon(Icons.subject, color: Color(0xFF94A3B8)),
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontFamily: 'Outfit',
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  suffixIcon: const Icon(
+                    Icons.subject,
+                    color: Color(0xFF94A3B8),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -221,10 +246,68 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF20B486),
+                      width: 1.5,
+                    ),
                   ),
                 ),
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'SECTION CODE (OPTIONAL)',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF64748B),
+                  letterSpacing: 1.2,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _codeController,
+                decoration: InputDecoration(
+                  hintText: 'e.g. SEC-01',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontFamily: 'Outfit',
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  suffixIcon: const Icon(
+                    Icons.code,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF20B486),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -242,9 +325,17 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                 controller: _descController,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Briefly describe what students will learn in this chapter...',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  hintText:
+                      'Briefly describe what students will learn in this chapter...',
+                  hintStyle: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 14,
+                    fontFamily: 'Outfit',
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -255,10 +346,17 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF20B486),
+                      width: 1.5,
+                    ),
                   ),
                 ),
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
               ),
               const SizedBox(height: 20),
               Row(
@@ -270,14 +368,21 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF64748B),
                         side: const BorderSide(color: Color(0xFFCBD5E1)),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       child: const Text(
                         'Cancel',
-                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -286,7 +391,10 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF20B486),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -294,21 +402,36 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                       ),
                       child: const Text(
                         'Update Section',
-                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ] else ...[
                     ElevatedButton.icon(
                       onPressed: _addSection,
-                      icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                      icon: const Icon(
+                        Icons.add,
+                        size: 16,
+                        color: Colors.white,
+                      ),
                       label: const Text(
                         'Add Section',
-                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF20B486),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -328,10 +451,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFF20B486),
-                width: 1.5,
-              ),
+              border: Border.all(color: const Color(0xFF20B486), width: 1.5),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Text(
@@ -376,7 +496,12 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       final paginatedSections = _localSections.sublist(startIndex, endIndex);
 
       innerContent = Container(
-        padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 16),
+        padding: const EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 24,
+          bottom: 16,
+        ),
         child: Column(
           children: [
             ListView.builder(
@@ -388,9 +513,13 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                 final section = paginatedSections[index];
                 final lessons = section['lessons'] as List<dynamic>? ?? [];
                 final isExpanded = _expandedIndices.contains(originalIndex);
+                final displayOrder =
+                    section['displayOrder'] ?? section['orderIndex'];
 
                 return Container(
-                  margin: EdgeInsets.only(bottom: index == paginatedSections.length - 1 ? 0 : 12),
+                  margin: EdgeInsets.only(
+                    bottom: index == paginatedSections.length - 1 ? 0 : 12,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEDF5FF), // premium light blue bg
                     borderRadius: BorderRadius.circular(8),
@@ -399,7 +528,10 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         child: Row(
                           children: [
                             // Circle Index Badge
@@ -428,10 +560,12 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          section['title'] ?? 'Untitled Section',
+                                          section['title'] ??
+                                              'Untitled Section',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 15,
@@ -452,13 +586,21 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.edit_note, color: Color(0xFF64748B), size: 22),
+                                    icon: const Icon(
+                                      Icons.edit_note,
+                                      color: Color(0xFF64748B),
+                                      size: 22,
+                                    ),
                                     tooltip: 'Edit Section Info',
                                     onPressed: () {
                                       setState(() {
                                         _editingIndex = originalIndex;
-                                        _nameController.text = section['title'] ?? '';
-                                        _descController.text = section['description'] ?? '';
+                                        _nameController.text =
+                                            section['title'] ?? '';
+                                        _codeController.text =
+                                            section['code'] ?? '';
+                                        _descController.text =
+                                            section['description'] ?? '';
                                       });
                                     },
                                   ),
@@ -468,7 +610,11 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                             const SizedBox(width: 8),
                             // Action buttons
                             IconButton(
-                              icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
+                              icon: const Icon(
+                                Icons.edit,
+                                color: Color(0xFFF59E0B),
+                                size: 20,
+                              ),
                               tooltip: 'Edit Section',
                               onPressed: () async {
                                 final result = await Navigator.push(
@@ -481,28 +627,36 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                       trainerInitials: widget.trainerInitials,
                                       sections: _localSections,
                                       selectedSectionIndex: originalIndex,
-                                      onSectionsChanged: (updatedSections) async {
-                                        setState(() {
-                                          _localSections = updatedSections;
-                                        });
-                                        await _notifyParent();
-                                      },
+                                      onSectionsChanged:
+                                          (updatedSections) async {
+                                            setState(() {
+                                              _localSections = updatedSections;
+                                            });
+                                            await _notifyParent();
+                                          },
                                     ),
                                   ),
                                 );
-                                if (result == 'goToIntroduction' && widget.onStepChanged != null) {
+                                if (result == 'goToIntroduction' &&
+                                    widget.onStepChanged != null) {
                                   widget.onStepChanged!(1);
                                 }
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Color(0xFFEF4444),
+                                size: 20,
+                              ),
                               tooltip: 'Delete Section',
                               onPressed: () => _deleteSection(originalIndex),
                             ),
                             IconButton(
                               icon: Icon(
-                                isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                isExpanded
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
                                 color: const Color(0xFF64748B),
                                 size: 22,
                               ),
@@ -520,7 +674,11 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              if (section['description'] != null && section['description'].toString().trim().isNotEmpty)
+                              if (section['description'] != null &&
+                                  section['description']
+                                      .toString()
+                                      .trim()
+                                      .isNotEmpty)
                                 Text(
                                   section['description'],
                                   style: const TextStyle(
@@ -557,7 +715,9 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                   IconButton(
                     icon: Icon(
                       Icons.chevron_left,
-                      color: _currentSectionPage > 0 ? const Color(0xFF20B486) : const Color(0xFF94A3B8),
+                      color: _currentSectionPage > 0
+                          ? const Color(0xFF20B486)
+                          : const Color(0xFF94A3B8),
                       size: 18,
                     ),
                     onPressed: _currentSectionPage > 0
@@ -569,17 +729,26 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                     GestureDetector(
                       onTap: () => setState(() => _currentSectionPage = i),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         decoration: BoxDecoration(
-                          color: _currentSectionPage == i ? const Color(0xFF20B486) : Colors.transparent,
+                          color: _currentSectionPage == i
+                              ? const Color(0xFF20B486)
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(4),
-                          border: _currentSectionPage == i ? null : Border.all(color: const Color(0xFFCBD5E1)),
+                          border: _currentSectionPage == i
+                              ? null
+                              : Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: Text(
                           '${i + 1}',
                           style: TextStyle(
-                            color: _currentSectionPage == i ? Colors.white : const Color(0xFF475569),
+                            color: _currentSectionPage == i
+                                ? Colors.white
+                                : const Color(0xFF475569),
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                             fontFamily: 'Outfit',
@@ -592,7 +761,9 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                   IconButton(
                     icon: Icon(
                       Icons.chevron_right,
-                      color: _currentSectionPage < totalPages - 1 ? const Color(0xFF20B486) : const Color(0xFF94A3B8),
+                      color: _currentSectionPage < totalPages - 1
+                          ? const Color(0xFF20B486)
+                          : const Color(0xFF94A3B8),
                       size: 18,
                     ),
                     onPressed: _currentSectionPage < totalPages - 1
@@ -624,10 +795,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFF20B486),
-                width: 1.5,
-              ),
+              border: Border.all(color: const Color(0xFF20B486), width: 1.5),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: const Text(

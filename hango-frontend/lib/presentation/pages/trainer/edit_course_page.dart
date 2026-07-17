@@ -34,6 +34,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
+  // Import-template compatible fields
+  final TextEditingController _codeController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController _objectivesController = TextEditingController();
+
   // Dynamic dropdown lists (populated from DB with default fallbacks)
   List<Map<String, dynamic>> _dbCategories = [
     {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
@@ -79,6 +86,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
     _titleController.dispose();
     _descriptionController.dispose();
     _versionController.dispose();
+    _codeController.dispose();
+    _priceController.dispose();
+    _objectivesController.dispose();
     super.dispose();
   }
 
@@ -170,6 +180,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _titleController.text = data['title'] ?? '';
           _descriptionController.text = data['description'] ?? '';
           _uploadedImageUrl = data['thumbnailUrl'] ?? '';
+          _versionController.text = data['version'] ?? 'v1.0';
+          _codeController.text = data['code'] ?? '';
+          _priceController.text = data['price']?.toString() ?? '0';
+          _objectivesController.text = data['objectives'] ?? '';
 
           if (data['categoryKey'] != null && data['categoryKey'].toString().isNotEmpty) {
             _selectedCategoryKey = data['categoryKey'].toString().toUpperCase();
@@ -262,6 +276,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
       final body = jsonEncode({
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
+        'version': _versionController.text.trim(),
+        'code': _codeController.text.trim(),
+        'price': double.tryParse(_priceController.text.trim().isEmpty ? '0' : _priceController.text.trim()) ?? 0,
+        'objectives': _objectivesController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
@@ -345,6 +363,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
       final body = jsonEncode({
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
+        'version': _versionController.text.trim(),
+        'code': _codeController.text.trim(),
+        'price': double.tryParse(_priceController.text.trim().isEmpty ? '0' : _priceController.text.trim()) ?? 0,
+        'objectives': _objectivesController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
@@ -1057,6 +1079,122 @@ class _EditCoursePageState extends State<EditCoursePage> {
             },
           ),
           const SizedBox(height: 20),
+          // Course Code and Price
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Course Code',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4B5563),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _codeController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. ENG101',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF20B486),
+                          ),
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Price',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4B5563),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _priceController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 0',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF20B486),
+                          ),
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           // Category & Academic Level side-by-side
           Row(
             children: [
@@ -1244,6 +1382,47 @@ class _EditCoursePageState extends State<EditCoursePage> {
               }
               return null;
             },
+          ),
+          const SizedBox(height: 20),
+          // Objectives
+          const Text(
+            'Objectives',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4B5563),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _objectivesController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: 'Enter learning objectives (one per line)......',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF20B486)),
+              ),
+            ),
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
           ),
         ],
       ),
