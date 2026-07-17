@@ -4179,7 +4179,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         body: jsonEncode({
           'fullName': '$firstName $name'.trim(),
           'email': email,
-          'password': _createPasswordController.text.trim(),
+          'password': 'Hango@2026!',
           'phoneNumber': _createPhoneController.text.trim(),
           'gender': _createGender,
           'role': backendRole,

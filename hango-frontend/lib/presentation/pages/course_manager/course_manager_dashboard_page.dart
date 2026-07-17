@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/shared_header.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../data/models/course_manager_dashboard_summary.dart';
+import 'course_manager_courses_page.dart';
 import 'course_manager_exams_page.dart';
 import 'course_manager_question_bank_page.dart';
 import '../trainer/matrix_management_page.dart';
@@ -12,10 +12,12 @@ class CourseManagerDashboardPage extends StatefulWidget {
   const CourseManagerDashboardPage({super.key});
 
   @override
-  State<CourseManagerDashboardPage> createState() => _CourseManagerDashboardPageState();
+  State<CourseManagerDashboardPage> createState() =>
+      _CourseManagerDashboardPageState();
 }
 
-class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage> {
+class _CourseManagerDashboardPageState
+    extends State<CourseManagerDashboardPage> {
   final _api = CourseManagerApi();
   CourseManagerDashboardSummary? _summary;
   bool _isLoading = true;
@@ -46,10 +48,6 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
     }
   }
 
-
-
-
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -66,7 +64,8 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop && _isSidebarVisible)
+            SizedBox(width: 240, child: _buildSidebar(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -84,7 +83,9 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
                               ),
                             ),
                           )
-                        : _buildMetricCards(constraints: BoxConstraints(maxWidth: size.width)),
+                        : _buildMetricCards(
+                            constraints: BoxConstraints(maxWidth: size.width),
+                          ),
                   ),
                 ),
               ],
@@ -103,41 +104,77 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSidebarItem(Icons.dashboard, 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {}),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CourseManagerExamsPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.grid_on, 'Exam Matrix', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MatrixManagementPage(onBack: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
-                  );
-                }),
-              ),
-            );
-          }),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CourseManagerQuestionBankPage()),
-            );
-          }),
+          _buildSidebarItem(
+            Icons.book_outlined,
+            'Courses',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CourseManagerCoursesPage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.assignment_outlined,
+            'Exam',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CourseManagerExamsPage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.grid_on,
+            'Exam Matrix',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MatrixManagementPage(
+                    onBack: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const CourseManagerDashboardPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            'Question Bank',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CourseManagerQuestionBankPage(),
+                ),
+              );
+            },
+          ),
           const Spacer(),
         ],
       ),
     );
   }
 
-
-
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -154,14 +191,18 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
+                color: isActive
+                    ? Colors.white
+                    : (color ?? const Color(0xFF4B5563)),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
+                  color: isActive
+                      ? Colors.white
+                      : (color ?? const Color(0xFF1F2937)),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',
@@ -216,7 +257,8 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
     // 4 cards in a row if there is enough space. Since each card is roughly 250-300px min width.
     // We'll wrap them in a Wrap or Responsive layout.
     final useRow = constraints.maxWidth > 1024;
-    final useTwoColumns = constraints.maxWidth > 600 && constraints.maxWidth <= 1024;
+    final useTwoColumns =
+        constraints.maxWidth > 600 && constraints.maxWidth <= 1024;
 
     final usersCount = _summary?.registeredUsersCount ?? 0;
     final activeCourses = _summary?.activeCoursesCount ?? 0;
@@ -233,7 +275,11 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
         iconColor: const Color(0xFF20B486),
         subtitleWidget: const Row(
           children: [
-            Icon(Icons.check_circle_outline, size: 14, color: Color(0xFF20B486)),
+            Icon(
+              Icons.check_circle_outline,
+              size: 14,
+              color: Color(0xFF20B486),
+            ),
             Text(
               ' Total system users',
               style: TextStyle(
@@ -253,7 +299,14 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
         iconColor: const Color(0xFF4B5563),
         subtitleWidget: Row(
           children: [
-            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF20B486), shape: BoxShape.circle)),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Color(0xFF20B486),
+                shape: BoxShape.circle,
+              ),
+            ),
             Text(
               ' $activeCourses active  ',
               style: const TextStyle(
@@ -263,7 +316,14 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
                 fontFamily: 'Outfit',
               ),
             ),
-            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFFCBD5E1), shape: BoxShape.circle)),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Color(0xFFCBD5E1),
+                shape: BoxShape.circle,
+              ),
+            ),
             Text(
               ' $inactiveCourses inactive',
               style: const TextStyle(
@@ -284,7 +344,11 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
         iconColor: const Color(0xFF64748B),
         subtitleWidget: const Row(
           children: [
-            Icon(Icons.assignment_turned_in_outlined, size: 14, color: Color(0xFF64748B)),
+            Icon(
+              Icons.assignment_turned_in_outlined,
+              size: 14,
+              color: Color(0xFF64748B),
+            ),
             Text(
               ' System-wide exams',
               style: TextStyle(
@@ -361,7 +425,7 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
             color: Color.fromRGBO(0, 0, 0, 0.02),
             blurRadius: 10,
             offset: Offset(0, 2),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -390,11 +454,7 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
                   color: iconBgColor,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 20,
-                ),
+                child: Icon(icon, color: iconColor, size: 20),
               ),
             ],
           ),

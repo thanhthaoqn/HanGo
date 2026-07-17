@@ -181,6 +181,7 @@ public class CourseServiceImpl implements CourseService {
         return CourseDetailDTO.builder()
                 .id(course.getId())
                 .title(course.getTitle())
+                .code(course.getCode())
                 .creatorName(creatorName)
                 .difficultyName(difficultyName)
                 .difficultyKey(difficultyKey)

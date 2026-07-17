@@ -96,6 +96,7 @@ public class CourseImportService {
         int importedQuestions = 0;
 
         Set<String> knownCourseCodes = new java.util.HashSet<>();
+        Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
         for (Map<String, String> courseRow : courseRows) {
             String courseCode = required(courseRow, "Course Code", "COURSE");
             if (!knownCourseCodes.add(courseCode)) {
@@ -122,6 +123,8 @@ public class CourseImportService {
                 warnings.add("Course " + courseCode + " was imported as DRAFT because trainer imports still require review before publishing.");
             }
 
+            String persistedCourseCode = resolveUniqueCourseCode(courseCode, reservedPersistedCourseCodes, warnings);
+
             Course course = Course.builder()
                     .title(required(courseRow, "Title", "COURSE"))
                     .description(valueOrDefault(courseRow, "Description", ""))
@@ -129,7 +132,7 @@ public class CourseImportService {
                     .category(category)
                     .difficulty(difficulty)
                     .thumbnailUrl(valueOrDefault(courseRow, "Thumbnail URL", ""))
-                    .code(courseCode)
+                    .code(persistedCourseCode)
                     .price(parseDecimal(valueOrDefault(courseRow, "Price", "0"), null))
                     .version(valueOrDefault(courseRow, "Version", ""))
                     .objectives(valueOrDefault(courseRow, "Objectives", ""))
@@ -731,6 +734,38 @@ public class CourseImportService {
     private String valueOrDefault(Map<String, String> row, String column, String defaultValue) {
         String value = row.get(column);
         return value == null || value.isBlank() ? defaultValue : value.trim();
+    }
+
+    private String resolveUniqueCourseCode(
+            String requestedCode,
+            Set<String> reservedCodes,
+            List<String> warnings
+    ) {
+        String baseCode = trimToMaxLength(requestedCode.trim(), 100);
+        String candidate = baseCode;
+        int suffix = 2;
+        while (courseCodeExists(candidate, reservedCodes)) {
+            String suffixText = "-" + suffix++;
+            candidate = trimToMaxLength(baseCode, 100 - suffixText.length()) + suffixText;
+        }
+
+        reservedCodes.add(candidate.toUpperCase(Locale.ROOT));
+        if (!candidate.equals(requestedCode)) {
+            warnings.add("Course Code '" + requestedCode + "' already exists and was imported as '" + candidate + "'.");
+        }
+        return candidate;
+    }
+
+    private boolean courseCodeExists(String code, Set<String> reservedCodes) {
+        return reservedCodes.contains(code.toUpperCase(Locale.ROOT))
+                || courseRepository.existsByCodeIgnoreCase(code);
+    }
+
+    private String trimToMaxLength(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private int parseInt(String value, int defaultValue) {
