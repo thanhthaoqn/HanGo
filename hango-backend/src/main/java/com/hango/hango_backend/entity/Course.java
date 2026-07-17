@@ -41,6 +41,9 @@ public class Course {
     @Column(columnDefinition = "TEXT")
     private String objectives;
 
+    @Column(name = "estimated_duration")
+    private Integer estimatedDuration;
+
     @Builder.Default
     @Column(length = 30)
     private String status = "DRAFT";

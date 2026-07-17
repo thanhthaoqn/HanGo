@@ -69,7 +69,6 @@ class SharedFooter extends StatelessWidget {
                               ),
                               const SizedBox(height: 16),
                               _buildFooterLink('Mock Tests'),
-                              _buildFooterLink('Vocabulary Sets'),
                               _buildFooterLink('Grammar Courses'),
                             ],
                           ),
@@ -126,7 +125,6 @@ class SharedFooter extends StatelessWidget {
                         ),
                         const Divider(),
                         _buildFooterLink('Mock Tests'),
-                        _buildFooterLink('Vocabulary Sets'),
                         _buildFooterLink('Grammar Courses'),
                         const SizedBox(height: 24),
                         const Text(

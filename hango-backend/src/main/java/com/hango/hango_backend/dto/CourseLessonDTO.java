@@ -18,4 +18,5 @@ public class CourseLessonDTO {
     private String questionText;
     private String pdfName;
     private String questionImageUrl;
+    private Integer estimatedTime;
 }

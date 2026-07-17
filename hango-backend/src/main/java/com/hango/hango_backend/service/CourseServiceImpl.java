@@ -92,25 +92,28 @@ public class CourseServiceImpl implements CourseService {
         List<CourseSessionDTO> sessionDTOs = sections.stream().map(section -> {
             List<Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId());
             List<CourseLessonDTO> lessonDTOs = lessons.stream().map(lesson -> {
-                Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
-                int qCount = 0;
-                if ("quiz".equalsIgnoreCase(lesson.getLessonType()) || "practice".equalsIgnoreCase(lesson.getLessonType())) {
-                    qCount = lessonRepository.countQuestionsByLessonId(lesson.getId());
-                }
-                return CourseLessonDTO.builder()
-                    .id(lesson.getId())
-                    .title(lesson.getTitle())
-                    .orderIndex(lesson.getDisplayOrder())
-                    .itemType(lesson.getLessonType())
-                    .examId(examId)
-                    .questionCount(qCount)
-                    .isCompleted(completedLessonIds.contains(lesson.getId()))
-                    .description(lesson.getDescription())
-                    .questionText(lesson.getContent())
-                    .pdfName(lesson.getPdfName())
-                    .questionImageUrl(lesson.getQuestionImageUrl())
-                    .build();
-            }).collect(Collectors.toList());
+                    Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
+                    int qCount = 0;
+                    if ("quiz".equalsIgnoreCase(lesson.getLessonType()) || "practice".equalsIgnoreCase(lesson.getLessonType())) {
+                        qCount = lessonRepository.countQuestionsByLessonId(lesson.getId());
+                    }
+                    int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime() 
+                                  : ("quiz".equalsIgnoreCase(lesson.getLessonType()) ? (10 + qCount * 2) : 15);
+                    return CourseLessonDTO.builder()
+                        .id(lesson.getId())
+                        .title(lesson.getTitle())
+                        .orderIndex(lesson.getDisplayOrder())
+                        .itemType(lesson.getLessonType())
+                        .examId(examId)
+                        .questionCount(qCount)
+                        .isCompleted(completedLessonIds.contains(lesson.getId()))
+                        .description(lesson.getDescription())
+                        .questionText(lesson.getContent())
+                        .pdfName(lesson.getPdfName())
+                        .questionImageUrl(lesson.getQuestionImageUrl())
+                        .estimatedTime(estTime)
+                        .build();
+                }).collect(Collectors.toList());
 
             return CourseSessionDTO.builder()
                     .id(section.getId())
@@ -168,6 +171,7 @@ public class CourseServiceImpl implements CourseService {
             averageRating = Math.round(averageRating * 10.0) / 10.0;
         }
 
+        int estimatedDuration = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 12;
         return CourseDetailDTO.builder()
                 .id(course.getId())
                 .title(course.getTitle())
@@ -182,6 +186,7 @@ public class CourseServiceImpl implements CourseService {
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
                 .isEnrolled(isEnrolled)
+                .estimatedDuration(estimatedDuration)
                 .sessions(sessionDTOs)
                 .build();
     }
