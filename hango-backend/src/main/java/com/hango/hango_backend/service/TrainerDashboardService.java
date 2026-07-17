@@ -20,6 +20,8 @@ public interface TrainerDashboardService {
     
     void updateExamStatus(Long examId, String email, String status);
     
+    void updateExamVisibility(Long examId, String email, String visibility);
+    
     void deleteTrainerExam(Long examId, String email);
     void publishTrainerCourse(Long id, String email);
 }

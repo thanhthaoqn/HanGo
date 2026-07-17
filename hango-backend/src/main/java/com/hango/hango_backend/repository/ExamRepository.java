@@ -16,4 +16,6 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
 
     @Query("SELECT COUNT(e) FROM Exam e WHERE e.createdBy.id = :createdById AND e.deletedAt IS NULL")
     long countByCreatedByIdAndDeletedAtIsNull(@Param("createdById") Long createdById);
+
+    List<Exam> findByDeletedAtIsNullOrderByCreatedAtDesc();
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../../../data/services/auth_service.dart';
 import 'course_manager_dashboard_page.dart';
@@ -22,6 +23,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   bool _isLoading = true;
   String _errorMessage = '';
   bool _isSidebarVisible = true;
+  int? _currentUserId;
   List<dynamic> _examsList = [];
   
   int _currentPage = 1;
@@ -52,7 +54,15 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   @override
   void initState() {
     super.initState();
+    _loadCourseManagerInfo();
     _fetchExamsData();
+  }
+
+  Future<void> _loadCourseManagerInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _currentUserId = prefs.getInt('user_id');
+    });
   }
 
   @override
@@ -190,8 +200,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildWelcomeSection(),
-                        const SizedBox(height: 24),
+
                         _buildFilterContainer(),
                         const SizedBox(height: 24),
                         if (_isLoading)
@@ -215,48 +224,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     );
   }
 
-  Widget _buildWelcomeSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          'Exam Management',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
-            fontFamily: 'Outfit',
-          ),
-        ),
-        ElevatedButton.icon(
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
-            );
-            _fetchExamsData();
-          },
-          icon: const Icon(Icons.add, color: Colors.white, size: 18),
-          label: const Text(
-            'Create New Exam',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Outfit',
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF38C9A6),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: 0,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildFilterContainer() {
     return Container(
@@ -722,7 +690,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
             flex: 1,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _buildVisibilityChip(exam['status'], exam['visibility']),
+              child: _buildVisibilityChip(exam),
             ),
           ),
           Expanded(
@@ -730,23 +698,50 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => TrainerEditExamPage(
-                        examId: exam['id'],
-                        examTitle: exam['title'] ?? 'Untitled',
-                        examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
-                      )),
+                Builder(builder: (context) {
+                  final status = exam['status']?.toString().toUpperCase() ?? 'DRAFT';
+                  final bool isCreator = _currentUserId != null && exam['creatorId'] == _currentUserId;
+                  
+                  if (isCreator && status == 'DRAFT') {
+                    return IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                            examId: exam['id'],
+                            examTitle: exam['title'] ?? 'Untitled',
+                            examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                          )),
+                        );
+                        _fetchExamsData();
+                      },
+                      splashRadius: 20,
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                     );
-                    _fetchExamsData();
-                  },
-                  splashRadius: 20,
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
+                  } else {
+                    return IconButton(
+                      icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF38C9A6), size: 20),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                            examId: exam['id'],
+                            examTitle: exam['title'] ?? 'Untitled',
+                            examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                            isReadOnly: true,
+                            courseManagerActionStatus: status,
+                          )),
+                        );
+                        _fetchExamsData();
+                      },
+                      splashRadius: 20,
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    );
+                  }
+                }),
               ],
             ),
           ),
@@ -754,6 +749,34 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       ),
     );
   }
+
+
+  Future<void> _updateExamVisibility(int examId, String newVisibility) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final response = await http.patch(
+        Uri.parse('$apiBaseUrl/trainer/exams/$examId/visibility'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'visibility': newVisibility}),
+      );
+      if (response.statusCode == 200) {
+        _fetchExamsData();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update visibility')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error updating exam visibility: $e');
+    }
+  }
+
 
 
   Widget _buildStatusChip(String status) {
@@ -806,40 +829,66 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     );
   }
 
-  Widget _buildVisibilityChip(String? status, String? visibility) {
-    if (status == null || status.toUpperCase() != 'APPROVED') {
-      return const Text(
-        '-',
-        style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold),
-      );
-    }
-    
+  Widget _buildVisibilityChip(Map<String, dynamic> exam) {
+    String? visibility = exam['visibility'];
     bool isPublic = visibility?.toUpperCase() == 'PUBLIC';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPublic ? Icons.public : Icons.lock_outline,
-            size: 14,
-            color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            isPublic ? 'Public' : 'Private',
-            style: TextStyle(
-              color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-              fontFamily: 'Outfit',
+    bool canEdit = _currentUserId != null && exam['creatorId'] == _currentUserId;
+
+    return InkWell(
+      onTap: canEdit ? () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Change Visibility', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+            content: Text(
+              'Do you want to change visibility to ${isPublic ? "Private" : "Public"}?',
+              style: const TextStyle(fontFamily: 'Outfit'),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _updateExamVisibility(exam['id'], isPublic ? 'PRIVATE' : 'PUBLIC');
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38C9A6)),
+                child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-        ],
+        );
+      } : null,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: canEdit ? (isPublic ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)) : Colors.transparent),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPublic ? Icons.public : Icons.lock_outline,
+              size: 14,
+              color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isPublic ? 'Public' : 'Private',
+              style: TextStyle(
+                color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1008,6 +1057,33 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               fontWeight: FontWeight.bold,
               fontSize: 14,
               fontFamily: 'Outfit',
+            ),
+          ),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
+              );
+              _fetchExamsData();
+            },
+            icon: const Icon(Icons.add, color: Colors.white, size: 18),
+            label: const Text(
+              'Create New Exam',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF38C9A6),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
             ),
           ),
         ],

@@ -323,7 +323,37 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         Long trainerId = user.getId();
-        List<com.hango.hango_backend.entity.Exam> exams = examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(trainerId);
+        
+        boolean isManager = user.getRoles().stream()
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+        
+        List<com.hango.hango_backend.entity.Exam> exams;
+        if (isManager) {
+            exams = examRepository.findByDeletedAtIsNullOrderByCreatedAtDesc();
+            // Filter out DRAFT exams that belong to other users
+            exams = exams.stream()
+                    .filter(exam -> {
+                        boolean isDraft = "DRAFT".equalsIgnoreCase(exam.getStatus());
+                        boolean isOwn = exam.getCreatedBy() != null && exam.getCreatedBy().getId().equals(trainerId);
+                        return !isDraft || isOwn;
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            exams = examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(trainerId);
+        }
+
+        // Sort exams by priority and then by createdAt descending
+        exams.sort((e1, e2) -> {
+            int p1 = getExamStatusPriority(e1.getStatus());
+            int p2 = getExamStatusPriority(e2.getStatus());
+            if (p1 != p2) {
+                return Integer.compare(p1, p2);
+            }
+            if (e1.getCreatedAt() == null && e2.getCreatedAt() == null) return 0;
+            if (e1.getCreatedAt() == null) return 1;
+            if (e2.getCreatedAt() == null) return -1;
+            return e2.getCreatedAt().compareTo(e1.getCreatedAt());
+        });
 
         return exams.stream().map(exam -> {
             int questionCount = examQuestionRepository.countByIdExamId(exam.getId());
@@ -337,8 +367,18 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .status(exam.getStatus() != null ? exam.getStatus() : "private")
                     .visibility(exam.getVisibility() != null ? exam.getVisibility() : "PRIVATE")
                     .thumbnailUrl(exam.getThumbnailUrl())
+                    .creatorId(exam.getCreatedBy() != null ? exam.getCreatedBy().getId() : null)
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    private int getExamStatusPriority(String status) {
+        if (status == null) return 4;
+        String s = status.toUpperCase();
+        if ("SUBMITTED".equals(s)) return 1;
+        if ("PUBLISHED".equals(s) || "REJECTED".equals(s) || "HIDDEN".equals(s)) return 2;
+        if ("DRAFT".equals(s)) return 3;
+        return 4;
     }
 
     @Override
@@ -462,12 +502,33 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
                 
-        // Optional: verify that the user is the creator of the exam
-        if (!exam.getCreatedBy().getId().equals(user.getId())) {
+        boolean isManager = user.getRoles().stream()
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+
+        // verify that the user is the creator of the exam or is a manager
+        if (!isManager && !exam.getCreatedBy().getId().equals(user.getId())) {
             throw new RuntimeException("User is not authorized to update this exam");
         }
         
         exam.setStatus(status);
+        examRepository.save(exam);
+    }
+
+    @Override
+    @Transactional
+    public void updateExamVisibility(Long examId, String email, String visibility) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+                
+        // Only the creator can change the visibility of an exam
+        if (!exam.getCreatedBy().getId().equals(user.getId())) {
+            throw new RuntimeException("User is not authorized to update visibility of this exam");
+        }
+        
+        exam.setVisibility(visibility);
         examRepository.save(exam);
     }
 
