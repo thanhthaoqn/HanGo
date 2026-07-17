@@ -725,17 +725,8 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                if (!widget.hideLanguageSwitcher) ...[
-                  _buildLanguageSwitcher(),
-                  const SizedBox(width: 8),
-                ],
                 if (!widget.hideCommerceActions) ...[
                   _buildCartButton(),
-                  const SizedBox(width: 8),
-                ],
-              ] else ...[
-                if (!widget.hideLanguageSwitcher) ...[
-                  _buildLanguageSwitcher(),
                   const SizedBox(width: 8),
                 ],
               ],
@@ -1080,82 +1071,6 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
 
-                  if (!widget.hideLanguageSwitcher)
-                    PopupMenuItem(
-                      enabled: false,
-                    child: StatefulBuilder(
-                      builder: (context, setMenuState) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.language_rounded,
-                                size: 18,
-                                color: Color(0xFF4B5563),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                _isVietnamese ? 'Ngôn ngữ:' : 'Language:',
-                                style: const TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 14,
-                                  color: Color(0xFF1E293B),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const Spacer(),
-                              InkWell(
-                                onTap: () {
-                                  LanguageManager.setLanguage(true);
-                                  Navigator.pop(context);
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: _isVietnamese ? const Color(0xFF28B79B) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'VI',
-                                    style: TextStyle(
-                                      color: _isVietnamese ? Colors.white : const Color(0xFF475569),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Outfit',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: () {
-                                  LanguageManager.setLanguage(false);
-                                  Navigator.pop(context);
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: !_isVietnamese ? const Color(0xFF28B79B) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'EN',
-                                    style: TextStyle(
-                                      color: !_isVietnamese ? Colors.white : const Color(0xFF475569),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Outfit',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                    ),
-                  ),
                   PopupMenuItem(
                     value: 'logout',
                     child: Container(
@@ -1198,17 +1113,8 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                if (!widget.hideLanguageSwitcher) ...[
-                  _buildLanguageSwitcher(),
-                  const SizedBox(width: 8),
-                ],
                 _buildCartButton(),
                 const SizedBox(width: 12),
-              ] else ...[
-                if (!widget.hideLanguageSwitcher) ...[
-                  _buildLanguageSwitcher(),
-                  const SizedBox(width: 8),
-                ],
               ],
               TextButton(
                 onPressed: () {
