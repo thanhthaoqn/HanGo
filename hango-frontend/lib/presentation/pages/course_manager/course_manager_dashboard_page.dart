@@ -6,7 +6,7 @@ import '../../../data/services/course_manager_api.dart';
 import '../../../data/models/course_manager_dashboard_summary.dart';
 import 'course_manager_exams_page.dart';
 import 'course_manager_question_bank_page.dart';
-import '../trainer/matrix_management_page.dart';
+import 'course_manager_matrix_management_page.dart';
 
 class CourseManagerDashboardPage extends StatefulWidget {
   const CourseManagerDashboardPage({super.key});
@@ -114,7 +114,7 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => MatrixManagementPage(onBack: () {
+                builder: (context) => CourseManagerMatrixManagementPage(onBack: () {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),

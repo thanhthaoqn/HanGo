@@ -31,4 +31,62 @@ class CourseManagerApi {
       throw Exception('Failed to load dashboard summary: ${response.statusCode} ${response.body}');
     }
   }
+
+  Future<List<Map<String, dynamic>>> getExamMatrices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/matrices'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return decoded.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      throw Exception('Failed to get exam matrices: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  Future<void> createExamMatrix(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/matrices'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to create exam matrix: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  Future<int> countAvailableQuestions(int skillId, int diffId, int catId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/matrices/count-available?skillId=$skillId&diffId=$diffId&catId=$catId'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      return decoded['count'] as int;
+    } else {
+      throw Exception('Failed to count available questions: ${response.statusCode}');
+    }
+  }
 }
