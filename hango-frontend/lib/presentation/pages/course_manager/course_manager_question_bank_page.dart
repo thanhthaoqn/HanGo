@@ -3,15 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
-import 'course_manager_dashboard_page.dart';
-import 'course_manager_exams_page.dart';
-import '../trainer/matrix_management_page.dart';
+
 import '../../widgets/shared_header.dart';
-import '../trainer/question_bank/widgets/question_filter_pane.dart';
 import '../trainer/question_bank/widgets/question_search_bar.dart';
 import '../trainer/question_bank/widgets/question_table.dart';
 import '../trainer/question_bank/trainer_create_question_page.dart';
 import '../trainer/question_bank/models/trainer_question.dart';
+import '../../widgets/course_manager_sidebar.dart';
 
 class CourseManagerQuestionBankPage extends StatefulWidget {
   const CourseManagerQuestionBankPage({Key? key}) : super(key: key);
@@ -29,8 +27,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
   bool _isSidebarVisible = true;
 
   // Filter States
-  String _selectedType = 'ALL';
-  String _selectedGroupType = 'Choose Group Type';
+  String _selectedType = 'PUBLIC';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
   int _currentPage = 1;
@@ -115,14 +112,6 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
     _fetchQuestions();
   }
 
-  void _handleGroupTypeChanged(String groupType) {
-    setState(() {
-      _selectedGroupType = groupType;
-      _currentPage = 1;
-    });
-    _fetchQuestions();
-  }
-
   void _handleSortChanged(String sort) {
     setState(() {
       _sortBy = sort;
@@ -152,11 +141,12 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
         activeTab: '',
         hideNavLinks: true,
         hideCommerceActions: true,
+        hideLanguageSwitcher: true,
       ),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'question_bank')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop && _isSidebarVisible) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'question_bank')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -168,15 +158,6 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Left pane: SELECT TYPE dropdown
-                        QuestionFilterPane(
-                          selectedType: _selectedType,
-                          onTypeChanged: _handleTypeChanged,
-                          selectedGroupType: _selectedGroupType,
-                          onGroupTypeChanged: _handleGroupTypeChanged,
-                        ),
-                        const SizedBox(width: 24),
-                        // Right pane: Search bar and Table
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -184,6 +165,8 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                               QuestionSearchBar(
                                 searchController: _searchController,
                                 onSearchChanged: _handleSearch,
+                                selectedType: _selectedType,
+                                onTypeChanged: _handleTypeChanged,
                                 sortBy: _sortBy,
                                 onSortChanged: _handleSortChanged,
                                 onCreatePressed: () {
@@ -274,107 +257,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
     );
   }
 
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Sidebar menu items
-          _buildSidebarItem(
-            Icons.dashboard_outlined,
-            'Dashboard',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CourseManagerDashboardPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.book_outlined,
-            'Courses',
-            onTap: () {},
-          ),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CourseManagerExamsPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.grid_on, 'Exam Matrix', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MatrixManagementPage(onBack: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CourseManagerQuestionBankPage()),
-                  );
-                }),
-              ),
-            );
-          }),
-          _buildSidebarItem(
-            Icons.question_answer_outlined,
-            'Question Bank',
-            isActive: true,
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive
-                    ? Colors.white
-                    : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive
-                      ? Colors.white
-                      : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildContentHeader(BuildContext context, bool isDesktop) {
     return Padding(

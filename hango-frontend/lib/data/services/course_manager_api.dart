@@ -188,6 +188,7 @@ class CourseManagerApi {
     }
   }
 
+<<<<<<< Updated upstream
   Future<int> countAvailableQuestions(
     int skillId,
     int diffId,
@@ -199,12 +200,33 @@ class CourseManagerApi {
         'skillId': skillId.toString(),
         'diffId': diffId.toString(),
         'catId': catId.toString(),
+=======
+  Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    // The backend uses /api/v1/metadata/parameters
+    final metadataUrl = baseUrl.replaceAll('/course-manager', '/metadata/parameters');
+    
+    final response = await http.get(
+      Uri.parse('$metadataUrl?type=$type'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+>>>>>>> Stashed changes
       },
     );
 
     if (response.statusCode == 200) {
+<<<<<<< Updated upstream
       final decoded = jsonDecode(response.body);
       return decoded['count'] as int;
+=======
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return decoded.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      throw Exception('Failed to get system parameters: ${response.statusCode}');
+>>>>>>> Stashed changes
     }
 
     throw Exception(

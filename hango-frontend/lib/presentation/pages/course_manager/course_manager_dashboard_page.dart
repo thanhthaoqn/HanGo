@@ -1,12 +1,21 @@
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 import 'package:flutter/material.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/shared_header.dart';
+import '../../widgets/course_manager_sidebar.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../data/models/course_manager_dashboard_summary.dart';
+<<<<<<< Updated upstream
 import 'course_manager_courses_page.dart';
 import 'course_manager_exams_page.dart';
 import 'course_manager_question_bank_page.dart';
 import 'course_manager_matrix_management_page.dart';
+=======
+
+>>>>>>> Stashed changes
 
 class CourseManagerDashboardPage extends StatefulWidget {
   const CourseManagerDashboardPage({super.key});
@@ -60,12 +69,17 @@ class _CourseManagerDashboardPageState
         activeTab: '',
         hideNavLinks: true,
         hideCommerceActions: true,
+        hideLanguageSwitcher: true,
       ),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'dashboard')) : null,
       body: Row(
         children: [
+<<<<<<< Updated upstream
           if (isDesktop && _isSidebarVisible)
             SizedBox(width: 240, child: _buildSidebar(context)),
+=======
+          if (isDesktop && _isSidebarVisible) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'dashboard')),
+>>>>>>> Stashed changes
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -96,6 +110,7 @@ class _CourseManagerDashboardPageState
     );
   }
 
+<<<<<<< Updated upstream
   Widget _buildSidebar(BuildContext context) {
     return Container(
       color: Colors.white,
@@ -203,6 +218,9 @@ class _CourseManagerDashboardPageState
       ),
     );
   }
+=======
+
+>>>>>>> Stashed changes
 
   Widget _buildContentHeader(BuildContext context, bool isDesktop) {
     return Padding(

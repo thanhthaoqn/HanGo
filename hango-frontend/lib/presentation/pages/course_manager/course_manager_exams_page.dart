@@ -4,12 +4,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../../../data/services/auth_service.dart';
-import 'course_manager_dashboard_page.dart';
 import '../trainer/trainer_create_exam_page.dart';
 import '../trainer/trainer_edit_exam_page.dart';
-import 'course_manager_question_bank_page.dart';
 import '../../widgets/shared_header.dart';
-import '../trainer/matrix_management_page.dart';
+import '../../widgets/course_manager_sidebar.dart';
 
 class CourseManagerExamsPage extends StatefulWidget {
   const CourseManagerExamsPage({super.key});
@@ -184,11 +182,12 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
         activeTab: '',
         hideNavLinks: true,
         hideCommerceActions: true,
+        hideLanguageSwitcher: true,
       ),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'exams')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop && _isSidebarVisible) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -929,99 +928,6 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
             color: isActive ? Colors.white : const Color(0xFF64748B),
             fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
             fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
-// --- Layout stuff (sidebar and header) to keep the page consistent ---
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSidebarItem(
-            Icons.dashboard_outlined,
-            'Dashboard',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CourseManagerDashboardPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {}),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: true),
-          _buildSidebarItem(Icons.grid_on, 'Exam Matrix', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MatrixManagementPage(onBack: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CourseManagerExamsPage()),
-                  );
-                }),
-              ),
-            );
-          }),
-
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const CourseManagerQuestionBankPage(),
-              ),
-            );
-          }),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF38C9A6);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
           ),
         ),
       ),

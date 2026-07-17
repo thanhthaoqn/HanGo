@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 class QuestionSearchBar extends StatelessWidget {
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
+  final String selectedType;
+  final ValueChanged<String> onTypeChanged;
   final String sortBy;
   final ValueChanged<String> onSortChanged;
   final VoidCallback onCreatePressed;
@@ -13,6 +15,8 @@ class QuestionSearchBar extends StatelessWidget {
     Key? key,
     required this.searchController,
     required this.onSearchChanged,
+    required this.selectedType,
+    required this.onTypeChanged,
     required this.sortBy,
     required this.onSortChanged,
     required this.onCreatePressed,
@@ -24,6 +28,37 @@ class QuestionSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        // Status Filter Dropdown
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.filter_list, color: Color(0xFF64748B), size: 18),
+              const SizedBox(width: 6),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedType,
+                  icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 16),
+                  dropdownColor: Colors.white,
+                  items: const [
+                    DropdownMenuItem(value: 'PUBLIC', child: Text('Public', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)))),
+                    DropdownMenuItem(value: 'PRIVATE', child: Text('Private', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)))),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) onTypeChanged(val);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
         // Search box
         Expanded(
           flex: 4,

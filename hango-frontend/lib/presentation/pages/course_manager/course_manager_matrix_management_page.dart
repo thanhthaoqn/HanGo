@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
+import '../../widgets/shared_header.dart';
+import '../../widgets/course_manager_sidebar.dart';
 import 'course_manager_matrix_builder_page.dart';
-import 'course_manager_dashboard_page.dart';
+
 
 class CourseManagerMatrixManagementPage extends StatefulWidget {
   final VoidCallback? onBack;
@@ -17,6 +19,7 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
   final _api = CourseManagerApi();
   List<Map<String, dynamic>> _matrices = [];
   bool _isLoading = true;
+  bool _isSidebarVisible = true;
 
   @override
   void initState() {
@@ -36,90 +39,128 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ToastHelper.showError(context, 'Lỗi tải danh sách ma trận: $e');
+        ToastHelper.showError(context, 'Failed to load matrices: $e');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isDesktop = size.width > 1024;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 24),
-            Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF20B486)),
-                    )
-                  : _matrices.isEmpty
-                      ? _buildEmptyState()
-                      : _buildMatrixList(),
+      appBar: SharedHeader(
+        isDesktop: isDesktop,
+        activeTab: '',
+        hideNavLinks: true,
+        hideCommerceActions: true,
+        hideLanguageSwitcher: true,
+      ),
+      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'matrix')) : null,
+      body: Row(
+        children: [
+          if (isDesktop && _isSidebarVisible)
+            const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'matrix')),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildContentHeader(context, isDesktop),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_isLoading)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(40.0),
+                              child: CircularProgressIndicator(color: Color(0xFF20B486)),
+                            ),
+                          )
+                        else if (_matrices.isEmpty)
+                          _buildEmptyState()
+                        else
+                          _buildMatrixTable(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF4B5563)),
-          onPressed: widget.onBack ??
-              () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
-                );
+  Widget _buildContentHeader(BuildContext context, bool isDesktop) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      child: Row(
+        children: [
+          if (!isDesktop) ...[
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+            const SizedBox(width: 12),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
+              onPressed: () {
+                setState(() {
+                  _isSidebarVisible = !_isSidebarVisible;
+                });
               },
-        ),
-        const SizedBox(width: 16),
-        const Text(
-          'Quản lý Ma trận đề (Course Manager)',
-          style: TextStyle(
-            fontFamily: 'Outfit',
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        const Spacer(),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseManagerMatrixBuilderPage(
-                  api: _api,
-                  onSaved: () => _fetchMatrices(),
-                ),
-              ),
-            );
-          },
-          icon: const Icon(Icons.add, color: Colors.white, size: 20),
-          label: const Text(
-            'Tạo Ma trận mới',
+            ),
+            const SizedBox(width: 12),
+          ],
+          const Text(
+            'Exam Matrix',
             style: TextStyle(
-              fontFamily: 'Outfit',
+              color: Color(0xFF20B486),
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              fontSize: 14,
+              fontFamily: 'Outfit',
             ),
           ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF20B486),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            elevation: 0,
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right, size: 16, color: Color(0xFF20B486)),
+          const Spacer(),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CourseManagerMatrixBuilderPage(
+                    api: _api,
+                    onSaved: () => _fetchMatrices(),
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add, color: Colors.white, size: 20),
+            label: const Text(
+              'Create New Matrix',
+              style: TextStyle(
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -138,7 +179,7 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
           ),
           const SizedBox(height: 24),
           const Text(
-            'Chưa có ma trận nào',
+            'No exam matrices yet',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -148,7 +189,7 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
           ),
           const SizedBox(height: 8),
           const Text(
-            'Bạn chưa tạo ma trận đề thi nào.\nHãy tạo mới để bắt đầu.',
+            'You haven\'t created any exam matrices.\nCreate a new one to get started.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -161,102 +202,111 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
     );
   }
 
-  Widget _buildMatrixList() {
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 400,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        mainAxisExtent: 160,
-      ),
-      itemCount: _matrices.length,
-      itemBuilder: (context, index) {
-        final matrix = _matrices[index];
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color.fromRGBO(0, 0, 0, 0.02),
-                blurRadius: 10,
-                offset: Offset(0, 2),
-              ),
-            ],
+  Widget _buildMatrixTable() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.02),
+            blurRadius: 10,
+            offset: Offset(0, 2),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
+        ],
+      ),
+      child: DataTable(
+        headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
+        dataRowMaxHeight: 64,
+        dataRowMinHeight: 64,
+        columns: const [
+          DataColumn(
+              label: Text('Matrix Name',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontFamily: 'Outfit'))),
+          DataColumn(
+              label: Text('Created Date',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontFamily: 'Outfit'))),
+          DataColumn(
+              label: Text('Status',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontFamily: 'Outfit'))),
+          DataColumn(
+              label: Text('Actions',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B), fontFamily: 'Outfit'))),
+        ],
+        rows: _matrices.map((matrix) {
+          // Dummy logic for status
+          bool isPublic = (matrix['status'] ?? 'public').toString().toLowerCase() == 'public';
+
+          return DataRow(
+            cells: [
+              DataCell(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
                       matrix['title'] ?? 'Untitled',
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Color(0xFF0F172A),
-                        fontFamily: 'Outfit',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                          fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
+                    Text(
                       'ID: ${matrix['id']}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                        fontFamily: 'Outfit',
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Text(
-                  matrix['description'] ?? 'Không có mô tả',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF64748B),
-                    fontFamily: 'Outfit',
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  ],
                 ),
               ),
-              const Divider(color: Color(0xFFE2E8F0)),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      // TODO: View details or edit
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF20B486),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      textStyle: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-                    ),
-                    child: const Text('Xem chi tiết'),
+              DataCell(
+                Text(
+                  '20/07/2026', // TODO: Format actual date if available
+                  style: const TextStyle(color: Color(0xFF4B5563), fontFamily: 'Outfit'),
+                ),
+              ),
+              DataCell(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isPublic ? const Color(0xFFDEF7EC) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
+                  child: Text(
+                    isPublic ? 'Public' : 'Private',
+                    style: TextStyle(
+                      color: isPublic ? const Color(0xFF03543F) : const Color(0xFF475569),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ),
+              ),
+              DataCell(
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.visibility_outlined, color: Color(0xFF64748B)),
+                      tooltip: 'View',
+                      onPressed: () {
+                        // TODO: View
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: Color(0xFF20B486)),
+                      tooltip: 'Edit',
+                      onPressed: () {
+                        // TODO: Edit
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
-        );
-      },
+          );
+        }).toList(),
+      ),
     );
   }
 }
