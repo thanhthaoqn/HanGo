@@ -188,7 +188,6 @@ class CourseManagerApi {
     }
   }
 
-<<<<<<< Updated upstream
   Future<int> countAvailableQuestions(
     int skillId,
     int diffId,
@@ -200,7 +199,19 @@ class CourseManagerApi {
         'skillId': skillId.toString(),
         'diffId': diffId.toString(),
         'catId': catId.toString(),
-=======
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      return decoded['count'] as int;
+    }
+
+    throw Exception(
+      'Failed to count available questions: ${response.statusCode}',
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -213,25 +224,15 @@ class CourseManagerApi {
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
->>>>>>> Stashed changes
       },
     );
 
     if (response.statusCode == 200) {
-<<<<<<< Updated upstream
-      final decoded = jsonDecode(response.body);
-      return decoded['count'] as int;
-=======
       final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
       return decoded.map((item) => item as Map<String, dynamic>).toList();
     } else {
       throw Exception('Failed to get system parameters: ${response.statusCode}');
->>>>>>> Stashed changes
     }
-
-    throw Exception(
-      'Failed to count available questions: ${response.statusCode}',
-    );
   }
 
   Future<http.Response> _get(
