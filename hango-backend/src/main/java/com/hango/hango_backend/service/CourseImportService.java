@@ -129,6 +129,10 @@ public class CourseImportService {
                     .category(category)
                     .difficulty(difficulty)
                     .thumbnailUrl(valueOrDefault(courseRow, "Thumbnail URL", ""))
+                    .code(courseCode)
+                    .price(parseDecimal(valueOrDefault(courseRow, "Price", "0"), null))
+                    .version(valueOrDefault(courseRow, "Version", ""))
+                    .objectives(valueOrDefault(courseRow, "Objectives", ""))
                     .status("DRAFT")
                     .build();
             Course savedCourse = courseRepository.save(course);
@@ -147,9 +151,11 @@ public class CourseImportService {
 
                 Section section = Section.builder()
                         .course(savedCourse)
+                        .code(sectionCode)
                         .title(required(sectionRow, "Section Title", "SECTIONS"))
                         .description(valueOrDefault(sectionRow, "Section Description", ""))
                         .displayOrder(parseInt(valueOrDefault(sectionRow, "Section Order Index", ""), sectionIndex + 1))
+                        .version(valueOrDefault(sectionRow, "Version", ""))
                         .build();
                 Section savedSection = sectionRepository.save(section);
                 sectionsByImportKey.put(buildLessonKey(courseCode, sectionCode), savedSection);
@@ -169,6 +175,7 @@ public class CourseImportService {
 
                     Lesson lesson = Lesson.builder()
                             .section(savedSection)
+                            .code(lessonCode)
                             .title(required(lessonRow, "Lesson Title", "LESSONS"))
                             .lessonType(normalizeLessonType(valueOrDefault(lessonRow, "Lesson Type", "TEXT")))
                             .skill(category)
@@ -178,6 +185,10 @@ public class CourseImportService {
                             .description(valueOrDefault(lessonRow, "Learning Objectives", ""))
                             .pdfName(resolvePdfName(lessonRow))
                             .questionImageUrl(resolveImageUrl(lessonRow))
+                            .mediaDurationSeconds(parseInteger(valueOrDefault(lessonRow, "Media Duration", ""), null))
+                            .mediaSizeBytes(parseLong(valueOrDefault(lessonRow, "Media Size", ""), null))
+                            .estimatedTimeMinutes(parseInteger(valueOrDefault(lessonRow, "Estimated Time", ""), null))
+                            .version(valueOrDefault(lessonRow, "Version", ""))
                             .build();
                     Lesson savedLesson = lessonRepository.save(lesson);
                     lessonsByImportKey.put(buildLessonKey(courseCode, sectionCode, lessonCode), savedLesson);
@@ -218,6 +229,7 @@ public class CourseImportService {
             SystemParameter courseDifficulty = difficultyByCourseCode.get(courseCode);
             Question question = new Question();
             question.setCreatedBy(trainer);
+            question.setCode(valueOrDefault(questionRow, "Question Code", ""));
             question.setCategory(resolveQuestionCategory(valueOrDefault(questionRow, "Category", ""), warnings));
             question.setQuestionText(required(questionRow, "Question Text", "QUESTIONS"));
             question.setExplanation(valueOrDefault(questionRow, "Explaination", valueOrDefault(questionRow, "Explanation", "")));
@@ -731,7 +743,40 @@ public class CourseImportService {
             return defaultValue;
         }
     }
-
+ 
+    private Integer parseInteger(String value, Integer defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return (int) Double.parseDouble(value.trim());
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
+    }
+ 
+    private Long parseLong(String value, Long defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return (long) Double.parseDouble(value.trim());
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
+    }
+ 
+    private java.math.BigDecimal parseDecimal(String value, java.math.BigDecimal defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return new java.math.BigDecimal(value.trim());
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
+    }
+ 
     private record WorkbookData(Map<String, List<Map<String, String>>> rowsBySheet) {
     }
 }

@@ -2,6 +2,7 @@ package com.hango.hango_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -43,6 +44,15 @@ public class Course {
 
     @Column(name = "estimated_duration")
     private Integer estimatedDuration;
+
+    @Column(length = 100, unique = true)
+    private String code;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal price;
+
+    @Column(length = 50)
+    private String version;
 
     @Builder.Default
     @Column(length = 30)

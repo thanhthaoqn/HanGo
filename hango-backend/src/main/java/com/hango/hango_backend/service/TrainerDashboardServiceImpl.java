@@ -307,16 +307,33 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setContent(lDto.getQuestionText());
                 lesson.setPdfName(lDto.getPdfName());
                 lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
-                
+                 
                 // Set mandatory fields using Course category and difficulty parameters
                 lesson.setSkill(savedCourse.getCategory());
                 lesson.setDifficulty(savedCourse.getDifficulty());
-
+ 
                 lessonRepository.save(lesson);
             }
         }
     }
-
+ 
+    @Override
+    @Transactional
+    public void submitTrainerCourse(Long id, String email) {
+        com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+ 
+        if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
+            throw new RuntimeException("You are not authorized to submit this course");
+        }
+ 
+        if (!"DRAFT".equalsIgnoreCase(course.getStatus())) {
+            throw new RuntimeException("Only draft courses can be submitted for review");
+        }
+ 
+        course.setStatus("PENDING");
+        courseRepository.save(course);
+    }
     @Override
     @Transactional(readOnly = true)
     public List<com.hango.hango_backend.dto.TrainerExamResponseDTO> getTrainerExams(String email) {

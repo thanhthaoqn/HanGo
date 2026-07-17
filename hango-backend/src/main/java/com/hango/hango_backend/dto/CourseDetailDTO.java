@@ -3,6 +3,7 @@ package com.hango.hango_backend.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -16,6 +17,8 @@ public class CourseDetailDTO {
     private Integer learnersCount;
     private String description;
     private String objectives;
+    private BigDecimal price;
+    private String version;
     private Boolean isEnrolled;
     private String categoryKey;
     private String categoryName;

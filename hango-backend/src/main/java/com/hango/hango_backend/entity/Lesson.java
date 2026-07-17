@@ -22,6 +22,9 @@ public class Lesson {
     @JoinColumn(name = "section_id", nullable = false)
     private Section section;
 
+    @Column(length = 100)
+    private String code;
+
     @Column(nullable = false)
     private String title;
 
@@ -42,6 +45,18 @@ public class Lesson {
 
     @Column(name = "display_order")
     private Integer displayOrder;
+
+    @Column(name = "media_duration_seconds")
+    private Integer mediaDurationSeconds;
+
+    @Column(name = "media_size_bytes")
+    private Long mediaSizeBytes;
+
+    @Column(name = "estimated_time_minutes")
+    private Integer estimatedTimeMinutes;
+
+    @Column(length = 50)
+    private String version;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;

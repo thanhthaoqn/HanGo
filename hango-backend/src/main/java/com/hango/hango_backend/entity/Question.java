@@ -18,6 +18,9 @@ public class Question {
     @JoinColumn(name = "created_by", referencedColumnName = "id", nullable = false)
     private User createdBy;
 
+    @Column(name = "question_code", length = 100)
+    private String code;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", referencedColumnName = "id", nullable = true)
     private QuestionCategory category;
