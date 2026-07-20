@@ -182,6 +182,84 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     }
   }
 
+  Future<void> _deleteCourse(dynamic course) async {
+    final title = course['title'] ?? 'Untitled Course';
+    final courseId = course['id'] is int
+        ? course['id'] as int
+        : int.parse(course['id'].toString());
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete Course',
+          style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+        ),
+        content: Text(
+          'Are you sure you want to delete "$title"? This action cannot be undone.',
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+
+      final response = await http.delete(
+        Uri.parse('$apiBaseUrl/trainer/courses/$courseId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Course deleted successfully');
+          _fetchCoursesData();
+        }
+      } else {
+        throw Exception('Failed to delete course: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error deleting course: $e');
+      if (mounted) {
+        ToastHelper.showError(context, 'Error deleting course: $e');
+      }
+    }
+  }
+
   Future<void> _downloadImportTemplate() async {
     setState(() {
       _isDownloadingTemplate = true;
@@ -1316,6 +1394,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   );
                 },
               ),
+              const SizedBox(height: 12),
+              _buildActionButton(
+                icon: Icons.delete_outline,
+                onTap: () => _deleteCourse(course),
+              ),
             ],
           );
 
@@ -1360,6 +1443,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                     _buildActionButton(
                       icon: Icons.remove_red_eye_outlined,
                       onTap: () {},
+                    ),
+                    const SizedBox(width: 12),
+                    _buildActionButton(
+                      icon: Icons.delete_outline,
+                      onTap: () => _deleteCourse(course),
                     ),
                   ],
                 ),

@@ -24,5 +24,6 @@ public interface TrainerDashboardService {
     void updateExamVisibility(Long examId, String email, String visibility);
     
     void deleteTrainerExam(Long examId, String email);
+    void deleteTrainerCourse(Long id, String email);
     void publishTrainerCourse(Long id, String email);
 }

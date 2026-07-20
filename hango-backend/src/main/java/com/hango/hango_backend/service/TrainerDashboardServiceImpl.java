@@ -577,6 +577,23 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     }
 
     @Override
+    @Transactional
+    public void deleteTrainerCourse(Long id, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        
+        com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+                
+        if (!course.getCreator().getId().equals(user.getId())) {
+            throw new RuntimeException("You are not authorized to delete this course");
+        }
+        
+        course.setDeletedAt(java.time.LocalDateTime.now());
+        courseRepository.save(course);
+    }
+
+    @Override
     @org.springframework.transaction.annotation.Transactional
     public void publishTrainerCourse(Long id, String email) {
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
