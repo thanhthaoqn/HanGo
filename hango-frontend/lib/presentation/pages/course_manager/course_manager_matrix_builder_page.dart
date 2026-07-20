@@ -164,28 +164,44 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
     setState(() => _isSaving = true);
 
     try {
+      final flatDetails = <Map<String, dynamic>>[];
+      for (var r in _rules) {
+        if (r['type'] == 'single') {
+          flatDetails.add({
+            'skillParamId': r['skillId'],
+            'difficultyParamId': r['diffId'],
+            'categoryId': 1,
+          });
+        } else {
+          for (var sq in (r['subQuestions'] as List)) {
+            flatDetails.add({
+              'skillParamId': sq['skillId'],
+              'difficultyParamId': sq['diffId'],
+              'categoryId': 1,
+            });
+          }
+        }
+      }
+
+      final grouped = <String, Map<String, dynamic>>{};
+      for (var d in flatDetails) {
+        final key = '${d['skillParamId']}_${d['difficultyParamId']}';
+        if (grouped.containsKey(key)) {
+          grouped[key]!['quantity'] = (grouped[key]!['quantity'] as int) + 1;
+        } else {
+          grouped[key] = {
+            'skillParamId': d['skillParamId'],
+            'difficultyParamId': d['difficultyParamId'],
+            'categoryId': d['categoryId'],
+            'quantity': 1,
+          };
+        }
+      }
+
       final data = {
         'title': _titleController.text.trim(),
         'description': _descController.text.trim(),
-        'details': _rules.map((r) {
-          if (r['type'] == 'single') {
-            return {
-              'skillParamId': r['skillId'],
-              'difficultyParamId': r['diffId'],
-              'groupTypeParamId': r['groupTypeId'],
-              'quantity': 1,
-            };
-          } else {
-            return {
-              'groupTypeParamId': r['groupTypeId'],
-              'subQuestions': (r['subQuestions'] as List).map((sq) => {
-                'skillParamId': sq['skillId'],
-                'difficultyParamId': sq['diffId'],
-                'quantity': 1,
-              }).toList(),
-            };
-          }
-        }).toList(),
+        'details': grouped.values.toList(),
       };
 
       await widget.api.createExamMatrix(data);

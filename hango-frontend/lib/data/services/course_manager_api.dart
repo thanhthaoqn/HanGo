@@ -217,8 +217,11 @@ class CourseManagerApi {
     final token = prefs.getString('auth_token');
 
     // The backend uses /api/v1/metadata/parameters
-    final metadataUrl = baseUrl.replaceAll('/course-manager', '/metadata/parameters');
-    
+    final metadataUrl = baseUrl.replaceAll(
+      '/course-manager',
+      '/metadata/parameters',
+    );
+
     final response = await http.get(
       Uri.parse('$metadataUrl?type=$type'),
       headers: {
@@ -231,7 +234,9 @@ class CourseManagerApi {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
       return decoded.map((item) => item as Map<String, dynamic>).toList();
     } else {
-      throw Exception('Failed to get system parameters: ${response.statusCode}');
+      throw Exception(
+        'Failed to get system parameters: ${response.statusCode}',
+      );
     }
   }
 
