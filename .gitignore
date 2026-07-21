@@ -48,7 +48,6 @@ bin/
 # Database & Backend Environment
 # -------------------------------------------------------------------------
 hango-backend/src/main/resources/application.properties
-hango-frontend/lib/utils/config.dart
 .env
 .env.local
 .env.development.local
