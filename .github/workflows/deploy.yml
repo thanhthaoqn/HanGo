@@ -1,0 +1,74 @@
+name: CI/CD Pipeline - Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - dev   # Triggers on push to dev branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout codebase
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Set up Java JDK 21 for Backend Compilation
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # 3. Build Backend JAR
+      - name: Build Backend JAR
+        run: |
+          cd hango-backend
+          chmod +x mvnw
+          ./mvnw clean package -DskipTests
+
+      # 4. Set up Flutter SDK for Frontend Compilation
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # 5. Build Flutter Web
+      - name: Build Flutter Web
+        run: |
+          cd hango-frontend
+          flutter pub get
+          flutter build web --release
+
+      # 6. Create Deployment Package
+      - name: Create Deploy Zip
+        run: |
+          zip -r deploy.zip docker-compose.yml hango-backend/Dockerfile hango-backend/target/hango-backend-0.0.1-SNAPSHOT.jar hango-frontend/Dockerfile hango-frontend/build/web nginx
+
+      # 7. Copy package to AWS EC2 via SCP
+      - name: Copy Deploy Package to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy.zip"
+          target: "~/"
+
+      # 8. Deploy and Restart Containers on EC2 via SSH
+      - name: SSH and Restart Containers
+        uses: appleboy/ssh-action@master
+        with:
+          host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/
+            unzip -o deploy.zip -d ~/hango
+            cd ~/hango
+            chmod -R 755 ~/hango
+            docker-compose up -d --build backend frontend
+            docker image prune -f
