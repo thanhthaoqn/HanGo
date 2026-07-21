@@ -658,7 +658,7 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
           : 'Congratulations! Your application has been approved. Please proceed to sign the agreement and configure your payout details.';
     } else {
       return isVi
-          ? 'Hồ sơ giảng viên của bạn chưa hoàn thiện hoặc đã bị từ chối phê duyệt. Hãy chỉnh sửa và cập nhật lại thông tin để gửi duyệt.'
+          ? 'Hồ sơ giáo viên của bạn chưa hoàn thiện hoặc đã bị từ chối phê duyệt. Hãy chỉnh sửa và cập nhật lại thông tin để gửi duyệt.'
           : 'Your profile is incomplete or has been rejected. Please edit and re-submit for review.';
     }
   }

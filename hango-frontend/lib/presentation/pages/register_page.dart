@@ -320,14 +320,16 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Role Selector Toggle
-                          RoleToggleSelector(
-                            selectedRole: _selectedRole,
-                            onRoleChanged: (role) {
-                              setState(() {
-                                _selectedRole = role;
-                              });
-                            },
+                          Text(
+                            _selectedRole == 'TRAINER'
+                                ? 'Đăng ký tài khoản Giáo viên'
+                                : 'Đăng ký tài khoản Học viên',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF28B79B),
+                              fontFamily: 'Outfit',
+                            ),
                           ),
                           const SizedBox(height: 24),
 

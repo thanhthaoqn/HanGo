@@ -132,7 +132,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       await prefs.setBool('redirect_to_trainer_onboarding', true);
       await prefs.setString('preselected_register_role', 'TRAINER');
       if (mounted) {
-        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng ký tài khoản giảng viên để bắt đầu' : 'Please register a trainer account to start');
+        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng ký tài khoản giáo viên để bắt đầu' : 'Please register a trainer account to start');
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const RegisterPage()),
@@ -565,7 +565,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         _buildExamsSection(isDesktop),
                         const SizedBox(height: 60),
 
-                        // 4. Trở thành giảng viên Section
+                        // 4. Trở thành giáo viên Section
                         if (!_isLoggedIn) ...[
                           _buildTeacherSection(isDesktop),
                           const SizedBox(height: 60),
@@ -790,7 +790,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     constraints: const BoxConstraints(maxWidth: 650),
                     child: Text(
                       isVi
-                          ? 'Khóa học từ giáo viên hàng đầu và kho đề thi THPTQG miễn phí — tất cả trong một nền tảng hiện đại, dễ dùng. Bạn cũng có thể trở thành giảng viên và tạo khóa học của riêng mình.'
+                          ? 'Khóa học từ giáo viên hàng đầu và kho đề thi THPTQG miễn phí — tất cả trong một nền tảng hiện đại, dễ dùng. Bạn cũng có thể trở thành giáo viên và tạo khóa học của riêng mình.'
                           : 'Courses from top teachers and free exam prep — all in a modern, easy-to-use platform. You can also become a teacher and create your own courses.',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
@@ -989,7 +989,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
                   // Main Title
                   Text(
-                    isVi ? 'Trở thành giảng viên,\nchia sẻ tri thức.' : 'Become a teacher,\nshare your knowledge.',
+                    isVi ? 'Trở thành giáo viên,\nchia sẻ tri thức.' : 'Become a teacher,\nshare your knowledge.',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: isDesktop ? 42 : 28,
@@ -1114,7 +1114,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               const Icon(Icons.school_rounded, color: Color(0xFF28B79B), size: 28),
               const SizedBox(width: 12),
               Text(
-                isVi ? 'Trở thành giảng viên' : 'Become a Trainer',
+                isVi ? 'Trở thành giáo viên' : 'Become a Trainer',
                 style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
@@ -2155,7 +2155,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         ),
         const SizedBox(height: 12),
         Text(
-          isVi ? 'Trở thành giảng viên trên HanGo' : 'Become an instructor on HanGo',
+          isVi ? 'Trở thành giáo viên trên HanGo' : 'Become an instructor on HanGo',
           style: const TextStyle(
             color: Colors.white,
             fontSize: 28,

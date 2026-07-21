@@ -85,7 +85,7 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
         ToastHelper.showSuccess(
           context,
           LanguageManager.isVi
-              ? 'Đã khởi tạo vai trò giảng viên thành công!'
+              ? 'Đã khởi tạo vai trò giáo viên thành công!'
               : 'Instructor role initialized successfully!',
         );
         final Map<String, dynamic> initialProfile = {};
@@ -242,7 +242,7 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
 
     final desc = isPro
         ? (isVi
-            ? 'Dành cho giáo viên trường THPT, giảng viên đại học hoặc giáo viên trung tâm luyện thi lâu năm có bằng cấp học thuật.'
+            ? 'Dành cho giáo viên trường THPT, giáo viên đại học hoặc giáo viên trung tâm luyện thi lâu năm có bằng cấp học thuật.'
             : 'For school teachers, university professors, or center lecturers with formal educational degrees.')
         : (isVi
             ? 'Dành cho sinh viên, trợ giảng hoặc cá nhân có điểm thi THPT QG 9+ hoặc chứng chỉ IELTS đạt thành tích xuất sắc.'
