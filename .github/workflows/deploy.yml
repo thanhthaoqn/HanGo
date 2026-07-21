@@ -71,4 +71,5 @@ jobs:
             cd ~/hango
             chmod -R 755 ~/hango
             docker-compose up -d --build backend frontend
+            docker-compose restart nginx
             docker image prune -f
