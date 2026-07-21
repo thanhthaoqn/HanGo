@@ -1364,7 +1364,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        isVi ? 'Giảng viên Tiếng Anh tại HanGo' : 'English Trainer at HanGo',
+                        isVi ? 'Giáo viên Tiếng Anh tại HanGo' : 'English Trainer at HanGo',
                         style: const TextStyle(
                           color: Color(0xFF137333),
                           fontSize: 12,
@@ -1394,7 +1394,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           const SizedBox(height: 8),
           Text(
             isVi 
-              ? 'Giảng viên ôn thi THPT Quốc Gia giàu kinh nghiệm, tốt nghiệp chuyên ngành Ngôn ngữ Anh. Với phương pháp giảng dạy hiện đại, trực quan và tập trung vào bản chất, thầy/cô đã hỗ trợ hàng ngàn học sinh cải thiện điểm số vượt bậc.'
+              ? 'Giáo viên ôn thi THPT Quốc Gia giàu kinh nghiệm, tốt nghiệp chuyên ngành Ngôn ngữ Anh. Với phương pháp giảng dạy hiện đại, trực quan và tập trung vào bản chất, thầy/cô đã hỗ trợ hàng ngàn học sinh cải thiện điểm số vượt bậc.'
               : 'An experienced high school exam preparation instructor holding a degree in English Linguistics. Utilizing modern, visual, and conceptual teaching methodologies, they have successfully helped thousands of students achieve dramatic score improvements.',
             style: const TextStyle(
               fontSize: 14,

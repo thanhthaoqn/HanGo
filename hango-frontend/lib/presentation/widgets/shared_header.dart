@@ -724,6 +724,10 @@ class _SharedHeaderState extends State<SharedHeader> {
         ? Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (!widget.hideLanguageSwitcher && !widget.hideCommerceActions) ...[
+                _buildLanguageSwitcher(),
+                const SizedBox(width: 12),
+              ],
               if (widget.isDesktop) ...[
                 if (!widget.hideCommerceActions) ...[
                   _buildCartButton(),
@@ -1112,6 +1116,10 @@ class _SharedHeaderState extends State<SharedHeader> {
           : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (!widget.hideLanguageSwitcher) ...[
+                _buildLanguageSwitcher(),
+                const SizedBox(width: 12),
+              ],
               if (widget.isDesktop) ...[
                 _buildCartButton(),
                 const SizedBox(width: 12),
