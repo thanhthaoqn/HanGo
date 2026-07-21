@@ -154,9 +154,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     );
     overlay.insert(entry);
     Future.delayed(const Duration(seconds: 3), () {
-      if (entry.mounted) {
+      try {
         entry.remove();
-      }
+      } catch (_) {}
     });
   }
 
