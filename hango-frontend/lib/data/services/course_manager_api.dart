@@ -152,8 +152,11 @@ class CourseManagerApi {
     }
   }
 
-  Future<void> rejectCourse(int courseId) async {
-    final response = await _post('/courses/$courseId/reject');
+  Future<void> rejectCourse(int courseId, {String? reason}) async {
+    final response = await _post(
+      '/courses/$courseId/reject',
+      body: reason != null && reason.isNotEmpty ? jsonEncode({'reason': reason}) : null,
+    );
     if (response.statusCode != 200) {
       throw Exception(
         'Failed to reject course: ${response.statusCode} ${response.body}',

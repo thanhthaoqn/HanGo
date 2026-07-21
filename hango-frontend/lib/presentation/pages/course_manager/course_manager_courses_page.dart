@@ -105,18 +105,18 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     }
   }
 
-  Future<void> _rejectCourse(CourseReviewCourse course) async {
+  Future<void> _rejectCourse(CourseReviewCourse course, {String reason = ''}) async {
     final confirmed = await _confirmAction(
       title: 'Return to draft?',
       message:
-          'This will return "${course.title}" to DRAFT so the trainer can revise and submit again.',
+          'This will return "${course.title}" to DRAFT so the trainer can revise and submit again.\n\nReason: ${reason.isEmpty ? "None" : reason}',
       confirmLabel: 'Return',
       confirmColor: const Color(0xFFEF4444),
     );
     if (!confirmed) return;
 
     try {
-      await _api.rejectCourse(course.id);
+      await _api.rejectCourse(course.id, reason: reason);
       if (!mounted) return;
       ToastHelper.showSuccess(context, 'Course returned to draft.');
       await _loadCourses();
@@ -142,9 +142,9 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
       context: context,
       builder: (context) => _CourseReviewDialog(
         course: detail,
-        onReject: () {
+        onReject: (String reason) {
           Navigator.pop(context);
-          _rejectCourse(detail);
+          _rejectCourse(detail, reason: reason);
         },
         onPublish: () {
           Navigator.pop(context);
@@ -764,9 +764,9 @@ bool _isPendingStatus(String status) {
   return s == 'PENDING' || s == 'PENDING_APPROVAL';
 }
 
-class _CourseReviewDialog extends StatelessWidget {
+class _CourseReviewDialog extends StatefulWidget {
   final CourseReviewCourse course;
-  final VoidCallback onReject;
+  final ValueChanged<String> onReject;
   final VoidCallback onPublish;
 
   const _CourseReviewDialog({
@@ -776,25 +776,89 @@ class _CourseReviewDialog extends StatelessWidget {
   });
 
   @override
+  State<_CourseReviewDialog> createState() => _CourseReviewDialogState();
+}
+
+class _CourseReviewDialogState extends State<_CourseReviewDialog> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _reasonController = TextEditingController();
+  bool _hasViewedAll = false;
+  bool _showReasonInput = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkIfViewedAll();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_hasViewedAll) return;
+    _checkIfViewedAll();
+  }
+
+  void _checkIfViewedAll() {
+    if (!_scrollController.hasClients) return;
+    
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    
+    // If the content is short enough to fit without scrolling, or scrolled to bottom
+    if (maxScroll <= 0 || currentScroll >= maxScroll - 20) {
+      setState(() {
+        _hasViewedAll = true;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 780),
         child: Column(
           children: [
             _buildHeader(context),
+            if (!_hasViewedAll && _isPendingStatus(widget.course.status))
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                color: const Color(0xFFFFFBEB),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Color(0xFFB45309), size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Please scroll down and review all information before approving or rejecting.',
+                        style: TextStyle(color: Color(0xFF92400E), fontFamily: 'Outfit'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (course.thumbnailUrl.isNotEmpty) ...[
+                    if (widget.course.thumbnailUrl.isNotEmpty) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          course.thumbnailUrl,
+                          widget.course.thumbnailUrl,
                           height: 220,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) =>
@@ -807,47 +871,117 @@ class _CourseReviewDialog extends StatelessWidget {
                       spacing: 12,
                       runSpacing: 12,
                       children: [
-                        _InfoTile(label: 'Trainer', value: course.creatorName),
-                        _InfoTile(label: 'Code', value: course.code),
+                        _InfoTile(label: 'Trainer', value: widget.course.creatorName),
+                        _InfoTile(label: 'Code', value: widget.course.code),
                         _InfoTile(
                           label: 'Category',
-                          value: course.categoryName,
+                          value: widget.course.categoryName,
                         ),
-                        _InfoTile(label: 'Level', value: course.difficultyName),
-                        _InfoTile(label: 'Version', value: course.version),
+                        _InfoTile(label: 'Level', value: widget.course.difficultyName),
+                        _InfoTile(label: 'Version', value: widget.course.version),
                         _InfoTile(
                           label: 'Price',
-                          value: _formatPrice(course.price),
+                          value: _formatPrice(widget.course.price),
                         ),
                         _InfoTile(
                           label: 'Content',
                           value:
-                              '${course.sectionsCount} sections / ${course.lessonsCount} lessons',
+                              '${widget.course.sectionsCount} sections / ${widget.course.lessonsCount} lessons',
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     _SectionBlock(
                       title: 'Description',
-                      content: course.description.isEmpty
+                      content: widget.course.description.isEmpty
                           ? 'No description provided.'
-                          : course.description,
+                          : widget.course.description,
                     ),
                     const SizedBox(height: 16),
                     _SectionBlock(
                       title: 'Objectives',
-                      content: course.objectives.isEmpty
+                      content: widget.course.objectives.isEmpty
                           ? 'No objectives provided.'
-                          : course.objectives,
+                          : widget.course.objectives,
                     ),
-                    if (course.sessions.isNotEmpty) ...[
+                    if (widget.course.sessions.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      _SyllabusPreview(sessions: course.sessions),
+                      _SyllabusPreview(sessions: widget.course.sessions),
                     ],
+                    const SizedBox(height: 40), // extra space to ensure scrolling
                   ],
                 ),
               ),
             ),
+            if (_showReasonInput)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF2F2),
+                  border: Border(top: BorderSide(color: Color(0xFFFECACA))),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Rejection Reason',
+                      style: TextStyle(
+                        color: Color(0xFF991B1B),
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _reasonController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Please provide a reason for rejecting this course...',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFFCA5A5)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFFCA5A5)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _showReasonInput = false;
+                              _reasonController.clear();
+                            });
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (_reasonController.text.trim().isEmpty) {
+                              ToastHelper.showError(context, 'Please enter a rejection reason.');
+                              return;
+                            }
+                            widget.onReject(_reasonController.text.trim());
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Confirm Rejection'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
@@ -861,8 +995,12 @@ class _CourseReviewDialog extends StatelessWidget {
                   ),
                   const Spacer(),
                   OutlinedButton.icon(
-                    onPressed: _isPendingStatus(course.status)
-                        ? onReject
+                    onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
+                        ? () {
+                            setState(() {
+                              _showReasonInput = !_showReasonInput;
+                            });
+                          }
                         : null,
                     icon: const Icon(Icons.undo_outlined),
                     label: const Text('Return to Draft'),
@@ -876,8 +1014,8 @@ class _CourseReviewDialog extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
-                    onPressed: _isPendingStatus(course.status)
-                        ? onPublish
+                    onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
+                        ? widget.onPublish
                         : null,
                     icon: const Icon(Icons.check),
                     label: const Text('Publish'),
@@ -911,7 +1049,7 @@ class _CourseReviewDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  course.title,
+                  widget.course.title,
                   style: const TextStyle(
                     color: Color(0xFF0F172A),
                     fontWeight: FontWeight.bold,
@@ -922,7 +1060,7 @@ class _CourseReviewDialog extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    _StatusPill(status: course.status),
+                    _StatusPill(status: widget.course.status),
                     const SizedBox(width: 8),
                     const Text(
                       'DRAFT → PENDING → PUBLISHED',
