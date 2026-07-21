@@ -4,6 +4,7 @@ import '../../../utils/toast_helper.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/download_helper.dart';
+import '../../../utils/config.dart';
 
 class TrainerExamImportExcelPage extends StatefulWidget {
   final VoidCallback onBack;
@@ -21,7 +22,7 @@ class _TrainerExamImportExcelPageState
 
   Future<HangoApi> _getApi() async {
     final token = await AuthService().getToken();
-    return HangoApi(baseUrl: 'http://localhost:8080', token: token);
+    return HangoApi(baseUrl: EnvConfig.apiBaseUrl, token: token);
   }
 
   Future<void> _handleDownloadTemplate() async {

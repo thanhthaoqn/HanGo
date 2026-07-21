@@ -4,17 +4,14 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/file_picker_helper.dart';
 
+import '../../utils/config.dart';
+
 class AuthService {
   // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
   static Function(Map<String, dynamic>)? onLoginSuccess;
 
-  // Use localhost or 10.0.2.2 for Android emulator
-  static String get baseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/auth';
-    }
-    return 'http://localhost:8080/api/auth';
-  }
+  // Use dynamic baseUrl configuration
+  static String get baseUrl => EnvConfig.authBaseUrl;
 
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';

@@ -1251,12 +1251,14 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   }
 
   String _getCoursePrice(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   int _getCourseLessonsCount(Course course) {
@@ -1483,10 +1485,19 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   String _getOriginalPrice(String currentPrice) {
     if (currentPrice == 'Miễn phí') return '';
-    if (currentPrice.contains('699')) return '999.000đ';
-    if (currentPrice.contains('899')) return '1.290.000đ';
-    if (currentPrice.contains('1.290')) return '1.800.000đ';
-    return '2.100.000đ';
+    try {
+      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
+      if (clean.isEmpty) return '';
+      final val = double.parse(clean);
+      final original = val * 1.3;
+      final formatted = original.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
+      return '$formattedđ';
+    } catch (_) {
+      return '';
+    }
   }
 
   Widget _buildCourseCardHeaderPlaceholder(Map<String, dynamic> theme) {

@@ -13,6 +13,7 @@ import 'cart_page.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../widgets/payment_qr_dialog.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final int courseId;
@@ -1276,20 +1277,36 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   String _getCoursePrice(CourseDetail course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   String _getOriginalPrice(String currentPrice) {
     if (currentPrice == 'Miễn phí') return '';
-    if (currentPrice.contains('699')) return '999.000đ';
-    if (currentPrice.contains('899')) return '1.290.000đ';
-    if (currentPrice.contains('1.290')) return '1.800.000đ';
-    return '2.100.000đ';
+    try {
+      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
+      if (clean.isEmpty) return '';
+      final val = double.parse(clean);
+      final original = val * 1.3;
+      final formatted = original.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
+      return '$formattedđ';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Trả về giá số (VND) để truyền vào PaymentQrDialog
+  double _getCourseNumericPrice(CourseDetail course) {
+    return course.price;
   }
 
   Widget _buildTrainerTab(CourseDetail course) {
@@ -1662,20 +1679,27 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       );
                       return;
                     }
-                    final prefs = await SharedPreferences.getInstance();
-                    final cart = prefs.getStringList('cart_course_ids') ?? [];
-                    final courseIdStr = course.id.toString();
-                    if (!cart.contains(courseIdStr)) {
-                      cart.add(courseIdStr);
-                      await prefs.setStringList('cart_course_ids', cart);
-                      await CartManager.updateCount();
-                    }
-                    if (mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const CartPage()),
-                      );
-                    }
+                    // Mở dialog thanh toán VNPay QR
+                    if (!mounted) return;
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => PaymentQrDialog(
+                        courseId: course.id,
+                        courseTitle: course.title,
+                        price: _getCourseNumericPrice(course),
+                        onPaymentSuccess: () {
+                          setState(() {
+                            _courseDetail = _courseDetail!.copyWith(
+                              isEnrolled: true,
+                            );
+                          });
+                          _showNotification(
+                            '🎉 Thanh toán thành công! Khóa học đã được mở khóa.');
+                          _loadCourseDetail();
+                        },
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF05A22),

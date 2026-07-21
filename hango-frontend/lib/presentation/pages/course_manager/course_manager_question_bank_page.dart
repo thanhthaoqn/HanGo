@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
-
+import '../../../../utils/config.dart';
 import '../../widgets/shared_header.dart';
 import '../trainer/question_bank/widgets/question_search_bar.dart';
 import '../trainer/question_bank/widgets/question_table.dart';
@@ -37,12 +37,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
   List<TrainerQuestion> _displayedQuestions = [];
   Timer? _debounceTimer;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
-    }
-    return 'http://localhost:8080';
-  }
+  String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   void initState() {
     super.initState();

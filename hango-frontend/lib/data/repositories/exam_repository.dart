@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/exam.dart';
+import '../../utils/config.dart';
 
 class ExamRepository {
-  // Use localhost for Web/Desktop. For Android Emulator, change to 10.0.2.2
-  final String baseUrl = 'http://localhost:8080/api/v1';
+  // Use dynamic baseUrl configuration
+  final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<List<Exam>> fetchExams({String status = 'All'}) async {
     try {

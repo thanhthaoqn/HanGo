@@ -48,8 +48,9 @@ public class Course {
     @Column(length = 100, unique = true)
     private String code;
 
+    @Builder.Default
     @Column(precision = 10, scale = 2)
-    private BigDecimal price;
+    private BigDecimal price = BigDecimal.ZERO;
 
     @Column(length = 50)
     private String version;

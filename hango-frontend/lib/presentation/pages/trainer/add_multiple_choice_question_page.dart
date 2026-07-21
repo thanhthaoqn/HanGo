@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/file_picker_helper.dart';
@@ -451,7 +452,7 @@ class _AddMultipleChoiceQuestionPageState
       };
 
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/v1/trainer/questions/group'),
+        Uri.parse('${EnvConfig.v1BaseUrl}/trainer/questions/group'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

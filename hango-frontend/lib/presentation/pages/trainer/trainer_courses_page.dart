@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../utils/config.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,12 +54,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   bool _isDownloadingTemplate = false;
   bool _isImportingExcel = false;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {

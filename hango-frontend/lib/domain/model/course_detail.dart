@@ -71,6 +71,7 @@ class CourseDetail {
   final bool isEnrolled;
   final String? thumbnailUrl;
   final int? estimatedDuration;
+  final double price;
   final List<CourseSession> sessions;
 
   CourseDetail({
@@ -85,6 +86,7 @@ class CourseDetail {
     required this.isEnrolled,
     this.thumbnailUrl,
     this.estimatedDuration,
+    required this.price,
     required this.sessions,
   });
 
@@ -104,6 +106,7 @@ class CourseDetail {
       isEnrolled: json['isEnrolled'] as bool? ?? false,
       thumbnailUrl: json['thumbnailUrl'] as String?,
       estimatedDuration: json['estimatedDuration'] as int?,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
       sessions: sessionsList,
     );
   }
@@ -120,6 +123,7 @@ class CourseDetail {
     bool? isEnrolled,
     String? thumbnailUrl,
     int? estimatedDuration,
+    double? price,
     List<CourseSession>? sessions,
   }) {
     return CourseDetail(
@@ -134,6 +138,7 @@ class CourseDetail {
       isEnrolled: isEnrolled ?? this.isEnrolled,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       estimatedDuration: estimatedDuration ?? this.estimatedDuration,
+      price: price ?? this.price,
       sessions: sessions ?? this.sessions,
     );
   }
