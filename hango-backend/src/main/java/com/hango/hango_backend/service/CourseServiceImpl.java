@@ -196,6 +196,7 @@ public class CourseServiceImpl implements CourseService {
                 .version(course.getVersion())
                 .isEnrolled(isEnrolled)
                 .estimatedDuration(estimatedDuration)
+                .price(course.getPrice())
                 .sessions(sessionDTOs)
                 .build();
     }

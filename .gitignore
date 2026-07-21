@@ -48,6 +48,7 @@ bin/
 # Database & Backend Environment
 # -------------------------------------------------------------------------
 hango-backend/src/main/resources/application.properties
+hango-frontend/lib/utils/config.dart
 .env
 .env.local
 .env.development.local
@@ -76,3 +77,11 @@ database.sql
 **/linux/flutter/generated_*
 **/macos/Flutter/Generated*
 **/windows/flutter/generated_*
+
+# -------------------------------------------------------------------------
+# Deployment & Security Keys
+# -------------------------------------------------------------------------
+deploy.zip
+*.zip
+*.tar.gz
+*.pem

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import 'add_new_question_page.dart';
@@ -43,12 +44,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
   int _totalElements = 0;
   final int _pageSize = 10;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {

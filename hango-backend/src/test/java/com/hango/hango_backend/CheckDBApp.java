@@ -20,16 +20,25 @@ public class CheckDBApp {
 @Component
 class Checker implements CommandLineRunner {
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private com.hango.hango_backend.repository.CourseRepository courseRepository;
+    @Autowired
+    private com.hango.hango_backend.repository.ExamRepository examRepository;
 
     @Override
     public void run(String... args) throws Exception {
-        System.out.println("====== EXAM DB CHECK ======");
-        List<Map<String, Object>> list = jdbcTemplate.queryForList("SELECT e.id, e.title, COUNT(eq.question_id) as qCount FROM exams e LEFT JOIN exam_questions eq ON e.id = eq.exam_id GROUP BY e.id ORDER BY e.id DESC LIMIT 10");
-        for (Map<String, Object> map : list) {
-            System.out.println("Exam ID: " + map.get("id") + ", Title: " + map.get("title") + ", Questions: " + map.get("qCount"));
+        System.out.println("====== EXAM REPOSITORY CHECK ======");
+        List<com.hango.hango_backend.entity.Exam> exams = examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED");
+        System.out.println("Published Exams Count: " + exams.size());
+        for (com.hango.hango_backend.entity.Exam e : exams) {
+            System.out.println("Exam ID: " + e.getId() + ", Title: " + e.getTitle() + ", Status: " + e.getStatus());
+        }
+
+        System.out.println("====== COURSE REPOSITORY CHECK ======");
+        List<com.hango.hango_backend.dto.CourseSummaryDTO> courses = courseRepository.findCoursesWithFilters(null, null, null, null);
+        System.out.println("Published Courses Count (findCoursesWithFilters): " + courses.size());
+        for (com.hango.hango_backend.dto.CourseSummaryDTO c : courses) {
+            System.out.println("Course ID: " + c.getId() + ", Title: " + c.getTitle() + ", Category: " + c.getCategoryName() + ", Diff: " + c.getDifficultyName());
         }
         System.out.println("===========================");
-        System.exit(0);
     }
 }

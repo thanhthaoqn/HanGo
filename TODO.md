@@ -268,7 +268,7 @@ This file is the official roadmap and checklist for the HanGo platform developme
 
 ### ⚙️ Phase 2: Backend Execution & API Design
 - [ ] Set up `orders`, `revenue_records`, `monthly_statements` tables.
-- [ ] Write VNPay payment integration (generate payment URL, verify IPN checksum, idempotent success handler).
+- [x] Write VNPay payment integration (generate payment URL, verify IPN checksum, idempotent success handler).
 - [ ] Write auto revenue splitter logic (Gross -> TrainerShare / PlatformShare based on TrainerType 70/30 or 60/40) upon successful payment.
 - [ ] Implement background scheduler job to automatically generate Monthly Statements.
 - [ ] Create Trainer APIs (`GET /api/v1/trainer/revenue`, `POST /api/v1/trainer/statements/{id}/confirm`).
@@ -281,7 +281,7 @@ This file is the official roadmap and checklist for the HanGo platform developme
 
 ### 🚨 Phase 4: Quality Assurance
 - [ ] Test double-payment IPN (idempotency checks).
-- [ ] Test VNPay signature checks.
+- [x] Test VNPay signature checks.
 - [ ] Validate manual transfer record flow by Admin.
 
 ---

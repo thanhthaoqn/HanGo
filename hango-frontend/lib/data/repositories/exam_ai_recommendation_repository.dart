@@ -3,9 +3,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/entities/exam.dart';
+import '../../utils/config.dart';
 
 class ExamAIRecommendationRepository {
-  final String baseUrl = 'http://localhost:8080/api/v1';
+  final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<Map<String, dynamic>> recommendCoursesAI({
     required int examAttemptId,

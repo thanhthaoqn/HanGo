@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../utils/toast_helper.dart';
+import '../../../../utils/config.dart';
 import '../../login_page.dart';
 import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
@@ -101,7 +102,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
 
   Future<HangoApi> _getApi() async {
     final token = await _authService.getToken();
-    final String apiBaseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.0.2.2:8080';
+    final String apiBaseUrl = EnvConfig.apiBaseUrl;
     return HangoApi(baseUrl: apiBaseUrl, token: token);
   }
 

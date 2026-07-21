@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
+import '../../../../utils/config.dart';
 import '../../login_page.dart';
 import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
@@ -44,12 +45,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   List<TrainerQuestion> _displayedQuestions = [];
   Timer? _debounceTimer;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
-    }
-    return 'http://localhost:8080';
-  }
+  String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   @override
   void initState() {

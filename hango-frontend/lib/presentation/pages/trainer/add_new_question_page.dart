@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/file_picker_helper.dart';
@@ -279,7 +280,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
       };
 
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/v1/trainer/questions'),
+        Uri.parse('${EnvConfig.v1BaseUrl}/trainer/questions'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
