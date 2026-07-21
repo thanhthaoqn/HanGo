@@ -1165,7 +1165,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _codeController,
+                      readOnly: true,
                       decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
                         hintText: 'e.g. ENG101',
                         hintStyle: const TextStyle(
                           color: Color(0xFF94A3B8),
@@ -1406,8 +1409,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
           const SizedBox(height: 8),
           TextField(
             controller: _versionController,
+            readOnly: true,
             decoration: InputDecoration(
-              hintText: 'Enter version...',
+              filled: true,
+              fillColor: const Color(0xFFF1F5F9),
+              hintText: 'Auto-generated version',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 14,
@@ -1416,29 +1422,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
-              ),
-              suffixIcon: PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.arrow_drop_down,
-                  color: Color(0xFF64748B),
-                ),
-                onSelected: (value) {
-                  _versionController.text = value;
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'v1.0',
-                    child: Text('v1.0', style: TextStyle(fontFamily: 'Outfit')),
-                  ),
-                  const PopupMenuItem(
-                    value: 'v2.0',
-                    child: Text('v2.0', style: TextStyle(fontFamily: 'Outfit')),
-                  ),
-                  const PopupMenuItem(
-                    value: 'v3.0',
-                    child: Text('v3.0', style: TextStyle(fontFamily: 'Outfit')),
-                  ),
-                ],
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1456,7 +1439,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
             style: const TextStyle(
               fontFamily: 'Outfit',
               fontSize: 14,
-              color: Color(0xFF1E293B),
+              color: Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 20),

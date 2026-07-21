@@ -13,9 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -73,7 +72,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         long draftCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "DRAFT");
         long publishedCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "PUBLISHED");
         long hiddenCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "HIDDEN");
-        long pendingCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "PENDING");
+        long pendingCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "PENDING_APPROVAL");
 
         // 2. Fetch Base courses
         String searchParam = (search == null || search.trim().isEmpty()) ? null : search.trim();
@@ -116,7 +115,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 });
             }
         } else {
-            // Default to newest
             mutableProjections.sort((p1, p2) -> {
                 if (p1.getCreatedAt() == null) return 1;
                 if (p2.getCreatedAt() == null) return -1;
@@ -134,6 +132,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .lessonsCount(p.getLessonsCount() != null ? p.getLessonsCount() : 0L)
                 .thumbnailUrl(p.getThumbnailUrl())
                 .createdAt(p.getCreatedAt())
+                .code(p.getCode())
+                .version(p.getVersion())
+                .parentId(p.getParentId())
                 .build()).collect(Collectors.toList());
 
         return TrainerCoursesResponseDTO.builder()
@@ -174,9 +175,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
                 .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
 
+        // Auto-generate a unique course code to avoid DB unique constraint violations
+        String generatedCode = generateUniqueCourseCode();
+
         com.hango.hango_backend.entity.Course course = com.hango.hango_backend.entity.Course.builder()
                 .title(request.getTitle())
-                .code(request.getCode())
+                .code(generatedCode)
                 .description(request.getDescription())
                 .objectives(request.getObjectives())
                 .creator(user)
@@ -184,7 +188,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .difficulty(difficulty)
                 .thumbnailUrl(request.getThumbnailUrl())
                 .price(request.getPrice())
-                .version(request.getVersion())
+                .version("v1")
                 .estimatedDuration(request.getEstimatedDuration())
                 .status("DRAFT")
                 .build();
@@ -199,7 +203,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
     @Override
     @org.springframework.transaction.annotation.Transactional
-    public void updateTrainerCourse(Long id, String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
+    public Long updateTrainerCourse(Long id, String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 
@@ -229,6 +233,59 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
                 .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
 
+        boolean needsNewDraftVersion = "PUBLISHED".equalsIgnoreCase(course.getStatus())
+                && enrollmentRepository.countByCourseId(course.getId()) > 0;
+
+        List<com.hango.hango_backend.dto.CourseSessionDTO> sessionDTOs = request.getSessions();
+        if (sessionDTOs == null) {
+            sessionDTOs = new java.util.ArrayList<>();
+        }
+
+        if (needsNewDraftVersion) {
+            // Clone V1 → V2: Create a new DRAFT version preserving the original published course (V1).
+            // V2 links back to V1 via parentId for version tracking.
+            String newVersion = incrementVersion(course.getVersion());
+            String baseCode = course.getCode() != null ? course.getCode().replaceAll("\\s+$", "") : "";
+            
+            // Strip any existing version suffix (e.g. -V2) to prevent COURSE-1-V2-V3
+            if (baseCode.matches(".*-V\\d+")) {
+                baseCode = baseCode.replaceAll("-V\\d+$", "");
+            }
+            
+            String newCode = "";
+            if (!baseCode.isEmpty()) {
+                newCode = baseCode + "-" + newVersion.toUpperCase();
+            }
+            
+            // Resolve unique constraint conflicts if code was used by a soft-deleted course
+            int suffix = 1;
+            String candidateCode = newCode;
+            while (candidateCode != null && !candidateCode.isEmpty() && courseRepository.existsByCodeIgnoreCase(candidateCode)) {
+                candidateCode = newCode + "_" + suffix;
+                suffix++;
+            }
+            newCode = candidateCode;
+            com.hango.hango_backend.entity.Course draftCourse = com.hango.hango_backend.entity.Course.builder()
+                    .title(request.getTitle())
+                    .code(newCode)
+                    .description(request.getDescription())
+                    .objectives(request.getObjectives())
+                    .creator(course.getCreator())
+                    .category(category)
+                    .difficulty(difficulty)
+                    .thumbnailUrl(request.getThumbnailUrl())
+                    .price(request.getPrice())
+                    .version(newVersion)
+                    .estimatedDuration(request.getEstimatedDuration())
+                    .status("DRAFT")
+                    .parentId(course.getId())
+                    .build();
+
+            com.hango.hango_backend.entity.Course savedDraftCourse = courseRepository.save(draftCourse);
+            saveSectionsAndLessonsForCourse(savedDraftCourse, sessionDTOs, category, difficulty);
+            return savedDraftCourse.getId();
+        }
+
         course.setTitle(request.getTitle());
         course.setCode(request.getCode());
         course.setDescription(request.getDescription());
@@ -236,7 +293,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setCategory(category);
         course.setDifficulty(difficulty);
         course.setPrice(request.getPrice());
-        course.setVersion(request.getVersion());
         course.setEstimatedDuration(request.getEstimatedDuration());
         if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isEmpty()) {
             course.setThumbnailUrl(request.getThumbnailUrl());
@@ -244,32 +300,26 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         com.hango.hango_backend.entity.Course savedCourse = courseRepository.save(course);
 
-        // Update sections and lessons
+        // Update sections and lessons in place for the existing course record.
         List<com.hango.hango_backend.entity.Section> existingSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(savedCourse.getId());
-        List<com.hango.hango_backend.dto.CourseSessionDTO> sessionDTOs = request.getSessions();
-        if (sessionDTOs == null) {
-            sessionDTOs = new java.util.ArrayList<>();
-        }
 
         java.util.Set<Long> requestSectionIds = sessionDTOs.stream()
                 .map(com.hango.hango_backend.dto.CourseSessionDTO::getId)
                 .filter(sid -> sid != null && sid < 1000000000000L)
                 .collect(java.util.stream.Collectors.toSet());
 
-        // Delete sections not in request
+        // Delete sections that were removed
         for (com.hango.hango_backend.entity.Section existingSection : existingSections) {
             if (!requestSectionIds.contains(existingSection.getId())) {
                 sectionRepository.delete(existingSection);
             }
         }
 
-        // Save/update sections
         for (int sIdx = 0; sIdx < sessionDTOs.size(); sIdx++) {
             com.hango.hango_backend.dto.CourseSessionDTO sDto = sessionDTOs.get(sIdx);
             com.hango.hango_backend.entity.Section section;
             if (sDto.getId() != null && sDto.getId() < 1000000000000L) {
-                section = sectionRepository.findById(sDto.getId())
-                        .orElse(new com.hango.hango_backend.entity.Section());
+                section = sectionRepository.findById(sDto.getId()).orElse(new com.hango.hango_backend.entity.Section());
             } else {
                 section = new com.hango.hango_backend.entity.Section();
             }
@@ -277,10 +327,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             section.setTitle(sDto.getTitle());
             section.setDescription(sDto.getDescription());
             section.setDisplayOrder(sIdx + 1);
+            section.setVersion(savedCourse.getVersion());
 
             final com.hango.hango_backend.entity.Section savedSection = sectionRepository.save(section);
 
-            // Update lessons in this section
             List<com.hango.hango_backend.entity.Lesson> existingLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(savedSection.getId());
             List<com.hango.hango_backend.dto.CourseLessonDTO> lessonDTOs = sDto.getLessons();
             if (lessonDTOs == null) {
@@ -292,20 +342,17 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .filter(lid -> lid != null && lid < 1000000000000L)
                     .collect(java.util.stream.Collectors.toSet());
 
-            // Delete lessons not in request
             for (com.hango.hango_backend.entity.Lesson existingLesson : existingLessons) {
                 if (!requestLessonIds.contains(existingLesson.getId())) {
                     lessonRepository.delete(existingLesson);
                 }
             }
 
-            // Save/update lessons
             for (int lIdx = 0; lIdx < lessonDTOs.size(); lIdx++) {
                 com.hango.hango_backend.dto.CourseLessonDTO lDto = lessonDTOs.get(lIdx);
                 com.hango.hango_backend.entity.Lesson lesson;
                 if (lDto.getId() != null && lDto.getId() < 1000000000000L) {
-                    lesson = lessonRepository.findById(lDto.getId())
-                            .orElse(new com.hango.hango_backend.entity.Lesson());
+                    lesson = lessonRepository.findById(lDto.getId()).orElse(new com.hango.hango_backend.entity.Lesson());
                 } else {
                     lesson = new com.hango.hango_backend.entity.Lesson();
                 }
@@ -317,16 +364,65 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setContent(lDto.getQuestionText());
                 lesson.setPdfName(lDto.getPdfName());
                 lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
-                 
-                // Set mandatory fields using Course category and difficulty parameters
+                lesson.setVersion(savedCourse.getVersion());
                 lesson.setSkill(savedCourse.getCategory());
                 lesson.setDifficulty(savedCourse.getDifficulty());
- 
+
+                if (lDto.getExamId() != null) {
+                    lesson.setExam(examRepository.findById(lDto.getExamId()).orElse(null));
+                }
+                lessonRepository.save(lesson);
+            }
+        }
+
+        return savedCourse.getId();
+    }
+
+    private void saveSectionsAndLessonsForCourse(com.hango.hango_backend.entity.Course course,
+                                                 List<com.hango.hango_backend.dto.CourseSessionDTO> sessionDTOs,
+                                                 com.hango.hango_backend.entity.SystemParameter category,
+                                                 com.hango.hango_backend.entity.SystemParameter difficulty) {
+        for (int sIdx = 0; sIdx < sessionDTOs.size(); sIdx++) {
+            com.hango.hango_backend.dto.CourseSessionDTO sDto = sessionDTOs.get(sIdx);
+            com.hango.hango_backend.entity.Section section = com.hango.hango_backend.entity.Section.builder()
+                    .course(course)
+                    .title(sDto.getTitle())
+                    .description(sDto.getDescription())
+                    .displayOrder(sIdx + 1)
+                    .version(course.getVersion())
+                    .build();
+            section = sectionRepository.save(section);
+
+            List<com.hango.hango_backend.dto.CourseLessonDTO> lessonDTOs = sDto.getLessons();
+            if (lessonDTOs == null) {
+                lessonDTOs = new java.util.ArrayList<>();
+            }
+
+            for (int lIdx = 0; lIdx < lessonDTOs.size(); lIdx++) {
+                com.hango.hango_backend.dto.CourseLessonDTO lDto = lessonDTOs.get(lIdx);
+                com.hango.hango_backend.entity.Lesson lesson = com.hango.hango_backend.entity.Lesson.builder()
+                        .section(section)
+                        .title(lDto.getTitle())
+                        .lessonType(lDto.getItemType() != null ? lDto.getItemType() : "video")
+                        .displayOrder(lIdx + 1)
+                        .description(lDto.getDescription())
+                        .content(lDto.getQuestionText())
+                        .pdfName(lDto.getPdfName())
+                        .questionImageUrl(lDto.getQuestionImageUrl())
+                        .estimatedTime(lDto.getEstimatedTime())
+                        .version(course.getVersion())
+                        .skill(category)
+                        .difficulty(difficulty)
+                        .build();
+
+                if (lDto.getExamId() != null) {
+                    lesson.setExam(examRepository.findById(lDto.getExamId()).orElse(null));
+                }
                 lessonRepository.save(lesson);
             }
         }
     }
- 
+  
     @Override
     @Transactional
     public void submitTrainerCourse(Long id, String email) {
@@ -341,7 +437,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("Only draft courses can be submitted for review");
         }
  
-        course.setStatus("PENDING");
+        course.setStatus("PENDING_APPROVAL");
         courseRepository.save(course);
     }
     @Override
@@ -593,9 +689,34 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         courseRepository.save(course);
     }
 
+    private String generateUniqueCourseCode() {
+        String baseCode = "COURSE-" + java.time.Instant.now().toEpochMilli();
+        // Keep trying with incrementing suffix if base timestamp collides
+        String candidate = baseCode;
+        int suffix = 0;
+        while (courseRepository.existsByCodeIgnoreCase(candidate)) {
+            candidate = baseCode + "-" + (++suffix);
+        }
+        return candidate;
+    }
+
+    private String incrementVersion(String currentVersion) {
+        if (currentVersion == null || currentVersion.isBlank()) {
+            return "v1";
+        }
+        try {
+            String numPart = currentVersion.replaceAll("[^0-9]", "");
+            int num = Integer.parseInt(numPart);
+            return "v" + (num + 1);
+        } catch (NumberFormatException e) {
+            return "v1";
+        }
+    }
+
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void publishTrainerCourse(Long id, String email) {
+        // Legacy direct publish (for new courses without enrolled learners)
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 
@@ -609,6 +730,57 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         course.setStatus("PUBLISHED");
+        course.setPublishedAt(java.time.LocalDateTime.now());
+        course.setLatestVersionId(course.getId());
         courseRepository.save(course);
+    }
+
+    @Override
+    @Transactional
+    public void approveTrainerCourse(Long id, String email) {
+        // This approves a PENDING_APPROVAL draft (V2) submitted by a trainer.
+        // V2 becomes PUBLISHED, and V1 remains PUBLISHED so existing learners can continue viewing it.
+        // V1.latestVersionId is set to V2.id so existing learners are notified.
+        com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(draftCourse.getStatus())) {
+            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be approved");
+        }
+
+        if (draftCourse.getParentId() == null) {
+            throw new RuntimeException("This course is not a draft version. Cannot approve.");
+        }
+
+        // Publish the draft (V2)
+        draftCourse.setStatus("PUBLISHED");
+        draftCourse.setPublishedAt(java.time.LocalDateTime.now());
+        draftCourse.setLatestVersionId(draftCourse.getId());
+        courseRepository.save(draftCourse);
+
+        // Update original published version (V1) to point latestVersionId to V2 (keep V1 PUBLISHED)
+        com.hango.hango_backend.entity.Course originalCourse = courseRepository.findById(draftCourse.getParentId())
+                .orElseThrow(() -> new RuntimeException("Original course (V1) not found"));
+        if ("PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
+            originalCourse.setLatestVersionId(draftCourse.getId());
+            courseRepository.save(originalCourse);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void rejectTrainerCourseDraft(Long id, String email) {
+        // Rejects a PENDING_APPROVAL draft (V2). V2 goes back to DRAFT/REJECTED for editing.
+        // V1 remains PUBLISHED and untouched.
+        com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(draftCourse.getStatus())) {
+            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be rejected");
+        }
+
+        draftCourse.setStatus("REJECTED");
+        courseRepository.save(draftCourse);
+        // V1 remains PUBLISHED - no changes needed
     }
 }

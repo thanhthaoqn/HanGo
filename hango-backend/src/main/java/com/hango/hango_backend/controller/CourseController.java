@@ -62,6 +62,7 @@ public class CourseController {
         }
     }
 
+
     @DeleteMapping("/{id}/enroll")
     public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
         try {
@@ -71,6 +72,21 @@ public class CourseController {
             }
             courseService.unenrollCourse(id, currentUserId);
             return ResponseEntity.ok().body("{\"message\": \"Unenrollment successful\"}");
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(400).body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/{id}/switch-version")
+    public ResponseEntity<?> switchCourseVersion(@PathVariable Long id) {
+        try {
+            Long currentUserId = getCurrentUserId();
+            if (currentUserId == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            courseService.switchCourseVersion(id, currentUserId);
+            return ResponseEntity.ok().body("{\"message\": \"Course version switched successfully\"}");
         } catch (RuntimeException e) {
             e.printStackTrace();
             return ResponseEntity.status(400).body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -115,6 +131,16 @@ public class CourseController {
         } catch (RuntimeException e) {
             e.printStackTrace();
             return ResponseEntity.status(400).body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/{id}/versions")
+    public ResponseEntity<?> getCourseVersionHistory(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(courseService.getCourseVersionHistory(id));
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(404).body(e.getClass().getName() + ": " + e.getMessage());
         }
     }
 }

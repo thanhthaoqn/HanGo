@@ -21,6 +21,9 @@ public class CourseDetailDTO {
     private BigDecimal price;
     private String version;
     private Boolean isEnrolled;
+    private Boolean hasNewVersionAvailable;
+    private Long latestPublishedCourseId;
+    private String latestPublishedVersion;
     private String categoryKey;
     private String categoryName;
     private String difficultyKey;

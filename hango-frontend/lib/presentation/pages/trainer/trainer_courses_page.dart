@@ -15,7 +15,6 @@ import 'edit_course_page.dart';
 import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
 import 'question_bank/trainer_question_bank_page.dart';
-import '../../../utils/language_manager.dart';
 import 'trainer_profile_page.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
@@ -1125,7 +1124,67 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     );
   }
 
+  // ─── Version grouping helpers ─────────────────────────────────────────────
+
+  /// Resolves a flat list of versions (same `code`) into a typed group.
+  ({dynamic published, dynamic draft, dynamic pending, List<dynamic> all})
+  _resolveGroup(List<dynamic> group) {
+    dynamic published;
+    dynamic draft;
+    dynamic pending;
+
+    for (final c in group) {
+      final s = (c['status'] ?? '').toString().toUpperCase();
+      final id = (c['id'] ?? 0) as int;
+      if (s == 'PUBLISHED') {
+        if (published == null || id > (published['id'] as int)) published = c;
+      } else if (s == 'PENDING_APPROVAL' || s == 'PENDING') {
+        if (pending == null || id > (pending['id'] as int)) pending = c;
+      } else {
+        if (draft == null || id > (draft['id'] as int)) draft = c;
+      }
+    }
+    return (published: published, draft: draft, pending: pending, all: group);
+  }
+
+  /// Groups _coursesList by `parentId` (if exists) or `id`, falling back to `code` if necessary.
+  List<({dynamic published, dynamic draft, dynamic pending, List<dynamic> all})>
+  get _groupedCourses {
+    final Map<String, List<dynamic>> byKey = {};
+    for (final c in _coursesList) {
+      // Prioritize parentId for grouping versions of the same course
+      final parentId = c['parentId'];
+      final id = c['id'];
+      final key = (parentId ?? id ?? '').toString();
+      byKey.putIfAbsent(key, () => []).add(c);
+    }
+    return byKey.values.map(_resolveGroup).toList();
+  }
+
+  /// Returns the lifecycle state string for a group.
+  /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'PENDING' | 'DUAL_PUBLISHED'
+  String _lifecycleState({
+    required dynamic published,
+    required dynamic draft,
+    required dynamic pending,
+    required List<dynamic> all,
+  }) {
+    final publishedCount = all
+        .where(
+          (c) => (c['status'] ?? '').toString().toUpperCase() == 'PUBLISHED',
+        )
+        .length;
+    if (publishedCount >= 2) return 'DUAL_PUBLISHED';
+    if (pending != null) return 'PENDING';
+    if (draft != null && published != null) return 'HAS_DRAFT';
+    return 'LIVE_ONLY';
+  }
+
+  // ─── Courses section ──────────────────────────────────────────────────────
+
   Widget _buildCoursesSection() {
+    final groups = _groupedCourses;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1142,335 +1201,596 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               ),
             ),
           ),
-        _isLoading
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48.0),
-                  child: CircularProgressIndicator(color: Color(0xFF20B486)),
+        if (_isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 48.0),
+              child: CircularProgressIndicator(color: Color(0xFF20B486)),
+            ),
+          )
+        else if (groups.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 64),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFEFF2F5)),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.folder_open, size: 48, color: Color(0xFF94A3B8)),
+                SizedBox(height: 16),
+                Text(
+                  'No courses found matching this criteria',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Outfit',
+                  ),
                 ),
-              )
-            : _coursesList.isEmpty
-            ? Container(
-                padding: const EdgeInsets.symmetric(vertical: 64),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFEFF2F5)),
-                ),
-                child: Column(
-                  children: const [
-                    Icon(Icons.folder_open, size: 48, color: Color(0xFF94A3B8)),
-                    SizedBox(height: 16),
-                    Text(
-                      'No courses found matching this criteria',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : Column(
-                children: _coursesList
-                    .map((course) => _buildCourseCard(course))
-                    .toList(),
-              ),
+              ],
+            ),
+          )
+        else
+          Column(children: groups.map(_buildCourseCard).toList()),
         const SizedBox(height: 24),
         _buildPagination(),
       ],
     );
   }
 
-  Widget _buildCourseCard(dynamic course) {
-    final title = course['title'] ?? 'Untitled Course';
-    final status = course['status'] ?? 'DRAFT';
-    final desc = course['description'] ?? 'No description provided.';
+  // ─── Course Card (lifecycle-aware) ────────────────────────────────────────
+
+  Widget _buildCourseCard(
+    ({dynamic published, dynamic draft, dynamic pending, List<dynamic> all})
+    group,
+  ) {
+    final published = group.published;
+    final draft = group.draft;
+    final pending = group.pending;
+
+    // Representative record: prefer published, then draft, then pending
+    final course = published ?? draft ?? pending ?? group.all.first;
+
+    final title = (course['title'] ?? 'Untitled Course') as String;
+    final desc =
+        (course['description'] ?? 'No description provided.') as String;
     final learners = course['learnersCount'] ?? 0;
     final lessons = course['lessonsCount'] ?? 0;
     final dateStr = _formatDate(course['createdAt']);
-    final thumbnail = course['thumbnailUrl'] ?? '';
+    final thumbnail = (course['thumbnailUrl'] ?? '') as String;
 
-    final isPublished = status.toString().toUpperCase() == 'PUBLISHED';
+    final state = _lifecycleState(
+      published: published,
+      draft: draft,
+      pending: pending,
+      all: group.all,
+    );
+
+    int extractId(dynamic c) =>
+        c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
+
+    // Version label strings
+    final pubVer = (published?['version'] ?? '').toString();
+    final draftVer = (draft?['version'] ?? '').toString();
+    final pendingVer = (pending?['version'] ?? '').toString();
+
+    // State 4 – learner counts per published version
+    final pubVersions =
+        group.all
+            .where(
+              (c) =>
+                  (c['status'] ?? '').toString().toUpperCase() == 'PUBLISHED',
+            )
+            .toList()
+          ..sort(
+            (a, b) => ((b['id'] ?? 0) as int).compareTo((a['id'] ?? 0) as int),
+          );
+    final latestPub = pubVersions.isNotEmpty ? pubVersions.first : null;
+    final prevPub = pubVersions.length >= 2 ? pubVersions[1] : null;
+    final latestPubVer = (latestPub?['version'] ?? '').toString();
+    final latestPubLearners = latestPub?['learnersCount'] ?? 0;
+    final prevPubVer = (prevPub?['version'] ?? '').toString();
+    final prevPubLearners = prevPub?['learnersCount'] ?? 0;
+
+    // Border accent by state
+    final borderColor = state == 'HAS_DRAFT'
+        ? const Color(0xFFFDE68A)
+        : state == 'PENDING'
+        ? const Color(0xFFBFDBFE)
+        : state == 'DUAL_PUBLISHED'
+        ? const Color(0xFFA7F3D0)
+        : const Color(0xFFEFF2F5);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEFF2F5)),
-        boxShadow: [
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: const [
           BoxShadow(
-            color: const Color.fromRGBO(0, 0, 0, 0.01),
+            color: Color.fromRGBO(0, 0, 0, 0.04),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final useRow = constraints.maxWidth > 600;
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Body ─────────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final useRow = constraints.maxWidth > 600;
 
-          final imageContainer = Container(
-            width: useRow ? 120 : double.infinity,
-            height: 90,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF2F6),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: thumbnail.toString().isNotEmpty
-                ? ClipRRect(
+                final imageWidget = Container(
+                  width: useRow ? 110 : double.infinity,
+                  height: 82,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2F6),
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      thumbnail,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.school,
-                        color: Color(0xFF20B486),
-                        size: 32,
-                      ),
-                    ),
-                  )
-                : const Icon(Icons.school, color: Color(0xFF20B486), size: 32),
-          );
-
-          final details = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title & Status Badge
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isPublished
-                          ? const Color(0xFFE6FFFA)
-                          : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      status.toString().toUpperCase(),
-                      style: TextStyle(
-                        color: isPublished
-                            ? const Color(0xFF20B486)
-                            : const Color(0xFF64748B),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Stats
-              Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.people_outline,
-                        size: 16,
-                        color: Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$learners learners',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 13,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.class_outlined,
-                        size: 16,
-                        color: Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$lessons lesson',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 13,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 14,
-                        color: Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        dateStr,
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 13,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // Description
-              Text(
-                desc,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 13,
-                  fontFamily: 'Outfit',
-                  height: 1.4,
-                ),
-              ),
-            ],
-          );
-
-          final actionButtons = Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildActionButton(
-                icon: Icons.edit_outlined,
-                onTap: () {
-                  final courseId = course['id'] is int
-                      ? course['id'] as int
-                      : int.parse(course['id'].toString());
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EditCoursePage(courseId: courseId),
-                    ),
-                  ).then((_) => _fetchCoursesData());
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildActionButton(
-                icon: Icons.remove_red_eye_outlined,
-                onTap: () {
-                  ToastHelper.show(
-                    context,
-                    'View course $title details is under construction',
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildActionButton(
-                icon: Icons.delete_outline,
-                onTap: () => _deleteCourse(course),
-              ),
-            ],
-          );
-
-          if (useRow) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                imageContainer,
-                const SizedBox(width: 20),
-                Expanded(child: details),
-                const SizedBox(width: 20),
-                actionButtons,
-              ],
-            );
-          } else {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                imageContainer,
-                const SizedBox(height: 16),
-                details,
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    _buildActionButton(
-                      icon: Icons.edit_outlined,
-                      onTap: () {
-                        final courseId = course['id'] is int
-                            ? course['id'] as int
-                            : int.parse(course['id'].toString());
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                EditCoursePage(courseId: courseId),
+                  clipBehavior: Clip.antiAlias,
+                  child: thumbnail.isNotEmpty
+                      ? Image.network(
+                          thumbnail,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.school,
+                            color: Color(0xFF20B486),
+                            size: 32,
                           ),
-                        ).then((_) => _fetchCoursesData());
-                      },
+                        )
+                      : const Icon(
+                          Icons.school,
+                          color: Color(0xFF20B486),
+                          size: 32,
+                        ),
+                );
+
+                final infoCol = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title + lifecycle badges
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        if (state == 'LIVE_ONLY')
+                          _badge(
+                            label: published != null
+                                ? 'PUBLISHED${pubVer.isNotEmpty ? ' · $pubVer' : ''}'
+                                : 'DRAFT${draftVer.isNotEmpty ? ' · $draftVer' : ''}',
+                            bg: published != null
+                                ? const Color(0xFFE6FFFA)
+                                : const Color(0xFFF1F5F9),
+                            fg: published != null
+                                ? const Color(0xFF0D9373)
+                                : const Color(0xFF64748B),
+                          ),
+                        if (state == 'HAS_DRAFT') ...[
+                          _badge(
+                            label:
+                                '🟢 PUBLISHED${pubVer.isNotEmpty ? ' · $pubVer' : ''}',
+                            bg: const Color(0xFFE6FFFA),
+                            fg: const Color(0xFF0D9373),
+                          ),
+                          _badge(
+                            label:
+                                '🟡 Draft${draftVer.isNotEmpty ? ' $draftVer' : ''} Waiting Approval',
+                            bg: const Color(0xFFFEF9C3),
+                            fg: const Color(0xFF92400E),
+                            border: const Color(0xFFFDE68A),
+                          ),
+                        ],
+                        if (state == 'PENDING') ...[
+                          _badge(
+                            label:
+                                '🟢 PUBLISHED${pubVer.isNotEmpty ? ' · $pubVer' : ''}',
+                            bg: const Color(0xFFE6FFFA),
+                            fg: const Color(0xFF0D9373),
+                          ),
+                          _badge(
+                            label:
+                                '🔵 Draft${pendingVer.isNotEmpty ? ' $pendingVer' : ''} Approved',
+                            bg: const Color(0xFFEFF6FF),
+                            fg: const Color(0xFF1D4ED8),
+                            border: const Color(0xFFBFDBFE),
+                          ),
+                        ],
+                        if (state == 'DUAL_PUBLISHED')
+                          _badge(
+                            label:
+                                '🟢 PUBLISHED${latestPubVer.isNotEmpty ? ' · $latestPubVer' : ''}',
+                            bg: const Color(0xFFE6FFFA),
+                            fg: const Color(0xFF0D9373),
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    _buildActionButton(
-                      icon: Icons.remove_red_eye_outlined,
-                      onTap: () {},
+                    const SizedBox(height: 8),
+                    // Stats
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 6,
+                      children: [
+                        if (state == 'DUAL_PUBLISHED' && latestPub != null) ...[
+                          _statChip(
+                            Icons.people_outline,
+                            '$latestPubLearners học viên${latestPubVer.isNotEmpty ? ' ở $latestPubVer' : ''}',
+                          ),
+                          if (prevPub != null)
+                            _statChip(
+                              Icons.history,
+                              '$prevPubLearners học viên${prevPubVer.isNotEmpty ? ' ở $prevPubVer' : ''}',
+                            ),
+                        ] else
+                          _statChip(Icons.people_outline, '$learners learners'),
+                        _statChip(Icons.class_outlined, '$lessons lessons'),
+                        _statChip(Icons.calendar_today_outlined, dateStr),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    _buildActionButton(
-                      icon: Icons.delete_outline,
-                      onTap: () => _deleteCourse(course),
+                    const SizedBox(height: 8),
+                    Text(
+                      desc,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 13,
+                        fontFamily: 'Outfit',
+                        height: 1.4,
+                      ),
                     ),
                   ],
-                ),
-              ],
-            );
-          }
-        },
+                );
+
+                if (useRow) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      imageWidget,
+                      const SizedBox(width: 16),
+                      Expanded(child: infoCol),
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [imageWidget, const SizedBox(height: 14), infoCol],
+                );
+              },
+            ),
+          ),
+
+          // ── Lifecycle Action Bar ──────────────────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(14),
+              ),
+              border: Border(
+                top: BorderSide(color: borderColor.withAlpha(100)),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: _buildLifecycleActions(
+              state: state,
+              course: course,
+              published: published,
+              draft: draft,
+              extractId: extractId,
+              title: title,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildActionButton({
+  // ─── Per-state action bar ─────────────────────────────────────────────────
+
+  Widget _buildLifecycleActions({
+    required String state,
+    required dynamic course,
+    required dynamic published,
+    required dynamic draft,
+    required int Function(dynamic) extractId,
+    required String title,
+  }) {
+    switch (state) {
+      // ── State 1: Normal – course is live ─────────────────────────────────
+      case 'LIVE_ONLY':
+        return Row(
+          children: [
+            _actionChip(
+              icon: Icons.visibility_outlined,
+              label: 'View',
+              onTap: () => ToastHelper.show(
+                context,
+                'View course feature is under development',
+              ),
+            ),
+            const SizedBox(width: 8),
+            _actionChip(
+              icon: Icons.edit_outlined,
+              label: 'Edit / Create New Version',
+              color: const Color(0xFF20B486),
+              bg: const Color(0xFFE6F7F1),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditCoursePage(courseId: extractId(course)),
+                  ),
+                ).then((_) => _fetchCoursesData());
+              },
+            ),
+            const Spacer(),
+            _iconBtn(
+              icon: Icons.history,
+              tooltip: 'Version history',
+              color: const Color(0xFF64748B),
+              onTap: () => ToastHelper.show(
+                context,
+                'Version history is empty (only 1 version exists).',
+              ),
+            ),
+            const SizedBox(width: 8),
+            _iconBtn(
+              icon: Icons.delete_outline,
+              tooltip: 'Delete course',
+              color: const Color(0xFFEF4444),
+              onTap: () => _deleteCourse(course),
+            ),
+          ],
+        );
+
+      // ── State 2: Trainer editing in progress ─────────────────────────────
+      case 'HAS_DRAFT':
+        return Row(
+          children: [
+            _actionChip(
+              icon: Icons.edit_note,
+              label: 'Continue Editing v2',
+              color: const Color(0xFFD97706),
+              bg: const Color(0xFFFEF3C7),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditCoursePage(courseId: extractId(draft)),
+                  ),
+                ).then((_) => _fetchCoursesData());
+              },
+            ),
+            const SizedBox(width: 8),
+            if (published != null) ...[
+              _actionChip(
+                icon: Icons.visibility_outlined,
+                label: 'View Old Version',
+                color: const Color(0xFF475569),
+                bg: const Color(0xFFF1F5F9),
+                onTap: () => ToastHelper.show(
+                  context,
+                  'View old version details for: $title',
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            _actionChip(
+              icon: Icons.cancel_outlined,
+              label: 'Cancel',
+              color: const Color(0xFF64748B),
+              onTap: () => _deleteCourse(draft),
+            ),
+            const Spacer(),
+            _iconBtn(
+              icon: Icons.delete_outline,
+              tooltip: 'Delete course',
+              color: const Color(0xFFEF4444),
+              onTap: () => _deleteCourse(published ?? draft),
+            ),
+          ],
+        );
+
+      // ── State 3: Waiting for Course Manager approval ──────────────────────
+      case 'PENDING':
+        return Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.hourglass_top, size: 15, color: Color(0xFF3B82F6)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Waiting for Course Manager approval...',
+                    style: TextStyle(
+                      color: Color(0xFF1D4ED8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            _iconBtn(
+              icon: Icons.visibility_outlined,
+              tooltip: 'View pending version',
+              color: const Color(0xFF3B82F6),
+              onTap: () =>
+                  ToastHelper.show(context, 'View pending version: $title'),
+            ),
+          ],
+        );
+
+      // ── State 4: Two published versions running in parallel ───────────────
+      case 'DUAL_PUBLISHED':
+        return Row(
+          children: [
+            _actionChip(
+              icon: Icons.history,
+              label: 'View Version History',
+              color: const Color(0xFF6366F1),
+              bg: const Color(0xFFEEF2FF),
+              onTap: () =>
+                  ToastHelper.show(context, 'View version history: $title'),
+            ),
+            const SizedBox(width: 8),
+            _actionChip(
+              icon: Icons.edit_outlined,
+              label: 'Edit / Create New Version',
+              color: const Color(0xFF20B486),
+              bg: const Color(0xFFE6F7F1),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditCoursePage(courseId: extractId(course)),
+                  ),
+                ).then((_) => _fetchCoursesData());
+              },
+            ),
+            const Spacer(),
+            _iconBtn(
+              icon: Icons.delete_outline,
+              tooltip: 'Delete course',
+              color: const Color(0xFFEF4444),
+              onTap: () => _deleteCourse(course),
+            ),
+          ],
+        );
+
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // ─── Shared UI micro-components ───────────────────────────────────────────
+
+  Widget _badge({
+    required String label,
+    required Color bg,
+    required Color fg,
+    Color? border,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: border != null ? Border.all(color: border) : null,
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fg,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Outfit',
+        ),
+      ),
+    );
+  }
+
+  Widget _statChip(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF94A3B8)),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 13,
+            fontFamily: 'Outfit',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionChip({
     required IconData icon,
+    required String label,
     required VoidCallback onTap,
+    Color color = const Color(0xFF475569),
+    Color bg = const Color(0xFFF1F5F9),
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        width: 38,
-        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: bg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFEFF2F5)),
         ),
-        child: Icon(icon, color: const Color(0xFF64748B), size: 18),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _iconBtn({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    Color color = const Color(0xFF64748B),
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFEFF2F5)),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
       ),
     );
   }
@@ -1499,8 +1819,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           width: 32,
           height: 32,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: const Color(0xFF20B486),
+          decoration: const BoxDecoration(
+            color: Color(0xFF20B486),
             shape: BoxShape.circle,
           ),
           child: const Text(
