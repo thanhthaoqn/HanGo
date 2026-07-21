@@ -121,12 +121,14 @@ class _SharedHeaderState extends State<SharedHeader> {
   }
 
   String _getCoursePrice(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   int _parsePriceInt(String priceStr) {
@@ -724,10 +726,6 @@ class _SharedHeaderState extends State<SharedHeader> {
         ? Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!widget.hideLanguageSwitcher && !widget.hideCommerceActions) ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 12),
-              ],
               if (widget.isDesktop) ...[
                 if (!widget.hideCommerceActions) ...[
                   _buildCartButton(),
@@ -1116,10 +1114,6 @@ class _SharedHeaderState extends State<SharedHeader> {
           : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!widget.hideLanguageSwitcher) ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 12),
-              ],
               if (widget.isDesktop) ...[
                 _buildCartButton(),
                 const SizedBox(width: 12),
