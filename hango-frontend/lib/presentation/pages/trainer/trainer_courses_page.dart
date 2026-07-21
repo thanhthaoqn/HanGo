@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../utils/config.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1152,29 +1151,23 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   get _groupedCourses {
     final Map<String, List<dynamic>> byKey = {};
     for (final c in _coursesList) {
-      // Prioritize parentId for grouping versions of the same course
-      final parentId = c['parentId'];
-      final id = c['id'];
-      final key = (parentId ?? id ?? '').toString();
-      byKey.putIfAbsent(key, () => []).add(c);
+      final code = (c['code'] ?? '').toString();
+      // Code is like COURSE-1234 or COURSE-1234-V2. We group by the base code.
+      final baseCode = code.contains('-V') ? code.split('-V')[0] : code;
+      
+      byKey.putIfAbsent(baseCode, () => []).add(c);
     }
     return byKey.values.map(_resolveGroup).toList();
   }
 
   /// Returns the lifecycle state string for a group.
-  /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'PENDING' | 'DUAL_PUBLISHED'
+  /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'PENDING'
   String _lifecycleState({
     required dynamic published,
     required dynamic draft,
     required dynamic pending,
     required List<dynamic> all,
   }) {
-    final publishedCount = all
-        .where(
-          (c) => (c['status'] ?? '').toString().toUpperCase() == 'PUBLISHED',
-        )
-        .length;
-    if (publishedCount >= 2) return 'DUAL_PUBLISHED';
     if (pending != null) return 'PENDING';
     if (draft != null && published != null) return 'HAS_DRAFT';
     return 'LIVE_ONLY';
@@ -1278,30 +1271,13 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     final pendingVer = (pending?['version'] ?? '').toString();
 
     // State 4 – learner counts per published version
-    final pubVersions =
-        group.all
-            .where(
-              (c) =>
-                  (c['status'] ?? '').toString().toUpperCase() == 'PUBLISHED',
-            )
-            .toList()
-          ..sort(
-            (a, b) => ((b['id'] ?? 0) as int).compareTo((a['id'] ?? 0) as int),
-          );
-    final latestPub = pubVersions.isNotEmpty ? pubVersions.first : null;
-    final prevPub = pubVersions.length >= 2 ? pubVersions[1] : null;
-    final latestPubVer = (latestPub?['version'] ?? '').toString();
-    final latestPubLearners = latestPub?['learnersCount'] ?? 0;
-    final prevPubVer = (prevPub?['version'] ?? '').toString();
-    final prevPubLearners = prevPub?['learnersCount'] ?? 0;
+
 
     // Border accent by state
     final borderColor = state == 'HAS_DRAFT'
         ? const Color(0xFFFDE68A)
         : state == 'PENDING'
         ? const Color(0xFFBFDBFE)
-        : state == 'DUAL_PUBLISHED'
-        ? const Color(0xFFA7F3D0)
         : const Color(0xFFEFF2F5);
 
     return Container(
@@ -1413,13 +1389,6 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                             border: const Color(0xFFBFDBFE),
                           ),
                         ],
-                        if (state == 'DUAL_PUBLISHED')
-                          _badge(
-                            label:
-                                '🟢 PUBLISHED${latestPubVer.isNotEmpty ? ' · $latestPubVer' : ''}',
-                            bg: const Color(0xFFE6FFFA),
-                            fg: const Color(0xFF0D9373),
-                          ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1428,18 +1397,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                       spacing: 16,
                       runSpacing: 6,
                       children: [
-                        if (state == 'DUAL_PUBLISHED' && latestPub != null) ...[
-                          _statChip(
-                            Icons.people_outline,
-                            '$latestPubLearners học viên${latestPubVer.isNotEmpty ? ' ở $latestPubVer' : ''}',
-                          ),
-                          if (prevPub != null)
-                            _statChip(
-                              Icons.history,
-                              '$prevPubLearners học viên${prevPubVer.isNotEmpty ? ' ở $prevPubVer' : ''}',
-                            ),
-                        ] else
-                          _statChip(Icons.people_outline, '$learners learners'),
+                        _statChip(Icons.people_outline, '$learners learners'),
                         _statChip(Icons.class_outlined, '$lessons lessons'),
                         _statChip(Icons.calendar_today_outlined, dateStr),
                       ],
@@ -1496,6 +1454,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               draft: draft,
               extractId: extractId,
               title: title,
+              allVersions: group.all,
             ),
           ),
         ],
@@ -1512,6 +1471,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     required dynamic draft,
     required int Function(dynamic) extractId,
     required String title,
+    required List<dynamic> allVersions,
   }) {
     switch (state) {
       // ── State 1: Normal – course is live ─────────────────────────────────
@@ -1546,9 +1506,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               icon: Icons.history,
               tooltip: 'Version history',
               color: const Color(0xFF64748B),
-              onTap: () => ToastHelper.show(
+              onTap: () => _showVersionHistoryModal(
                 context,
-                'Version history is empty (only 1 version exists).',
+                title,
+                allVersions,
               ),
             ),
             const SizedBox(width: 8),
@@ -1580,22 +1541,21 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               },
             ),
             const SizedBox(width: 8),
-            if (published != null) ...[
-              _actionChip(
-                icon: Icons.visibility_outlined,
-                label: 'View Old Version',
-                color: const Color(0xFF475569),
-                bg: const Color(0xFFF1F5F9),
-                onTap: () => ToastHelper.show(
-                  context,
-                  'View old version details for: $title',
-                ),
+            _actionChip(
+              icon: Icons.history,
+              label: 'Version History',
+              color: const Color(0xFF475569),
+              bg: const Color(0xFFF1F5F9),
+              onTap: () => _showVersionHistoryModal(
+                context,
+                title,
+                allVersions,
               ),
-              const SizedBox(width: 8),
-            ],
+            ),
+            const SizedBox(width: 8),
             _actionChip(
               icon: Icons.cancel_outlined,
-              label: 'Cancel',
+              label: 'Cancel Draft',
               color: const Color(0xFF64748B),
               onTap: () => _deleteCourse(draft),
             ),
@@ -1638,48 +1598,14 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             ),
             const Spacer(),
             _iconBtn(
-              icon: Icons.visibility_outlined,
-              tooltip: 'View pending version',
-              color: const Color(0xFF3B82F6),
-              onTap: () =>
-                  ToastHelper.show(context, 'View pending version: $title'),
-            ),
-          ],
-        );
-
-      // ── State 4: Two published versions running in parallel ───────────────
-      case 'DUAL_PUBLISHED':
-        return Row(
-          children: [
-            _actionChip(
               icon: Icons.history,
-              label: 'View Version History',
-              color: const Color(0xFF6366F1),
-              bg: const Color(0xFFEEF2FF),
-              onTap: () =>
-                  ToastHelper.show(context, 'View version history: $title'),
-            ),
-            const SizedBox(width: 8),
-            _actionChip(
-              icon: Icons.edit_outlined,
-              label: 'Edit / Create New Version',
-              color: const Color(0xFF20B486),
-              bg: const Color(0xFFE6F7F1),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => EditCoursePage(courseId: extractId(course)),
-                  ),
-                ).then((_) => _fetchCoursesData());
-              },
-            ),
-            const Spacer(),
-            _iconBtn(
-              icon: Icons.delete_outline,
-              tooltip: 'Delete course',
-              color: const Color(0xFFEF4444),
-              onTap: () => _deleteCourse(course),
+              tooltip: 'Version history',
+              color: const Color(0xFF3B82F6),
+              onTap: () => _showVersionHistoryModal(
+                context,
+                title,
+                allVersions,
+              ),
             ),
           ],
         );
@@ -1687,6 +1613,246 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  void _showVersionHistoryModal(
+    BuildContext context,
+    String courseTitle,
+    List<dynamic> versions,
+  ) {
+    final sortedVersions = List<dynamic>.from(versions)
+      ..sort((a, b) {
+        final idA = (a['id'] ?? 0) as int;
+        final idB = (b['id'] ?? 0) as int;
+        return idB.compareTo(idA);
+      });
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        clipBehavior: Clip.antiAlias,
+        child: Container(
+          width: 600,
+          constraints: const BoxConstraints(maxHeight: 700),
+          color: Colors.white,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8FAFC),
+                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.history_rounded,
+                        color: Color(0xFF6366F1),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Lịch sử phiên bản khóa học',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          Text(
+                            courseTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF64748B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // Body list
+              Flexible(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(20),
+                  shrinkWrap: true,
+                  itemCount: sortedVersions.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = sortedVersions[index];
+                    final version = (item['version'] ?? 'v1').toString();
+                    final status = (item['status'] ?? 'DRAFT').toString().toUpperCase();
+                    final dateStr = _formatDate(item['createdAt']);
+                    final learners = item['learnersCount'] ?? 0;
+                    final lessons = item['lessonsCount'] ?? 0;
+
+                    Color statusBg;
+                    Color statusFg;
+                    String statusText;
+
+                    if (status == 'PUBLISHED') {
+                      statusBg = const Color(0xFFE6FFFA);
+                      statusFg = const Color(0xFF0D9373);
+                      statusText = '🟢 Đang phát sóng (Published)';
+                    } else if (status == 'PENDING_APPROVAL' || status == 'PENDING') {
+                      statusBg = const Color(0xFFEFF6FF);
+                      statusFg = const Color(0xFF1D4ED8);
+                      statusText = '🔵 Chờ phê duyệt (Pending)';
+                    } else if (status == 'REJECTED') {
+                      statusBg = const Color(0xFFFEF2F2);
+                      statusFg = const Color(0xFFDC2626);
+                      statusText = '🔴 Từ chối (Rejected)';
+                    } else {
+                      statusBg = const Color(0xFFFEF9C3);
+                      statusFg = const Color(0xFF92400E);
+                      statusText = '🟡 Bản nháp (Draft)';
+                    }
+
+                    int extractId(dynamic c) =>
+                        c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
+                    final courseId = extractId(item);
+
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              version.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: statusBg,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        statusText,
+                                        style: TextStyle(
+                                          color: statusFg,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 4,
+                                  children: [
+                                    _statChip(Icons.people_outline, '$learners học viên'),
+                                    _statChip(Icons.class_outlined, '$lessons bài học'),
+                                    _statChip(Icons.calendar_today_outlined, dateStr),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          if (status == 'DRAFT')
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EditCoursePage(courseId: courseId),
+                                  ),
+                                ).then((_) => _fetchCoursesData());
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF20B486),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              child: const Text('Chỉnh sửa', style: TextStyle(fontSize: 12, fontFamily: 'Outfit')),
+                            )
+                          else
+                            OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EditCoursePage(courseId: courseId),
+                                  ),
+                                ).then((_) => _fetchCoursesData());
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF475569),
+                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              child: const Text('Xem chi tiết', style: TextStyle(fontSize: 12, fontFamily: 'Outfit')),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ─── Shared UI micro-components ───────────────────────────────────────────
