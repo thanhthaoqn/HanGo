@@ -248,8 +248,6 @@ class _CartPageState extends State<CartPage> {
     for (final c in _cartCourses) {
       subtotal += _parsePriceInt(_getCoursePrice(c));
     }
-    int discount = (subtotal * _discountPercentage).round();
-    int total = subtotal - discount;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -294,7 +292,7 @@ class _CartPageState extends State<CartPage> {
                           )
                         : _cartCourses.isEmpty
                             ? _buildEmptyState(isVi)
-                            : _buildCartContent(isDesktop, isVi, subtotal, discount, total),
+                            : _buildCartContent(isDesktop, isVi, subtotal),
                   ],
                 ),
               ),
@@ -371,7 +369,7 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildCartContent(bool isDesktop, bool isVi, int subtotal, int discount, int total) {
+  Widget _buildCartContent(bool isDesktop, bool isVi, int subtotal) {
     if (isDesktop) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,7 +381,7 @@ class _CartPageState extends State<CartPage> {
           const SizedBox(width: 32),
           Expanded(
             flex: 1,
-            child: _buildSummaryCard(isVi, subtotal, discount, total),
+            child: _buildSummaryCard(isVi, subtotal),
           )
         ],
       );
@@ -392,7 +390,7 @@ class _CartPageState extends State<CartPage> {
         children: [
           _buildItemsList(isVi),
           const SizedBox(height: 28),
-          _buildSummaryCard(isVi, subtotal, discount, total),
+          _buildSummaryCard(isVi, subtotal),
         ],
       );
     }
@@ -541,7 +539,7 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildSummaryCard(bool isVi, int subtotal, int discount, int total) {
+  Widget _buildSummaryCard(bool isVi, int subtotal) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
