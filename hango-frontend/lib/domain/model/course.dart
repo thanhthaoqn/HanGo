@@ -10,6 +10,7 @@ class Course {
   final String status; // 'featured' | 'in_progress' | 'completed'
   final double progressPercentage;
   final double price;
+  final String? version;
 
   const Course({
     required this.id,
@@ -23,6 +24,7 @@ class Course {
     required this.status,
     required this.progressPercentage,
     required this.price,
+    this.version,
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class Course {
       status: 'featured',
       progressPercentage: (json['progressPercentage'] ?? 0.0).toDouble(),
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      version: json['version'] as String?,
     );
   }
 }

@@ -19,4 +19,7 @@ public class TrainerCourseDetailDTO {
     private long lessonsCount;
     private String thumbnailUrl;
     private LocalDateTime createdAt;
+    private String code;
+    private String version;
+    private Long parentId;
 }

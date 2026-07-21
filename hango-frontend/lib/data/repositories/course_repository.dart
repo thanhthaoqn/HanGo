@@ -21,16 +21,16 @@ class CourseRepository {
       if (filterType != 'ALL') queryParams['filterType'] = filterType;
       if (difficulty != 'ALL') queryParams['difficulty'] = difficulty;
 
-      final uri = Uri.parse('$baseUrl/courses').replace(queryParameters: queryParams);
-      
+      final uri = Uri.parse(
+        '$baseUrl/courses',
+      ).replace(queryParameters: queryParams);
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
       final response = await http.get(
         uri,
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
@@ -47,22 +47,24 @@ class CourseRepository {
   Future<CourseDetail> fetchCourseDetail(int id) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$id');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
       final response = await http.get(
         uri,
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        final Map<String, dynamic> data = json.decode(
+          utf8.decode(response.bodyBytes),
+        );
         return CourseDetail.fromJson(data);
       } else {
-        throw Exception('Failed to load course details: ${response.statusCode}');
+        throw Exception(
+          'Failed to load course details: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Error fetching course details: $e');
@@ -72,22 +74,24 @@ class CourseRepository {
   Future<CourseReviewSummary> fetchCourseReviews(int id) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$id/reviews');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
       final response = await http.get(
         uri,
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        final Map<String, dynamic> data = json.decode(
+          utf8.decode(response.bodyBytes),
+        );
         return CourseReviewSummary.fromJson(data);
       } else {
-        throw Exception('Failed to load course reviews: ${response.statusCode}');
+        throw Exception(
+          'Failed to load course reviews: ${response.statusCode}',
+        );
       }
     } catch (e) {
       throw Exception('Error fetching course reviews: $e');
@@ -97,15 +101,13 @@ class CourseRepository {
   Future<void> enrollCourse(int courseId) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$courseId/enroll');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
       final response = await http.post(
         uri,
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode != 200) {
@@ -119,15 +121,13 @@ class CourseRepository {
   Future<void> unenrollCourse(int courseId) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$courseId/enroll');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
       final response = await http.delete(
         uri,
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode != 200) {
@@ -138,10 +138,14 @@ class CourseRepository {
     }
   }
 
-  Future<void> submitCourseReview(int courseId, double rating, String content) async {
+  Future<void> submitCourseReview(
+    int courseId,
+    double rating,
+    String content,
+  ) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$courseId/reviews');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
@@ -151,10 +155,7 @@ class CourseRepository {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'rating': rating.round(),
-          'content': content,
-        }),
+        body: jsonEncode({'rating': rating.round(), 'content': content}),
       );
 
       if (response.statusCode != 200) {
@@ -168,15 +169,13 @@ class CourseRepository {
   Future<void> deleteCourseReview(int courseId) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$courseId/reviews');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
       final response = await http.delete(
         uri,
-        headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode != 200) {
@@ -184,6 +183,53 @@ class CourseRepository {
       }
     } catch (e) {
       throw Exception('Error deleting review: $e');
+    }
+  }
+
+  Future<void> switchCourseVersion(int courseId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/courses/$courseId/switch-version');
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.post(
+        uri,
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to switch version: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error switching course version: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchCourseVersionHistory(
+    int courseId,
+  ) async {
+    try {
+      final uri = Uri.parse('$baseUrl/courses/$courseId/versions');
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.get(
+        uri,
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception(
+          'Failed to fetch version history: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Error fetching version history: $e');
     }
   }
 }

@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CourseRepository extends JpaRepository<Course, Long> {
@@ -23,15 +24,22 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
            "LEFT JOIN c.creator u " +
            "LEFT JOIN CourseRating cr ON cr.course.id = c.id " +
            "LEFT JOIN Enrollment e ON e.course.id = c.id " +
-          "WHERE c.status = 'PUBLISHED' " +
+           "WHERE c.status = 'PUBLISHED' AND c.deletedAt IS NULL " +
            "AND (:search IS NULL OR LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:difficulty IS NULL OR diff.paramKey = :difficulty) " +
            "AND (:enrolledUserId IS NULL OR EXISTS (SELECT 1 FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId AND (:enrollmentStatus IS NULL OR e2.status = :enrollmentStatus))) " +
+           "AND ((c.latestVersionId = c.id OR c.latestVersionId IS NULL) " +
+           "     OR (:enrolledUserId IS NOT NULL AND EXISTS (SELECT 1 FROM Enrollment e3 WHERE e3.course.id = c.id AND e3.user.id = :enrolledUserId))) " +
            "GROUP BY c.id, cat.paramValue, c.title, u.fullName, diff.paramKey, c.thumbnailUrl, c.price")
     List<CourseSummaryDTO> findCoursesWithFilters(@Param("search") String search,
                                                   @Param("difficulty") String difficulty,
                                                   @Param("enrolledUserId") Long enrolledUserId,
                                                   @Param("enrollmentStatus") String enrollmentStatus);
+
+    @Query("SELECT c FROM Course c WHERE c.code = :code AND c.status = 'PUBLISHED' ORDER BY COALESCE(c.publishedAt, c.createdAt) DESC")
+    List<Course> findPublishedByCodeOrderByPublishedAtDesc(@Param("code") String code);
+
+    Optional<Course> findFirstByCodeAndStatusOrderByPublishedAtDesc(String code, String status);
 
     @Query("SELECT COUNT(c) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
     long countByCreatorIdAndDeletedAtIsNull(@Param("creatorId") Long creatorId);
@@ -52,7 +60,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query(value = "SELECT c.id AS id, c.title AS title, c.status AS status, c.description AS description, " +
            "(SELECT COUNT(e.id) FROM enrollments e WHERE e.course_id = c.id) AS learnersCount, " +
            "(SELECT COUNT(l.id) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id AND l.deleted_at IS NULL) AS lessonsCount, " +
-           "c.thumbnail_url AS thumbnailUrl, c.created_at AS createdAt " +
+           "c.thumbnail_url AS thumbnailUrl, c.created_at AS createdAt, " +
+           "c.code AS code, c.version AS version, c.parent_id AS parentId " +
            "FROM courses c " +
            "WHERE c.created_by = :trainerId AND c.deleted_at IS NULL " +
            "AND (:status = 'ALL' OR c.status = :status) " +
@@ -69,4 +78,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     long countByStatusAndDeletedAtIsNull(String status);
 
     boolean existsByCodeIgnoreCase(String code);
+
+    List<Course> findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(String code);
+
+    List<Course> findByParentIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long parentId);
+
+    Optional<Course> findByIdAndParentIdIsNullAndDeletedAtIsNull(Long id);
 }

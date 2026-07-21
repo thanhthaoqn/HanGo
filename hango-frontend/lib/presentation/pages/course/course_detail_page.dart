@@ -35,7 +35,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   late Future<CourseReviewSummary> _reviewsFuture;
   bool _isEnrolling = false;
   bool _isUnenrolling = false;
+  bool _isSwitchingVersion = false;
   bool _isInCart = false;
+  bool _dismissedVersionBanner = false;
 
   int _currentUserId = 1;
 
@@ -71,8 +73,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     }
   }
 
-
-
   Future<void> _loadCourseDetail() async {
     try {
       setState(() {
@@ -89,6 +89,41 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         _errorMessage = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _switchToNewVersion() async {
+    if (_courseDetail == null || _courseDetail!.latestPublishedCourseId == null)
+      return;
+
+    setState(() {
+      _isSwitchingVersion = true;
+    });
+
+    try {
+      await _repository.switchCourseVersion(_courseDetail!.id);
+      if (!mounted) return;
+
+      _showNotification(
+        'Switch to new version successfully! Learning progress has been synchronized.',
+      );
+
+      // Reload course detail to reflect new version
+      final updated = await _repository.fetchCourseDetail(widget.courseId);
+      if (mounted) {
+        setState(() {
+          _courseDetail = updated;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showNotification('Error switching version: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSwitchingVersion = false;
+        });
+      }
     }
   }
 
@@ -112,10 +147,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               ),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
-                color: isError ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+                color: isError
+                    ? const Color(0xFFFEF2F2)
+                    : const Color(0xFFECFDF5),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isError ? const Color(0xFFFCA5A5) : const Color(0xFF34D399),
+                  color: isError
+                      ? const Color(0xFFFCA5A5)
+                      : const Color(0xFF34D399),
                   width: 1,
                 ),
                 boxShadow: [
@@ -130,8 +169,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-                    color: isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                    isError
+                        ? Icons.error_outline_rounded
+                        : Icons.check_circle_outline_rounded,
+                    color: isError
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFF10B981),
                     size: 20,
                   ),
                   const SizedBox(width: 12),
@@ -139,7 +182,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     child: Text(
                       message,
                       style: TextStyle(
-                        color: isError ? const Color(0xFF991B1B) : const Color(0xFF065F46),
+                        color: isError
+                            ? const Color(0xFF991B1B)
+                            : const Color(0xFF065F46),
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -183,23 +228,47 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final ratingLabels = ['Terrible', 'Bad', 'Average', 'Good', 'Excellent'];
+            final ratingLabels = [
+              'Terrible',
+              'Bad',
+              'Average',
+              'Good',
+              'Excellent',
+            ];
             final label = ratingLabels[selectedRating.round() - 1];
 
             final ratingColors = [
-              { 'bg': const Color(0xFFFEF2F2), 'text': const Color(0xFFEF4444) }, // Terrible
-              { 'bg': const Color(0xFFFFF7ED), 'text': const Color(0xFFF97316) }, // Bad
-              { 'bg': const Color(0xFFFEF3C7), 'text': const Color(0xFFD97706) }, // Average
-              { 'bg': const Color(0xFFECFDF5), 'text': const Color(0xFF10B981) }, // Good
-              { 'bg': const Color(0xFFE6F4EA), 'text': const Color(0xFF0F9D58) }, // Excellent
+              {
+                'bg': const Color(0xFFFEF2F2),
+                'text': const Color(0xFFEF4444),
+              }, // Terrible
+              {
+                'bg': const Color(0xFFFFF7ED),
+                'text': const Color(0xFFF97316),
+              }, // Bad
+              {
+                'bg': const Color(0xFFFEF3C7),
+                'text': const Color(0xFFD97706),
+              }, // Average
+              {
+                'bg': const Color(0xFFECFDF5),
+                'text': const Color(0xFF10B981),
+              }, // Good
+              {
+                'bg': const Color(0xFFE6F4EA),
+                'text': const Color(0xFF0F9D58),
+              }, // Excellent
             ];
-            final colorConfig = ratingColors[(selectedRating.round() - 1).clamp(0, 4)];
+            final colorConfig =
+                ratingColors[(selectedRating.round() - 1).clamp(0, 4)];
 
             return Dialog(
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
               elevation: 12,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 450),
                 padding: const EdgeInsets.all(28),
@@ -225,7 +294,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           ),
                           child: IconButton(
                             onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 20),
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Color(0xFF64748B),
+                              size: 20,
+                            ),
                             constraints: const BoxConstraints(),
                             padding: const EdgeInsets.all(8),
                             splashRadius: 20,
@@ -262,8 +335,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                                   curve: Curves.easeOut,
                                   padding: const EdgeInsets.only(right: 8.0),
                                   child: Icon(
-                                    isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
-                                    color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+                                    isSelected
+                                        ? Icons.star_rounded
+                                        : Icons.star_outline_rounded,
+                                    color: isSelected
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFFE2E8F0),
                                     size: 44,
                                   ),
                                 ),
@@ -274,7 +351,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                         const SizedBox(width: 12),
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: colorConfig['bg'],
                             borderRadius: BorderRadius.circular(20),
@@ -321,24 +401,39 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       controller: contentController,
                       maxLines: 4,
                       maxLength: 500,
-                      style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Share your experience with this course...',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 13,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF8FAFC),
                         counterText: "",
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                            width: 1,
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                            width: 1,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF28B79B),
+                            width: 1.5,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.all(16),
                       ),
@@ -348,9 +443,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         OutlinedButton(
-                          onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                          onPressed: isSubmitting
+                              ? null
+                              : () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 14,
+                            ),
                             side: const BorderSide(color: Color(0xFFE2E8F0)),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -358,7 +458,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           ),
                           child: const Text(
                             'Cancel',
-                            style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -367,7 +470,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                               ? null
                               : () async {
                                   if (contentController.text.trim().isEmpty) {
-                                    _showNotification('Please write some content for your review', isError: true);
+                                    _showNotification(
+                                      'Please write some content for your review',
+                                      isError: true,
+                                    );
                                     return;
                                   }
                                   setDialogState(() {
@@ -386,20 +492,27 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                                           : 'Review submitted successfully!',
                                     );
                                     setState(() {
-                                      _reviewsFuture = _repository.fetchCourseReviews(widget.courseId);
+                                      _reviewsFuture = _repository
+                                          .fetchCourseReviews(widget.courseId);
                                       _loadCourseDetail();
                                     });
                                   } catch (e) {
                                     setDialogState(() {
                                       isSubmitting = false;
                                     });
-                                    _showNotification('Error: $e', isError: true);
+                                    _showNotification(
+                                      'Error: $e',
+                                      isError: true,
+                                    );
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF28B79B),
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -415,7 +528,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                                 )
                               : const Text(
                                   'Submit',
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                         ),
                       ],
@@ -449,7 +565,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       context: context,
       builder: (ctx) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 10,
           backgroundColor: Colors.white,
           child: Container(
@@ -560,7 +678,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       await _repository.enrollCourse(course.id);
       if (!mounted) return;
 
-      _showNotification('You have successfully joined the course ${course.title}');
+      _showNotification(
+        'You have successfully joined the course ${course.title}',
+      );
 
       // Silently fetch fresh details in background to sync any other backend updates
       final updated = await _repository.fetchCourseDetail(widget.courseId);
@@ -590,7 +710,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       context: context,
       builder: (ctx) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 10,
           backgroundColor: Colors.white,
           child: Container(
@@ -738,61 +860,64 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
             )
           : (_errorMessage != null)
-              ? Center(child: Text('Error: $_errorMessage'))
-              : (_courseDetail == null)
-                  ? const Center(child: Text('Course not found.'))
-                    : SingleChildScrollView(
-                      controller: _scrollController,
+          ? Center(child: Text('Error: $_errorMessage'))
+          : (_courseDetail == null)
+          ? const Center(child: Text('Course not found.'))
+          : SingleChildScrollView(
+              controller: _scrollController,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_courseDetail!.hasNewVersionAvailable)
+                    _buildVersionBanner(_courseDetail!, isDesktop),
+                  _buildBanner(_courseDetail!, isDesktop),
+                  Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 1440),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 32,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildBanner(_courseDetail!, isDesktop),
-                          Center(
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 1440),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 32,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (isDesktop)
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          flex: 2,
-                                          child: _buildMainContent(_courseDetail!),
-                                        ),
-                                        const SizedBox(width: 32),
-                                        Expanded(
-                                          flex: 1,
-                                          child: _buildEnrollCard(_courseDetail!),
-                                        ),
-                                      ],
-                                    )
-                                  else
-                                    Column(
-                                      children: [
-                                        _buildEnrollCard(_courseDetail!),
-                                        const SizedBox(height: 32),
-                                        _buildMainContent(_courseDetail!),
-                                      ],
-                                    ),
-                                ],
-                              ),
+                          if (isDesktop)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: _buildMainContent(_courseDetail!),
+                                ),
+                                const SizedBox(width: 32),
+                                Expanded(
+                                  flex: 1,
+                                  child: _buildEnrollCard(_courseDetail!),
+                                ),
+                              ],
+                            )
+                          else
+                            Column(
+                              children: [
+                                _buildEnrollCard(_courseDetail!),
+                                const SizedBox(height: 32),
+                                _buildMainContent(_courseDetail!),
+                              ],
                             ),
-                          ),
-                          SharedFooter(isDesktop: isDesktop),
                         ],
                       ),
                     ),
+                  ),
+                  SharedFooter(isDesktop: isDesktop),
+                ],
+              ),
+            ),
     );
   }
 
   Widget _buildBanner(CourseDetail course, bool isDesktop) {
-    final hasImage = course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty;
+    final hasImage =
+        course.thumbnailUrl != null && course.thumbnailUrl!.isNotEmpty;
 
     return Container(
       width: double.infinity,
@@ -805,9 +930,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               child: Image.network(
                 course.thumbnailUrl!,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: const Color(0xFF135D4E),
-                ),
+                errorBuilder: (context, error, stackTrace) =>
+                    Container(color: const Color(0xFF135D4E)),
               ),
             ),
 
@@ -848,7 +972,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       } else {
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+                          MaterialPageRoute(
+                            builder: (context) => const LearnerHomePage(),
+                          ),
                           (route) => false,
                         );
                       }
@@ -893,10 +1019,23 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     spacing: 24,
                     runSpacing: 12,
                     children: [
-                      _buildBannerStatItem(Icons.person_outline_rounded, 'Trainer: ${course.creatorName}'),
-                      _buildBannerStatItem(Icons.people_outline_rounded, '${course.learnersCount} Learners'),
-                      _buildBannerStatItem(Icons.bar_chart_rounded, 'Level: ${course.difficultyName}'),
-                      _buildBannerStatItem(Icons.star_rounded, '${course.rating}', iconColor: Colors.amber),
+                      _buildBannerStatItem(
+                        Icons.person_outline_rounded,
+                        'Trainer: ${course.creatorName}',
+                      ),
+                      _buildBannerStatItem(
+                        Icons.people_outline_rounded,
+                        '${course.learnersCount} Learners',
+                      ),
+                      _buildBannerStatItem(
+                        Icons.bar_chart_rounded,
+                        'Level: ${course.difficultyName}',
+                      ),
+                      _buildBannerStatItem(
+                        Icons.star_rounded,
+                        '${course.rating}',
+                        iconColor: Colors.amber,
+                      ),
                     ],
                   ),
                 ],
@@ -908,7 +1047,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     );
   }
 
-  Widget _buildBannerStatItem(IconData icon, String text, {Color iconColor = Colors.white70}) {
+  Widget _buildBannerStatItem(
+    IconData icon,
+    String text, {
+    Color iconColor = Colors.white70,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -972,9 +1115,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF28B79B),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFF28B79B)),
                 );
               } else if (snapshot.hasError) {
                 return Center(child: Text('Error: ${snapshot.error}'));
@@ -982,7 +1123,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 return const Center(child: Text('No reviews available.'));
               }
               final reviews = snapshot.data!.reviews;
-              final hasReviewed = reviews.any((r) => r.userId == _currentUserId);
+              final hasReviewed = reviews.any(
+                (r) => r.userId == _currentUserId,
+              );
               return ReviewTab(
                 summary: snapshot.data!,
                 showWriteReviewButton: course.isEnrolled && !hasReviewed,
@@ -1280,10 +1423,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+    final formatted = course.price
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
     return '$formattedđ';
   }
 
@@ -1294,10 +1439,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       if (clean.isEmpty) return '';
       final val = double.parse(clean);
       final original = val * 1.3;
-      final formatted = original.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]}.',
-      );
+      final formatted = original
+          .toStringAsFixed(0)
+          .replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (m) => '${m[1]}.',
+          );
       return '$formattedđ';
     } catch (_) {
       return '';
@@ -1312,10 +1459,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   Widget _buildTrainerTab(CourseDetail course) {
     final isVi = LanguageManager.isVi;
     final trainerName = course.creatorName;
-    final String initials = trainerName.isNotEmpty 
-        ? trainerName.trim().split(' ').last[0].toUpperCase() 
+    final String initials = trainerName.isNotEmpty
+        ? trainerName.trim().split(' ').last[0].toUpperCase()
         : 'T';
-        
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1358,13 +1505,18 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFE6FFFA),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        isVi ? 'Giáo viên Tiếng Anh tại HanGo' : 'English Trainer at HanGo',
+                        isVi
+                            ? 'Giáo viên Tiếng Anh tại HanGo'
+                            : 'English Trainer at HanGo',
                         style: const TextStyle(
                           color: Color(0xFF137333),
                           fontSize: 12,
@@ -1381,7 +1533,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           const SizedBox(height: 24),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 20),
-          
+
           Text(
             isVi ? 'Giới thiệu' : 'About the Trainer',
             style: const TextStyle(
@@ -1393,9 +1545,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           ),
           const SizedBox(height: 8),
           Text(
-            isVi 
-              ? 'Giáo viên ôn thi THPT Quốc Gia giàu kinh nghiệm, tốt nghiệp chuyên ngành Ngôn ngữ Anh. Với phương pháp giảng dạy hiện đại, trực quan và tập trung vào bản chất, thầy/cô đã hỗ trợ hàng ngàn học sinh cải thiện điểm số vượt bậc.'
-              : 'An experienced high school exam preparation instructor holding a degree in English Linguistics. Utilizing modern, visual, and conceptual teaching methodologies, they have successfully helped thousands of students achieve dramatic score improvements.',
+            isVi
+                ? 'Giáo viên ôn thi THPT Quốc Gia giàu kinh nghiệm, tốt nghiệp chuyên ngành Ngôn ngữ Anh. Với phương pháp giảng dạy hiện đại, trực quan và tập trung vào bản chất, thầy/cô đã hỗ trợ hàng ngàn học sinh cải thiện điểm số vượt bậc.'
+                : 'An experienced high school exam preparation instructor holding a degree in English Linguistics. Utilizing modern, visual, and conceptual teaching methodologies, they have successfully helped thousands of students achieve dramatic score improvements.',
             style: const TextStyle(
               fontSize: 14,
               color: Color(0xFF4B5563),
@@ -1404,7 +1556,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
             ),
           ),
           const SizedBox(height: 24),
-          
+
           Text(
             isVi ? 'Kinh nghiệm & Bằng cấp' : 'Experience & Qualifications',
             style: const TextStyle(
@@ -1417,21 +1569,21 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           const SizedBox(height: 12),
           _buildTrainerQualificationItem(
             Icons.school_rounded,
-            isVi 
-              ? 'Cử nhân/Thạc sĩ chuyên ngành Sư phạm tiếng Anh / Ngôn ngữ Anh.'
-              : 'Bachelor/Master of English Pedagogy or English Linguistics.',
+            isVi
+                ? 'Cử nhân/Thạc sĩ chuyên ngành Sư phạm tiếng Anh / Ngôn ngữ Anh.'
+                : 'Bachelor/Master of English Pedagogy or English Linguistics.',
           ),
           _buildTrainerQualificationItem(
             Icons.workspace_premium_rounded,
-            isVi 
-              ? 'Chứng chỉ IELTS 8.0+ hoặc chứng chỉ giảng dạy tiếng Anh quốc tế (TESOL, CELTA).'
-              : 'IELTS 8.0+ score or internationally recognized English Teaching Certificates (TESOL, CELTA).',
+            isVi
+                ? 'Chứng chỉ IELTS 8.0+ hoặc chứng chỉ giảng dạy tiếng Anh quốc tế (TESOL, CELTA).'
+                : 'IELTS 8.0+ score or internationally recognized English Teaching Certificates (TESOL, CELTA).',
           ),
           _buildTrainerQualificationItem(
             Icons.trending_up_rounded,
-            isVi 
-              ? 'Hơn 5 năm giảng dạy thực chiến và ôn luyện học sinh thi THPT Quốc Gia môn Tiếng Anh.'
-              : '5+ years of active high school English exam preparation and teaching experience.',
+            isVi
+                ? 'Hơn 5 năm giảng dạy thực chiến và ôn luyện học sinh thi THPT Quốc Gia môn Tiếng Anh.'
+                : '5+ years of active high school English exam preparation and teaching experience.',
           ),
         ],
       ),
@@ -1541,7 +1693,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEE2E2),
                     borderRadius: BorderRadius.circular(6),
@@ -1558,11 +1713,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 ),
               ],
             ),
-            
+
           const SizedBox(height: 24),
           const Divider(color: Color(0xFFF1F5F9)),
           const SizedBox(height: 16),
-          
+
           const Text(
             'Course includes:',
             style: TextStyle(
@@ -1582,9 +1737,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
             '${course.sessions.fold(0, (sum, s) => sum + s.lessons.length)} Detailed Lessons',
           ),
           _buildIncludeItem(Icons.quiz_outlined, 'Practice Quizzes'),
-          
+
           const SizedBox(height: 28),
-          
+
           if (course.isEnrolled) ...[
             SizedBox(
               width: double.infinity,
@@ -1627,6 +1782,37 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     fontFamily: 'Outfit',
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _isUnenrolling
+                    ? null
+                    : () => _showUnenrollConfirmDialog(course),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: _isUnenrolling
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Cancel Enrollment',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
               ),
             ),
           ] else ...[
@@ -1675,7 +1861,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       if (!mounted) return;
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
                       );
                       return;
                     }
@@ -1695,7 +1883,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                             );
                           });
                           _showNotification(
-                            '🎉 Thanh toán thành công! Khóa học đã được mở khóa.');
+                            '🎉 Thanh toán thành công! Khóa học đã được mở khóa.',
+                          );
                           _loadCourseDetail();
                         },
                       ),
@@ -1728,13 +1917,18 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       ? () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const CartPage()),
+                            MaterialPageRoute(
+                              builder: (context) => const CartPage(),
+                            ),
                           );
                         }
                       : _addToCart,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                    side: const BorderSide(
+                      color: Color(0xFF28B79B),
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -1773,5 +1967,118 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     );
   }
 
-
+  Widget _buildVersionBanner(CourseDetail course, bool isDesktop) {
+    if (_dismissedVersionBanner) return const SizedBox.shrink();
+    final isVi = LanguageManager.isVi;
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: isDesktop ? 16 : 12,
+      ),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1440),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                color: Color(0xFFE65100),
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isVi
+                          ? 'New version available!'
+                          : 'New version available!',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFBF360C),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isVi
+                          ? 'The trainer has updated the course to ${course.latestPublishedVersion ?? "a new version"}. You can switch to the latest version to access updated content.'
+                          : 'The trainer has updated the course to ${course.latestPublishedVersion ?? "a new version"}. You can switch to the latest version to access updated content.',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFBF360C),
+                        fontFamily: 'Outfit',
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _dismissedVersionBanner = true;
+                  });
+                },
+                child: Text(
+                  isVi ? 'Later' : 'Later',
+                  style: const TextStyle(
+                    color: Color(0xFFBF360C),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _isSwitchingVersion ? null : _switchToNewVersion,
+                icon: _isSwitchingVersion
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.swap_horiz_rounded, size: 18),
+                label: Text(
+                  isVi ? 'Update Now' : 'Update Now',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

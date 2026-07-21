@@ -46,9 +46,12 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
           course.title.toLowerCase().contains(keyword) ||
           course.creatorName.toLowerCase().contains(keyword) ||
           course.code.toLowerCase().contains(keyword);
+      // Normalize: PENDING_APPROVAL from backend should match "PENDING" filter on frontend
+      final courseStatus = course.status.toUpperCase();
       final matchesStatus =
           _statusFilter == 'ALL' ||
-          course.status.toUpperCase() == _statusFilter;
+          courseStatus == _statusFilter ||
+          (_statusFilter == 'PENDING' && courseStatus == 'PENDING_APPROVAL');
       return matchesSearch && matchesStatus;
     }).toList();
   }
@@ -442,8 +445,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
                             ),
                             IconButton(
                               tooltip: 'Return to draft',
-                              onPressed:
-                                  course.status.toUpperCase() == 'PENDING'
+                              onPressed: _isPendingStatus(course.status)
                                   ? () => _rejectCourse(course)
                                   : null,
                               icon: const Icon(Icons.undo_outlined),
@@ -451,8 +453,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
                             ),
                             IconButton.filled(
                               tooltip: 'Publish',
-                              onPressed:
-                                  course.status.toUpperCase() == 'PENDING'
+                              onPressed: _isPendingStatus(course.status)
                                   ? () => _publishCourse(course)
                                   : null,
                               icon: const Icon(Icons.check),
@@ -475,6 +476,11 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         ),
       ),
     );
+  }
+
+  bool _isPendingStatus(String status) {
+    final s = status.toUpperCase();
+    return s == 'PENDING' || s == 'PENDING_APPROVAL';
   }
 
   Widget _buildEmptyState() {
@@ -753,6 +759,11 @@ class _CourseTitleCell extends StatelessWidget {
   }
 }
 
+bool _isPendingStatus(String status) {
+  final s = status.toUpperCase();
+  return s == 'PENDING' || s == 'PENDING_APPROVAL';
+}
+
 class _CourseReviewDialog extends StatelessWidget {
   final CourseReviewCourse course;
   final VoidCallback onReject;
@@ -850,7 +861,7 @@ class _CourseReviewDialog extends StatelessWidget {
                   ),
                   const Spacer(),
                   OutlinedButton.icon(
-                    onPressed: course.status.toUpperCase() == 'PENDING'
+                    onPressed: _isPendingStatus(course.status)
                         ? onReject
                         : null,
                     icon: const Icon(Icons.undo_outlined),
@@ -865,7 +876,7 @@ class _CourseReviewDialog extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
-                    onPressed: course.status.toUpperCase() == 'PENDING'
+                    onPressed: _isPendingStatus(course.status)
                         ? onPublish
                         : null,
                     icon: const Icon(Icons.check),
@@ -914,7 +925,7 @@ class _CourseReviewDialog extends StatelessWidget {
                     _StatusPill(status: course.status),
                     const SizedBox(width: 8),
                     const Text(
-                      'DRAFT -> PENDING -> PUBLISHED',
+                      'DRAFT → PENDING → PUBLISHED',
                       style: TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 12,
@@ -1089,9 +1100,12 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = status.toUpperCase();
+    final displayText = normalized == 'PENDING_APPROVAL'
+        ? 'PENDING'
+        : normalized;
     final color = switch (normalized) {
       'PUBLISHED' => const Color(0xFF20B486),
-      'PENDING' => const Color(0xFFF59E0B),
+      'PENDING' || 'PENDING_APPROVAL' => const Color(0xFFF59E0B),
       'DRAFT' => const Color(0xFF64748B),
       _ => const Color(0xFF64748B),
     };
@@ -1103,7 +1117,7 @@ class _StatusPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        normalized,
+        displayText,
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.bold,
