@@ -11,6 +11,8 @@ import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
+import '../pages/course_manager/course_manager_dashboard_page.dart';
+import '../pages/trainer/trainer_dashboard_page.dart';
 import '../pages/learner/my_learning_page.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
@@ -51,6 +53,7 @@ class _SharedHeaderState extends State<SharedHeader> {
   String _userAvatarUrl = '';
   bool _isVietnamese = true;
   int _cartCount = 0;
+  List<String> _userRoles = [];
 
   List<Course> _allCourses = [];
   List<String> _cartIds = [];
@@ -392,6 +395,8 @@ class _SharedHeaderState extends State<SharedHeader> {
       }
     }
 
+    final roles = prefs.getStringList('user_roles') ?? [];
+
     if (mounted) {
       setState(() {
         _isLoggedIn = true;
@@ -400,6 +405,7 @@ class _SharedHeaderState extends State<SharedHeader> {
         _userInitials = initials;
         _userAvatarUrl = avatarUrl;
         _cartCount = cartCount;
+        _userRoles = roles;
       });
     }
   }
@@ -595,19 +601,15 @@ class _SharedHeaderState extends State<SharedHeader> {
   @override
   Widget build(BuildContext context) {
     final logoWidget = InkWell(
-      onTap: widget.hideNavLinks
-          ? null
-          : () {
-              if (widget.activeTab != '') {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LearnerHomePage(),
-                  ),
-                  (route) => false,
-                );
-              }
-            },
+      onTap: () {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const LearnerHomePage(),
+          ),
+          (route) => false,
+        );
+      },
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -815,7 +817,24 @@ class _SharedHeaderState extends State<SharedHeader> {
               PopupMenuButton<String>(
                 enabled: true,
                 onSelected: (val) {
-                  if (val == 'logout') {
+                  if (val == 'dashboard') {
+                    final isTrainer = _userRoles.any((r) => r.toUpperCase().contains('TRAINER'));
+                    if (isTrainer) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TrainerDashboardPage(),
+                        ),
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CourseManagerDashboardPage(),
+                        ),
+                      );
+                    }
+                  } else if (val == 'logout') {
                     _handleLogout();
                   } else if (val == 'my_info' || val == 'profile') {
                     Navigator.push(
@@ -938,6 +957,38 @@ class _SharedHeaderState extends State<SharedHeader> {
                           ),
                           const SizedBox(height: 10),
                           const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'dashboard',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6F7F1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.dashboard_outlined,
+                              size: 18,
+                              color: Color(0xFF20B486),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Dashboard',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
                         ],
                       ),
                     ),
