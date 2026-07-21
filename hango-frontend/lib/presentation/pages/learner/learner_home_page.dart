@@ -1435,30 +1435,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
               )
-            : isDesktop
-            ? GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: isDesktop ? 0.85 : 0.85,
-                ),
-                itemCount: _courses.length,
-                itemBuilder: (context, index) {
-                  return _buildCourseCard(_courses[index]);
-                },
-              )
             : SizedBox(
-                height: 360,
+                height: isDesktop ? 390 : 360,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   itemCount: _courses.length,
                   itemBuilder: (context, index) {
                     return Container(
-                      width: 280,
-                      margin: const EdgeInsets.only(right: 16),
+                      width: isDesktop ? 300 : 280,
+                      margin: const EdgeInsets.only(right: 16, bottom: 12, top: 4),
                       child: _buildCourseCard(_courses[index]),
                     );
                   },
@@ -1944,30 +1930,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
               )
-            : isDesktop
-            ? GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: isDesktop ? 1.45 : 0.85,
-                ),
-                itemCount: _exams.length,
-                itemBuilder: (context, index) {
-                  return _buildExamCard(_exams[index]);
-                },
-              )
             : SizedBox(
-                height: 180,
+                height: isDesktop ? 210 : 180,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   itemCount: _exams.length,
                   itemBuilder: (context, index) {
                     return Container(
-                      width: 260,
-                      margin: const EdgeInsets.only(right: 16),
+                      width: isDesktop ? 300 : 260,
+                      margin: const EdgeInsets.only(right: 16, bottom: 10, top: 4),
                       child: _buildExamCard(_exams[index]),
                     );
                   },

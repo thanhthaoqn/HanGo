@@ -1128,7 +1128,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                   );
                 },
                 child: const Text(
-                  'Đăng nhập',
+                  'Login',
                   style: TextStyle(
                     color: Color(0xFF1E293B),
                     fontWeight: FontWeight.bold,
@@ -1171,7 +1171,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
                   child: const Text(
-                    'Đăng ký',
+                    'Register',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
