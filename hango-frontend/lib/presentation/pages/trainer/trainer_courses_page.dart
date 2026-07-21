@@ -1154,7 +1154,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       final code = (c['code'] ?? '').toString();
       // Code is like COURSE-1234 or COURSE-1234-V2. We group by the base code.
       final baseCode = code.contains('-V') ? code.split('-V')[0] : code;
-      
+
       byKey.putIfAbsent(baseCode, () => []).add(c);
     }
     return byKey.values.map(_resolveGroup).toList();
@@ -1271,7 +1271,6 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     final pendingVer = (pending?['version'] ?? '').toString();
 
     // State 4 – learner counts per published version
-
 
     // Border accent by state
     final borderColor = state == 'HAS_DRAFT'
@@ -1506,11 +1505,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               icon: Icons.history,
               tooltip: 'Version history',
               color: const Color(0xFF64748B),
-              onTap: () => _showVersionHistoryModal(
-                context,
-                title,
-                allVersions,
-              ),
+              onTap: () =>
+                  _showVersionHistoryModal(context, title, allVersions),
             ),
             const SizedBox(width: 8),
             _iconBtn(
@@ -1546,11 +1542,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               label: 'Version History',
               color: const Color(0xFF475569),
               bg: const Color(0xFFF1F5F9),
-              onTap: () => _showVersionHistoryModal(
-                context,
-                title,
-                allVersions,
-              ),
+              onTap: () =>
+                  _showVersionHistoryModal(context, title, allVersions),
             ),
             const SizedBox(width: 8),
             _actionChip(
@@ -1601,11 +1594,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               icon: Icons.history,
               tooltip: 'Version history',
               color: const Color(0xFF3B82F6),
-              onTap: () => _showVersionHistoryModal(
-                context,
-                title,
-                allVersions,
-              ),
+              onTap: () =>
+                  _showVersionHistoryModal(context, title, allVersions),
             ),
           ],
         );
@@ -1641,7 +1631,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 18,
+                ),
                 decoration: const BoxDecoration(
                   color: Color(0xFFF8FAFC),
                   border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
@@ -1666,7 +1659,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Lịch sử phiên bản khóa học',
+                            'Course version history',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1704,7 +1697,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   itemBuilder: (context, index) {
                     final item = sortedVersions[index];
                     final version = (item['version'] ?? 'v1').toString();
-                    final status = (item['status'] ?? 'DRAFT').toString().toUpperCase();
+                    final status = (item['status'] ?? 'DRAFT')
+                        .toString()
+                        .toUpperCase();
                     final dateStr = _formatDate(item['createdAt']);
                     final learners = item['learnersCount'] ?? 0;
                     final lessons = item['lessonsCount'] ?? 0;
@@ -1716,23 +1711,25 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                     if (status == 'PUBLISHED') {
                       statusBg = const Color(0xFFE6FFFA);
                       statusFg = const Color(0xFF0D9373);
-                      statusText = '🟢 Đang phát sóng (Published)';
-                    } else if (status == 'PENDING_APPROVAL' || status == 'PENDING') {
+                      statusText = 'Published';
+                    } else if (status == 'PENDING_APPROVAL' ||
+                        status == 'PENDING') {
                       statusBg = const Color(0xFFEFF6FF);
                       statusFg = const Color(0xFF1D4ED8);
-                      statusText = '🔵 Chờ phê duyệt (Pending)';
+                      statusText = 'Pending';
                     } else if (status == 'REJECTED') {
                       statusBg = const Color(0xFFFEF2F2);
                       statusFg = const Color(0xFFDC2626);
-                      statusText = '🔴 Từ chối (Rejected)';
+                      statusText = 'Rejected';
                     } else {
                       statusBg = const Color(0xFFFEF9C3);
                       statusFg = const Color(0xFF92400E);
-                      statusText = '🟡 Bản nháp (Draft)';
+                      statusText = 'Draft';
                     }
 
-                    int extractId(dynamic c) =>
-                        c['id'] is int ? c['id'] as int : int.parse(c['id'].toString());
+                    int extractId(dynamic c) => c['id'] is int
+                        ? c['id'] as int
+                        : int.parse(c['id'].toString());
                     final courseId = extractId(item);
 
                     return Container(
@@ -1745,7 +1742,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF6366F1),
                               borderRadius: BorderRadius.circular(8),
@@ -1768,7 +1768,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                 Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: statusBg,
                                         borderRadius: BorderRadius.circular(6),
@@ -1790,9 +1793,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                   spacing: 12,
                                   runSpacing: 4,
                                   children: [
-                                    _statChip(Icons.people_outline, '$learners học viên'),
-                                    _statChip(Icons.class_outlined, '$lessons bài học'),
-                                    _statChip(Icons.calendar_today_outlined, dateStr),
+                                    _statChip(
+                                      Icons.people_outline,
+                                      '$learners students',
+                                    ),
+                                    _statChip(
+                                      Icons.class_outlined,
+                                      '$lessons lessons',
+                                    ),
+                                    _statChip(
+                                      Icons.calendar_today_outlined,
+                                      dateStr,
+                                    ),
                                   ],
                                 ),
                               ],
@@ -1806,7 +1818,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => EditCoursePage(courseId: courseId),
+                                    builder: (_) =>
+                                        EditCoursePage(courseId: courseId),
                                   ),
                                 ).then((_) => _fetchCoursesData());
                               },
@@ -1817,9 +1830,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                               ),
-                              child: const Text('Chỉnh sửa', style: TextStyle(fontSize: 12, fontFamily: 'Outfit')),
+                              child: const Text(
+                                'Edit',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
                             )
                           else
                             OutlinedButton(
@@ -1828,19 +1850,31 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => EditCoursePage(courseId: courseId),
+                                    builder: (_) =>
+                                        EditCoursePage(courseId: courseId),
                                   ),
                                 ).then((_) => _fetchCoursesData());
                               },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF475569),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                side: const BorderSide(
+                                  color: Color(0xFFCBD5E1),
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                               ),
-                              child: const Text('Xem chi tiết', style: TextStyle(fontSize: 12, fontFamily: 'Outfit')),
+                              child: const Text(
+                                'View Detail',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
                             ),
                         ],
                       ),
