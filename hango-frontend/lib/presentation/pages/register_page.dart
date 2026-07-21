@@ -318,19 +318,6 @@ class _RegisterPageState extends State<RegisterPage> {
                               color: Color(0xFF1F2937),
                             ),
                           ),
-                          const SizedBox(height: 20),
-
-                          Text(
-                            _selectedRole == 'TRAINER'
-                                ? 'Đăng ký tài khoản Giáo viên'
-                                : 'Đăng ký tài khoản Học viên',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF28B79B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
                           const SizedBox(height: 24),
 
                           // Full Name Field
