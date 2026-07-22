@@ -26,7 +26,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
-  int? _currentUserId;
+
   bool _isCourseManager = false;
 
   bool _isLoading = true;
@@ -136,30 +136,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     }
   }
 
-  Future<void> _updateExamVisibility(int examId, String newVisibility) async {
-    try {
-      final token = await _authService.getToken();
-      if (token == null) return;
-      final uri = Uri.parse('$apiBaseUrl/trainer/exams/$examId/visibility');
-      final response = await http.patch(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'visibility': newVisibility}),
-      );
-      if (response.statusCode == 200) {
-        ToastHelper.showSuccess(context, 'Exam visibility updated successfully');
-        _fetchExamsData();
-      } else {
-        ToastHelper.showError(context, 'Failed to update visibility: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Error updating exam visibility: $e');
-    }
-  }
-
   Future<void> _updateExamStatus(int examId, String newStatus) async {
     try {
       final token = await _authService.getToken();
@@ -220,7 +196,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    final userId = prefs.getInt('user_id');
+
     final roles = prefs.getStringList('user_roles') ?? [];
     
     String initials = 'T';
@@ -234,7 +210,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       _trainerName = fullName;
       _trainerInitials = initials;
       _trainerAvatarUrl = avatarUrl;
-      _currentUserId = userId;
+
       _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'TRAINER_LEAD' || r.toUpperCase() == 'ADMIN');
     });
   }
@@ -610,7 +586,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 Expanded(flex: 1, child: _buildTableHeaderText('Questions')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Duration')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Status')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Visibility')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Actions', align: TextAlign.center)),
               ],
             ),
@@ -802,13 +777,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           ),
           Expanded(
             flex: 1,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _buildVisibilityChip(exam),
-            ),
-          ),
-          Expanded(
-            flex: 1,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -924,82 +892,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildVisibilityChip(Map<String, dynamic> exam) {
-    String? status = exam['status'];
-    String? visibility = exam['visibility'];
-    
-    if (status == null || (status.toUpperCase() != 'PUBLISHED' && status.toUpperCase() != 'APPROVED')) {
-      return const Text(
-        '-',
-        style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold),
-      );
-    }
-    
-    bool isPublic = visibility?.toUpperCase() == 'PUBLIC';
-    bool canEdit = _currentUserId != null && exam['creatorId'] == _currentUserId;
-
-    return InkWell(
-      onTap: canEdit ? () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Change Visibility'),
-            content: Text('Do you want to make this exam ${isPublic ? 'PRIVATE' : 'PUBLIC'}?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _updateExamVisibility(exam['id'], isPublic ? 'PRIVATE' : 'PUBLIC');
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38C9A6)),
-                child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
-      } : () {
-        ToastHelper.showError(context, 'You do not have permission to change visibility of this exam');
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: canEdit ? (isPublic ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)) : Colors.transparent),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isPublic ? Icons.public : Icons.lock_outline,
-              size: 14,
-              color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              isPublic ? 'Public' : 'Private',
-              style: TextStyle(
-                color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                fontFamily: 'Outfit',
-              ),
-            ),
-            if (canEdit) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, size: 14, color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
-            ]
-          ],
-        ),
       ),
     );
   }

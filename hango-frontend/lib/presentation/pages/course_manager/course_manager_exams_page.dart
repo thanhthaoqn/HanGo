@@ -495,7 +495,6 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                 Expanded(flex: 1, child: _buildTableHeaderText('Questions')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Duration')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Status')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Visibility')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Actions', align: TextAlign.center)),
               ],
             ),
@@ -687,13 +686,6 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           ),
           Expanded(
             flex: 1,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _buildVisibilityChip(exam),
-            ),
-          ),
-          Expanded(
-            flex: 1,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -750,33 +742,6 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   }
 
 
-  Future<void> _updateExamVisibility(int examId, String newVisibility) async {
-    try {
-      final token = await _authService.getToken();
-      if (token == null) return;
-      final response = await http.patch(
-        Uri.parse('$apiBaseUrl/trainer/exams/$examId/visibility'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'visibility': newVisibility}),
-      );
-      if (response.statusCode == 200) {
-        _fetchExamsData();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to update visibility')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error updating exam visibility: $e');
-    }
-  }
-
-
 
   Widget _buildStatusChip(String status) {
     status = status.toUpperCase();
@@ -824,70 +789,6 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildVisibilityChip(Map<String, dynamic> exam) {
-    String? visibility = exam['visibility'];
-    bool isPublic = visibility?.toUpperCase() == 'PUBLIC';
-    bool canEdit = _currentUserId != null && exam['creatorId'] == _currentUserId;
-
-    return InkWell(
-      onTap: canEdit ? () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Change Visibility', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
-            content: Text(
-              'Do you want to change visibility to ${isPublic ? "Private" : "Public"}?',
-              style: const TextStyle(fontFamily: 'Outfit'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _updateExamVisibility(exam['id'], isPublic ? 'PRIVATE' : 'PUBLIC');
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38C9A6)),
-                child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
-      } : null,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: canEdit ? (isPublic ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)) : Colors.transparent),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isPublic ? Icons.public : Icons.lock_outline,
-              size: 14,
-              color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              isPublic ? 'Public' : 'Private',
-              style: TextStyle(
-                color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
