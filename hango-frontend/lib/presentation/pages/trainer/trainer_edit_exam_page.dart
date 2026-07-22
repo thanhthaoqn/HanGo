@@ -228,7 +228,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       final api = await _getApi();
       final skills = await api.getSystemParameters('SKILL_TYPE');
       final difficulties = await api.getSystemParameters('DIFFICULTY');
-      final groupTypes = await api.getQuestionCategories();
+      final groupTypes = await api.getSystemParameters('GROUP_TYPE');
 
       setState(() {
         _skills = skills;
@@ -1052,7 +1052,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                         items: _groupTypes,
                         onChanged: (val) =>
                             setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),
@@ -1128,7 +1128,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                         items: _groupTypes,
                         onChanged: (val) =>
                             setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),
