@@ -296,15 +296,32 @@ public class SectionQuestionController {
     public ResponseEntity<?> createQuestion(@RequestBody CreateQuestionRequestDTO request) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
-            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
 
-        // Default category / difficulty if null
         Long categoryId = request.getCategoryId() != null ? request.getCategoryId() : 1L;
+        Integer catCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM question_categories WHERE id = ?", Integer.class, categoryId);
+        if (catCount == null || catCount == 0) {
+            categoryId = jdbcTemplate.queryForObject("SELECT id FROM question_categories LIMIT 1", Long.class);
+        }
+
         Long difficultyId = request.getDifficultyId() != null ? request.getDifficultyId() : 14L;
+        Integer diffCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM system_parameters WHERE id = ?", Integer.class, difficultyId);
+        if (diffCount == null || diffCount == 0) {
+            difficultyId = jdbcTemplate.queryForObject("SELECT id FROM system_parameters WHERE param_type = 'DIFFICULTY' LIMIT 1", Long.class);
+        }
+
         Long skillParamId = request.getSkillParamId() != null ? request.getSkillParamId() : 1L;
+        Integer skillCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM system_parameters WHERE id = ?", Integer.class, skillParamId);
+        if (skillCount == null || skillCount == 0) {
+            skillParamId = jdbcTemplate.queryForObject("SELECT id FROM system_parameters WHERE param_type = 'SKILL' LIMIT 1", Long.class);
+        }
 
         Long questionId = null;
+        final Long finalCategoryId = categoryId;
+        final Long finalDifficultyId = difficultyId;
+        final Long finalSkillParamId = skillParamId;
+        
         try {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
@@ -313,17 +330,17 @@ public class SectionQuestionController {
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
                 ps.setLong(1, currentUserId);
-                ps.setLong(2, categoryId);
+                ps.setLong(2, finalCategoryId);
                 ps.setString(3, request.getQuestionText());
                 ps.setString(4, request.getExplanation());
-                ps.setLong(5, difficultyId);
+                ps.setLong(5, finalDifficultyId);
                 ps.setString(6, "APPROVED");
                 if (request.getSectionId() != null) {
                     ps.setLong(7, request.getSectionId());
                 } else {
                     ps.setNull(7, java.sql.Types.BIGINT);
                 }
-                ps.setLong(8, skillParamId);
+                ps.setLong(8, finalSkillParamId);
                 return ps;
             }, keyHolder);
 
@@ -333,11 +350,11 @@ public class SectionQuestionController {
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
 
         if (questionId == null) {
-            return ResponseEntity.badRequest().body("{\"error\": \"Failed to save question\"}");
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to save question"));
         }
 
         // Insert options
@@ -366,7 +383,7 @@ public class SectionQuestionController {
             @RequestBody CreateQuestionRequestDTO request) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
-            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
 
         try {
@@ -378,7 +395,7 @@ public class SectionQuestionController {
             );
 
             if (updatedRows == 0) {
-                return ResponseEntity.status(404).body("{\"error\": \"Question not found\"}");
+                return ResponseEntity.status(404).body(Map.of("error", "Question not found"));
             }
 
             // Update options
@@ -400,7 +417,7 @@ public class SectionQuestionController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"Failed to update question: \" + e.getMessage()}");
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to update question: " + e.getMessage()));
         }
     }
 
@@ -409,13 +426,27 @@ public class SectionQuestionController {
     public ResponseEntity<?> createGroupQuestion(@RequestBody CreateGroupQuestionRequestDTO request) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
-            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
 
         // Default category / skill / difficulty if null
         Long categoryId = request.getCategoryId() != null ? request.getCategoryId() : 1L;
-        Long skillParamId = request.getSkillParamId() != null ? request.getSkillParamId() : 1L;
+        Integer catCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM question_categories WHERE id = ?", Integer.class, categoryId);
+        if (catCount == null || catCount == 0) {
+            categoryId = jdbcTemplate.queryForObject("SELECT id FROM question_categories LIMIT 1", Long.class);
+        }
+
         Long difficultyId = request.getDifficultyId() != null ? request.getDifficultyId() : 14L;
+        Integer diffCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM system_parameters WHERE id = ?", Integer.class, difficultyId);
+        if (diffCount == null || diffCount == 0) {
+            difficultyId = jdbcTemplate.queryForObject("SELECT id FROM system_parameters WHERE param_type = 'DIFFICULTY' LIMIT 1", Long.class);
+        }
+
+        Long skillParamId = request.getSkillParamId() != null ? request.getSkillParamId() : 1L;
+        Integer skillCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM system_parameters WHERE id = ?", Integer.class, skillParamId);
+        if (skillCount == null || skillCount == 0) {
+            skillParamId = jdbcTemplate.queryForObject("SELECT id FROM system_parameters WHERE param_type = 'SKILL' LIMIT 1", Long.class);
+        }
 
 
         // 1. Insert into question_groups
@@ -439,11 +470,11 @@ public class SectionQuestionController {
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"Failed to create question group: " + e.getMessage() + "\"}");
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to create question group: " + e.getMessage()));
         }
 
         if (questionGroupId == null) {
-            return ResponseEntity.badRequest().body("{\"error\": \"Failed to save question group context\"}");
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to save question group context"));
         }
 
         // 2. Insert sub-questions
@@ -452,6 +483,10 @@ public class SectionQuestionController {
         if (subQuestions != null && !subQuestions.isEmpty()) {
             for (CreateSubQuestionDTO subQ : subQuestions) {
                 Long subQuestionId = null;
+                final Long finalCategoryId = categoryId;
+                final Long finalDifficultyId = difficultyId;
+                final Long finalSkillParamId = skillParamId;
+                
                 try {
                     org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
                     final Long finalGroupId = questionGroupId;
@@ -462,10 +497,10 @@ public class SectionQuestionController {
                                 java.sql.Statement.RETURN_GENERATED_KEYS
                         );
                         ps.setLong(1, currentUserId);
-                        ps.setLong(2, categoryId);
+                        ps.setLong(2, finalCategoryId);
                         ps.setString(3, subQ.getQuestionText());
                         ps.setString(4, subQ.getExplanation());
-                        ps.setLong(5, difficultyId);
+                        ps.setLong(5, finalDifficultyId);
                         ps.setString(6, "APPROVED");
                         if (request.getSectionId() != null) {
                             ps.setLong(7, request.getSectionId());
@@ -473,7 +508,7 @@ public class SectionQuestionController {
                             ps.setNull(7, java.sql.Types.BIGINT);
                         }
                         ps.setLong(8, finalGroupId);
-                        ps.setLong(9, skillParamId);
+                        ps.setLong(9, finalSkillParamId);
                         return ps;
 
                     }, keyHolder);
@@ -485,7 +520,7 @@ public class SectionQuestionController {
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
-                    return ResponseEntity.badRequest().body("{\"error\": \"Failed to save sub question: " + e.getMessage() + "\"}");
+                    return ResponseEntity.badRequest().body(Map.of("error", "Failed to save sub question: " + e.getMessage()));
                 }
 
                 if (subQuestionId != null) {
