@@ -188,26 +188,33 @@ class _CourseCardState extends State<CourseCard> {
         'tagColor': const Color(0xFFE0F2FE),
         'textColor': const Color(0xFF0369A1),
       };
-    } else if (cat.contains('reading') || cat.contains('đọc hiểu')) {
+    } else if (cat.contains('reading') || cat.contains('đọc')) {
       return {
         'color': const Color(0xFF28B79B),
         'icon': Icons.chrome_reader_mode_rounded,
         'tagColor': const Color(0xFFE6FFFA),
         'textColor': const Color(0xFF137333),
       };
-    } else if (cat.contains('pronunciation') || cat.contains('phát âm') || cat.contains('stress') || cat.contains('trọng âm')) {
+    } else if (cat.contains('pronunciation') || cat.contains('phát âm')) {
       return {
         'color': const Color(0xFF8B5CF6),
         'icon': Icons.volume_up_rounded,
         'tagColor': const Color(0xFFF3E8FF),
         'textColor': const Color(0xFF6D28D9),
       };
-    } else if (cat.contains('vocabulary') || cat.contains('từ vựng')) {
+    } else if (cat.contains('synonym') || cat.contains('antonym') || cat.contains('đồng nghĩa') || cat.contains('trái nghĩa')) {
       return {
         'color': const Color(0xFFF97316),
-        'icon': Icons.translate_rounded,
+        'icon': Icons.compare_arrows_rounded,
         'tagColor': const Color(0xFFFFF7ED),
         'textColor': const Color(0xFFC2410C),
+      };
+    } else if (cat.contains('conversation') || cat.contains('giao tiếp')) {
+      return {
+        'color': const Color(0xFFEC4899),
+        'icon': Icons.chat_bubble_outline_rounded,
+        'tagColor': const Color(0xFFFCE7F3),
+        'textColor': const Color(0xFFBE185D),
       };
     } else {
       return {
@@ -217,6 +224,47 @@ class _CourseCardState extends State<CourseCard> {
         'textColor': const Color(0xFF137333),
       };
     }
+  }
+
+  Widget _buildCategoryTags() {
+    final tags = widget.course.categories.isNotEmpty
+        ? widget.course.categories
+        : (widget.course.category.isNotEmpty ? [widget.course.category] : []);
+
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: tags.take(3).map((tag) {
+          final theme = _getCourseCategoryTheme(tag);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: theme['tagColor'] as Color? ?? const Color(0xFFE6FFFA),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (theme['textColor'] as Color? ?? const Color(0xFF28B79B)).withOpacity(0.3),
+                width: 0.8,
+              ),
+            ),
+            child: Text(
+              tag,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: theme['textColor'] as Color? ?? const Color(0xFF137333),
+                fontFamily: 'Outfit',
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   Widget _buildCardPlaceholder(Map<String, dynamic> theme) {
@@ -367,6 +415,7 @@ class _CourseCardState extends State<CourseCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildCategoryTags(),
                     Text(
                       widget.course.title,
                       maxLines: 2,

@@ -1,13 +1,16 @@
 package com.hango.hango_backend.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-
+import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.util.List;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CourseDetailDTO {
     private Long id;
     private String title;
@@ -26,6 +29,8 @@ public class CourseDetailDTO {
     private String latestPublishedVersion;
     private String categoryKey;
     private String categoryName;
+    private List<String> categoryKeys;
+    private List<String> categoryNames;
     private String difficultyKey;
     private String thumbnailUrl;
     private Integer estimatedDuration;

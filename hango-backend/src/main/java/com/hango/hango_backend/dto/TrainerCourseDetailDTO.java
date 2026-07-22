@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -15,6 +16,8 @@ public class TrainerCourseDetailDTO {
     private String title;
     private String status;
     private String description;
+    private List<String> categoryKeys;
+    private List<String> categories;
     private long learnersCount;
     private long lessonsCount;
     private String thumbnailUrl;

@@ -13,6 +13,7 @@ public class TrainerCreateCourseRequestDTO {
     private String code;
     private String description;
     private String categoryKey;
+    private List<String> categoryKeys;
     private String difficultyKey;
     private String thumbnailUrl;
     private BigDecimal price;
