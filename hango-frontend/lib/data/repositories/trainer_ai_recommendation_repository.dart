@@ -16,6 +16,8 @@ class TrainerAiQuestionRepository {
     required int quantity,
     int? categoryId,
     int? difficultyId,
+    String? skillType,
+    String? groupType,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -29,6 +31,8 @@ class TrainerAiQuestionRepository {
       'quantity': quantity,
       if (categoryId != null) 'categoryId': categoryId,
       if (difficultyId != null) 'difficultyId': difficultyId,
+      if (skillType != null) 'skillType': skillType,
+      if (groupType != null) 'groupType': groupType,
     };
 
     final response = await http.post(

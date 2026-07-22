@@ -41,25 +41,20 @@ class AddNewQuestionPage extends StatefulWidget {
 class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
   final AuthService _authService = AuthService();
 
-  // Text inputs
-  final TextEditingController _questionController = TextEditingController();
-  final TextEditingController _hintController = TextEditingController();
-
   // AI inputs
   final TextEditingController _topicSeedController = TextEditingController();
+  int _aiQuantity = 2;
 
-  int _aiQuantity = 1; // number of SINGLE questions
   int _aiDifficultyId = 14;
   int _aiCategoryId = 1;
   int _aiSkillId = 1; // alias for category/skill (if you map separately later)
+  String? _selectedSkillType;
 
   final TrainerAiQuestionRepository _aiRepo = TrainerAiQuestionRepository();
   bool _isGeneratingByAi = false;
 
   // SINGLE mode: list of generated questions so trainer can edit/reorder
   final List<Map<String, dynamic>> _singleQuestions = [];
-
-  int _editingQuestionIndex = 0;
 
   // Question details
   String _questionType = 'SINGLE'; // 'SINGLE' or 'MULTIPLE'
@@ -69,17 +64,13 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
   double _pdfUploadProgress = 0.0;
   final GlobalKey _dropZoneKey = GlobalKey();
 
-  // Legacy option list state (kept but used only by active question editor)
-  final List<Map<String, dynamic>> _options = [];
-
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with 2 options
-    _addOption(text: '', isCorrect: true);
-    _addOption(text: '', isCorrect: false);
+    // Initialize with 1 empty question
+    _addSingleQuestion();
 
     if (kIsWeb) {
       registerDragDrop((clientX, clientY, pickedFile) {
@@ -98,46 +89,24 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     }
   }
 
-  void _addOption({String text = '', bool isCorrect = false}) {
-    final textCtrl = TextEditingController(text: text);
-    final expCtrl = TextEditingController();
+  void _addSingleQuestion() {
     setState(() {
-      _options.add({
-        'textController': textCtrl,
-        'isCorrect': isCorrect,
-        'explanationController': expCtrl,
+      _singleQuestions.add({
+        'questionTextController': TextEditingController(text: ''),
+        'hintController': TextEditingController(text: ''),
+        'options': [
+          {
+            'textController': TextEditingController(text: ''),
+            'isCorrect': true,
+            'explanationController': TextEditingController(),
+          },
+          {
+            'textController': TextEditingController(text: ''),
+            'isCorrect': false,
+            'explanationController': TextEditingController(),
+          },
+        ],
       });
-    });
-  }
-
-  void _removeOption(int index) {
-    _syncEditorToModel();
-
-    if (_options.length <= 1) {
-      ToastHelper.showError(
-        context,
-        'Questions must have at least one option.',
-      );
-      return;
-    }
-    setState(() {
-      _options[index]['textController'].dispose();
-      _options[index]['explanationController'].dispose();
-      _options.removeAt(index);
-    });
-  }
-
-  void _handleOptionSelect(int index) {
-    setState(() {
-      if (_questionType == 'SINGLE') {
-        // Deselect all others
-        for (int i = 0; i < _options.length; i++) {
-          _options[i]['isCorrect'] = (i == index);
-        }
-      } else {
-        // Toggle checkbox
-        _options[index]['isCorrect'] = !_options[index]['isCorrect'];
-      }
     });
   }
 
@@ -205,47 +174,41 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
       );
       return;
     }
-    if (_editingQuestionIndex < 0 ||
-        _editingQuestionIndex >= _singleQuestions.length) {
-      ToastHelper.showError(context, 'Invalid question selection.');
-      return;
-    }
 
-    // Always save from the currently edited model (prevents UI<->editor mismatch)
-    final current =
-        _singleQuestions[_editingQuestionIndex] as Map<String, dynamic>;
-    final questionText =
-        (current['questionTextController'] as TextEditingController).text
-            .trim();
-    if (questionText.isEmpty) {
-      ToastHelper.showError(context, 'Please enter the question text.');
-      return;
-    }
-
-    final List<Map<String, dynamic>> currentOptions =
-        (current['options'] as List<Map<String, dynamic>>);
-
-    List<Map<String, dynamic>> payloadOptions = [];
-    bool hasCorrectAnswer = false;
-    for (final opt in currentOptions) {
-      final text = (opt['textController'] as TextEditingController).text.trim();
+    // Validate ALL questions before saving ANY
+    for (int i = 0; i < _singleQuestions.length; i++) {
+      final q = _singleQuestions[i];
+      final text = (q['questionTextController'] as TextEditingController).text
+          .trim();
       if (text.isEmpty) {
-        ToastHelper.showError(context, 'Please fill in all option texts.');
+        ToastHelper.showError(
+          context,
+          'Please enter question text for question ${i + 1}.',
+        );
         return;
       }
-      final bool isCorrect = opt['isCorrect'] as bool;
-      if (isCorrect) {
-        hasCorrectAnswer = true;
-      }
-      payloadOptions.add({'optionText': text, 'isCorrect': isCorrect});
-    }
 
-    if (!hasCorrectAnswer) {
-      ToastHelper.showError(
-        context,
-        'Please select at least one correct answer.',
-      );
-      return;
+      final opts = q['options'] as List<Map<String, dynamic>>;
+      bool hasCorrect = false;
+      for (final opt in opts) {
+        final optText = (opt['textController'] as TextEditingController).text
+            .trim();
+        if (optText.isEmpty) {
+          ToastHelper.showError(
+            context,
+            'Please fill in all option texts for question ${i + 1}.',
+          );
+          return;
+        }
+        if (opt['isCorrect'] == true) hasCorrect = true;
+      }
+      if (!hasCorrect) {
+        ToastHelper.showError(
+          context,
+          'Please select at least one correct answer for question ${i + 1}.',
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -253,59 +216,77 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     });
 
     try {
-      // Ensure we persist latest editor input into current model
-      _syncEditorToModel();
-
       final token = await _authService.getToken();
-
       if (token == null) {
-        ToastHelper.showError(
-          context,
-          'Your session has expired. Please log in again.',
-        );
-        setState(() {
-          _isSaving = false;
-        });
+        ToastHelper.showError(context, 'Session expired. Please log in again.');
+        setState(() => _isSaving = false);
         return;
       }
 
-      final body = {
-        'sectionId': widget.sectionId,
-        'questionText': questionText,
-        'explanation': _hintController.text.trim(),
-        'categoryId': _aiCategoryId,
-        'skillParamId': _aiSkillId,
-        'difficultyId': _aiDifficultyId,
-        'options': payloadOptions,
-      };
+      List<int> newIds = [];
+      for (final q in _singleQuestions) {
+        final questionText =
+            (q['questionTextController'] as TextEditingController).text.trim();
+        final explanation = (q['hintController'] as TextEditingController).text
+            .trim();
+        final opts = q['options'] as List<Map<String, dynamic>>;
 
-      final response = await http.post(
-        Uri.parse('${EnvConfig.v1BaseUrl}/trainer/questions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(body),
-      );
+        List<Map<String, dynamic>> payloadOptions = [];
+        for (final opt in opts) {
+          payloadOptions.add({
+            'optionText': (opt['textController'] as TextEditingController).text
+                .trim(),
+            'isCorrect': opt['isCorrect'] as bool,
+          });
+        }
 
-      if (response.statusCode == 200) {
-        final resData = jsonDecode(response.body);
-        final newId = resData['id'] as int;
-        ToastHelper.showSuccess(context, 'Question created successfully!');
-        widget.onQuestionCreated([newId]);
-        Navigator.pop(context);
-      } else {
-        final errorMsg =
-            jsonDecode(response.body)['error'] ?? 'Failed to save question';
-        ToastHelper.showError(context, errorMsg);
+        final body = {
+          'sectionId': widget.sectionId,
+          'questionText': questionText,
+          'explanation': explanation,
+          'categoryId': _aiCategoryId,
+          'skillParamId': _aiSkillId,
+          'difficultyId': _aiDifficultyId,
+          'options': payloadOptions,
+        };
+
+        final response = await http.post(
+          Uri.parse('${EnvConfig.v1BaseUrl}/trainer/questions'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        );
+
+        if (response.statusCode == 200) {
+          final resData = jsonDecode(response.body);
+          newIds.add(resData['id'] as int);
+        } else {
+          throw Exception(
+            jsonDecode(response.body)['error'] ?? 'Failed to save question',
+          );
+        }
       }
+
+      ToastHelper.showSuccess(
+        context,
+        'Saved ${newIds.length} question(s) successfully!',
+      );
+      widget.onQuestionCreated(newIds);
+      Navigator.pop(context);
     } catch (e) {
       debugPrint('Error saving question: $e');
-      ToastHelper.showError(context, 'Connection error. Please try again.');
+      ToastHelper.showError(
+        context,
+        e.toString().replaceAll('Exception:', '').trim(),
+      );
     } finally {
-      setState(() {
-        _isSaving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
@@ -323,19 +304,8 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     }
     _singleQuestions.clear();
 
-    // Dispose editor option controllers
-    _disposeEditorOptionsControllers();
-
-    // legacy editor controllers disposed below
-
     if (kIsWeb) {
       unregisterDragDrop();
-    }
-    _questionController.dispose();
-    _hintController.dispose();
-    for (var opt in _options) {
-      opt['textController'].dispose();
-      opt['explanationController'].dispose();
     }
     super.dispose();
   }
@@ -807,69 +777,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Question text field with formatting bar
-                    const Text(
-                      'Question *',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        children: [
-                          // Format bar
-                          Container(
-                            color: const Color(0xFFF8FAFC),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            child: Row(
-                              children: [
-                                _buildFormatButton('B'),
-                                _buildFormatButton('I'),
-                                _buildFormatButton('1.'),
-                                const SizedBox(width: 12),
-                                _buildFormatIconButton(Icons.link),
-                                _buildFormatButton('Σ'),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                          // Field
-                          TextField(
-                            controller: _questionController,
-                            minLines: 5,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            decoration: const InputDecoration(
-                              hintText: 'Enter your question here...',
-                              hintStyle: TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 13,
-                                fontFamily: 'Outfit',
-                              ),
-                              contentPadding: EdgeInsets.all(12),
-                              border: InputBorder.none,
-                            ),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF1E293B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
                     // AI Generate
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -917,47 +824,166 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                           ),
                           const SizedBox(height: 12),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: TextEditingController(
-                                    text: '$_aiQuantity',
-                                  ),
-                                  enabled: false,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Quantity',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.all(
-                                        Radius.circular(8),
-                                      ),
-                                    ),
-                                  ),
+                              const Text(
+                                'Quantity',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF64748B),
+                                  fontFamily: 'Outfit',
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              SizedBox(
-                                width: 72,
-                                child: TextField(
-                                  controller: TextEditingController(),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (v) {
-                                    final n = int.tryParse(v.trim());
-                                    if (n == null) return;
-                                    setState(() {
-                                      _aiQuantity = n.clamp(1, 10);
-                                    });
-                                  },
-                                  decoration: const InputDecoration(
-                                    hintText: '1..10',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.all(
-                                        Radius.circular(8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.white,
+                                ),
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.remove,
+                                        size: 16,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          if (_aiQuantity > 1) _aiQuantity--;
+                                        });
+                                      },
+                                    ),
+                                    Container(
+                                      width: 40,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        '$_aiQuantity',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1E293B),
+                                          fontFamily: 'Outfit',
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.add,
+                                        size: 16,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          if (_aiQuantity < 10) _aiQuantity++;
+                                        });
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Difficulty Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                value: _aiDifficultyId,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Color(0xFF64748B),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 12, child: Text('Easy')),
+                                  DropdownMenuItem(value: 13, child: Text('Medium')),
+                                  DropdownMenuItem(value: 14, child: Text('Hard')),
+                                  DropdownMenuItem(value: 15, child: Text('Very Hard')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _aiDifficultyId = val;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // SkillType Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: _selectedSkillType,
+                                hint: const Text(
+                                  'Select Skill Type (Optional)',
+                                  style: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 12,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Color(0xFF64748B),
+                                ),
+                                items:
+                                    [
+                                      'Conversation/Short Sentences',
+                                      'Synonym',
+                                      'Antonym',
+                                      'Pronunciation',
+                                      'Grammar',
+                                      'Sentence Meaning',
+                                      'Sentence Combining',
+                                      'Fill in Blank',
+                                      'Reading Comprehension',
+                                      'Arrangement',
+                                    ].map((String val) {
+                                      return DropdownMenuItem<String>(
+                                        value: val,
+                                        child: Text(val),
+                                      );
+                                    }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedSkillType = val;
+                                  });
+                                },
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           ElevatedButton.icon(
@@ -1160,42 +1186,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     );
   }
 
-  Widget _buildFormatButton(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.all(4.0),
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF64748B),
-              fontFamily: 'Outfit',
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFormatIconButton(IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.all(4.0),
-          child: Icon(icon, size: 14, color: const Color(0xFF64748B)),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPdfAttachedCard() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1382,15 +1372,18 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                   onTap: () {
                     setState(() {
                       _questionType = 'SINGLE';
-                      // Clear extra correct options to keep single selection
-                      int firstCorrectIdx = _options.indexWhere(
-                        (opt) => opt['isCorrect'] == true,
-                      );
-                      if (firstCorrectIdx == -1 && _options.isNotEmpty) {
-                        _options[0]['isCorrect'] = true;
-                      } else {
-                        for (int i = 0; i < _options.length; i++) {
-                          _options[i]['isCorrect'] = (i == firstCorrectIdx);
+                      // For SINGLE type, we enforce one correct option
+                      for (final q in _singleQuestions) {
+                        final opts = q['options'] as List<Map<String, dynamic>>;
+                        int firstCorrectIdx = opts.indexWhere(
+                          (opt) => opt['isCorrect'] == true,
+                        );
+                        if (firstCorrectIdx == -1 && opts.isNotEmpty) {
+                          opts[0]['isCorrect'] = true;
+                        } else {
+                          for (int i = 0; i < opts.length; i++) {
+                            opts[i]['isCorrect'] = (i == firstCorrectIdx);
+                          }
                         }
                       }
                     });
@@ -1465,9 +1458,11 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
         quantity: _aiQuantity,
         difficultyId: _aiDifficultyId,
         categoryId: _aiCategoryId,
+        skillType: _selectedSkillType,
       );
 
       final generated = resp.questions ?? [];
+      if (!mounted) return;
       if (generated.isEmpty) {
         ToastHelper.showError(
           context,
@@ -1487,7 +1482,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
         }
       }
       _singleQuestions.clear();
-      _disposeEditorOptionsControllers();
 
       // Build models for ALL generated questions
       for (final q in generated) {
@@ -1523,10 +1517,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
         });
       }
 
-      // Load first into editor
-      _editingQuestionIndex = 0;
-      _loadQuestionIntoEditor(_editingQuestionIndex);
-
       setState(() {});
       ToastHelper.showSuccess(
         context,
@@ -1534,60 +1524,14 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
       );
     } catch (e) {
       debugPrint('Error generating by AI: $e');
-      ToastHelper.showError(context, 'AI generate failed. Please try again.');
+      ToastHelper.showError(
+        context,
+        'AI generate failed: ${e.toString().replaceAll('Exception:', '').trim()}',
+      );
     } finally {
       setState(() {
         _isGeneratingByAi = false;
       });
-    }
-  }
-
-  void _disposeEditorOptionsControllers() {
-    // Do NOT dispose here because editor controllers are reused by the
-    // underlying question model list in _singleQuestions.
-    // We only detach references.
-    _options.clear();
-  }
-
-  void _loadQuestionIntoEditor(int index) {
-    if (index < 0 || index >= _singleQuestions.length) return;
-    final q = _singleQuestions[index];
-
-    _questionController.text =
-        (q['questionTextController'] as TextEditingController).text;
-    _hintController.text = (q['hintController'] as TextEditingController).text;
-
-    _disposeEditorOptionsControllers();
-
-    final opts = q['options'] as List<Map<String, dynamic>>;
-    // clone controllers reference (we want edits to reflect on same controllers)
-    for (final opt in opts) {
-      _options.add({
-        'textController': opt['textController'],
-        'isCorrect': opt['isCorrect'],
-        'explanationController': opt['explanationController'],
-      });
-    }
-
-    setState(() {
-      _editingQuestionIndex = index;
-    });
-  }
-
-  void _syncEditorToModel() {
-    if (_singleQuestions.isEmpty) return;
-    final q = _singleQuestions[_editingQuestionIndex];
-    (q['questionTextController'] as TextEditingController).text =
-        _questionController.text;
-    (q['hintController'] as TextEditingController).text = _hintController.text;
-
-    final opts = q['options'] as List<Map<String, dynamic>>;
-    for (int i = 0; i < opts.length; i++) {
-      opts[i]['isCorrect'] = _options[i]['isCorrect'];
-      (opts[i]['textController'] as TextEditingController).text =
-          (_options[i]['textController'] as TextEditingController).text;
-      (opts[i]['explanationController'] as TextEditingController).text =
-          (_options[i]['explanationController'] as TextEditingController).text;
     }
   }
 
@@ -1645,9 +1589,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                     'hintController': TextEditingController(text: ''),
                     'options': opts,
                   });
-
-                  _editingQuestionIndex = _singleQuestions.length - 1;
-                  _loadQuestionIntoEditor(_editingQuestionIndex);
                 });
               },
               style: OutlinedButton.styleFrom(
@@ -1700,7 +1641,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             itemCount: _singleQuestions.length,
             itemBuilder: (context, setIdx) {
               final set = _singleQuestions[setIdx];
-              final bool isExpanded = setIdx == _editingQuestionIndex;
               final String title = 'Question ${setIdx + 1}';
 
               final TextEditingController qTextCtrl =
@@ -1714,326 +1654,327 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isExpanded
-                        ? const Color(0xFF20B486)
-                        : const Color(0xFFE2E8F0),
-                    width: isExpanded ? 1.5 : 1,
-                  ),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
                 ),
                 child: Column(
                   children: [
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _editingQuestionIndex = setIdx;
-                          _loadQuestionIntoEditor(setIdx);
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: isExpanded
-                                    ? const Color(0xFF20B486)
-                                    : const Color(0xFF1E293B),
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                            const Spacer(),
-                            if (_singleQuestions.length > 1) ...[
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Color(0xFFEF4444),
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _singleQuestions.removeAt(setIdx);
-                                    if (_singleQuestions.isEmpty) {
-                                      _editingQuestionIndex = 0;
-                                      _options.clear();
-                                      _disposeEditorOptionsControllers();
-                                    } else {
-                                      _editingQuestionIndex =
-                                          _editingQuestionIndex.clamp(
-                                            0,
-                                            _singleQuestions.length - 1,
-                                          );
-                                      _loadQuestionIntoEditor(
-                                        _editingQuestionIndex,
-                                      );
-                                    }
-                                  });
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            Icon(
-                              isExpanded
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              color: const Color(0xFF64748B),
-                              size: 18,
-                            ),
-                          ],
-                        ),
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
                       ),
-                    ),
-                    if (isExpanded) ...[
-                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Options list - allow internal scroll to prevent overflow
-                            SizedBox(
-                              height: 360,
-                              child: ListView.builder(
-                                itemCount: opts.length,
-                                itemBuilder: (context, optIdx) {
-                                  final opt = opts[optIdx];
-                                  final bool isCorrect =
-                                      opt['isCorrect'] as bool;
-                                  final TextEditingController textCtrl =
-                                      opt['textController']
-                                          as TextEditingController;
-
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isCorrect
-                                          ? const Color(0xFFE2F9F3)
-                                          : Colors.white,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: isCorrect
-                                            ? const Color(0xFF20B486)
-                                            : const Color(0xFFE2E8F0),
-                                        width: isCorrect ? 1.5 : 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        // Radio-like circle
-                                        InkWell(
-                                          onTap: () {
-                                            setState(() {
-                                              for (
-                                                int i = 0;
-                                                i < opts.length;
-                                                i++
-                                              ) {
-                                                opts[i]['isCorrect'] =
-                                                    (i == optIdx);
-                                              }
-                                            });
-                                          },
-                                          child: Container(
-                                            width: 20,
-                                            height: 20,
-                                            decoration: BoxDecoration(
-                                              color: isCorrect
-                                                  ? const Color(0xFF20B486)
-                                                  : Colors.white,
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: isCorrect
-                                                    ? const Color(0xFF20B486)
-                                                    : const Color(0xFFCBD5E1),
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            child: isCorrect
-                                                ? const Center(
-                                                    child: Icon(
-                                                      Icons.check,
-                                                      size: 14,
-                                                      color: Colors.white,
-                                                    ),
-                                                  )
-                                                : null,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: TextField(
-                                            controller: textCtrl,
-                                            minLines: 1,
-                                            maxLines: null,
-                                            keyboardType: TextInputType.multiline,
-                                            decoration: const InputDecoration(
-                                              hintText: 'Enter option text...',
-                                              border: InputBorder.none,
-                                              contentPadding: EdgeInsets.zero,
-                                            ),
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Color(0xFF1E293B),
-                                              fontFamily: 'Outfit',
-                                            ),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            color: Color(0xFFEF4444),
-                                            size: 18,
-                                          ),
-                                          onPressed: () {
-                                            if (opts.length <= 1) {
-                                              ToastHelper.showError(
-                                                context,
-                                                'Each question set must have at least one option.',
-                                              );
-                                              return;
-                                            }
-                                            setState(() {
-                                              // Detach controllers; actual disposal is handled
-                                              // when the owning question model list is disposed.
-                                              // Do not call dispose() here.
-                                              // (no-op)
-                                              // ignore: unused_local_variable
-                                              final _ = opt['textController'];
-                                              // ignore: unused_local_variable
-                                              final __ =
-                                                  opt['explanationController'];
-                                              opts.removeAt(optIdx);
-                                              if (!opts.any(
-                                                    (o) =>
-                                                        o['isCorrect'] == true,
-                                                  ) &&
-                                                  opts.isNotEmpty) {
-                                                opts[0]['isCorrect'] = true;
-                                              }
-                                            });
-                                          },
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
+                      child: Row(
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF1E293B),
+                              fontFamily: 'Outfit',
                             ),
-
-                            // Add Option
-                            TextButton.icon(
+                          ),
+                          const Spacer(),
+                          if (_singleQuestions.length > 1)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Color(0xFFEF4444),
+                                size: 16,
+                              ),
                               onPressed: () {
                                 setState(() {
-                                  opts.add({
-                                    'textController': TextEditingController(
-                                      text: '',
-                                    ),
-                                    'isCorrect': false,
-                                    'explanationController':
-                                        TextEditingController(),
-                                  });
+                                  _singleQuestions.removeAt(setIdx);
                                 });
                               },
-                              icon: const Icon(
-                                Icons.add,
-                                size: 14,
-                                color: Color(0xFF20B486),
-                              ),
-                              label: const Text(
-                                'Add Option',
-                                style: TextStyle(
-                                  color: Color(0xFF20B486),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
                             ),
-
-                            const SizedBox(height: 12),
-
-                            // Question text
-                            const Text(
-                              'EXPLANATION',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF64748B),
-                                letterSpacing: 0.5,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            TextField(
-                              controller: expCtrl,
-                              minLines: 3,
-                              maxLines: null,
-                              keyboardType: TextInputType.multiline,
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Explain why this correct answer is selected...',
-                                hintStyle: const TextStyle(
-                                  color: Color(0xFF94A3B8),
-                                  fontSize: 11,
-                                  fontFamily: 'Outfit',
-                                ),
-                                fillColor: const Color(0xFFF8FAFC),
-                                filled: true,
-                                contentPadding: const EdgeInsets.all(10),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF20B486),
-                                    width: 1,
-                                  ),
-                                ),
-                              ),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF475569),
-                                height: 1.4,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    // Body
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Question Text Input
+                          const Text(
+                            'QUESTION TEXT *',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                              letterSpacing: 0.5,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: qTextCtrl,
+                            minLines: 3,
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            decoration: InputDecoration(
+                              hintText: 'Enter your question here...',
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 11,
+                                fontFamily: 'Outfit',
+                              ),
+                              fillColor: const Color(0xFFF8FAFC),
+                              filled: true,
+                              contentPadding: const EdgeInsets.all(10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF20B486),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF1E293B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Options list
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: opts.length,
+                            itemBuilder: (context, optIdx) {
+                              final opt = opts[optIdx];
+                              final bool isCorrect = opt['isCorrect'] as bool;
+                              final TextEditingController textCtrl =
+                                  opt['textController']
+                                      as TextEditingController;
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isCorrect
+                                      ? const Color(0xFFE2F9F3)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isCorrect
+                                        ? const Color(0xFF20B486)
+                                        : const Color(0xFFE2E8F0),
+                                    width: isCorrect ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          for (
+                                            int i = 0;
+                                            i < opts.length;
+                                            i++
+                                          ) {
+                                            opts[i]['isCorrect'] =
+                                                (i == optIdx);
+                                          }
+                                        });
+                                      },
+                                      child: Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: isCorrect
+                                              ? const Color(0xFF20B486)
+                                              : Colors.white,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isCorrect
+                                                ? const Color(0xFF20B486)
+                                                : const Color(0xFFCBD5E1),
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        child: isCorrect
+                                            ? const Center(
+                                                child: Icon(
+                                                  Icons.check,
+                                                  size: 14,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: textCtrl,
+                                        minLines: 1,
+                                        maxLines: null,
+                                        keyboardType: TextInputType.multiline,
+                                        decoration: const InputDecoration(
+                                          hintText: 'Enter option text...',
+                                          border: InputBorder.none,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF1E293B),
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Color(0xFFEF4444),
+                                        size: 18,
+                                      ),
+                                      onPressed: () {
+                                        if (opts.length <= 1) {
+                                          ToastHelper.showError(
+                                            context,
+                                            'Must have at least one option.',
+                                          );
+                                          return;
+                                        }
+                                        setState(() {
+                                          opts.removeAt(optIdx);
+                                          if (!opts.any(
+                                                (o) => o['isCorrect'] == true,
+                                              ) &&
+                                              opts.isNotEmpty) {
+                                            opts[0]['isCorrect'] = true;
+                                          }
+                                        });
+                                      },
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+
+                          // Add Option
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                opts.add({
+                                  'textController': TextEditingController(
+                                    text: '',
+                                  ),
+                                  'isCorrect': false,
+                                  'explanationController':
+                                      TextEditingController(),
+                                });
+                              });
+                            },
+                            icon: const Icon(
+                              Icons.add,
+                              size: 14,
+                              color: Color(0xFF20B486),
+                            ),
+                            label: const Text(
+                              'Add Option',
+                              style: TextStyle(
+                                color: Color(0xFF20B486),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Explanation
+                          const Text(
+                            'EXPLANATION',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                              letterSpacing: 0.5,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: expCtrl,
+                            minLines: 3,
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Explain why this correct answer is selected...',
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 11,
+                                fontFamily: 'Outfit',
+                              ),
+                              fillColor: const Color(0xFFF8FAFC),
+                              filled: true,
+                              contentPadding: const EdgeInsets.all(10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF20B486),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF475569),
+                              height: 1.4,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
             },
           ),
-
           const SizedBox(height: 12),
-
           OutlinedButton.icon(
             onPressed: () {
               setState(() {
@@ -2051,9 +1992,6 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                   'hintController': TextEditingController(text: ''),
                   'options': opts,
                 });
-
-                _editingQuestionIndex = _singleQuestions.length - 1;
-                _loadQuestionIntoEditor(_editingQuestionIndex);
               });
             },
             style: OutlinedButton.styleFrom(
