@@ -79,7 +79,25 @@ public class CourseServiceImpl implements CourseService {
             diffFilter = difficulty.toUpperCase();
         }
 
-        return courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId, enrollmentStatus);
+        List<CourseSummaryDTO> dtos = courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId, enrollmentStatus);
+        for (CourseSummaryDTO dto : dtos) {
+            Course c = courseRepository.findById(dto.getId()).orElse(null);
+            if (c != null) {
+                List<String> catNames = new ArrayList<>();
+                if (c.getCategories() != null && !c.getCategories().isEmpty()) {
+                    for (com.hango.hango_backend.entity.SystemParameter sp : c.getCategories()) {
+                        catNames.add(sp.getParamValue());
+                    }
+                } else if (c.getCategory() != null) {
+                    catNames.add(c.getCategory().getParamValue());
+                }
+                dto.setCategories(catNames);
+                if (dto.getCategoryName() == null || dto.getCategoryName().isEmpty()) {
+                    dto.setCategoryName(catNames.isEmpty() ? "" : String.join(", ", catNames));
+                }
+            }
+        }
+        return dtos;
     }
 
     @Override
@@ -194,16 +212,24 @@ public class CourseServiceImpl implements CourseService {
             // Ignore
         }
 
-        String categoryKey = "";
-        String categoryName = "";
+        List<String> categoryKeys = new ArrayList<>();
+        List<String> categoryNames = new ArrayList<>();
         try {
-            if (course.getCategory() != null) {
-                categoryKey = course.getCategory().getParamKey();
-                categoryName = course.getCategory().getParamValue();
+            if (course.getCategories() != null && !course.getCategories().isEmpty()) {
+                for (com.hango.hango_backend.entity.SystemParameter sp : course.getCategories()) {
+                    categoryKeys.add(sp.getParamKey());
+                    categoryNames.add(sp.getParamValue());
+                }
+            } else if (course.getCategory() != null) {
+                categoryKeys.add(course.getCategory().getParamKey());
+                categoryNames.add(course.getCategory().getParamValue());
             }
         } catch (jakarta.persistence.EntityNotFoundException e) {
             // Ignore
         }
+
+        String categoryKey = categoryKeys.isEmpty() ? "" : categoryKeys.get(0);
+        String categoryName = categoryNames.isEmpty() ? "" : String.join(", ", categoryNames);
 
         // Calculate average rating dynamically from DB reviews/ratings
         double averageRating = 0.0;
@@ -228,6 +254,8 @@ public class CourseServiceImpl implements CourseService {
                 .difficultyKey(difficultyKey)
                 .categoryKey(categoryKey)
                 .categoryName(categoryName)
+                .categoryKeys(categoryKeys)
+                .categoryNames(categoryNames)
                 .thumbnailUrl(course.getThumbnailUrl())
                 .rating(averageRating)
                 .learnersCount(learnersCount)

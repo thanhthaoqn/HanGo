@@ -5,6 +5,9 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import java.util.Set;
+import java.util.HashSet;
+
 @Entity
 @Table(name = "courses")
 @Getter
@@ -23,8 +26,17 @@ public class Course {
     private User creator;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_param_id", nullable = false)
+    @JoinColumn(name = "category_param_id", nullable = true)
     private SystemParameter category;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "course_categories",
+        joinColumns = @JoinColumn(name = "course_id"),
+        inverseJoinColumns = @JoinColumn(name = "category_param_id")
+    )
+    @Builder.Default
+    private Set<SystemParameter> categories = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "difficulty_param_id", nullable = true)

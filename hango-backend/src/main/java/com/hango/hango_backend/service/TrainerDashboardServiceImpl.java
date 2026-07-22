@@ -123,11 +123,27 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         // 5. Map to DTOs
-        List<TrainerCourseDetailDTO> courses = mutableProjections.stream().map(p -> TrainerCourseDetailDTO.builder()
+        List<TrainerCourseDetailDTO> courses = mutableProjections.stream().map(p -> {
+            List<String> catKeys = new ArrayList<>();
+            List<String> catNames = new ArrayList<>();
+            com.hango.hango_backend.entity.Course c = courseRepository.findById(p.getId()).orElse(null);
+            if (c != null && c.getCategories() != null && !c.getCategories().isEmpty()) {
+                for (com.hango.hango_backend.entity.SystemParameter sp : c.getCategories()) {
+                    catKeys.add(sp.getParamKey());
+                    catNames.add(sp.getParamValue());
+                }
+            } else if (c != null && c.getCategory() != null) {
+                catKeys.add(c.getCategory().getParamKey());
+                catNames.add(c.getCategory().getParamValue());
+            }
+
+            return TrainerCourseDetailDTO.builder()
                 .id(p.getId())
                 .title(p.getTitle())
                 .status(p.getStatus())
                 .description(p.getDescription())
+                .categoryKeys(catKeys)
+                .categories(catNames)
                 .learnersCount(p.getLearnersCount() != null ? p.getLearnersCount() : 0L)
                 .lessonsCount(p.getLessonsCount() != null ? p.getLessonsCount() : 0L)
                 .thumbnailUrl(p.getThumbnailUrl())
@@ -135,7 +151,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .code(p.getCode())
                 .version(p.getVersion())
                 .parentId(p.getParentId())
-                .build()).collect(Collectors.toList());
+                .build();
+        }).collect(Collectors.toList());
 
         return TrainerCoursesResponseDTO.builder()
                 .allCount(allCount)
@@ -147,29 +164,59 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .build();
     }
 
+    private java.util.Set<com.hango.hango_backend.entity.SystemParameter> resolveCategories(com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
+        List<String> rawKeys = request.getCategoryKeys();
+        if (rawKeys == null || rawKeys.isEmpty()) {
+            if (request.getCategoryKey() != null && !request.getCategoryKey().isBlank()) {
+                rawKeys = List.of(request.getCategoryKey());
+            } else {
+                rawKeys = new ArrayList<>();
+            }
+        }
+
+        if (rawKeys.isEmpty() || rawKeys.size() > 3) {
+            throw new IllegalArgumentException("Course must have between 1 and 3 categories selected");
+        }
+
+        java.util.Set<com.hango.hango_backend.entity.SystemParameter> categorySet = new java.util.HashSet<>();
+        for (String rawKey : rawKeys) {
+            if (rawKey == null || rawKey.isBlank()) continue;
+            String catKey = rawKey.toUpperCase().trim();
+            if ("READING".equals(catKey)) {
+                catKey = "READING_COMPREHENSION";
+            } else if ("PRONUNCIATION".equals(catKey) || "SPEAKING".equals(catKey)) {
+                catKey = "PRONUNCIATION";
+            } else if ("WRITING".equals(catKey)) {
+                catKey = "GRAMMAR";
+            }
+
+            String finalKey = catKey;
+            com.hango.hango_backend.entity.SystemParameter param = systemParameterRepository
+                    .findByParamTypeAndParamKey("COURSE_CATEGORY", finalKey)
+                    .orElseThrow(() -> new RuntimeException("Category not found: " + finalKey));
+            categorySet.add(param);
+        }
+
+        if (categorySet.isEmpty()) {
+            throw new IllegalArgumentException("Course must have between 1 and 3 valid categories selected");
+        }
+
+        return categorySet;
+    }
+
     @Override
     @Transactional
     public void createTrainerCourse(String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
-        String catKey = request.getCategoryKey().toUpperCase();
-        if ("READING".equals(catKey)) {
-            catKey = "READING_COMPREHENSION";
-        } else if ("PRONUNCIATION".equals(catKey) || "SPEAKING".equals(catKey)) {
-            catKey = "PRONUNCIATION";
-        } else if ("WRITING".equals(catKey)) {
-            catKey = "GRAMMAR";
-        }
+        java.util.Set<com.hango.hango_backend.entity.SystemParameter> categorySet = resolveCategories(request);
+        com.hango.hango_backend.entity.SystemParameter firstCategory = categorySet.iterator().next();
 
-        String diffKey = request.getDifficultyKey().toUpperCase();
+        String diffKey = request.getDifficultyKey() != null ? request.getDifficultyKey().toUpperCase() : "BASIC";
         if ("BEGINNER".equals(diffKey)) {
             diffKey = "BASIC";
         }
-
-        com.hango.hango_backend.entity.SystemParameter category = systemParameterRepository
-                .findByParamTypeAndParamKey("COURSE_CATEGORY", catKey)
-                .orElseThrow(() -> new RuntimeException("Category not found: " + request.getCategoryKey()));
 
         com.hango.hango_backend.entity.SystemParameter difficulty = systemParameterRepository
                 .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
@@ -184,7 +231,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .description(request.getDescription())
                 .objectives(request.getObjectives())
                 .creator(user)
-                .category(category)
+                .category(firstCategory)
+                .categories(categorySet)
                 .difficulty(difficulty)
                 .thumbnailUrl(request.getThumbnailUrl())
                 .price(request.getPrice())
@@ -211,27 +259,21 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("You are not authorized to edit this course");
         }
 
-        String catKey = request.getCategoryKey().toUpperCase();
-        if ("READING".equals(catKey)) {
-            catKey = "READING_COMPREHENSION";
-        } else if ("PRONUNCIATION".equals(catKey) || "SPEAKING".equals(catKey)) {
-            catKey = "PRONUNCIATION";
-        } else if ("WRITING".equals(catKey)) {
-            catKey = "GRAMMAR";
-        }
+        java.util.Set<com.hango.hango_backend.entity.SystemParameter> categorySet = resolveCategories(request);
+        com.hango.hango_backend.entity.SystemParameter firstCategory = categorySet.iterator().next();
 
-        String diffKey = request.getDifficultyKey().toUpperCase();
+        String diffKey = request.getDifficultyKey() != null ? request.getDifficultyKey().toUpperCase() : "BASIC";
         if ("BEGINNER".equals(diffKey)) {
             diffKey = "BASIC";
         }
 
-        com.hango.hango_backend.entity.SystemParameter category = systemParameterRepository
-                .findByParamTypeAndParamKey("COURSE_CATEGORY", catKey)
-                .orElseThrow(() -> new RuntimeException("Category not found: " + request.getCategoryKey()));
-
         com.hango.hango_backend.entity.SystemParameter difficulty = systemParameterRepository
                 .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
                 .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
+
+        course.setCategory(firstCategory);
+        course.setCategories(categorySet);
+        course.setDifficulty(difficulty);
 
         boolean needsNewDraftVersion = "PUBLISHED".equalsIgnoreCase(course.getStatus())
                 && enrollmentRepository.countByCourseId(course.getId()) > 0;
@@ -271,7 +313,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .description(request.getDescription())
                     .objectives(request.getObjectives())
                     .creator(course.getCreator())
-                    .category(category)
+                    .category(firstCategory)
+                    .categories(categorySet)
                     .difficulty(difficulty)
                     .thumbnailUrl(request.getThumbnailUrl())
                     .price(request.getPrice())
@@ -282,7 +325,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .build();
 
             com.hango.hango_backend.entity.Course savedDraftCourse = courseRepository.save(draftCourse);
-            saveSectionsAndLessonsForCourse(savedDraftCourse, sessionDTOs, category, difficulty);
+            saveSectionsAndLessonsForCourse(savedDraftCourse, sessionDTOs, firstCategory, difficulty);
             return savedDraftCourse.getId();
         }
 
@@ -290,7 +333,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setCode(request.getCode());
         course.setDescription(request.getDescription());
         course.setObjectives(request.getObjectives());
-        course.setCategory(category);
+        course.setCategory(firstCategory);
+        course.setCategories(categorySet);
         course.setDifficulty(difficulty);
         course.setPrice(request.getPrice());
         course.setEstimatedDuration(request.getEstimatedDuration());
