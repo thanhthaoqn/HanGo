@@ -111,7 +111,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       final api = await _getApi();
       final skills = await api.getSystemParameters('SKILL_TYPE');
       final difficulties = await api.getSystemParameters('DIFFICULTY');
-      final groupTypes = await api.getQuestionCategories();
+      final groupTypes = await api.getSystemParameters('GROUP_TYPE');
 
       Map<String, dynamic>? detail;
       if (widget.question != null) {
@@ -502,7 +502,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                         value: _selectedGroupTypeId,
                         items: _groupTypes,
                         onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),
@@ -575,7 +575,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                         value: _selectedGroupTypeId,
                         items: _groupTypes,
                         onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),
