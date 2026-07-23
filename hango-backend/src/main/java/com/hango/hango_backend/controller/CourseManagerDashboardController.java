@@ -83,4 +83,44 @@ public class CourseManagerDashboardController {
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
+
+    @GetMapping("/exams/review")
+    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    public ResponseEntity<?> getExamsForReview(@RequestParam(defaultValue = "PENDING_APPROVAL") String status) {
+        try {
+            List<com.hango.hango_backend.dto.ExamResponseDTO> exams = courseManagerDashboardService.getExamsForReview(status);
+            return ResponseEntity.ok(exams);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/exams/{id}/publish")
+    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    public ResponseEntity<?> publishExam(@PathVariable Long id) {
+        try {
+            courseManagerDashboardService.publishExam(id);
+            return ResponseEntity.ok("{\"message\": \"Exam published successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/exams/{id}/reject")
+    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    public ResponseEntity<?> rejectExam(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body) {
+        try {
+            String reason = body != null ? body.get("reason") : null;
+            if (reason == null || reason.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"Rejection reason is required\"}");
+            }
+            courseManagerDashboardService.returnExamToDraft(id, reason);
+            return ResponseEntity.ok("{\"message\": \"Exam returned to draft\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
 }

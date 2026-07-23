@@ -189,4 +189,66 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 .sessions(sessions)
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.hango.hango_backend.dto.ExamResponseDTO> getExamsForReview(String status) {
+        String normalizedStatus = normalizeStatus(status);
+        List<com.hango.hango_backend.entity.Exam> exams;
+        if ("ALL".equals(normalizedStatus)) {
+            exams = examRepository.findByDeletedAtIsNullOrderByCreatedAtDesc();
+        } else if ("PENDING_APPROVAL".equals(normalizedStatus)) {
+            exams = examRepository.findByStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(
+                    java.util.Arrays.asList("PENDING_APPROVAL", "SUBMITTED"));
+        } else {
+            exams = examRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(normalizedStatus);
+        }
+
+        return exams.stream().map(exam -> {
+            int questionCount = exam.getExpectedQuestionCount() != null ? exam.getExpectedQuestionCount() : 0;
+            return com.hango.hango_backend.dto.ExamResponseDTO.builder()
+                    .id(exam.getId())
+                    .title(exam.getTitle())
+                    .description(exam.getDescription())
+                    .status(exam.getStatus())
+                    .creatorName(exam.getCreatedBy() != null ? exam.getCreatedBy().getFullName() : "Unknown")
+                    .questionCount(questionCount)
+                    .durationMinutes(exam.getDurationMinutes())
+                    .thumbnailUrl(exam.getThumbnailUrl())
+                    .rejectionReason(exam.getRejectionReason())
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void publishExam(Long examId) {
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .filter(e -> e.getDeletedAt() == null)
+                .orElseThrow(() -> new RuntimeException("Exam not found with ID: " + examId));
+
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(exam.getStatus()) && !"SUBMITTED".equalsIgnoreCase(exam.getStatus())) {
+            throw new RuntimeException("Only exams in PENDING_APPROVAL or SUBMITTED status can be published");
+        }
+
+        exam.setStatus("PUBLISHED");
+        exam.setRejectionReason(null);
+        examRepository.save(exam);
+    }
+
+    @Override
+    @Transactional
+    public void returnExamToDraft(Long examId, String reason) {
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .filter(e -> e.getDeletedAt() == null)
+                .orElseThrow(() -> new RuntimeException("Exam not found with ID: " + examId));
+
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(exam.getStatus()) && !"SUBMITTED".equalsIgnoreCase(exam.getStatus())) {
+            throw new RuntimeException("Only exams in PENDING_APPROVAL or SUBMITTED status can be returned to draft");
+        }
+
+        exam.setStatus("DRAFT");
+        exam.setRejectionReason(reason);
+        examRepository.save(exam);
+    }
 }

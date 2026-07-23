@@ -16,4 +16,5 @@ public class ExamResponseDTO {
     private Double rating;
     private String learnerCountFormatted;
     private String thumbnailUrl;
+    private String rejectionReason;
 }
