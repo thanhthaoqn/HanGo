@@ -279,6 +279,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         'isLocallyModified': true,
 
         // Keep old keys (compatibility)
+        'itemType': 'text',
         'questionText': question,
         'questionImageUrl': _uploadedImageUrl ?? '',
         'pdfName': _uploadedPdfName ?? '',
