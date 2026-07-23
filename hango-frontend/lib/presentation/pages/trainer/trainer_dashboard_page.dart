@@ -574,22 +574,6 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
       ),
       child: Stack(
         children: [
-          Positioned(
-            right: -10,
-            top: -10,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: gradient,
-              ),
-              child: Opacity(
-                opacity: 0.1,
-                child: Icon(icon, size: 60, color: Colors.white),
-              ),
-            ),
-          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
