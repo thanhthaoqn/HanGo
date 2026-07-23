@@ -83,7 +83,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       }
 
       final lessonId = lesson['id'];
-      if (lessonId is num && lessonId < 1000000000000) {
+      final isLocallyModified = lesson['isLocallyModified'] == true;
+      if (lessonId is num && lessonId < 1000000000000 && !isLocallyModified) {
         _loadLessonDetailFromApi(lessonId.toInt());
       }
     }
@@ -270,8 +271,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         'learningObjectives': objectives,
         'estimatedTimeMinutes': estimatedTime,
         'version': 'v1.0',
+        'isLocallyModified': true,
 
-        // Keep old keys for backward compatibility (if backend ignores them it's fine)
+        // Keep old keys (compatibility)
         'questionText': question,
         'questionImageUrl': _uploadedImageUrl ?? '',
         'pdfName': _uploadedPdfName ?? '',
