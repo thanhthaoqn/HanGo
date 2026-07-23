@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -16,41 +17,60 @@ import java.util.Map;
 public class SystemParameterDataInitializer implements CommandLineRunner {
 
     private final SystemParameterRepository systemParameterRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) {
-        log.info("Initializing Course Category System Parameters...");
+        log.info("Initializing New Skill/Category System Parameters...");
 
-        Map<String, String> categories = new LinkedHashMap<>();
-        categories.put("CONVERSATION_SHORT_SENTENCES", "Conversation/Short Sentences");
-        categories.put("SYNONYM", "Synonym");
-        categories.put("ANTONYM", "Antonym");
-        categories.put("PRONUNCIATION", "Pronunciation");
-        categories.put("GRAMMAR", "Grammar");
-        categories.put("SENTENCE_MEANING", "Sentence Meaning");
-        categories.put("SENTENCE_COMBINING", "Sentence Combining");
-        categories.put("FILL_IN_BLANK", "Fill in Blank");
-        categories.put("READING_COMPREHENSION", "Reading Comprehension");
-        categories.put("ARRANGEMENT", "Arrangement");
+        // Xóa các loại cũ (có thể đang dùng)
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
+        jdbcTemplate.update("DELETE FROM system_parameters WHERE param_type IN ('COURSE_CATEGORY', 'SKILL_TYPE', 'SKILL')");
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
 
-        for (Map.Entry<String, String> entry : categories.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
+        Map<String, String> newSkills = new LinkedHashMap<>();
+        newSkills.put("PHONETICS", "Phonetics");
+        newSkills.put("WORD_ORDER", "Word order");
+        newSkills.put("REDUCED_RELATIVE_CLAUSE", "Reduced relative clause");
+        newSkills.put("PREPOSITION", "Preposition");
+        newSkills.put("COLLOCATION", "Collocation");
+        newSkills.put("TO_INFINITIVE", "To-infinitive");
+        newSkills.put("QUANTIFIER", "Quantifier");
+        newSkills.put("PHRASAL_VERB", "Phrasal verb");
+        newSkills.put("PREPOSITIONAL_PHRASE", "Prepositional phrase");
+        newSkills.put("VOCABULARY", "Vocabulary");
+        newSkills.put("CONVERSATION_ORDERING", "Conversation ordering");
+        newSkills.put("LETTER_ORDERING", "Letter ordering");
+        newSkills.put("PARAGRAPH_ORDERING", "Paragraph ordering");
+        newSkills.put("PASSIVE_VOICE", "Passive voice");
+        newSkills.put("RELATIVE_CLAUSE", "Relative clause");
+        newSkills.put("CONTEXTUAL_MEANING", "Contextual meaning");
+        newSkills.put("FACTUAL_DETAIL_QUESTION", "Factual / Detail question");
+        newSkills.put("SYNONYM_IN_CONTEXT", "Synonym in context");
+        newSkills.put("ANTONYM_IN_CONTEXT", "Antonym in context");
+        newSkills.put("REFERENCE_QUESTION", "Reference question");
+        newSkills.put("PARAPHRASING_QUESTION", "Paraphrasing question");
+        newSkills.put("PARAGRAPH_SPECIFIC_INFORMATION_QUESTION", "Paragraph-specific information question");
+        newSkills.put("MAIN_IDEA_CENTRAL_THEME_QUESTION", "Main idea / Central theme question");
+        newSkills.put("TRUE_NOT_TRUE_QUESTION", "TRUE / NOT TRUE question");
+        newSkills.put("INFERENCE_QUESTION", "Inference question");
 
-            boolean exists = systemParameterRepository
-                    .findByParamTypeAndParamKey("COURSE_CATEGORY", key)
-                    .isPresent();
+        String[] types = {"COURSE_CATEGORY", "SKILL_TYPE", "SKILL"};
 
-            if (!exists) {
+        for (String type : types) {
+            for (Map.Entry<String, String> entry : newSkills.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+
                 SystemParameter param = SystemParameter.builder()
-                        .paramType("COURSE_CATEGORY")
+                        .paramType(type)
                         .paramKey(key)
                         .paramValue(value)
                         .isActive(true)
                         .build();
                 systemParameterRepository.save(param);
-                log.info("Created SystemParameter: COURSE_CATEGORY -> {} ({})", key, value);
             }
         }
+        log.info("Successfully recreated COURSE_CATEGORY, SKILL_TYPE, and SKILL in system_parameters.");
     }
 }
