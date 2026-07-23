@@ -51,6 +51,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   bool _isNavigatingLesson = false;
   bool _isMarkingCompleted = false;
   late int _currentLessonId;
+  
+  bool _isPlayingYoutube = false;
+  String? _youtubeVideoId;
 
   int _currentUserId = 1; // Default
   String _currentUserAvatar = '';
@@ -284,37 +287,59 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     _youtubeController = null;
     _chewieController = null;
     _videoPlayerController = null;
+    _isPlayingYoutube = false;
+    _youtubeVideoId = null;
+  }
+
+  String? _extractYouTubeVideoId(String url) {
+    final patterns = [
+      RegExp(r'(?:youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtu\.be\/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})'),
+    ];
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(url);
+      if (match != null) return match.group(1);
+    }
+    return null;
   }
 
   void _initializePlayer(String url) {
     _disposePlayers();
 
-    if (url.contains('youtube.com') || url.contains('youtu.be')) {
-      final videoId = YoutubePlayerController.convertUrlToId(url);
-      if (videoId != null) {
-        _youtubeController = YoutubePlayerController.fromVideoId(
-          videoId: videoId,
-          autoPlay: false,
-          params: const YoutubePlayerParams(
-            showControls: true,
-            mute: false,
-            showFullscreenButton: true,
-            loop: false,
-          ),
-        );
-      }
-    } else {
-      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
-      _videoPlayerController!.initialize().then((_) {
-        setState(() {
-          _chewieController = ChewieController(
-            videoPlayerController: _videoPlayerController!,
-            autoPlay: false,
-            looping: false,
-            aspectRatio: _videoPlayerController!.value.aspectRatio,
-          );
-        });
+    final youtubeId = _extractYouTubeVideoId(url);
+    if (youtubeId != null) {
+      setState(() {
+        _youtubeVideoId = youtubeId;
+        _isPlayingYoutube = false;
       });
+    } else if (url.isNotEmpty) {
+      final trimmedUrl = url.trim();
+      final isHtml = trimmedUrl.startsWith('<') || trimmedUrl.contains('iframe');
+      final isHttp = trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://');
+      
+      if (!isHtml && isHttp) {
+        try {
+          _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(trimmedUrl));
+          _videoPlayerController!.initialize().then((_) {
+            setState(() {
+              _chewieController = ChewieController(
+                videoPlayerController: _videoPlayerController!,
+                autoPlay: false,
+                looping: false,
+                aspectRatio: _videoPlayerController!.value.aspectRatio,
+              );
+            });
+          }).catchError((error) {
+            debugPrint('Video Player initialization error: $error');
+          });
+        } catch (e) {
+          debugPrint('Invalid video URL: $e');
+        }
+      } else {
+        debugPrint('Unsupported video format or iframe snippet: $trimmedUrl');
+      }
     }
   }
 
@@ -1116,11 +1141,42 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   }
 
   Widget _buildVideoPlayer() {
-    if (_youtubeController != null) {
-      return YoutubePlayer(
-        controller: _youtubeController!,
-        aspectRatio: 16 / 9,
-      );
+    if (_youtubeVideoId != null) {
+      if (!_isPlayingYoutube) {
+        return Stack(
+          alignment: Alignment.center,
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              'https://img.youtube.com/vi/$_youtubeVideoId/hqdefault.jpg',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(color: Colors.black87),
+            ),
+            Container(color: Colors.black.withOpacity(0.3)),
+            IconButton(
+              icon: const Icon(Icons.play_circle_fill, size: 64, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _isPlayingYoutube = true;
+                  _youtubeController = YoutubePlayerController.fromVideoId(
+                    videoId: _youtubeVideoId!,
+                    autoPlay: true,
+                    params: const YoutubePlayerParams(
+                      showControls: true,
+                      mute: false,
+                      showFullscreenButton: true,
+                      loop: false,
+                    ),
+                  );
+                });
+              },
+            ),
+          ],
+        );
+      }
+      return _youtubeController != null 
+          ? YoutubePlayer(controller: _youtubeController!, aspectRatio: 16 / 9)
+          : const Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)));
     } else if (_chewieController != null && _videoPlayerController != null) {
       return Chewie(controller: _chewieController!);
     } else {
