@@ -14,6 +14,15 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
 
     int countByExamIdAndStudentId(Long examId, Long studentId);
 
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(DISTINCT e.student.id) FROM ExamAttempt e WHERE e.exam.id = :examId")
+    Long countDistinctStudentsByExamId(@org.springframework.data.repository.query.Param("examId") Long examId);
+
+    List<ExamAttempt> findByStudentIdOrderByStartedAtDesc(Long studentId);
+
+    List<ExamAttempt> findByExamIdAndStudentIdOrderByStartedAtDesc(Long examId, Long studentId);
+
+    int countByExamIdAndStudentIdAndStartedAtLessThanEqual(Long examId, Long studentId, java.time.LocalDateTime startedAt);
+
     // Lấy N attempts gần nhất của learner (theo submittedAt desc) để tổng hợp skill gaps.
     List<ExamAttempt> findTop10ByStudent_IdOrderBySubmittedAtDesc(Long studentId);
 }

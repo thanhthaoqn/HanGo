@@ -17,6 +17,7 @@ import '../../widgets/shared_header.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_footer.dart';
 import 'learning_pathway_page.dart';
+import '../exam/entry_exam_instruction_page.dart';
 import '../exam/take_exam_page.dart';
 import '../trainer/trainer_dashboard_page.dart';
 import '../trainer/onboarding/trainer_type_selection_page.dart';
@@ -120,6 +121,11 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showOnboardingPopup(userId, showOnboardingKey);
         });
+      } else {
+        // If no onboarding, check for entry exam suggestion
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkEntryExamStatus();
+        });
       }
     }
   }
@@ -208,6 +214,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       }
     }
   }
+
+
 
   void _showOnboardingPopup(int userId, String showOnboardingKey) {
     showDialog(
@@ -456,6 +464,147 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         );
       },
     );
+  }
+
+  Future<void> _checkEntryExamStatus() async {
+    if (!_isLoggedIn) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('dismissed_entry_exam') == true) return;
+
+      final attempts = await _examRepository.fetchMyExamAttempts();
+      final hasCompleted = attempts.any((a) => a['examId'] == 60 || a['examId'] == '60');
+      
+      if (!hasCompleted) {
+        _showEntryExamSuggestion();
+      }
+    } catch (e) {
+      debugPrint("Error checking entry exam: $e");
+    }
+  }
+
+  void _showEntryExamSuggestion() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 12,
+          backgroundColor: Colors.white,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEFF6FF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.assignment_outlined,
+                    color: Colors.blueAccent,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Entry Exam!',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Take the entry exam so the system can generate a personalized learning pathway specifically for you.',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('dismissed_entry_exam', true);
+                          if (!mounted) return;
+                          Navigator.pop(ctx);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Later'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _navigateToEntryExam();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Take now'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _navigateToEntryExam() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (loadingCtx) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+        ),
+      ),
+    );
+    try {
+      final exams = await _examRepository.fetchExams();
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+      
+      final entryExam = exams.firstWhere(
+        (e) => e.id == '60',
+        orElse: () => exams.isNotEmpty ? exams.first : Exam(
+          id: '60',
+          title: 'Entry Exam',
+          description: 'Entry exam to assess your proficiency level.',
+          creatorName: 'System',
+          questionCount: 40,
+          durationMinutes: 50,
+          rating: 5.0,
+          learnerCountFormatted: '1k Learner',
+        ),
+      );
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => EntryExamInstructionPage(exam: entryExam)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ToastHelper.showError(context, 'Lỗi kết nối máy chủ');
+    }
   }
 
   // Load courses depending on selected tab
