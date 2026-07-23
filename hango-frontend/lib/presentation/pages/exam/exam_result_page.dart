@@ -41,6 +41,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
   bool _isLoadingCourses = true;
   String _weakestSkill = "";
   Map<String, double> _skillAccuracies = {};
+  bool _showAllSkills = false;
   List<Map<String, dynamic>> _attempts = [];
   bool _isLoadingAttempts = true;
 
@@ -370,7 +371,10 @@ class _ExamResultPageState extends State<ExamResultPage> {
             ),
           ),
           const SizedBox(height: 16),
-          ..._skillAccuracies.entries.map((entry) {
+          ...(_showAllSkills
+                  ? _skillAccuracies.entries
+                  : _skillAccuracies.entries.take(5))
+              .map((entry) {
             final skill = entry.key;
             final val = entry.value;
             return Padding(
@@ -419,6 +423,33 @@ class _ExamResultPageState extends State<ExamResultPage> {
               ),
             );
           }).toList(),
+          if (_skillAccuracies.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _showAllSkills = !_showAllSkills;
+                    });
+                  },
+                  icon: Icon(
+                    _showAllSkills ? Icons.expand_less : Icons.expand_more,
+                    color: const Color(0xFF28B79B),
+                    size: 20,
+                  ),
+                  label: Text(
+                    _showAllSkills 
+                        ? 'Show Less' 
+                        : 'Show All ${_skillAccuracies.length} Skills',
+                    style: const TextStyle(
+                      color: Color(0xFF28B79B),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 32),
 
           // Action Buttons
