@@ -3,6 +3,7 @@ package com.hango.hango_backend.controller;
 import com.hango.hango_backend.dto.ExamResponseDTO;
 import com.hango.hango_backend.dto.ExamAttemptRequestDTO;
 import com.hango.hango_backend.dto.ExamAttemptResponseDTO;
+import com.hango.hango_backend.dto.LearnerExamQuestionDTO;
 import com.hango.hango_backend.service.ExamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +38,12 @@ public class ExamController {
             @RequestParam(required = false, defaultValue = "All") String status) {
         List<ExamResponseDTO> exams = examService.getAllExams(status);
         return ResponseEntity.ok(exams);
+    }
+    
+    @GetMapping("/{id}/questions")
+    public ResponseEntity<List<LearnerExamQuestionDTO>> getExamQuestions(@PathVariable Long id) {
+        List<LearnerExamQuestionDTO> questions = examService.getExamQuestions(id);
+        return ResponseEntity.ok(questions);
     }
 
     @GetMapping("/my-attempts")
