@@ -1187,43 +1187,55 @@ class _AddMultipleChoiceQuestionPageState
                               borderRadius: BorderRadius.circular(8),
                               color: Colors.white,
                             ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: _selectedGroupType,
-                                hint: const Text(
-                                  'Select Group Type (Optional)',
-                                  style: TextStyle(
-                                    color: Color(0xFF94A3B8),
-                                    fontSize: 12,
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF1E293B),
-                                  fontFamily: 'Outfit',
-                                ),
-                                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
-                                items: [
+                            child: Autocomplete<String>(
+                              initialValue: TextEditingValue(text: _selectedGroupType ?? ''),
+                              optionsBuilder: (TextEditingValue textEditingValue) {
+                                final options = [
                                   'Read and Fill in a Notice',
                                   'Read and Fill in a Leaflet/Advertisement',
                                   'Paragraph/Text Reordering',
                                   'Guided Cloze Test',
                                   'Reading Comprehension - 8 questions',
                                   'Reading Comprehension - 10 questions'
-                                ].map((String val) {
-                                  return DropdownMenuItem<String>(
-                                    value: val,
-                                    child: Text(val),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedGroupType = val;
-                                  });
-                                },
-                              ),
+                                ];
+                                if (textEditingValue.text == '') {
+                                  return options;
+                                }
+                                return options.where((String option) {
+                                  return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                                });
+                              },
+                              onSelected: (String selection) {
+                                setState(() {
+                                  _selectedGroupType = selection;
+                                });
+                              },
+                              fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                                return TextFormField(
+                                  controller: textEditingController,
+                                  focusNode: focusNode,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF1E293B),
+                                    fontFamily: 'Outfit',
+                                  ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: 'Search or select Group Type...',
+                                    hintStyle: TextStyle(
+                                      color: Color(0xFF94A3B8),
+                                      fontSize: 12,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                    suffixIcon: Icon(Icons.search, color: Color(0xFF64748B), size: 18),
+                                  ),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedGroupType = val.isNotEmpty ? val : null;
+                                    });
+                                  },
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -1235,62 +1247,58 @@ class _AddMultipleChoiceQuestionPageState
                               borderRadius: BorderRadius.circular(8),
                               color: Colors.white,
                             ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: _selectedSkillType,
-                                hint: const Text(
-                                  'Select Skill Type (Optional)',
-                                  style: TextStyle(
-                                    color: Color(0xFF94A3B8),
+                            child: Autocomplete<String>(
+                              initialValue: TextEditingValue(text: _selectedSkillType ?? ''),
+                              optionsBuilder: (TextEditingValue textEditingValue) {
+                                final options = [
+                                  'Phonetics', 'Word order', 'Reduced relative clause', 'Preposition',
+                                  'Collocation', 'To-infinitive', 'Quantifier', 'Phrasal verb',
+                                  'Prepositional phrase', 'Vocabulary', 'Conversation ordering',
+                                  'Letter ordering', 'Paragraph ordering', 'Passive voice',
+                                  'Relative clause', 'Contextual meaning', 'Factual / Detail question',
+                                  'Synonym in context', 'Antonym in context', 'Reference question',
+                                  'Paraphrasing question', 'Paragraph-specific information question',
+                                  'Main idea / Central theme question', 'TRUE / NOT TRUE question',
+                                  'Inference question'
+                                ];
+                                if (textEditingValue.text == '') {
+                                  return options;
+                                }
+                                return options.where((String option) {
+                                  return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                                });
+                              },
+                              onSelected: (String selection) {
+                                setState(() {
+                                  _selectedSkillType = selection;
+                                });
+                              },
+                              fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                                return TextFormField(
+                                  controller: textEditingController,
+                                  focusNode: focusNode,
+                                  style: const TextStyle(
                                     fontSize: 12,
+                                    color: Color(0xFF1E293B),
                                     fontFamily: 'Outfit',
                                   ),
-                                ),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF1E293B),
-                                  fontFamily: 'Outfit',
-                                ),
-                                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
-                                items: [
-                                  'Phonetics',
-                                  'Word order',
-                                  'Reduced relative clause',
-                                  'Preposition',
-                                  'Collocation',
-                                  'To-infinitive',
-                                  'Quantifier',
-                                  'Phrasal verb',
-                                  'Prepositional phrase',
-                                  'Vocabulary',
-                                  'Conversation ordering',
-                                  'Letter ordering',
-                                  'Paragraph ordering',
-                                  'Passive voice',
-                                  'Relative clause',
-                                  'Contextual meaning',
-                                  'Factual / Detail question',
-                                  'Synonym in context',
-                                  'Antonym in context',
-                                  'Reference question',
-                                  'Paraphrasing question',
-                                  'Paragraph-specific information question',
-                                  'Main idea / Central theme question',
-                                  'TRUE / NOT TRUE question',
-                                  'Inference question'
-                                ].map((String val) {
-                                  return DropdownMenuItem<String>(
-                                    value: val,
-                                    child: Text(val),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedSkillType = val;
-                                  });
-                                },
-                              ),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: 'Search or select Skill Type...',
+                                    hintStyle: TextStyle(
+                                      color: Color(0xFF94A3B8),
+                                      fontSize: 12,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                    suffixIcon: Icon(Icons.search, color: Color(0xFF64748B), size: 18),
+                                  ),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedSkillType = val.isNotEmpty ? val : null;
+                                    });
+                                  },
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(height: 12),

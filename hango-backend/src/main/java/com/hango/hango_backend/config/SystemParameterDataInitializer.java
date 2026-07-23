@@ -40,6 +40,18 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
                 "UPDATE questions SET difficulty_param_id = NULL WHERE difficulty_param_id IS NOT NULL AND difficulty_param_id NOT IN (SELECT id FROM system_parameters)");
             jdbcTemplate.update(
                 "UPDATE question_groups SET group_type_param_id = NULL WHERE group_type_param_id IS NOT NULL AND group_type_param_id NOT IN (SELECT id FROM system_parameters)");
+            
+            // First unlink courses that are using the obsolete categories
+            jdbcTemplate.update(
+                "UPDATE courses SET category_param_id = NULL WHERE category_param_id IN " +
+                "(SELECT id FROM system_parameters WHERE param_type = 'COURSE_CATEGORY' AND param_key NOT IN " +
+                "('READING_COMPREHENSION', 'VOCABULARY', 'GRAMMAR', 'WRITING_STRUCTURE', 'PRONUNCIATION', 'TEST_PREPARATION'))");
+
+            // Cleanup obsolete COURSE_CATEGORY that are actually skills (from previous structure)
+            jdbcTemplate.update(
+                "DELETE FROM system_parameters WHERE param_type = 'COURSE_CATEGORY' AND param_key NOT IN " +
+                "('READING_COMPREHENSION', 'VOCABULARY', 'GRAMMAR', 'WRITING_STRUCTURE', 'PRONUNCIATION', 'TEST_PREPARATION')");
+                
             log.info("Orphaned FK references cleaned up.");
         } catch (Exception e) {
             log.warn("Could not cleanup orphaned references (tables may not exist yet): {}", e.getMessage());
@@ -73,11 +85,25 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         skills.put("TRUE_NOT_TRUE_QUESTION", "TRUE / NOT TRUE question");
         skills.put("INFERENCE_QUESTION", "Inference question");
 
-        String[] skillParamTypes = {"COURSE_CATEGORY", "SKILL_TYPE", "SKILL"};
+        // --- STEP 1: Ensure 25 Skill Types exist for SKILL_TYPE and SKILL ---
+        String[] skillParamTypes = {"SKILL_TYPE", "SKILL"};
         for (String paramType : skillParamTypes) {
             for (Map.Entry<String, String> entry : skills.entrySet()) {
                 ensureExists(paramType, entry.getKey(), entry.getValue());
             }
+        }
+
+        // --- STEP 1.5: Ensure 6 Macro COURSE_CATEGORIES exist ---
+        Map<String, String> courseCategories = new LinkedHashMap<>();
+        courseCategories.put("READING_COMPREHENSION", "Reading Comprehension");
+        courseCategories.put("VOCABULARY", "Vocabulary");
+        courseCategories.put("GRAMMAR", "Grammar");
+        courseCategories.put("WRITING_STRUCTURE", "Writing & Structure");
+        courseCategories.put("PRONUNCIATION", "Pronunciation");
+        courseCategories.put("TEST_PREPARATION", "Test Preparation");
+        
+        for (Map.Entry<String, String> entry : courseCategories.entrySet()) {
+            ensureExists("COURSE_CATEGORY", entry.getKey(), entry.getValue());
         }
 
         // --- STEP 2: Ensure 6 Group Types exist ---
