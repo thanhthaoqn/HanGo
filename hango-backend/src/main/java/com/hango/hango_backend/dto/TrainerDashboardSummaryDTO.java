@@ -14,5 +14,9 @@ public class TrainerDashboardSummaryDTO {
     private long coursesCount;
     private long learnersCount;
     private long examsCount;
+    private java.math.BigDecimal totalRevenue;
+    private Double averageRating;
     private List<TrainerCourseDTO> courses;
+    private List<RecentActivityDTO> recentActivities;
+    private List<MonthlyRevenueDTO> monthlyRevenues;
 }
