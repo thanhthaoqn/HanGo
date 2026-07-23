@@ -319,9 +319,31 @@ public class ExamImportController {
     private Long resolveSystemParam(String paramValue) {
         if (paramValue == null || paramValue.isBlank())
             return null;
+        
+        String searchVal = paramValue.trim();
+        
+        // Map old Skill Types to new ones
+        if (searchVal.equalsIgnoreCase("Conversation/Short Sentences")) searchVal = "Conversation ordering"; // Or any appropriate new skill
+        else if (searchVal.equalsIgnoreCase("Synonym")) searchVal = "Synonym in context";
+        else if (searchVal.equalsIgnoreCase("Antonym")) searchVal = "Antonym in context";
+        else if (searchVal.equalsIgnoreCase("Pronunciation")) searchVal = "Phonetics";
+        else if (searchVal.equalsIgnoreCase("Grammar")) searchVal = "Vocabulary"; // Fallback
+        else if (searchVal.equalsIgnoreCase("Sentence Meaning")) searchVal = "Contextual meaning";
+        else if (searchVal.equalsIgnoreCase("Sentence Combining")) searchVal = "Word order";
+        else if (searchVal.equalsIgnoreCase("Fill in Blank")) searchVal = "Vocabulary";
+        else if (searchVal.equalsIgnoreCase("Reading Comprehension")) searchVal = "Reading Comprehension - 10 questions";
+        else if (searchVal.equalsIgnoreCase("Arrangement")) searchVal = "Paragraph ordering";
+        
+        // Map old Group Types to new ones
+        if (searchVal.equalsIgnoreCase("Notice Completion")) searchVal = "Read and Fill in a Notice";
+        else if (searchVal.equalsIgnoreCase("Flyer Completion")) searchVal = "Read and Fill in a Leaflet/Advertisement";
+        else if (searchVal.equalsIgnoreCase("Passage Arrangement")) searchVal = "Paragraph/Text Reordering";
+        else if (searchVal.equalsIgnoreCase("Information Gap Filling")) searchVal = "Guided Cloze Test";
+        else if (searchVal.equalsIgnoreCase("Reading Comprehension")) searchVal = "Reading Comprehension - 10 questions";
+
         List<Long> ids = jdbcTemplate.query(
                 "SELECT id FROM system_parameters WHERE LOWER(param_value) = LOWER(?) LIMIT 1",
-                (rs, rn) -> rs.getLong("id"), paramValue.trim());
+                (rs, rn) -> rs.getLong("id"), searchVal);
         return ids.isEmpty() ? null : ids.get(0);
     }
 
