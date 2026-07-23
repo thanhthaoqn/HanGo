@@ -6,4 +6,5 @@ public interface TrainerCourseProjection {
     Long getLearnersCount();
     Long getLessonsCount();
     String getThumbnailUrl();
+    Long getVersionsCount();
 }

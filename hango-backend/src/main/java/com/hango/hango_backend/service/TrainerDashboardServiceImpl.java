@@ -31,6 +31,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final TrainerQuestionService trainerQuestionService;
     private final QuestionRepository questionRepository;
     private final TrainerProfileRepository trainerProfileRepository;
+    private final PaymentRepository paymentRepository;
+    private final CourseRatingRepository courseRatingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -43,20 +45,124 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         long learnersCount = enrollmentRepository.countDistinctStudentsByCourseCreatorId(trainerId);
         long examsCount = examRepository.countByCreatedByIdAndDeletedAtIsNull(trainerId);
 
-        List<TrainerCourseProjection> projections = courseRepository.findTrainerCourses(trainerId);
-        List<TrainerCourseDTO> courses = projections.stream().map(p -> TrainerCourseDTO.builder()
-                .id(p.getId())
-                .title(p.getTitle())
-                .learnersCount(p.getLearnersCount() != null ? p.getLearnersCount() : 0L)
-                .lessonsCount(p.getLessonsCount() != null ? p.getLessonsCount() : 0L)
-                .thumbnailUrl(p.getThumbnailUrl())
-                .build()).collect(Collectors.toList());
+        java.math.BigDecimal totalRevenue = paymentRepository.sumRevenueByTrainerId(trainerId);
+        if (totalRevenue == null) {
+            totalRevenue = java.math.BigDecimal.ZERO;
+        }
+
+        Double averageRating = courseRatingRepository.getAverageRatingByTrainerId(trainerId);
+        if (averageRating == null) {
+            averageRating = 0.0;
+        }
+
+        List<TrainerCourseDetailProjection> baseProjections = courseRepository.findTrainerCoursesDetailBase(trainerId, "ALL", null);
+        Map<String, List<TrainerCourseDetailProjection>> groupedByCode = baseProjections.stream()
+                .filter(p -> p.getCode() != null)
+                .collect(Collectors.groupingBy(TrainerCourseDetailProjection::getCode));
+
+        List<TrainerCourseDTO> courses = groupedByCode.values().stream()
+                .map(group -> {
+                    TrainerCourseDetailProjection latest = group.stream()
+                            .max((p1, p2) -> {
+                                if (p1.getCreatedAt() == null) return -1;
+                                if (p2.getCreatedAt() == null) return 1;
+                                return p1.getCreatedAt().compareTo(p2.getCreatedAt());
+                            })
+                            .orElse(group.get(0));
+                    return TrainerCourseDTO.builder()
+                            .id(latest.getId())
+                            .title(latest.getTitle())
+                            .learnersCount(latest.getLearnersCount() != null ? latest.getLearnersCount() : 0L)
+                            .lessonsCount(latest.getLessonsCount() != null ? latest.getLessonsCount() : 0L)
+                            .thumbnailUrl(latest.getThumbnailUrl())
+                            .versionsCount((long) group.size())
+                            .build();
+                })
+                .sorted((c1, c2) -> c2.getId().compareTo(c1.getId()))
+                .collect(Collectors.toList());
+
+        // Monthly Revenues
+        List<Object[]> rawRevenues = paymentRepository.getRevenueByMonthForCurrentYear(trainerId);
+        List<com.hango.hango_backend.dto.MonthlyRevenueDTO> monthlyRevenues = new ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            monthlyRevenues.add(new com.hango.hango_backend.dto.MonthlyRevenueDTO(i, java.math.BigDecimal.ZERO));
+        }
+        for (Object[] row : rawRevenues) {
+            int month = ((Number) row[0]).intValue();
+            java.math.BigDecimal rev = (java.math.BigDecimal) row[1];
+            if (month >= 1 && month <= 12) {
+                monthlyRevenues.get(month - 1).setRevenue(rev);
+            }
+        }
+
+        // Recent Activities
+        List<com.hango.hango_backend.dto.RecentActivityDTO> recentActivities = new ArrayList<>();
+        
+        List<com.hango.hango_backend.entity.Payment> recentPayments = paymentRepository.findTop5ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(trainerId, "SUCCESS");
+        for (com.hango.hango_backend.entity.Payment p : recentPayments) {
+            recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
+                    .type("PAYMENT")
+                    .action("Sold course")
+                    .target(p.getCourse().getTitle())
+                    .timestamp(p.getCreatedAt())
+                    .build());
+        }
+
+        List<com.hango.hango_backend.entity.Enrollment> recentEnrollments = enrollmentRepository.findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(trainerId);
+        for (com.hango.hango_backend.entity.Enrollment e : recentEnrollments) {
+            recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
+                    .type("ENROLLMENT")
+                    .action("New student enrolled in")
+                    .target(e.getCourse().getTitle())
+                    .timestamp(e.getEnrolledAt())
+                    .build());
+        }
+
+        List<com.hango.hango_backend.entity.CourseRating> recentRatings = courseRatingRepository.findTop5ByCourseCreatorIdOrderByCreatedAtDesc(trainerId);
+        for (com.hango.hango_backend.entity.CourseRating r : recentRatings) {
+            recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
+                    .type("RATING")
+                    .action("New " + r.getRating() + "-star review on")
+                    .target(r.getCourse().getTitle())
+                    .timestamp(r.getCreatedAt())
+                    .build());
+        }
+
+        recentActivities.sort((a1, a2) -> {
+            if (a1.getTimestamp() == null) return 1;
+            if (a2.getTimestamp() == null) return -1;
+            return a2.getTimestamp().compareTo(a1.getTimestamp());
+        });
+
+        if (recentActivities.size() > 5) {
+            recentActivities = recentActivities.subList(0, 5);
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        for (com.hango.hango_backend.dto.RecentActivityDTO act : recentActivities) {
+            if (act.getTimestamp() != null) {
+                long minutes = java.time.Duration.between(act.getTimestamp(), now).toMinutes();
+                if (minutes < 60) {
+                    act.setTime(minutes + " mins ago");
+                } else if (minutes < 1440) {
+                    act.setTime((minutes / 60) + " hours ago");
+                } else {
+                    act.setTime((minutes / 1440) + " days ago");
+                }
+            } else {
+                act.setTime("Unknown");
+            }
+        }
 
         return TrainerDashboardSummaryDTO.builder()
                 .coursesCount(coursesCount)
                 .learnersCount(learnersCount)
                 .examsCount(examsCount)
+                .totalRevenue(totalRevenue)
+                .averageRating(averageRating)
                 .courses(courses)
+                .recentActivities(recentActivities)
+                .monthlyRevenues(monthlyRevenues)
                 .build();
     }
 
