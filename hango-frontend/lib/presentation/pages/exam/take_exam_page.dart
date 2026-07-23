@@ -8,7 +8,7 @@ import '../../../data/repositories/pathway_repository.dart';
 import '../../widgets/learning_pathway/pathway_setup_dialog.dart';
 import '../../../utils/fullscreen_helper.dart';
 import 'exam_result_page.dart';
-import '../../widgets/exam/entry_exam_goal_dialog.dart';
+
 class TakeExamPage extends StatefulWidget {
   final Exam exam;
 
@@ -243,7 +243,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
           exam: widget.exam,
           score: score,
           correctCount: correctCount,
-          totalQuestions: _examQuestions.length,
+          examQuestions: _examQuestions,
           userAnswers: _userAnswers,
           attempt: attemptMap ?? {
             "attemptNumber": 1,
@@ -342,44 +342,29 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                         }
                         int correctCount = (score * _examQuestions.length / 10).round();
                         
-                        if (widget.exam.id == '60') {
-                          if (!mounted) return;
-                          
-                          final rawAttemptId = attemptMap?['id'];
-                          final attemptId = rawAttemptId is int ? rawAttemptId : int.tryParse('$rawAttemptId') ?? 0;
-                          
-                          showDialog(
-                            context: this.context,
-                            barrierDismissible: false,
-                            builder: (ctx) => EntryExamGoalDialog(
-                              currentScore: score,
-                              attemptId: attemptId,
-                            ),
-                          );
-                        } else {
-                          await _maybeRefreshPathway(attemptMap);
-                          if (!mounted) return;
+                        await _maybeRefreshPathway(attemptMap);
+                        if (!mounted) return;
 
-                          Navigator.pushReplacement(
-                            this.context,
-                            MaterialPageRoute(
-                              builder: (context) => ExamResultPage(
-                                exam: widget.exam,
-                                score: score,
-                                correctCount: correctCount,
-                                totalQuestions: _examQuestions.length,
-                                userAnswers: _userAnswers,
-                                attempt: attemptMap ?? {
-                                  "attemptNumber": 1,
-                                  "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
-                                  "score": score,
-                                  "status": score >= 5.0 ? "PASSED" : "FAILED",
-                                  "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
-                                },
-                              ),
+                        Navigator.pushReplacement(
+                          this.context,
+                          MaterialPageRoute(
+                            builder: (context) => ExamResultPage(
+                              exam: widget.exam,
+                              score: score,
+                              correctCount: correctCount,
+                              userAnswers: _userAnswers,
+                              examQuestions: _examQuestions,
+                              attempt: attemptMap ?? {
+                                "attemptNumber": 1,
+                                "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
+                                "score": score,
+                                "status": score >= 5.0 ? "PASSED" : "FAILED",
+                                "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
+                                "correctness": {},
+                              },
                             ),
-                          );
-                        }
+                          ),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28B79B),

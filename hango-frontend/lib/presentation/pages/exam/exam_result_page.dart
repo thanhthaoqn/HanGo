@@ -9,15 +9,16 @@ import '../course/course_detail_page.dart';
 import 'exam_review_page.dart';
 import 'list_exams_page.dart';
 
-import '../learner/learning_pathway_page.dart';
+
 import '../../../data/repositories/exam_ai_recommendation_repository.dart';
+import '../../widgets/learner/pathway_goal_dialog.dart';
 
 class ExamResultPage extends StatefulWidget {
   final Exam exam;
   final double score;
   final int correctCount;
-  final int totalQuestions;
   final Map<int, int> userAnswers;
+  final List<Map<String, dynamic>> examQuestions;
   final Map<String, dynamic> attempt;
 
   const ExamResultPage({
@@ -25,8 +26,8 @@ class ExamResultPage extends StatefulWidget {
     required this.exam,
     required this.score,
     required this.correctCount,
-    required this.totalQuestions,
     required this.userAnswers,
+    required this.examQuestions,
     required this.attempt,
   }) : super(key: key);
 
@@ -43,7 +44,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
   List<Map<String, dynamic>> _attempts = [];
   bool _isLoadingAttempts = true;
 
-  // AI recommendation (không thay thế hoàn toàn rule-based, dùng làm “bong bóng phân tích”)
+  // AI recommendation
   String _aiWeaknessSummary = "";
   bool _isLoadingAi = true;
   List<Map<String, dynamic>> _aiRecommendedCourses = [];
@@ -76,36 +77,26 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   void _analyzeSkills() {
-    // Generate questions matching exam's question count to match skill types
-    final List<String> baseSkills = [
-      "Grammar",
-      "Grammar",
-      "Vocabulary",
-      "Grammar",
-      "Grammar",
-      "Vocabulary",
-      "Vocabulary",
-      "Vocabulary",
-      "Reading Comprehension",
-      "Reading Comprehension",
-    ];
-
     Map<String, int> totalPerSkill = {};
     Map<String, int> correctPerSkill = {};
 
-    for (int i = 0; i < widget.totalQuestions; i++) {
-      final skill = baseSkills[i % baseSkills.length];
-      totalPerSkill[skill] = (totalPerSkill[skill] ?? 0) + 1;
+    final correctnessMap = widget.attempt['correctness'] ?? {};
 
-      final correctIndex = _getMockCorrectIndex(i);
-      if (widget.userAnswers[i] == correctIndex) {
+    for (int i = 0; i < widget.examQuestions.length; i++) {
+      final q = widget.examQuestions[i];
+      final skill = q['skill'] ?? 'General';
+      
+      totalPerSkill[skill] = (totalPerSkill[skill] ?? 0) + 1;
+      
+      final indexStr = (i + 1).toString();
+      final isCorrect = correctnessMap[indexStr] == true;
+      if (isCorrect) {
         correctPerSkill[skill] = (correctPerSkill[skill] ?? 0) + 1;
       }
     }
 
-    // Compute accuracies
     double lowestAccuracy = 1.1;
-    String weakest = "English";
+    String weakest = "General";
 
     totalPerSkill.forEach((skill, total) {
       int correct = correctPerSkill[skill] ?? 0;
@@ -121,11 +112,6 @@ class _ExamResultPageState extends State<ExamResultPage> {
     setState(() {
       _weakestSkill = weakest;
     });
-  }
-
-  int _getMockCorrectIndex(int questionIndex) {
-    final List<int> correctIndices = [2, 2, 1, 1, 2, 0, 0, 1, 2, 0];
-    return correctIndices[questionIndex % correctIndices.length];
   }
 
   Future<void> _loadAiRecommendations() async {
@@ -352,7 +338,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               _buildStatBox(
                 Icons.quiz_outlined,
                 'Total',
-                '${widget.totalQuestions}',
+                '${widget.examQuestions.length}',
                 Colors.grey.shade700,
               ),
               _buildStatBox(
@@ -364,7 +350,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               _buildStatBox(
                 Icons.cancel_outlined,
                 'Incorrect',
-                '${widget.totalQuestions - widget.correctCount}',
+                '${widget.examQuestions.length - widget.correctCount}',
                 const Color(0xFFEF4444),
               ),
             ],
@@ -769,10 +755,14 @@ class _ExamResultPageState extends State<ExamResultPage> {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LearningPathwayPage(),
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => PathwayGoalDialog(
+                              weakestSkill: _weakestSkill,
+                              examAttemptId: widget.attempt['id'] is int 
+                                  ? widget.attempt['id'] 
+                                  : int.tryParse('${widget.attempt['id']}') ?? 0,
                             ),
                           );
                         },

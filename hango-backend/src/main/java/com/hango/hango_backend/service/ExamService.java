@@ -210,17 +210,23 @@ public class ExamService {
 
     private ExamAttemptResponseDTO mapToAttemptDTO(ExamAttempt attempt, int attemptNumber) {
         Map<String, Integer> answers = new java.util.HashMap<>();
+        Map<String, Boolean> correctness = new java.util.HashMap<>();
         try {
             if (attempt.getAnswersJson() != null && !attempt.getAnswersJson().equals("{}")) {
                 List<Map<String, Object>> enrichedList = objectMapper.readValue(attempt.getAnswersJson(), List.class);
                 for (Map<String, Object> map : enrichedList) {
                     Object qId = map.get("questionId");
                     Object uAns = map.get("userAnswer");
+                    Object isCorrectObj = map.get("isCorrect");
                     if (qId != null && uAns != null) {
                         try {
                             int qIndex = Integer.parseInt(qId.toString());
                             int ansIndex = Integer.parseInt(uAns.toString());
-                            answers.put(String.valueOf(qIndex + 1), ansIndex);
+                            String indexStr = String.valueOf(qIndex + 1);
+                            answers.put(indexStr, ansIndex);
+                            if (isCorrectObj != null) {
+                                correctness.put(indexStr, Boolean.parseBoolean(isCorrectObj.toString()));
+                            }
                         } catch (NumberFormatException ex) {
                         }
                     }
@@ -248,6 +254,7 @@ public class ExamService {
                 .date(dateStr)
                 .status(isPassed ? "PASSED" : "FAILED")
                 .answers(answers)
+                .correctness(correctness)
                 .build();
     }
     
