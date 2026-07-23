@@ -5,15 +5,18 @@ import com.hango.hango_backend.repository.SystemParameterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Order(1) // Run early
 public class SystemParameterDataInitializer implements CommandLineRunner {
 
     private final SystemParameterRepository systemParameterRepository;
@@ -21,80 +24,89 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        log.info("Initializing New Skill/Category System Parameters...");
+        log.info("Ensuring Skill/Category/GroupType System Parameters exist...");
 
-        // Xóa các loại cũ (có thể đang dùng)
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
-        jdbcTemplate.update("DELETE FROM system_parameters WHERE param_type IN ('COURSE_CATEGORY', 'SKILL_TYPE', 'SKILL')");
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+        // --- STEP 0: Clean up orphaned FK references left by previous destructive runs ---
+        try {
+            jdbcTemplate.update(
+                "DELETE FROM course_categories WHERE category_param_id NOT IN (SELECT id FROM system_parameters)");
+            jdbcTemplate.update(
+                "UPDATE courses SET category_param_id = NULL WHERE category_param_id IS NOT NULL AND category_param_id NOT IN (SELECT id FROM system_parameters)");
+            jdbcTemplate.update(
+                "UPDATE courses SET difficulty_param_id = NULL WHERE difficulty_param_id IS NOT NULL AND difficulty_param_id NOT IN (SELECT id FROM system_parameters)");
+            jdbcTemplate.update(
+                "UPDATE questions SET skill_param_id = NULL WHERE skill_param_id IS NOT NULL AND skill_param_id NOT IN (SELECT id FROM system_parameters)");
+            jdbcTemplate.update(
+                "UPDATE questions SET difficulty_param_id = NULL WHERE difficulty_param_id IS NOT NULL AND difficulty_param_id NOT IN (SELECT id FROM system_parameters)");
+            jdbcTemplate.update(
+                "UPDATE question_groups SET group_type_param_id = NULL WHERE group_type_param_id IS NOT NULL AND group_type_param_id NOT IN (SELECT id FROM system_parameters)");
+            log.info("Orphaned FK references cleaned up.");
+        } catch (Exception e) {
+            log.warn("Could not cleanup orphaned references (tables may not exist yet): {}", e.getMessage());
+        }
 
-        Map<String, String> newSkills = new LinkedHashMap<>();
-        newSkills.put("PHONETICS", "Phonetics");
-        newSkills.put("WORD_ORDER", "Word order");
-        newSkills.put("REDUCED_RELATIVE_CLAUSE", "Reduced relative clause");
-        newSkills.put("PREPOSITION", "Preposition");
-        newSkills.put("COLLOCATION", "Collocation");
-        newSkills.put("TO_INFINITIVE", "To-infinitive");
-        newSkills.put("QUANTIFIER", "Quantifier");
-        newSkills.put("PHRASAL_VERB", "Phrasal verb");
-        newSkills.put("PREPOSITIONAL_PHRASE", "Prepositional phrase");
-        newSkills.put("VOCABULARY", "Vocabulary");
-        newSkills.put("CONVERSATION_ORDERING", "Conversation ordering");
-        newSkills.put("LETTER_ORDERING", "Letter ordering");
-        newSkills.put("PARAGRAPH_ORDERING", "Paragraph ordering");
-        newSkills.put("PASSIVE_VOICE", "Passive voice");
-        newSkills.put("RELATIVE_CLAUSE", "Relative clause");
-        newSkills.put("CONTEXTUAL_MEANING", "Contextual meaning");
-        newSkills.put("FACTUAL_DETAIL_QUESTION", "Factual / Detail question");
-        newSkills.put("SYNONYM_IN_CONTEXT", "Synonym in context");
-        newSkills.put("ANTONYM_IN_CONTEXT", "Antonym in context");
-        newSkills.put("REFERENCE_QUESTION", "Reference question");
-        newSkills.put("PARAPHRASING_QUESTION", "Paraphrasing question");
-        newSkills.put("PARAGRAPH_SPECIFIC_INFORMATION_QUESTION", "Paragraph-specific information question");
-        newSkills.put("MAIN_IDEA_CENTRAL_THEME_QUESTION", "Main idea / Central theme question");
-        newSkills.put("TRUE_NOT_TRUE_QUESTION", "TRUE / NOT TRUE question");
-        newSkills.put("INFERENCE_QUESTION", "Inference question");
+        // --- STEP 1: Ensure 25 Skill Types exist ---
+        Map<String, String> skills = new LinkedHashMap<>();
+        skills.put("PHONETICS", "Phonetics");
+        skills.put("WORD_ORDER", "Word order");
+        skills.put("REDUCED_RELATIVE_CLAUSE", "Reduced relative clause");
+        skills.put("PREPOSITION", "Preposition");
+        skills.put("COLLOCATION", "Collocation");
+        skills.put("TO_INFINITIVE", "To-infinitive");
+        skills.put("QUANTIFIER", "Quantifier");
+        skills.put("PHRASAL_VERB", "Phrasal verb");
+        skills.put("PREPOSITIONAL_PHRASE", "Prepositional phrase");
+        skills.put("VOCABULARY", "Vocabulary");
+        skills.put("CONVERSATION_ORDERING", "Conversation ordering");
+        skills.put("LETTER_ORDERING", "Letter ordering");
+        skills.put("PARAGRAPH_ORDERING", "Paragraph ordering");
+        skills.put("PASSIVE_VOICE", "Passive voice");
+        skills.put("RELATIVE_CLAUSE", "Relative clause");
+        skills.put("CONTEXTUAL_MEANING", "Contextual meaning");
+        skills.put("FACTUAL_DETAIL_QUESTION", "Factual / Detail question");
+        skills.put("SYNONYM_IN_CONTEXT", "Synonym in context");
+        skills.put("ANTONYM_IN_CONTEXT", "Antonym in context");
+        skills.put("REFERENCE_QUESTION", "Reference question");
+        skills.put("PARAPHRASING_QUESTION", "Paraphrasing question");
+        skills.put("PARAGRAPH_SPECIFIC_INFORMATION_QUESTION", "Paragraph-specific information question");
+        skills.put("MAIN_IDEA_CENTRAL_THEME_QUESTION", "Main idea / Central theme question");
+        skills.put("TRUE_NOT_TRUE_QUESTION", "TRUE / NOT TRUE question");
+        skills.put("INFERENCE_QUESTION", "Inference question");
 
-        String[] types = {"COURSE_CATEGORY", "SKILL_TYPE", "SKILL"};
-
-        for (String type : types) {
-            for (Map.Entry<String, String> entry : newSkills.entrySet()) {
-                String key = entry.getKey();
-                String value = entry.getValue();
-
-                SystemParameter param = SystemParameter.builder()
-                        .paramType(type)
-                        .paramKey(key)
-                        .paramValue(value)
-                        .isActive(true)
-                        .build();
-                systemParameterRepository.save(param);
+        String[] skillParamTypes = {"COURSE_CATEGORY", "SKILL_TYPE", "SKILL"};
+        for (String paramType : skillParamTypes) {
+            for (Map.Entry<String, String> entry : skills.entrySet()) {
+                ensureExists(paramType, entry.getKey(), entry.getValue());
             }
         }
-        
-        // --- Bắt đầu cập nhật GROUP_TYPE ---
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
-        jdbcTemplate.update("DELETE FROM system_parameters WHERE param_type = 'GROUP_TYPE'");
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
 
-        Map<String, String> newGroupTypes = new LinkedHashMap<>();
-        newGroupTypes.put("NOTICE_COMPLETION", "Read and Fill in a Notice");
-        newGroupTypes.put("LEAFLET_ADVERTISEMENT", "Read and Fill in a Leaflet/Advertisement");
-        newGroupTypes.put("PARAGRAPH_TEXT_REORDERING", "Paragraph/Text Reordering");
-        newGroupTypes.put("GUIDED_CLOZE_TEST", "Guided Cloze Test");
-        newGroupTypes.put("READING_COMPREHENSION_8_QUESTIONS", "Reading Comprehension - 8 questions");
-        newGroupTypes.put("READING_COMPREHENSION_10_QUESTIONS", "Reading Comprehension - 10 questions");
+        // --- STEP 2: Ensure 6 Group Types exist ---
+        Map<String, String> groupTypes = new LinkedHashMap<>();
+        groupTypes.put("NOTICE_COMPLETION", "Read and Fill in a Notice");
+        groupTypes.put("LEAFLET_ADVERTISEMENT", "Read and Fill in a Leaflet/Advertisement");
+        groupTypes.put("PARAGRAPH_TEXT_REORDERING", "Paragraph/Text Reordering");
+        groupTypes.put("GUIDED_CLOZE_TEST", "Guided Cloze Test");
+        groupTypes.put("READING_COMPREHENSION_8_QUESTIONS", "Reading Comprehension - 8 questions");
+        groupTypes.put("READING_COMPREHENSION_10_QUESTIONS", "Reading Comprehension - 10 questions");
 
-        for (Map.Entry<String, String> entry : newGroupTypes.entrySet()) {
+        for (Map.Entry<String, String> entry : groupTypes.entrySet()) {
+            ensureExists("GROUP_TYPE", entry.getKey(), entry.getValue());
+        }
+
+        log.info("System parameters initialization complete.");
+    }
+
+    private void ensureExists(String paramType, String paramKey, String paramValue) {
+        Optional<SystemParameter> existing = systemParameterRepository.findByParamTypeAndParamKey(paramType, paramKey);
+        if (existing.isEmpty()) {
             SystemParameter param = SystemParameter.builder()
-                    .paramType("GROUP_TYPE")
-                    .paramKey(entry.getKey())
-                    .paramValue(entry.getValue())
+                    .paramType(paramType)
+                    .paramKey(paramKey)
+                    .paramValue(paramValue)
                     .isActive(true)
                     .build();
             systemParameterRepository.save(param);
+            log.info("Created SystemParameter: {} -> {} ({})", paramType, paramKey, paramValue);
         }
-        
-        log.info("Successfully recreated COURSE_CATEGORY, SKILL_TYPE, SKILL, and GROUP_TYPE in system_parameters.");
     }
 }

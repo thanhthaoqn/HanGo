@@ -3,6 +3,8 @@ package com.hango.hango_backend.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
@@ -39,6 +41,7 @@ public class Question {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "difficulty_param_id", referencedColumnName = "id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private SystemParameter difficulty;
 
     private String status;
@@ -49,6 +52,7 @@ public class Question {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "skill_param_id", referencedColumnName = "id", nullable = true)
+    @NotFound(action = NotFoundAction.IGNORE)
     private SystemParameter skillParam;
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
