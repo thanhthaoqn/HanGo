@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/lesson_repository.dart';
@@ -39,6 +42,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   CourseDetail? _courseDetail;
   LessonDetail? _lessonDetail;
+  String? _itemType;
+  YoutubePlayerController? _youtubeController;
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
   String? _errorMessage;
   bool _isLoading = true;
   bool _isNavigatingLesson = false;
@@ -110,13 +117,29 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         parsedAnswers.add(answersMap);
       }
 
+      String? foundItemType;
+      for (final s in course.sessions) {
+        for (final l in s.lessons) {
+          if (l.id == _currentLessonId) {
+            foundItemType = l.itemType;
+            break;
+          }
+        }
+        if (foundItemType != null) break;
+      }
+
       setState(() {
         _courseDetail = course;
         _lessonDetail = lesson;
+        _itemType = foundItemType;
         _mockAttempts = parsedAttempts;
         _attemptsAnswers = parsedAnswers;
         _isLoading = false;
       });
+
+      if (_itemType == 'video') {
+        _initializePlayer(lesson.content);
+      }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_lesson_id_for_${widget.courseId}', _currentLessonId);
       _saveLastVisitedSession(_currentLessonId, _isDoingQuiz);
@@ -130,6 +153,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   Future<void> _navigateToLesson(int lessonId, {bool startQuiz = false}) async {
     if (lessonId == _currentLessonId) return;
+    _disposePlayers();
     setState(() {
       _isNavigatingLesson = true;
       _isDoingQuiz = startQuiz;
@@ -253,8 +277,50 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
   }
 
+  void _disposePlayers() {
+    _youtubeController?.close();
+    _chewieController?.dispose();
+    _videoPlayerController?.dispose();
+    _youtubeController = null;
+    _chewieController = null;
+    _videoPlayerController = null;
+  }
+
+  void _initializePlayer(String url) {
+    _disposePlayers();
+
+    if (url.contains('youtube.com') || url.contains('youtu.be')) {
+      final videoId = YoutubePlayerController.convertUrlToId(url);
+      if (videoId != null) {
+        _youtubeController = YoutubePlayerController.fromVideoId(
+          videoId: videoId,
+          autoPlay: false,
+          params: const YoutubePlayerParams(
+            showControls: true,
+            mute: false,
+            showFullscreenButton: true,
+            loop: false,
+          ),
+        );
+      }
+    } else {
+      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+      _videoPlayerController!.initialize().then((_) {
+        setState(() {
+          _chewieController = ChewieController(
+            videoPlayerController: _videoPlayerController!,
+            autoPlay: false,
+            looping: false,
+            aspectRatio: _videoPlayerController!.value.aspectRatio,
+          );
+        });
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _disposePlayers();
     _commentController.dispose();
     _editCommentController.dispose();
     _clearLastVisitedSession();
@@ -1049,7 +1115,37 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
+  Widget _buildVideoPlayer() {
+    if (_youtubeController != null) {
+      return YoutubePlayer(
+        controller: _youtubeController!,
+        aspectRatio: 16 / 9,
+      );
+    } else if (_chewieController != null && _videoPlayerController != null) {
+      return Chewie(controller: _chewieController!);
+    } else {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+      );
+    }
+  }
+
   Widget _buildHtmlContent(LessonDetail lesson) {
+    if (_itemType == 'video') {
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: _buildVideoPlayer(),
+        ),
+      );
+    }
+
     return lesson.content.isEmpty
         ? const Center(
             child: Padding(

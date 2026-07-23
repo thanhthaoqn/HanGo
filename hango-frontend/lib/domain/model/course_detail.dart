@@ -7,6 +7,11 @@ class CourseLesson {
   final int? questionCount;
   final int? estimatedTime;
   final bool isCompleted;
+  final String? lessonCode;
+  final int? mediaDurationSeconds;
+  final int? mediaSizeBytes;
+  final int? estimatedTimeMinutes;
+  final String? learningObjectives;
 
   CourseLesson({
     required this.id,
@@ -17,6 +22,11 @@ class CourseLesson {
     this.questionCount,
     this.isCompleted = false,
     this.estimatedTime,
+    this.lessonCode,
+    this.mediaDurationSeconds,
+    this.mediaSizeBytes,
+    this.estimatedTimeMinutes,
+    this.learningObjectives,
   });
 
   factory CourseLesson.fromJson(Map<String, dynamic> json) {
@@ -29,6 +39,11 @@ class CourseLesson {
       questionCount: json['questionCount'] as int?,
       isCompleted: json['isCompleted'] as bool? ?? false,
       estimatedTime: json['estimatedTime'] as int?,
+      lessonCode: json['lessonCode'] as String?,
+      mediaDurationSeconds: json['mediaDurationSeconds'] as int?,
+      mediaSizeBytes: json['mediaSizeBytes'] as int?,
+      estimatedTimeMinutes: json['estimatedTimeMinutes'] as int?,
+      learningObjectives: json['learningObjectives'] as String?,
     );
   }
 }

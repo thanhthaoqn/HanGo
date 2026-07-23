@@ -64,6 +64,9 @@ public class Lesson {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "learning_objectives", columnDefinition = "TEXT")
+    private String learningObjectives;
+
     @Column(name = "estimated_time")
     private Integer estimatedTime;
 
