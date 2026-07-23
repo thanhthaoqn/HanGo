@@ -16,22 +16,20 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     @Query("SELECT new com.hango.hango_backend.dto.CourseSummaryDTO(" +
            "c.id, cat.paramValue, c.title, u.fullName, " +
-           "CAST(COALESCE(AVG(cr.rating), 0.0) AS double), " +
-           "COUNT(DISTINCT e.id), diff.paramKey, c.thumbnailUrl, c.price, " +
+           "CAST(COALESCE((SELECT AVG(cr.rating) FROM CourseRating cr WHERE cr.course.id = c.id OR cr.course.parentId = c.id OR cr.course.id = c.parentId OR (c.parentId IS NOT NULL AND cr.course.parentId = c.parentId)), 0.0) AS double), " +
+           "(SELECT COUNT(DISTINCT e.id) FROM Enrollment e WHERE e.course.id = c.id OR e.course.parentId = c.id OR e.course.id = c.parentId OR (c.parentId IS NOT NULL AND e.course.parentId = c.parentId)), " +
+           "diff.paramKey, c.thumbnailUrl, c.price, " +
            "(SELECT e2.progressPercentage FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId)) " +
            "FROM Course c " +
            "LEFT JOIN c.category cat " +
            "LEFT JOIN c.difficulty diff " +
            "LEFT JOIN c.creator u " +
-           "LEFT JOIN CourseRating cr ON cr.course.id = c.id " +
-           "LEFT JOIN Enrollment e ON e.course.id = c.id " +
            "WHERE c.status = 'PUBLISHED' AND c.deletedAt IS NULL " +
            "AND (:search IS NULL OR LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:difficulty IS NULL OR diff.paramKey = :difficulty) " +
            "AND (:enrolledUserId IS NULL OR EXISTS (SELECT 1 FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId AND (:enrollmentStatus IS NULL OR e2.status = :enrollmentStatus))) " +
            "AND ((c.latestVersionId = c.id OR c.latestVersionId IS NULL) " +
-           "     OR (:enrolledUserId IS NOT NULL AND EXISTS (SELECT 1 FROM Enrollment e3 WHERE e3.course.id = c.id AND e3.user.id = :enrolledUserId))) " +
-           "GROUP BY c.id, cat.paramValue, c.title, u.fullName, diff.paramKey, c.thumbnailUrl, c.price")
+           "     OR (:enrolledUserId IS NOT NULL AND EXISTS (SELECT 1 FROM Enrollment e3 WHERE e3.course.id = c.id AND e3.user.id = :enrolledUserId)))")
     List<CourseSummaryDTO> findCoursesWithFilters(@Param("search") String search,
                                                   @Param("difficulty") String difficulty,
                                                   @Param("enrolledUserId") Long enrolledUserId,

@@ -126,6 +126,12 @@ public class CourseServiceImpl implements CourseService {
  
         if (currentUserId != null) {
             Optional<Enrollment> enrollmentOpt = enrollmentRepository.findByUserIdAndCourseId(currentUserId, id);
+            if (enrollmentOpt.isEmpty()) {
+                List<Enrollment> familyE = enrollmentRepository.findFamilyEnrollments(currentUserId, id);
+                if (!familyE.isEmpty() && familyE.get(0).getCourse() != null && !familyE.get(0).getCourse().getId().equals(id)) {
+                    return getCourseDetail(familyE.get(0).getCourse().getId(), currentUserId);
+                }
+            }
             isEnrolled = enrollmentOpt.isPresent();
             completedLessonIds.addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
 
@@ -193,7 +199,7 @@ public class CourseServiceImpl implements CourseService {
         }).collect(Collectors.toList());
 
         // For Learners Count and Rating
-        int learnersCount = enrollmentRepository.countByCourseId(id);
+        int learnersCount = enrollmentRepository.countByCourseFamily(id);
         
         String creatorName = "Unknown Trainer";
         try {
@@ -236,7 +242,7 @@ public class CourseServiceImpl implements CourseService {
 
         // Calculate average rating dynamically from DB reviews/ratings
         double averageRating = 0.0;
-        List<CourseRating> ratings = courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(id);
+        List<CourseRating> ratings = courseRatingRepository.findByCourseFamilyOrderByCreatedAtDesc(id);
         if (!ratings.isEmpty()) {
             double sum = 0;
             for (CourseRating r : ratings) {

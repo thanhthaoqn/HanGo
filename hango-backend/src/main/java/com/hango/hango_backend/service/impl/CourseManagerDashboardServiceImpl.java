@@ -93,136 +93,19 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             throw new RuntimeException("Only courses in PENDING_APPROVAL status can be published");
         }
 
-        if (course.getParentId() != null) {
-            Course originalCourse = courseRepository.findById(course.getParentId()).orElse(null);
-            if (originalCourse != null) {
-                mergeDraftIntoOriginal(course, originalCourse);
-                return;
-            }
-        }
-
         course.setStatus("PUBLISHED");
         course.setPublishedAt(java.time.LocalDateTime.now());
         course.setLatestVersionId(course.getId());
         courseRepository.save(course);
-    }
 
-    private void mergeDraftIntoOriginal(Course draft, Course original) {
-        original.setTitle(draft.getTitle());
-        original.setDescription(draft.getDescription());
-        original.setObjectives(draft.getObjectives());
-        original.setCategory(draft.getCategory());
-        if (draft.getCategories() != null) {
-            original.setCategories(new java.util.HashSet<>(draft.getCategories()));
-        } else {
-            original.setCategories(new java.util.HashSet<>());
-        }
-        original.setDifficulty(draft.getDifficulty());
-        original.setThumbnailUrl(draft.getThumbnailUrl());
-        original.setPrice(draft.getPrice());
-        original.setVersion(draft.getVersion());
-        original.setEstimatedDuration(draft.getEstimatedDuration());
-        
-        courseRepository.save(original);
-
-        List<Section> draftSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(draft.getId());
-        List<Section> originalSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(original.getId());
-
-        for (Section draftSec : draftSections) {
-            Section match = originalSections.stream()
-                .filter(s -> s.getTitle() != null && s.getTitle().equalsIgnoreCase(draftSec.getTitle()))
-                .findFirst()
-                .orElse(null);
-                
-            if (match != null) {
-                match.setDescription(draftSec.getDescription());
-                match.setDisplayOrder(draftSec.getDisplayOrder());
-                match.setVersion(draftSec.getVersion());
-                sectionRepository.save(match);
-                
-                mergeLessons(draftSec, match);
-                originalSections.remove(match);
-            } else {
-                Section newSec = new Section();
-                newSec.setCourse(original);
-                newSec.setTitle(draftSec.getTitle());
-                newSec.setDescription(draftSec.getDescription());
-                newSec.setDisplayOrder(draftSec.getDisplayOrder());
-                newSec.setVersion(draftSec.getVersion());
-                Section savedSec = sectionRepository.save(newSec);
-                
-                mergeLessons(draftSec, savedSec);
+        if (course.getParentId() != null) {
+            Course originalCourse = courseRepository.findById(course.getParentId())
+                    .orElse(null);
+            if (originalCourse != null && "PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
+                originalCourse.setLatestVersionId(course.getId());
+                courseRepository.save(originalCourse);
             }
         }
-        
-        for (Section oldSec : originalSections) {
-            List<Lesson> oldLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(oldSec.getId());
-            lessonRepository.deleteAll(oldLessons);
-            sectionRepository.delete(oldSec);
-        }
-        
-        for (Section draftSec : draftSections) {
-            List<Lesson> dLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(draftSec.getId());
-            lessonRepository.deleteAll(dLessons);
-            sectionRepository.delete(draftSec);
-        }
-        courseRepository.delete(draft);
-    }
-    
-    private void mergeLessons(Section draftSec, Section targetSec) {
-        List<Lesson> draftLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(draftSec.getId());
-        List<Lesson> targetLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(targetSec.getId());
-        
-        for (Lesson draftLes : draftLessons) {
-            Lesson match = targetLessons.stream()
-                .filter(l -> l.getTitle() != null && l.getTitle().equalsIgnoreCase(draftLes.getTitle()))
-                .findFirst()
-                .orElse(null);
-                
-            if (match != null) {
-                match.setLessonType(draftLes.getLessonType());
-                match.setDisplayOrder(draftLes.getDisplayOrder());
-                match.setDescription(draftLes.getDescription());
-                match.setContent(draftLes.getContent());
-                match.setPdfName(draftLes.getPdfName());
-                match.setQuestionImageUrl(draftLes.getQuestionImageUrl());
-                match.setEstimatedTime(draftLes.getEstimatedTime());
-                match.setCode(draftLes.getCode());
-                match.setMediaDurationSeconds(draftLes.getMediaDurationSeconds());
-                match.setMediaSizeBytes(draftLes.getMediaSizeBytes());
-                match.setEstimatedTimeMinutes(draftLes.getEstimatedTimeMinutes());
-                match.setLearningObjectives(draftLes.getLearningObjectives());
-                match.setVersion(draftLes.getVersion());
-                match.setSkill(draftLes.getSkill());
-                match.setDifficulty(draftLes.getDifficulty());
-                match.setExam(draftLes.getExam());
-                lessonRepository.save(match);
-                targetLessons.remove(match);
-            } else {
-                Lesson newLes = new Lesson();
-                newLes.setSection(targetSec);
-                newLes.setTitle(draftLes.getTitle());
-                newLes.setLessonType(draftLes.getLessonType());
-                newLes.setDisplayOrder(draftLes.getDisplayOrder());
-                newLes.setDescription(draftLes.getDescription());
-                newLes.setContent(draftLes.getContent());
-                newLes.setPdfName(draftLes.getPdfName());
-                newLes.setQuestionImageUrl(draftLes.getQuestionImageUrl());
-                newLes.setEstimatedTime(draftLes.getEstimatedTime());
-                newLes.setCode(draftLes.getCode());
-                newLes.setMediaDurationSeconds(draftLes.getMediaDurationSeconds());
-                newLes.setMediaSizeBytes(draftLes.getMediaSizeBytes());
-                newLes.setEstimatedTimeMinutes(draftLes.getEstimatedTimeMinutes());
-                newLes.setLearningObjectives(draftLes.getLearningObjectives());
-                newLes.setVersion(draftLes.getVersion());
-                newLes.setSkill(draftLes.getSkill());
-                newLes.setDifficulty(draftLes.getDifficulty());
-                newLes.setExam(draftLes.getExam());
-                lessonRepository.save(newLes);
-            }
-        }
-        
-        lessonRepository.deleteAll(targetLessons);
     }
 
     @Override
