@@ -36,4 +36,19 @@ public class TestDBController {
             return "Error: " + e.getMessage();
         }
     }
+
+    @GetMapping("/api/test-db/init-prices")
+    public String initPrices() {
+        try {
+            // Update prices for existing courses to test VNPay payment
+            jdbcTemplate.update("UPDATE courses SET price = 699000.00 WHERE id = 1");
+            jdbcTemplate.update("UPDATE courses SET price = 899000.00 WHERE id = 2");
+            jdbcTemplate.update("UPDATE courses SET price = 1290000.00 WHERE id = 3");
+            jdbcTemplate.update("UPDATE courses SET price = 1500000.00 WHERE id > 3");
+            return "Successfully updated course prices to database!";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Error updating prices: " + e.getMessage();
+        }
+    }
 }

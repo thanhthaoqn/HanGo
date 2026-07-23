@@ -11,4 +11,7 @@ public interface TrainerCourseDetailProjection {
     Long getLessonsCount();
     String getThumbnailUrl();
     LocalDateTime getCreatedAt();
+    String getCode();
+    String getVersion();
+    Long getParentId();
 }

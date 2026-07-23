@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
@@ -46,9 +46,12 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
           course.title.toLowerCase().contains(keyword) ||
           course.creatorName.toLowerCase().contains(keyword) ||
           course.code.toLowerCase().contains(keyword);
+      // Normalize: PENDING_APPROVAL from backend should match "PENDING" filter on frontend
+      final courseStatus = course.status.toUpperCase();
       final matchesStatus =
           _statusFilter == 'ALL' ||
-          course.status.toUpperCase() == _statusFilter;
+          courseStatus == _statusFilter ||
+          (_statusFilter == 'PENDING' && courseStatus == 'PENDING_APPROVAL');
       return matchesSearch && matchesStatus;
     }).toList();
   }
@@ -102,18 +105,18 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     }
   }
 
-  Future<void> _rejectCourse(CourseReviewCourse course) async {
+  Future<void> _rejectCourse(CourseReviewCourse course, {String reason = ''}) async {
     final confirmed = await _confirmAction(
       title: 'Return to draft?',
       message:
-          'This will return "${course.title}" to DRAFT so the trainer can revise and submit again.',
+          'This will return "${course.title}" to DRAFT so the trainer can revise and submit again.\n\nReason: ${reason.isEmpty ? "None" : reason}',
       confirmLabel: 'Return',
       confirmColor: const Color(0xFFEF4444),
     );
     if (!confirmed) return;
 
     try {
-      await _api.rejectCourse(course.id);
+      await _api.rejectCourse(course.id, reason: reason);
       if (!mounted) return;
       ToastHelper.showSuccess(context, 'Course returned to draft.');
       await _loadCourses();
@@ -139,9 +142,9 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
       context: context,
       builder: (context) => _CourseReviewDialog(
         course: detail,
-        onReject: () {
+        onReject: (String reason) {
           Navigator.pop(context);
-          _rejectCourse(detail);
+          _rejectCourse(detail, reason: reason);
         },
         onPublish: () {
           Navigator.pop(context);
@@ -387,95 +390,167 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Scrollbar(
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-            headingTextStyle: const TextStyle(
-              color: Color(0xFF475569),
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Outfit',
-              fontSize: 12,
-            ),
-            dataTextStyle: const TextStyle(
-              color: Color(0xFF1E293B),
-              fontFamily: 'Outfit',
-              fontSize: 13,
-            ),
-            columns: const [
-              DataColumn(label: Text('Course')),
-              DataColumn(label: Text('Trainer')),
-              DataColumn(label: Text('Category')),
-              DataColumn(label: Text('Content')),
-              DataColumn(label: Text('Price')),
-              DataColumn(label: Text('Status')),
-              DataColumn(label: Text('Actions')),
-            ],
-            rows: courses
-                .map(
-                  (course) => DataRow(
-                    cells: [
-                      DataCell(_CourseTitleCell(course: course)),
-                      DataCell(Text(course.creatorName)),
-                      DataCell(Text(course.categoryName)),
-                      DataCell(
-                        Text(
-                          '${course.sectionsCount} sections / ${course.lessonsCount} lessons',
-                        ),
-                      ),
-                      DataCell(Text(_formatPrice(course.price))),
-                      DataCell(_StatusPill(status: course.status)),
-                      DataCell(
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: 'View details',
-                              onPressed: () => _showCourseDetail(course),
-                              icon: const Icon(Icons.visibility_outlined),
-                              color: const Color(0xFF475569),
-                            ),
-                            IconButton(
-                              tooltip: 'Return to draft',
-                              onPressed:
-                                  course.status.toUpperCase() == 'PENDING'
-                                  ? () => _rejectCourse(course)
-                                  : null,
-                              icon: const Icon(Icons.undo_outlined),
-                              color: const Color(0xFFEF4444),
-                            ),
-                            IconButton.filled(
-                              tooltip: 'Publish',
-                              onPressed:
-                                  course.status.toUpperCase() == 'PENDING'
-                                  ? () => _publishCourse(course)
-                                  : null,
-                              icon: const Icon(Icons.check),
-                              style: IconButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                backgroundColor: const Color(0xFF20B486),
-                                disabledBackgroundColor: const Color(
-                                  0xFFE2E8F0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-                .toList(),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+            ),
+            child: _buildTableHeaderRow(),
+          ),
+          // Data rows
+          ...courses.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final course = entry.value;
+            return Column(
+              children: [
+                Container(
+                  color: idx.isOdd ? const Color(0xFFFAFAFB) : Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  child: _buildTableDataRow(course),
+                ),
+                if (idx < courses.length - 1)
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              ],
+            );
+          }),
+        ],
       ),
     );
   }
+
+  Widget _buildTableHeaderRow() {
+    const style = TextStyle(
+      color: Color(0xFF475569),
+      fontWeight: FontWeight.bold,
+      fontFamily: 'Outfit',
+      fontSize: 12,
+      letterSpacing: 0.5,
+    );
+    return Row(
+      children: [
+        const Expanded(flex: 28, child: Text('COURSE', style: style)),
+        const Expanded(flex: 15, child: Text('TRAINER', style: style)),
+        const Expanded(flex: 13, child: Text('CATEGORY', style: style)),
+        const Expanded(flex: 13, child: Text('CONTENT', style: style)),
+        const Expanded(flex: 10, child: Text('PRICE', style: style)),
+        const Expanded(flex: 11, child: Text('STATUS', style: style)),
+        const SizedBox(width: 88, child: Text('ACTION', style: style)),
+      ],
+    );
+  }
+
+  Widget _buildTableDataRow(CourseReviewCourse course) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(flex: 28, child: _CourseTitleCell(course: course)),
+        Expanded(
+          flex: 15,
+          child: Text(
+            course.creatorName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Outfit',
+              fontSize: 13,
+              color: Color(0xFF1E293B),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Expanded(
+          flex: 13,
+          child: Text(
+            course.categoryName,
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 13,
+              color: Color(0xFF1E293B),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Expanded(
+          flex: 13,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${course.sectionsCount} sections',
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              Text(
+                '${course.lessonsCount} lessons',
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          flex: 10,
+          child: Text(
+            _formatPrice(course.price),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 13,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+        ),
+        Expanded(flex: 11, child: _StatusPill(status: course.status)),
+        SizedBox(
+          width: 88,
+          child: TextButton.icon(
+            onPressed: () => _showCourseDetail(course),
+            icon: const Icon(Icons.search_rounded, size: 15),
+            label: const Text('Review'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF20B486),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              textStyle: const TextStyle(
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+
 
   Widget _buildEmptyState() {
     return Container(
@@ -753,9 +828,14 @@ class _CourseTitleCell extends StatelessWidget {
   }
 }
 
-class _CourseReviewDialog extends StatelessWidget {
+bool _isPendingStatus(String status) {
+  final s = status.toUpperCase();
+  return s == 'PENDING' || s == 'PENDING_APPROVAL';
+}
+
+class _CourseReviewDialog extends StatefulWidget {
   final CourseReviewCourse course;
-  final VoidCallback onReject;
+  final ValueChanged<String> onReject;
   final VoidCallback onPublish;
 
   const _CourseReviewDialog({
@@ -765,25 +845,133 @@ class _CourseReviewDialog extends StatelessWidget {
   });
 
   @override
+  State<_CourseReviewDialog> createState() => _CourseReviewDialogState();
+}
+
+class _CourseReviewDialogState extends State<_CourseReviewDialog> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _reasonController = TextEditingController();
+  bool _hasScrolledAll = false;
+  bool _showReasonInput = false;
+
+  // Track which lesson IDs have been opened
+  final Set<String> _viewedLessonKeys = {};
+  late int _totalLessons;
+
+  bool get _hasViewedAll {
+    if (!_hasScrolledAll) return false;
+    if (_totalLessons == 0) return true;
+    return _viewedLessonKeys.length >= _totalLessons;
+  }
+
+  void _markLessonViewed(String key) {
+    setState(() {
+      _viewedLessonKeys.add(key);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Count total lessons
+    _totalLessons = widget.course.sessions.fold<int>(0, (sum, session) {
+      final map = session is Map ? session : const {};
+      final lessons = map['lessons'] as List? ?? const [];
+      return sum + lessons.length;
+    });
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkIfScrolledAll();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_hasScrolledAll) return;
+    _checkIfScrolledAll();
+  }
+
+  void _checkIfScrolledAll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll <= 0 || currentScroll >= maxScroll - 20) {
+      setState(() {
+        _hasScrolledAll = true;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 780),
         child: Column(
           children: [
             _buildHeader(context),
+            if (_isPendingStatus(widget.course.status))
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                color: _hasViewedAll
+                    ? const Color(0xFFECFDF5)
+                    : const Color(0xFFFFFBEB),
+                child: Row(
+                  children: [
+                    Icon(
+                      _hasViewedAll
+                          ? Icons.check_circle_outline
+                          : Icons.info_outline,
+                      color: _hasViewedAll
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFB45309),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _hasViewedAll
+                          ? const Text(
+                              'All content reviewed. You may now approve or reject.',
+                              style: TextStyle(
+                                color: Color(0xFF065F46),
+                                fontFamily: 'Outfit',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          : Text(
+                              _hasScrolledAll
+                                  ? 'Open each lesson below to review its content (${_viewedLessonKeys.length}/$_totalLessons viewed).'
+                                  : 'Scroll down to review all information, then open each lesson.',
+                              style: const TextStyle(
+                                color: Color(0xFF92400E),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (course.thumbnailUrl.isNotEmpty) ...[
+                    if (widget.course.thumbnailUrl.isNotEmpty) ...[
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          course.thumbnailUrl,
+                          widget.course.thumbnailUrl,
                           height: 220,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) =>
@@ -796,47 +984,121 @@ class _CourseReviewDialog extends StatelessWidget {
                       spacing: 12,
                       runSpacing: 12,
                       children: [
-                        _InfoTile(label: 'Trainer', value: course.creatorName),
-                        _InfoTile(label: 'Code', value: course.code),
+                        _InfoTile(label: 'Trainer', value: widget.course.creatorName),
+                        _InfoTile(label: 'Code', value: widget.course.code),
                         _InfoTile(
                           label: 'Category',
-                          value: course.categoryName,
+                          value: widget.course.categoryName,
                         ),
-                        _InfoTile(label: 'Level', value: course.difficultyName),
-                        _InfoTile(label: 'Version', value: course.version),
+                        _InfoTile(label: 'Level', value: widget.course.difficultyName),
+                        _InfoTile(label: 'Version', value: widget.course.version),
                         _InfoTile(
                           label: 'Price',
-                          value: _formatPrice(course.price),
+                          value: _formatPrice(widget.course.price),
                         ),
                         _InfoTile(
                           label: 'Content',
                           value:
-                              '${course.sectionsCount} sections / ${course.lessonsCount} lessons',
+                              '${widget.course.sectionsCount} sections / ${widget.course.lessonsCount} lessons',
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     _SectionBlock(
                       title: 'Description',
-                      content: course.description.isEmpty
+                      content: widget.course.description.isEmpty
                           ? 'No description provided.'
-                          : course.description,
+                          : widget.course.description,
                     ),
                     const SizedBox(height: 16),
                     _SectionBlock(
                       title: 'Objectives',
-                      content: course.objectives.isEmpty
+                      content: widget.course.objectives.isEmpty
                           ? 'No objectives provided.'
-                          : course.objectives,
+                          : widget.course.objectives,
                     ),
-                    if (course.sessions.isNotEmpty) ...[
+                    if (widget.course.sessions.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      _SyllabusPreview(sessions: course.sessions),
+                      _SyllabusPreview(
+                        sessions: widget.course.sessions,
+                        viewedLessonKeys: _viewedLessonKeys,
+                        onLessonViewed: _markLessonViewed,
+                      ),
                     ],
+                    const SizedBox(height: 40), // extra space to ensure scrolling
                   ],
                 ),
               ),
             ),
+            if (_showReasonInput)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF2F2),
+                  border: Border(top: BorderSide(color: Color(0xFFFECACA))),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Rejection Reason',
+                      style: TextStyle(
+                        color: Color(0xFF991B1B),
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _reasonController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Please provide a reason for rejecting this course...',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFFCA5A5)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFFCA5A5)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _showReasonInput = false;
+                              _reasonController.clear();
+                            });
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (_reasonController.text.trim().isEmpty) {
+                              ToastHelper.showError(context, 'Please enter a rejection reason.');
+                              return;
+                            }
+                            widget.onReject(_reasonController.text.trim());
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Confirm Rejection'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
@@ -850,8 +1112,12 @@ class _CourseReviewDialog extends StatelessWidget {
                   ),
                   const Spacer(),
                   OutlinedButton.icon(
-                    onPressed: course.status.toUpperCase() == 'PENDING'
-                        ? onReject
+                    onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
+                        ? () {
+                            setState(() {
+                              _showReasonInput = !_showReasonInput;
+                            });
+                          }
                         : null,
                     icon: const Icon(Icons.undo_outlined),
                     label: const Text('Return to Draft'),
@@ -865,8 +1131,8 @@ class _CourseReviewDialog extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
-                    onPressed: course.status.toUpperCase() == 'PENDING'
-                        ? onPublish
+                    onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
+                        ? widget.onPublish
                         : null,
                     icon: const Icon(Icons.check),
                     label: const Text('Publish'),
@@ -900,7 +1166,7 @@ class _CourseReviewDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  course.title,
+                  widget.course.title,
                   style: const TextStyle(
                     color: Color(0xFF0F172A),
                     fontWeight: FontWeight.bold,
@@ -911,10 +1177,10 @@ class _CourseReviewDialog extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    _StatusPill(status: course.status),
+                    _StatusPill(status: widget.course.status),
                     const SizedBox(width: 8),
                     const Text(
-                      'DRAFT -> PENDING -> PUBLISHED',
+                      'DRAFT → PENDING → PUBLISHED',
                       style: TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 12,
@@ -1017,66 +1283,523 @@ class _SectionBlock extends StatelessWidget {
 
 class _SyllabusPreview extends StatelessWidget {
   final List<dynamic> sessions;
+  final Set<String> viewedLessonKeys;
+  final void Function(String key) onLessonViewed;
 
-  const _SyllabusPreview({required this.sessions});
+  const _SyllabusPreview({
+    required this.sessions,
+    required this.viewedLessonKeys,
+    required this.onLessonViewed,
+  });
+
+  IconData _lessonIcon(String? type) {
+    switch ((type ?? '').toLowerCase()) {
+      case 'video':
+        return Icons.play_circle_outline_rounded;
+      case 'quiz':
+        return Icons.quiz_outlined;
+      case 'pdf':
+        return Icons.picture_as_pdf_outlined;
+      default:
+        return Icons.article_outlined;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            const Text(
+              'Course Syllabus',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                fontFamily: 'Outfit',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6F7F1),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${sessions.length} sections',
+                style: const TextStyle(
+                  color: Color(0xFF0F8B68),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
         const Text(
-          'Syllabus',
+          'Tap each lesson to review its content.',
           style: TextStyle(
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.bold,
+            color: Color(0xFF64748B),
+            fontSize: 12,
             fontFamily: 'Outfit',
           ),
         ),
-        const SizedBox(height: 8),
-        ...sessions.map((session) {
+        const SizedBox(height: 12),
+        ...sessions.asMap().entries.map((sEntry) {
+          final sIdx = sEntry.key;
+          final session = sEntry.value;
           final map = session is Map ? session : const {};
           final lessons = map['lessons'] as List? ?? const [];
-          return ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: Text(
-              map['title']?.toString() ?? 'Untitled section',
-              style: const TextStyle(
-                color: Color(0xFF1E293B),
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Outfit',
+          final sectionId = map['id']?.toString() ?? 'sec-$sIdx';
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
+              ),
+              child: ExpansionTile(
+                initiallyExpanded: true,
+                tilePadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                childrenPadding: EdgeInsets.zero,
+                title: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF20B486),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${sIdx + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        map['title']?.toString() ?? 'Untitled section',
+                        style: const TextStyle(
+                          color: Color(0xFF1E293B),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(left: 38, top: 2),
+                  child: Text(
+                    '${lessons.length} lessons',
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ),
+                children: [
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  ...lessons.asMap().entries.map((lEntry) {
+                    final lIdx = lEntry.key;
+                    final lesson = lEntry.value;
+                    final lessonMap =
+                        lesson is Map ? lesson : const {};
+                    final lessonKey = '${sectionId}_$lIdx';
+                    final isViewed = viewedLessonKeys.contains(lessonKey);
+                    final itemType = lessonMap['itemType']?.toString();
+                    final title =
+                        lessonMap['title']?.toString() ??
+                        'Untitled lesson';
+                    final description =
+                        lessonMap['description']?.toString() ?? '';
+                    final content =
+                        lessonMap['questionText']?.toString() ?? '';
+
+                    return InkWell(
+                      onTap: () {
+                        onLessonViewed(lessonKey);
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => _LessonDetailDialog(
+                            title: title,
+                            itemType: itemType ?? 'lesson',
+                            description: description,
+                            content: content,
+                            lessonMap: lessonMap,
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isViewed
+                              ? const Color(0xFFF0FDF4)
+                              : Colors.white,
+                          border: lIdx < lessons.length - 1
+                              ? const Border(
+                                  bottom: BorderSide(
+                                    color: Color(0xFFF1F5F9),
+                                  ),
+                                )
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: isViewed
+                                    ? const Color(0xFFD1FAE5)
+                                    : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                isViewed
+                                    ? Icons.check_rounded
+                                    : _lessonIcon(itemType),
+                                color: isViewed
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFF94A3B8),
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: TextStyle(
+                                      fontFamily: 'Outfit',
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: isViewed
+                                          ? const Color(0xFF065F46)
+                                          : const Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                  if (itemType != null)
+                                    Text(
+                                      itemType.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontFamily: 'Outfit',
+                                        fontSize: 11,
+                                        color: Color(0xFF94A3B8),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: isViewed
+                                  ? const Color(0xFF059669)
+                                  : const Color(0xFFCBD5E1),
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
               ),
             ),
-            subtitle: Text(
-              '${lessons.length} lessons',
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontFamily: 'Outfit',
-              ),
-            ),
-            children: lessons.map((lesson) {
-              final lessonMap = lesson is Map ? lesson : const {};
-              return ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  Icons.article_outlined,
-                  color: Color(0xFF20B486),
-                  size: 18,
-                ),
-                title: Text(
-                  lessonMap['title']?.toString() ?? 'Untitled lesson',
-                  style: const TextStyle(fontFamily: 'Outfit'),
-                ),
-                subtitle: Text(
-                  lessonMap['itemType']?.toString() ?? 'lesson',
-                  style: const TextStyle(fontFamily: 'Outfit'),
-                ),
-              );
-            }).toList(),
           );
         }),
       ],
+    );
+  }
+}
+
+class _LessonDetailDialog extends StatelessWidget {
+  final String title;
+  final String itemType;
+  final String description;
+  final String content;
+  final Map lessonMap;
+
+  const _LessonDetailDialog({
+    required this.title,
+    required this.itemType,
+    required this.description,
+    required this.content,
+    required this.lessonMap,
+  });
+
+  IconData get _icon {
+    switch (itemType.toLowerCase()) {
+      case 'video':
+        return Icons.play_circle_outline_rounded;
+      case 'quiz':
+        return Icons.quiz_outlined;
+      case 'pdf':
+        return Icons.picture_as_pdf_outlined;
+      default:
+        return Icons.article_outlined;
+    }
+  }
+
+  Color get _iconColor {
+    switch (itemType.toLowerCase()) {
+      case 'video':
+        return const Color(0xFF8B5CF6);
+      case 'quiz':
+        return const Color(0xFF3B82F6);
+      case 'pdf':
+        return const Color(0xFFEF4444);
+      default:
+        return const Color(0xFF20B486);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 560),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _iconColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(_icon, color: _iconColor, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontFamily: 'Outfit',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _iconColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            itemType.toUpperCase(),
+                            style: TextStyle(
+                              color: _iconColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // Body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (description.isNotEmpty) ...[
+                      const Text(
+                        'Description',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF475569),
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          color: Color(0xFF1E293B),
+                          height: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    if (content.isNotEmpty) ...[
+                      const Text(
+                        'Content',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF475569),
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Text(
+                          content,
+                          style: const TextStyle(
+                            fontFamily: 'Outfit',
+                            color: Color(0xFF1E293B),
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    // Extra info from lessonMap
+                    _buildExtraInfo(),
+                    if (description.isEmpty && content.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'No detailed content available for this lesson.',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF94A3B8),
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            // Footer
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF20B486),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(fontFamily: 'Outfit'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExtraInfo() {
+    final chips = <Widget>[];
+    final estimatedTime = lessonMap['estimatedTime'];
+    final pdfName = lessonMap['pdfName']?.toString() ?? '';
+    if (estimatedTime != null) {
+      chips.add(_infoChip(Icons.timer_outlined, '$estimatedTime min'));
+    }
+    if (pdfName.isNotEmpty) {
+      chips.add(_infoChip(Icons.attach_file_outlined, pdfName));
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
+
+  Widget _infoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF64748B)),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 12,
+              color: Color(0xFF475569),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1089,9 +1812,12 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = status.toUpperCase();
+    final displayText = normalized == 'PENDING_APPROVAL'
+        ? 'PENDING'
+        : normalized;
     final color = switch (normalized) {
       'PUBLISHED' => const Color(0xFF20B486),
-      'PENDING' => const Color(0xFFF59E0B),
+      'PENDING' || 'PENDING_APPROVAL' => const Color(0xFFF59E0B),
       'DRAFT' => const Color(0xFF64748B),
       _ => const Color(0xFF64748B),
     };
@@ -1103,7 +1829,7 @@ class _StatusPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        normalized,
+        displayText,
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.bold,

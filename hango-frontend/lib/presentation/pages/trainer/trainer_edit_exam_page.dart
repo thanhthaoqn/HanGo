@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
@@ -104,9 +105,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       final token = await _authService.getToken();
       if (token == null) return;
       
-      final String apiBaseUrl = kIsWeb
-          ? 'http://localhost:8080/api/v1'
-          : 'http://10.0.2.2:8080/api/v1';
+      final String apiBaseUrl = EnvConfig.v1BaseUrl;
           
       final response = await http.patch(
         Uri.parse('$apiBaseUrl/trainer/exams/${widget.examId}/status'),
@@ -220,9 +219,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
 
   Future<HangoApi> _getApi() async {
     final token = await _authService.getToken();
-    final String apiBaseUrl = kIsWeb
-        ? 'http://localhost:8080'
-        : 'http://10.0.2.2:8080';
+    final String apiBaseUrl = EnvConfig.apiBaseUrl;
     return HangoApi(baseUrl: apiBaseUrl, token: token);
   }
 
@@ -231,7 +228,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       final api = await _getApi();
       final skills = await api.getSystemParameters('SKILL_TYPE');
       final difficulties = await api.getSystemParameters('DIFFICULTY');
-      final groupTypes = await api.getQuestionCategories();
+      final groupTypes = await api.getSystemParameters('GROUP_TYPE');
 
       setState(() {
         _skills = skills;
@@ -1055,7 +1052,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                         items: _groupTypes,
                         onChanged: (val) =>
                             setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),
@@ -1131,7 +1128,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                         items: _groupTypes,
                         onChanged: (val) =>
                             setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),

@@ -132,7 +132,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       await prefs.setBool('redirect_to_trainer_onboarding', true);
       await prefs.setString('preselected_register_role', 'TRAINER');
       if (mounted) {
-        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng ký tài khoản giảng viên để bắt đầu' : 'Please register a trainer account to start');
+        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng ký tài khoản giáo viên để bắt đầu' : 'Please register a trainer account to start');
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const RegisterPage()),
@@ -565,7 +565,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         _buildExamsSection(isDesktop),
                         const SizedBox(height: 60),
 
-                        // 4. Trở thành giảng viên Section
+                        // 4. Trở thành giáo viên Section
                         if (!_isLoggedIn) ...[
                           _buildTeacherSection(isDesktop),
                           const SizedBox(height: 60),
@@ -790,7 +790,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     constraints: const BoxConstraints(maxWidth: 650),
                     child: Text(
                       isVi
-                          ? 'Khóa học từ giáo viên hàng đầu và kho đề thi THPTQG miễn phí — tất cả trong một nền tảng hiện đại, dễ dùng. Bạn cũng có thể trở thành giảng viên và tạo khóa học của riêng mình.'
+                          ? 'Khóa học từ giáo viên hàng đầu và kho đề thi THPTQG miễn phí — tất cả trong một nền tảng hiện đại, dễ dùng. Bạn cũng có thể trở thành giáo viên và tạo khóa học của riêng mình.'
                           : 'Courses from top teachers and free exam prep — all in a modern, easy-to-use platform. You can also become a teacher and create your own courses.',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
@@ -989,7 +989,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
                   // Main Title
                   Text(
-                    isVi ? 'Trở thành giảng viên,\nchia sẻ tri thức.' : 'Become a teacher,\nshare your knowledge.',
+                    isVi ? 'Trở thành giáo viên,\nchia sẻ tri thức.' : 'Become a teacher,\nshare your knowledge.',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: isDesktop ? 42 : 28,
@@ -1114,7 +1114,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               const Icon(Icons.school_rounded, color: Color(0xFF28B79B), size: 28),
               const SizedBox(width: 12),
               Text(
-                isVi ? 'Trở thành giảng viên' : 'Become a Trainer',
+                isVi ? 'Trở thành giáo viên' : 'Become a Trainer',
                 style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
@@ -1251,12 +1251,14 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   }
 
   String _getCoursePrice(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   int _getCourseLessonsCount(Course course) {
@@ -1433,30 +1435,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
               )
-            : isDesktop
-            ? GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: isDesktop ? 0.85 : 0.85,
-                ),
-                itemCount: _courses.length,
-                itemBuilder: (context, index) {
-                  return _buildCourseCard(_courses[index]);
-                },
-              )
             : SizedBox(
-                height: 360,
+                height: isDesktop ? 390 : 360,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   itemCount: _courses.length,
                   itemBuilder: (context, index) {
                     return Container(
-                      width: 280,
-                      margin: const EdgeInsets.only(right: 16),
+                      width: isDesktop ? 300 : 280,
+                      margin: const EdgeInsets.only(right: 16, bottom: 12, top: 4),
                       child: _buildCourseCard(_courses[index]),
                     );
                   },
@@ -1483,10 +1471,19 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   String _getOriginalPrice(String currentPrice) {
     if (currentPrice == 'Miễn phí') return '';
-    if (currentPrice.contains('699')) return '999.000đ';
-    if (currentPrice.contains('899')) return '1.290.000đ';
-    if (currentPrice.contains('1.290')) return '1.800.000đ';
-    return '2.100.000đ';
+    try {
+      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
+      if (clean.isEmpty) return '';
+      final val = double.parse(clean);
+      final original = val * 1.3;
+      final formatted = original.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
+      return '$formattedđ';
+    } catch (_) {
+      return '';
+    }
   }
 
   Widget _buildCourseCardHeaderPlaceholder(Map<String, dynamic> theme) {
@@ -1933,30 +1930,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
               )
-            : isDesktop
-            ? GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: isDesktop ? 1.45 : 0.85,
-                ),
-                itemCount: _exams.length,
-                itemBuilder: (context, index) {
-                  return _buildExamCard(_exams[index]);
-                },
-              )
             : SizedBox(
-                height: 180,
+                height: isDesktop ? 210 : 180,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   itemCount: _exams.length,
                   itemBuilder: (context, index) {
                     return Container(
-                      width: 260,
-                      margin: const EdgeInsets.only(right: 16),
+                      width: isDesktop ? 300 : 260,
+                      margin: const EdgeInsets.only(right: 16, bottom: 10, top: 4),
                       child: _buildExamCard(_exams[index]),
                     );
                   },
@@ -2144,7 +2127,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         ),
         const SizedBox(height: 12),
         Text(
-          isVi ? 'Trở thành giảng viên trên HanGo' : 'Become an instructor on HanGo',
+          isVi ? 'Trở thành giáo viên trên HanGo' : 'Become an instructor on HanGo',
           style: const TextStyle(
             color: Colors.white,
             fontSize: 28,

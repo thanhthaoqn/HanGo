@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/course_manager_dashboard_summary.dart';
+import '../../utils/config.dart';
 
 class CourseReviewCourse {
   final int id;
@@ -78,12 +79,7 @@ class CourseReviewCourse {
 }
 
 class CourseManagerApi {
-  static String get baseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1/course-manager';
-    }
-    return 'http://localhost:8080/api/v1/course-manager';
-  }
+  static String get baseUrl => '${EnvConfig.apiBaseUrl}/api/v1/course-manager';
 
   Future<CourseManagerDashboardSummary> getDashboardSummary() async {
     final prefs = await SharedPreferences.getInstance();
@@ -156,8 +152,11 @@ class CourseManagerApi {
     }
   }
 
-  Future<void> rejectCourse(int courseId) async {
-    final response = await _post('/courses/$courseId/reject');
+  Future<void> rejectCourse(int courseId, {String? reason}) async {
+    final response = await _post(
+      '/courses/$courseId/reject',
+      body: reason != null && reason.isNotEmpty ? jsonEncode({'reason': reason}) : null,
+    );
     if (response.statusCode != 200) {
       throw Exception(
         'Failed to reject course: ${response.statusCode} ${response.body}',

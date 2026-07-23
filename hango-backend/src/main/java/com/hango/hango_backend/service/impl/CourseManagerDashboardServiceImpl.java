@@ -89,12 +89,26 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
 
-        if (!"PENDING".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only pending courses can be published");
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(course.getStatus())) {
+            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be published");
         }
 
+        // Handle versioning: if this is a draft version (V2) with a parentId,
+        // publish V2 and update V1.latestVersionId = V2.id so old learners can see the banner
+        // while V1 remains PUBLISHED so old learners keep viewing V1 until they upgrade
         course.setStatus("PUBLISHED");
+        course.setPublishedAt(java.time.LocalDateTime.now());
+        course.setLatestVersionId(course.getId());
         courseRepository.save(course);
+
+        if (course.getParentId() != null) {
+            Course originalCourse = courseRepository.findById(course.getParentId())
+                    .orElse(null);
+            if (originalCourse != null && "PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
+                originalCourse.setLatestVersionId(course.getId());
+                courseRepository.save(originalCourse);
+            }
+        }
     }
 
     @Override
@@ -104,21 +118,22 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
 
-        if (!"PENDING".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only pending courses can be returned to draft");
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(course.getStatus())) {
+            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be returned to draft");
         }
 
         course.setStatus("DRAFT");
         courseRepository.save(course);
+        // V1 remains PUBLISHED untouched - no changes needed
     }
 
     private String normalizeStatus(String status) {
         if (status == null || status.isBlank()) {
-            return "PENDING";
+            return "PENDING_APPROVAL";
         }
         String normalized = status.trim().toUpperCase(Locale.ROOT);
-        if ("SUBMITTED".equals(normalized)) {
-            return "PENDING";
+        if ("SUBMITTED".equals(normalized) || "PENDING".equals(normalized)) {
+            return "PENDING_APPROVAL";
         }
         return normalized;
     }

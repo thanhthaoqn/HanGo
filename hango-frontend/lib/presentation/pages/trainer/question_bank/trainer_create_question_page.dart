@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../utils/toast_helper.dart';
+import '../../../../utils/config.dart';
 import '../../login_page.dart';
 import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
@@ -101,7 +102,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
 
   Future<HangoApi> _getApi() async {
     final token = await _authService.getToken();
-    final String apiBaseUrl = kIsWeb ? 'http://localhost:8080' : 'http://10.0.2.2:8080';
+    final String apiBaseUrl = EnvConfig.apiBaseUrl;
     return HangoApi(baseUrl: apiBaseUrl, token: token);
   }
 
@@ -110,7 +111,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       final api = await _getApi();
       final skills = await api.getSystemParameters('SKILL_TYPE');
       final difficulties = await api.getSystemParameters('DIFFICULTY');
-      final groupTypes = await api.getQuestionCategories();
+      final groupTypes = await api.getSystemParameters('GROUP_TYPE');
 
       Map<String, dynamic>? detail;
       if (widget.question != null) {
@@ -501,7 +502,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                         value: _selectedGroupTypeId,
                         items: _groupTypes,
                         onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),
@@ -574,7 +575,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
                         value: _selectedGroupTypeId,
                         items: _groupTypes,
                         onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),

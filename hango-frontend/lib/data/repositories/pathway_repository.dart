@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../domain/entities/learning_pathway.dart';
+import '../../utils/config.dart';
 
 class PathwayRepository {
-  final String baseUrl = 'http://localhost:8080/api/v1';
+  final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<LearningPathway> getMyPathway() async {
     final prefs = await SharedPreferences.getInstance();

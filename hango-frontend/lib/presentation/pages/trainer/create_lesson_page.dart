@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import 'create_lesson_text_page.dart';
 import 'create_quiz_page.dart';
@@ -56,12 +57,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
 
   final _authService = AuthService();
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   Future<void> _refreshCourseDetail() async {
     try {

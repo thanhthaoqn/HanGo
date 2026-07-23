@@ -183,14 +183,14 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                                   _buildTermTitle(isVi ? 'ĐIỀU 1: PHÂN CHIA DOANH THU' : 'ARTICLE 1: REVENUE SHARE'),
                                   _buildTermText(
                                     isVi
-                                        ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên chuyên nghiệp" : "Gia sư đồng học"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giảng viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
+                                        ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên chuyên nghiệp" : "Gia sư đồng học"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giáo viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
                                         : 'Based on selected profile: ${isPro ? "Professional" : "Peer Tutor"}.\n- Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
                                   ),
                                   const SizedBox(height: 16),
                                   _buildTermTitle(isVi ? 'ĐIỀU 2: BẢO MẬT & BẢN QUYỀN NỘI DUNG' : 'ARTICLE 2: CONTENT COPYRIGHTS'),
                                   _buildTermText(
                                     isVi
-                                        ? 'Giảng viên cam kết tự biên soạn nội dung bài giảng, đề thi và câu hỏi. Không sao chép hay sử dụng các nội dung của bên thứ ba chưa được cấp phép. Mọi tranh chấp liên quan đến bản quyền nội dung, giảng viên sẽ chịu trách nhiệm hoàn toàn trước pháp luật.'
+                                        ? 'Giáo viên cam kết tự biên soạn nội dung bài giảng, đề thi và câu hỏi. Không sao chép hay sử dụng các nội dung của bên thứ ba chưa được cấp phép. Mọi tranh chấp liên quan đến bản quyền nội dung, giáo viên sẽ chịu trách nhiệm hoàn toàn trước pháp luật.'
                                         : 'Instructors guarantee original ownership of syllabus, exams, and quizzes. No unlicensed duplication of third-party assets is permitted. The instructor assumes full legal responsibility for any copyrights violations.',
                                   ),
                                   const SizedBox(height: 16),

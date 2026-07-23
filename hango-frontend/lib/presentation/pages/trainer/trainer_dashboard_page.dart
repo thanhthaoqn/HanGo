@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
+import '../learner/learner_home_page.dart';
 import 'trainer_courses_page.dart';
 import 'trainer_exams_page.dart';
 import '../../../utils/toast_helper.dart';
@@ -32,12 +34,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   int _examsCount = 0;
   List<dynamic> _coursesList = [];
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {
@@ -195,34 +192,54 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Logo
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6FFFA),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.school,
-                    size: 18,
-                    color: Color(0xFF20B486),
-                  ),
+          InkWell(
+            onTap: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LearnerHomePage(),
                 ),
-                const SizedBox(width: 8),
-                const Text(
-                  'HanGo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
+                (route) => false,
+              );
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+              child: Image.network(
+                'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                height: 36,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE6FFFA),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.school,
+                          size: 18,
+                          color: Color(0xFF20B486),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'HanGo',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
           const SizedBox(height: 40),
@@ -402,17 +419,73 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             ],
           ),
           const SizedBox(width: 16),
-          // User profile widget
-          InkWell(
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerProfilePage(),
-                ),
-              );
+          // User profile widget with Popup Menu
+          PopupMenuButton<String>(
+            onSelected: (val) {
+              if (val == 'dashboard') {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TrainerDashboardPage(),
+                  ),
+                );
+              } else if (val == 'profile') {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TrainerProfilePage(),
+                  ),
+                );
+              } else if (val == 'logout') {
+                _handleLogout();
+              }
             },
-            borderRadius: BorderRadius.circular(20),
+            offset: const Offset(0, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'dashboard',
+                child: Row(
+                  children: const [
+                    Icon(Icons.dashboard_outlined, size: 18, color: Color(0xFF20B486)),
+                    SizedBox(width: 10),
+                    Text(
+                      'Dashboard',
+                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: const [
+                    Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
+                    SizedBox(width: 10),
+                    Text(
+                      'My Profile',
+                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: const [
+                    Icon(Icons.logout, size: 18, color: Colors.redAccent),
+                    SizedBox(width: 10),
+                    Text(
+                      'Logout',
+                      style: TextStyle(fontFamily: 'Outfit', color: Colors.redAccent, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(

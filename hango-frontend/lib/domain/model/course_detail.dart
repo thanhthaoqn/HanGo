@@ -48,7 +48,9 @@ class CourseSession {
 
   factory CourseSession.fromJson(Map<String, dynamic> json) {
     var list = json['lessons'] as List? ?? [];
-    List<CourseLesson> lessonsList = list.map((i) => CourseLesson.fromJson(i)).toList();
+    List<CourseLesson> lessonsList = list
+        .map((i) => CourseLesson.fromJson(i))
+        .toList();
 
     return CourseSession(
       id: json['id'] as int,
@@ -71,6 +73,11 @@ class CourseDetail {
   final bool isEnrolled;
   final String? thumbnailUrl;
   final int? estimatedDuration;
+  final double price;
+  final String? version;
+  final bool hasNewVersionAvailable;
+  final int? latestPublishedCourseId;
+  final String? latestPublishedVersion;
   final List<CourseSession> sessions;
 
   CourseDetail({
@@ -85,12 +92,19 @@ class CourseDetail {
     required this.isEnrolled,
     this.thumbnailUrl,
     this.estimatedDuration,
+    required this.price,
+    this.version,
+    this.hasNewVersionAvailable = false,
+    this.latestPublishedCourseId,
+    this.latestPublishedVersion,
     required this.sessions,
   });
 
   factory CourseDetail.fromJson(Map<String, dynamic> json) {
     var list = json['sessions'] as List? ?? [];
-    List<CourseSession> sessionsList = list.map((i) => CourseSession.fromJson(i)).toList();
+    List<CourseSession> sessionsList = list
+        .map((i) => CourseSession.fromJson(i))
+        .toList();
 
     return CourseDetail(
       id: json['id'] as int,
@@ -104,6 +118,11 @@ class CourseDetail {
       isEnrolled: json['isEnrolled'] as bool? ?? false,
       thumbnailUrl: json['thumbnailUrl'] as String?,
       estimatedDuration: json['estimatedDuration'] as int?,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      version: json['version'] as String?,
+      hasNewVersionAvailable: json['hasNewVersionAvailable'] as bool? ?? false,
+      latestPublishedCourseId: json['latestPublishedCourseId'] as int?,
+      latestPublishedVersion: json['latestPublishedVersion'] as String?,
       sessions: sessionsList,
     );
   }
@@ -120,6 +139,11 @@ class CourseDetail {
     bool? isEnrolled,
     String? thumbnailUrl,
     int? estimatedDuration,
+    double? price,
+    String? version,
+    bool? hasNewVersionAvailable,
+    int? latestPublishedCourseId,
+    String? latestPublishedVersion,
     List<CourseSession>? sessions,
   }) {
     return CourseDetail(
@@ -134,6 +158,14 @@ class CourseDetail {
       isEnrolled: isEnrolled ?? this.isEnrolled,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       estimatedDuration: estimatedDuration ?? this.estimatedDuration,
+      price: price ?? this.price,
+      version: version ?? this.version,
+      hasNewVersionAvailable:
+          hasNewVersionAvailable ?? this.hasNewVersionAvailable,
+      latestPublishedCourseId:
+          latestPublishedCourseId ?? this.latestPublishedCourseId,
+      latestPublishedVersion:
+          latestPublishedVersion ?? this.latestPublishedVersion,
       sessions: sessions ?? this.sessions,
     );
   }

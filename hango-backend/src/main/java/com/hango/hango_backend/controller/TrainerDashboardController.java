@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -108,6 +109,23 @@ public class TrainerDashboardController {
         }
     }
 
+    @DeleteMapping("/courses/{id}")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> deleteTrainerCourse(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.deleteTrainerCourse(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course deleted successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @PutMapping("/courses/{id}")
     @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> updateCourse(
@@ -118,8 +136,11 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            trainerDashboardService.updateTrainerCourse(id, userDetails.getUsername(), request);
-            return ResponseEntity.ok("{\"message\": \"Course updated successfully\"}");
+            Long updatedCourseId = trainerDashboardService.updateTrainerCourse(id, userDetails.getUsername(), request);
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("message", "Course updated successfully");
+            response.put("courseId", updatedCourseId);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -154,6 +175,40 @@ public class TrainerDashboardController {
             }
             trainerDashboardService.submitTrainerCourse(id, userDetails.getUsername());
             return ResponseEntity.ok("{\"message\": \"Course submitted for review\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/courses/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> approveCourse(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.approveTrainerCourse(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course approved and published successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/courses/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> rejectCourse(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.rejectTrainerCourseDraft(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course draft rejected\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

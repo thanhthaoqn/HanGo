@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -43,22 +44,23 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
   // Dynamic dropdown lists (populated from DB with default fallbacks)
   List<Map<String, dynamic>> _dbCategories = [
-    {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
-    {'paramKey': 'VOCABULARY', 'paramValue': 'Vocabulary'},
-    {'paramKey': 'LISTENING', 'paramValue': 'Listening'},
-    {
-      'paramKey': 'READING_COMPREHENSION',
-      'paramValue': 'Reading Comprehension',
-    },
-    {'paramKey': 'WRITING', 'paramValue': 'Writing'},
+    {'paramKey': 'CONVERSATION_SHORT_SENTENCES', 'paramValue': 'Conversation/Short Sentences'},
+    {'paramKey': 'SYNONYM', 'paramValue': 'Synonym'},
+    {'paramKey': 'ANTONYM', 'paramValue': 'Antonym'},
     {'paramKey': 'PRONUNCIATION', 'paramValue': 'Pronunciation'},
+    {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
+    {'paramKey': 'SENTENCE_MEANING', 'paramValue': 'Sentence Meaning'},
+    {'paramKey': 'SENTENCE_COMBINING', 'paramValue': 'Sentence Combining'},
+    {'paramKey': 'FILL_IN_BLANK', 'paramValue': 'Fill in Blank'},
+    {'paramKey': 'READING_COMPREHENSION', 'paramValue': 'Reading Comprehension'},
+    {'paramKey': 'ARRANGEMENT', 'paramValue': 'Arrangement'},
   ];
   List<Map<String, dynamic>> _dbLevels = [
     {'paramKey': 'BASIC', 'paramValue': 'Basic'},
     {'paramKey': 'INTERMEDIATE', 'paramValue': 'Intermediate'},
     {'paramKey': 'ADVANCED', 'paramValue': 'Advanced'},
   ];
-  String _selectedCategoryKey = 'GRAMMAR';
+  List<String> _selectedCategoryKeys = ['GRAMMAR'];
   String _selectedLevelKey = 'BASIC';
   final TextEditingController _versionController = TextEditingController(
     text: 'v1.0',
@@ -71,12 +73,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   List<dynamic> _sections = [];
   int _activeStep = 1;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {
@@ -159,12 +156,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
               .toList();
 
           if (_dbCategories.isNotEmpty) {
-            final hasSelectedCat = _dbCategories.any(
-              (e) => e['paramKey'] == _selectedCategoryKey,
+            final hasSelectedCat = _selectedCategoryKeys.every(
+              (key) => _dbCategories.any((e) => e['paramKey'] == key),
             );
-            if (!hasSelectedCat) {
-              _selectedCategoryKey =
-                  _dbCategories.first['paramKey'] ?? 'GRAMMAR';
+            if (!hasSelectedCat || _selectedCategoryKeys.isEmpty) {
+              _selectedCategoryKeys =
+                  [_dbCategories.first['paramKey'] ?? 'GRAMMAR'];
             }
           }
           if (_dbLevels.isNotEmpty) {
@@ -212,10 +209,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _codeController.text = data['code'] ?? '';
           _priceController.text = data['price']?.toString() ?? '0';
           _objectivesController.text = data['objectives'] ?? '';
-
-          if (data['categoryKey'] != null &&
+          
+          if (data['categoryKeys'] != null && data['categoryKeys'] is List && (data['categoryKeys'] as List).isNotEmpty) {
+            _selectedCategoryKeys = List<String>.from((data['categoryKeys'] as List).map((e) => e.toString().toUpperCase()));
+          } else if (data['categoryKey'] != null &&
               data['categoryKey'].toString().isNotEmpty) {
-            _selectedCategoryKey = data['categoryKey'].toString().toUpperCase();
+            _selectedCategoryKeys = [data['categoryKey'].toString().toUpperCase()];
           }
           if (data['difficultyKey'] != null &&
               data['difficultyKey'].toString().isNotEmpty) {
@@ -323,7 +322,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ) ??
             0,
         'objectives': _objectivesController.text.trim(),
-        'categoryKey': _selectedCategoryKey,
+        'categoryKey': _selectedCategoryKeys.first,
+        'categoryKeys': _selectedCategoryKeys,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
         'sessions': _sections,
@@ -418,7 +418,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ) ??
             0,
         'objectives': _objectivesController.text.trim(),
-        'categoryKey': _selectedCategoryKey,
+        'categoryKey': _selectedCategoryKeys.first,
+        'categoryKeys': _selectedCategoryKeys,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
         'sessions': _sections,
@@ -1169,7 +1170,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _codeController,
+                      readOnly: true,
                       decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
                         hintText: 'e.g. ENG101',
                         hintStyle: const TextStyle(
                           color: Color(0xFF94A3B8),
@@ -1266,133 +1270,143 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ],
           ),
           const SizedBox(height: 20),
-          // Category & Academic Level side-by-side
-          Row(
+          // Categories (1-3)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Category *',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4B5563),
-                        fontFamily: 'Outfit',
+              Row(
+                children: [
+                  const Text(
+                    'Categories (Select 1-3) *',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4B5563),
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '(${_selectedCategoryKeys.length}/3)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _selectedCategoryKeys.isEmpty || _selectedCategoryKeys.length > 3
+                          ? Colors.red
+                          : const Color(0xFF20B486),
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _dbCategories.map((cat) {
+                  final key = cat['paramKey'] as String;
+                  final val = cat['paramValue'] as String;
+                  final isSelected = _selectedCategoryKeys.contains(key);
+                  return FilterChip(
+                    label: Text(val),
+                    selected: isSelected,
+                    selectedColor: const Color(0xFF20B486).withOpacity(0.15),
+                    checkmarkColor: const Color(0xFF20B486),
+                    labelStyle: TextStyle(
+                      color: isSelected ? const Color(0xFF20B486) : const Color(0xFF475569),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontFamily: 'Outfit',
+                      fontSize: 13,
+                    ),
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: isSelected ? const Color(0xFF20B486) : const Color(0xFFCBD5E1),
+                        width: isSelected ? 1.5 : 1.0,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategoryKey,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF20B486),
-                          ),
-                        ),
-                      ),
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 14,
-                        color: Color(0xFF1E293B),
-                      ),
-                      items: _dbCategories.map((dynamic item) {
-                        return DropdownMenuItem<String>(
-                          value: item['paramKey'] as String,
-                          child: Text(item['paramValue'] as String),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedCategoryKey = newValue;
-                          });
+                    onSelected: (bool selected) {
+                      setState(() {
+                        if (selected) {
+                          if (_selectedCategoryKeys.length < 3) {
+                            _selectedCategoryKeys.add(key);
+                          } else {
+                            ToastHelper.showError(context, 'Chỉ được chọn tối đa 3 thể loại.');
+                          }
+                        } else {
+                          if (_selectedCategoryKeys.length > 1) {
+                            _selectedCategoryKeys.remove(key);
+                          } else {
+                            ToastHelper.showError(context, 'Cần chọn ít nhất 1 thể loại.');
+                          }
                         }
-                      },
-                    ),
-                  ],
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Academic Level
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Academic Level',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4B5563),
+                  fontFamily: 'Outfit',
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Academic Level',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4B5563),
-                        fontFamily: 'Outfit',
-                      ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedLevelKey,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFE2E8F0),
                     ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedLevelKey,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF20B486),
-                          ),
-                        ),
-                      ),
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 14,
-                        color: Color(0xFF1E293B),
-                      ),
-                      items: _dbLevels.map((dynamic item) {
-                        return DropdownMenuItem<String>(
-                          value: item['paramKey'] as String,
-                          child: Text(item['paramValue'] as String),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedLevelKey = newValue;
-                          });
-                        }
-                      },
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFE2E8F0),
                     ),
-                  ],
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF20B486),
+                    ),
+                  ),
                 ),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
+                items: _dbLevels.map((dynamic item) {
+                  return DropdownMenuItem<String>(
+                    value: item['paramKey'] as String,
+                    child: Text(item['paramValue'] as String),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedLevelKey = newValue;
+                    });
+                  }
+                },
               ),
             ],
           ),
@@ -1410,8 +1424,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
           const SizedBox(height: 8),
           TextField(
             controller: _versionController,
+            readOnly: true,
             decoration: InputDecoration(
-              hintText: 'Enter version...',
+              filled: true,
+              fillColor: const Color(0xFFF1F5F9),
+              hintText: 'Auto-generated version',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 14,
@@ -1420,29 +1437,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
-              ),
-              suffixIcon: PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.arrow_drop_down,
-                  color: Color(0xFF64748B),
-                ),
-                onSelected: (value) {
-                  _versionController.text = value;
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'v1.0',
-                    child: Text('v1.0', style: TextStyle(fontFamily: 'Outfit')),
-                  ),
-                  const PopupMenuItem(
-                    value: 'v2.0',
-                    child: Text('v2.0', style: TextStyle(fontFamily: 'Outfit')),
-                  ),
-                  const PopupMenuItem(
-                    value: 'v3.0',
-                    child: Text('v3.0', style: TextStyle(fontFamily: 'Outfit')),
-                  ),
-                ],
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1460,7 +1454,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
             style: const TextStyle(
               fontFamily: 'Outfit',
               fontSize: 14,
-              color: Color(0xFF1E293B),
+              color: Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 20),

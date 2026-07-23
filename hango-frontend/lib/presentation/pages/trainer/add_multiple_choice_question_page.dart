@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/file_picker_helper.dart';
@@ -49,8 +50,12 @@ class _AddMultipleChoiceQuestionPageState
   // alias for UI label consistency
   final TextEditingController _aiTopicSeedController = TextEditingController();
   int _aiQuantity = 2;
+  int _aiDifficultyId = 14;
   final TrainerAiQuestionRepository _aiRepo = TrainerAiQuestionRepository();
   bool _isGeneratingByAi = false;
+
+  String? _selectedSkillType;
+  String? _selectedGroupType;
 
   // AI-generated state lock
   final GlobalKey _aiPanelKey = GlobalKey();
@@ -75,6 +80,9 @@ class _AddMultipleChoiceQuestionPageState
         sectionId: widget.sectionId,
         topicSeed: topicSeed,
         quantity: _aiQuantity,
+        difficultyId: _aiDifficultyId,
+        skillType: _selectedSkillType,
+        groupType: _selectedGroupType,
       );
 
       final group = resp.group;
@@ -143,7 +151,10 @@ class _AddMultipleChoiceQuestionPageState
       ToastHelper.showSuccess(context, 'AI generated group question loaded.');
     } catch (e) {
       debugPrint('Error generating MULTIPLE by AI: $e');
-      ToastHelper.showError(context, 'AI generate failed. Please try again.');
+      ToastHelper.showError(
+        context,
+        'AI generate failed: ${e.toString().replaceAll('Exception:', '').trim()}',
+      );
     } finally {
       setState(() {
         _isGeneratingByAi = false;
@@ -446,12 +457,12 @@ class _AddMultipleChoiceQuestionPageState
         'explanation': _hintController.text.trim(),
         'categoryId': 1,
         'skillParamId': 1,
-        'difficultyId': 14,
+        'difficultyId': _aiDifficultyId,
         'subQuestions': payloadSubQuestions,
       };
 
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/v1/trainer/questions/group'),
+        Uri.parse('${EnvConfig.v1BaseUrl}/trainer/questions/group'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -1074,47 +1085,197 @@ class _AddMultipleChoiceQuestionPageState
                           ),
                           const SizedBox(height: 12),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: TextEditingController(
-                                    text: '$_aiQuantity',
-                                  ),
-                                  enabled: false,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Quantity (subQuestions)',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.all(
-                                        Radius.circular(8),
-                                      ),
-                                    ),
-                                  ),
+                              const Text(
+                                'Quantity (subQuestions)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF64748B),
+                                  fontFamily: 'Outfit',
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              SizedBox(
-                                width: 72,
-                                child: TextField(
-                                  controller: TextEditingController(),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (v) {
-                                    final n = int.tryParse(v.trim());
-                                    if (n == null) return;
-                                    setState(() {
-                                      _aiQuantity = n.clamp(2, 10);
-                                    });
-                                  },
-                                  decoration: const InputDecoration(
-                                    hintText: '2..10',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.all(
-                                        Radius.circular(8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.white,
+                                ),
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove, size: 16, color: Color(0xFF64748B)),
+                                      onPressed: () {
+                                        setState(() {
+                                          if (_aiQuantity > 2) _aiQuantity--;
+                                        });
+                                      },
+                                    ),
+                                    Container(
+                                      width: 40,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        '$_aiQuantity',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1E293B),
+                                          fontFamily: 'Outfit',
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                    IconButton(
+                                      icon: const Icon(Icons.add, size: 16, color: Color(0xFF64748B)),
+                                      onPressed: () {
+                                        setState(() {
+                                          if (_aiQuantity < 10) _aiQuantity++;
+                                        });
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Difficulty Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                value: _aiDifficultyId,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Color(0xFF64748B),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 12, child: Text('Easy')),
+                                  DropdownMenuItem(value: 13, child: Text('Medium')),
+                                  DropdownMenuItem(value: 14, child: Text('Hard')),
+                                  DropdownMenuItem(value: 15, child: Text('Very Hard')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _aiDifficultyId = val;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // GroupType Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: _selectedGroupType,
+                                hint: const Text(
+                                  'Select Group Type (Optional)',
+                                  style: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 12,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                                items: [
+                                  'Notice Completion',
+                                  'Flyer Completion',
+                                  'Passage Arrangement',
+                                  'Information Gap Filling',
+                                  'Reading Comprehension'
+                                ].map((String val) {
+                                  return DropdownMenuItem<String>(
+                                    value: val,
+                                    child: Text(val),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedGroupType = val;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // SkillType Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: _selectedSkillType,
+                                hint: const Text(
+                                  'Select Skill Type (Optional)',
+                                  style: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 12,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                                items: [
+                                  'Conversation/Short Sentences',
+                                  'Synonym',
+                                  'Antonym',
+                                  'Pronunciation',
+                                  'Grammar',
+                                  'Sentence Meaning',
+                                  'Sentence Combining',
+                                  'Fill in Blank',
+                                  'Reading Comprehension',
+                                  'Arrangement'
+                                ].map((String val) {
+                                  return DropdownMenuItem<String>(
+                                    value: val,
+                                    child: Text(val),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedSkillType = val;
+                                  });
+                                },
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           ElevatedButton.icon(

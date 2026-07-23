@@ -73,8 +73,9 @@ public class CourseManagerDashboardController {
 
     @PostMapping("/courses/{id}/reject")
     @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
-    public ResponseEntity<?> rejectCourse(@PathVariable Long id) {
+    public ResponseEntity<?> rejectCourse(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body) {
         try {
+            // Reason could be used later: String reason = body != null ? body.get("reason") : null;
             courseManagerDashboardService.returnCourseToDraft(id);
             return ResponseEntity.ok("{\"message\": \"Course returned to draft\"}");
         } catch (Exception e) {

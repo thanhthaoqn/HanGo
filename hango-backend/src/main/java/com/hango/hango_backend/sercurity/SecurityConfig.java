@@ -76,6 +76,9 @@ public class SecurityConfig {
                         // đúng bản chất
                         .requestMatchers("/error").permitAll()
 
+                        // 💳 PayOS / VNPay callback: không có JWT, phải permitAll
+                        .requestMatchers("/api/v1/payment/payos-webhook", "/api/v1/payment/vnpay-return").permitAll()
+
                         .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());
@@ -90,7 +93,10 @@ public class SecurityConfig {
 
         // 🔥 ĐÃ SỬA: Thay vì dùng "*" gây lỗi khi kết hợp với AllowCredentials, ta chỉ
         // định đích danh cổng Flutter Web
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "https://hangog92.online",
+                "https://www.hangog92.online"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
         // Đảm bảo trình duyệt chấp nhận các Header truyền từ Flutter lên (kể cả Bearer
