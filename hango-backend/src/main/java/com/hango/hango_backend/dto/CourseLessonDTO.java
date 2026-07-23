@@ -19,4 +19,11 @@ public class CourseLessonDTO {
     private String pdfName;
     private String questionImageUrl;
     private Integer estimatedTime;
+
+    // Added fields
+    private String lessonCode;
+    private Integer mediaDurationSeconds;
+    private Long mediaSizeBytes;
+    private Integer estimatedTimeMinutes;
+    private String learningObjectives;
 }

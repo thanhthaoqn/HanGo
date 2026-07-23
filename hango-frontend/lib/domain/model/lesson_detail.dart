@@ -76,6 +76,11 @@ class LessonDetail {
   final List<QuizQuestion> questions;
   final bool isCompleted;
   final int? estimatedTime;
+  final String? lessonCode;
+  final int? mediaDurationSeconds;
+  final int? mediaSizeBytes;
+  final int? estimatedTimeMinutes;
+  final String? learningObjectives;
 
   LessonDetail({
     required this.id,
@@ -87,6 +92,11 @@ class LessonDetail {
     required this.questions,
     this.isCompleted = false,
     this.estimatedTime,
+    this.lessonCode,
+    this.mediaDurationSeconds,
+    this.mediaSizeBytes,
+    this.estimatedTimeMinutes,
+    this.learningObjectives,
   });
 
   factory LessonDetail.fromJson(Map<String, dynamic> json) {
@@ -106,6 +116,11 @@ class LessonDetail {
       questions: questions,
       isCompleted: json['isCompleted'] as bool? ?? false,
       estimatedTime: json['estimatedTime'] as int?,
+      lessonCode: json['lessonCode'] as String?,
+      mediaDurationSeconds: json['mediaDurationSeconds'] as int?,
+      mediaSizeBytes: json['mediaSizeBytes'] as int?,
+      estimatedTimeMinutes: json['estimatedTimeMinutes'] as int?,
+      learningObjectives: json['learningObjectives'] as String?,
     );
   }
 }

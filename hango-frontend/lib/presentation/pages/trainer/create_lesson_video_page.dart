@@ -149,8 +149,11 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
         setState(() {
           _titleController.text = detail.title;
           _videoUrlController.text = detail.content;
-          // Avoid referencing non-existing LessonDetail getter.
-          // Keep existing value from local draft/controller.
+          if (detail.lessonCode != null) _codeController.text = detail.lessonCode!;
+          if (detail.learningObjectives != null) _learningObjectivesController.text = detail.learningObjectives!;
+          if (detail.mediaDurationSeconds != null) _mediaDurationController.text = detail.mediaDurationSeconds.toString();
+          if (detail.mediaSizeBytes != null) _mediaSizeController.text = detail.mediaSizeBytes.toString();
+          if (detail.estimatedTimeMinutes != null) _estimatedTimeController.text = detail.estimatedTimeMinutes.toString();
         });
       }
     } catch (e) {
