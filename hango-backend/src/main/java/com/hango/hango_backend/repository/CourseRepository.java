@@ -2,6 +2,7 @@ package com.hango.hango_backend.repository;
 
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.dto.CourseSummaryDTO;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -84,4 +85,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<Course> findByParentIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long parentId);
 
     Optional<Course> findByIdAndParentIdIsNullAndDeletedAtIsNull(Long id);
+
+    @EntityGraph(attributePaths = {"categories", "category", "difficulty", "creator"})
+    @Query("SELECT c FROM Course c WHERE c.id = :id")
+    Optional<Course> findByIdWithDetails(@Param("id") Long id);
 }

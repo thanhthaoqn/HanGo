@@ -103,7 +103,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional(readOnly = true)
     public CourseDetailDTO getCourseDetail(Long id, Long currentUserId) {
-        Course course = courseRepository.findById(id)
+        Course course = courseRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 
         if (course.getDeletedAt() != null) {
@@ -153,9 +153,12 @@ public class CourseServiceImpl implements CourseService {
         }
  
         List<Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(id);
+        List<Lesson> allLessons = lessonRepository.findByCourseIdOrdered(id);
+        java.util.Map<Long, List<Lesson>> lessonsBySectionId = allLessons.stream()
+                .collect(Collectors.groupingBy(l -> l.getSection().getId()));
         
         List<CourseSessionDTO> sessionDTOs = sections.stream().map(section -> {
-            List<Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId());
+            List<Lesson> lessons = lessonsBySectionId.getOrDefault(section.getId(), new ArrayList<>());
             List<CourseLessonDTO> lessonDTOs = lessons.stream().map(lesson -> {
                     Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
                     int qCount = 0;
@@ -370,8 +373,12 @@ public class CourseServiceImpl implements CourseService {
         int totalLessons = 0;
         int carriedCompletedLessons = 0;
         List<Section> newSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(latestPublishedCourse.getId());
+        List<Lesson> latestAllLessons = lessonRepository.findByCourseIdOrdered(latestPublishedCourse.getId());
+        java.util.Map<Long, List<Lesson>> latestLessonsBySectionId = latestAllLessons.stream()
+                .collect(Collectors.groupingBy(l -> l.getSection().getId()));
+
         for (Section section : newSections) {
-            List<Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId());
+            List<Lesson> lessons = latestLessonsBySectionId.getOrDefault(section.getId(), new ArrayList<>());
             totalLessons += lessons.size();
             for (Lesson lesson : lessons) {
                 boolean shouldCarry = false;
