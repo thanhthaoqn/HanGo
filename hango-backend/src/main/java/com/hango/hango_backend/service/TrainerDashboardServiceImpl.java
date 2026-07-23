@@ -406,6 +406,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             // V2 links back to V1 via parentId for version tracking.
             String newVersion = incrementVersion(course.getVersion());
             String baseCode = course.getCode() != null ? course.getCode() : "COURSE";
+            if (baseCode.matches(".*-V\\d+$")) {
+                baseCode = baseCode.replaceAll("-V\\d+$", "");
+            }
             String newCode = baseCode + "-" + newVersion.toUpperCase();
             
             int suffix = 1;
@@ -906,128 +909,19 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("This course is not a draft version. Cannot approve.");
         }
 
+        // Publish the draft (V2)
+        draftCourse.setStatus("PUBLISHED");
+        draftCourse.setPublishedAt(java.time.LocalDateTime.now());
+        draftCourse.setLatestVersionId(draftCourse.getId());
+        courseRepository.save(draftCourse);
+
+        // Update original published version (V1) to point latestVersionId to V2 (keep V1 PUBLISHED)
         com.hango.hango_backend.entity.Course originalCourse = courseRepository.findById(draftCourse.getParentId())
                 .orElseThrow(() -> new RuntimeException("Original course (V1) not found"));
-                
-        mergeDraftIntoOriginal(draftCourse, originalCourse);
-    }
-
-    private void mergeDraftIntoOriginal(com.hango.hango_backend.entity.Course draft, com.hango.hango_backend.entity.Course original) {
-        original.setTitle(draft.getTitle());
-        original.setDescription(draft.getDescription());
-        original.setObjectives(draft.getObjectives());
-        original.setCategory(draft.getCategory());
-        if (draft.getCategories() != null) {
-            original.setCategories(new java.util.HashSet<>(draft.getCategories()));
-        } else {
-            original.setCategories(new java.util.HashSet<>());
+        if ("PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
+            originalCourse.setLatestVersionId(draftCourse.getId());
+            courseRepository.save(originalCourse);
         }
-        original.setDifficulty(draft.getDifficulty());
-        original.setThumbnailUrl(draft.getThumbnailUrl());
-        original.setPrice(draft.getPrice());
-        original.setVersion(draft.getVersion());
-        original.setEstimatedDuration(draft.getEstimatedDuration());
-        
-        courseRepository.save(original);
-
-        List<com.hango.hango_backend.entity.Section> draftSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(draft.getId());
-        List<com.hango.hango_backend.entity.Section> originalSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(original.getId());
-
-        for (com.hango.hango_backend.entity.Section draftSec : draftSections) {
-            com.hango.hango_backend.entity.Section match = originalSections.stream()
-                .filter(s -> s.getTitle() != null && s.getTitle().equalsIgnoreCase(draftSec.getTitle()))
-                .findFirst()
-                .orElse(null);
-                
-            if (match != null) {
-                match.setDescription(draftSec.getDescription());
-                match.setDisplayOrder(draftSec.getDisplayOrder());
-                match.setVersion(draftSec.getVersion());
-                sectionRepository.save(match);
-                
-                mergeLessons(draftSec, match);
-                originalSections.remove(match);
-            } else {
-                com.hango.hango_backend.entity.Section newSec = new com.hango.hango_backend.entity.Section();
-                newSec.setCourse(original);
-                newSec.setTitle(draftSec.getTitle());
-                newSec.setDescription(draftSec.getDescription());
-                newSec.setDisplayOrder(draftSec.getDisplayOrder());
-                newSec.setVersion(draftSec.getVersion());
-                com.hango.hango_backend.entity.Section savedSec = sectionRepository.save(newSec);
-                
-                mergeLessons(draftSec, savedSec);
-            }
-        }
-        
-        for (com.hango.hango_backend.entity.Section oldSec : originalSections) {
-            List<com.hango.hango_backend.entity.Lesson> oldLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(oldSec.getId());
-            lessonRepository.deleteAll(oldLessons);
-            sectionRepository.delete(oldSec);
-        }
-        
-        for (com.hango.hango_backend.entity.Section draftSec : draftSections) {
-            List<com.hango.hango_backend.entity.Lesson> dLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(draftSec.getId());
-            lessonRepository.deleteAll(dLessons);
-            sectionRepository.delete(draftSec);
-        }
-        courseRepository.delete(draft);
-    }
-    
-    private void mergeLessons(com.hango.hango_backend.entity.Section draftSec, com.hango.hango_backend.entity.Section targetSec) {
-        List<com.hango.hango_backend.entity.Lesson> draftLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(draftSec.getId());
-        List<com.hango.hango_backend.entity.Lesson> targetLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(targetSec.getId());
-        
-        for (com.hango.hango_backend.entity.Lesson draftLes : draftLessons) {
-            com.hango.hango_backend.entity.Lesson match = targetLessons.stream()
-                .filter(l -> l.getTitle() != null && l.getTitle().equalsIgnoreCase(draftLes.getTitle()))
-                .findFirst()
-                .orElse(null);
-                
-            if (match != null) {
-                match.setLessonType(draftLes.getLessonType());
-                match.setDisplayOrder(draftLes.getDisplayOrder());
-                match.setDescription(draftLes.getDescription());
-                match.setContent(draftLes.getContent());
-                match.setPdfName(draftLes.getPdfName());
-                match.setQuestionImageUrl(draftLes.getQuestionImageUrl());
-                match.setEstimatedTime(draftLes.getEstimatedTime());
-                match.setCode(draftLes.getCode());
-                match.setMediaDurationSeconds(draftLes.getMediaDurationSeconds());
-                match.setMediaSizeBytes(draftLes.getMediaSizeBytes());
-                match.setEstimatedTimeMinutes(draftLes.getEstimatedTimeMinutes());
-                match.setLearningObjectives(draftLes.getLearningObjectives());
-                match.setVersion(draftLes.getVersion());
-                match.setSkill(draftLes.getSkill());
-                match.setDifficulty(draftLes.getDifficulty());
-                match.setExam(draftLes.getExam());
-                lessonRepository.save(match);
-                targetLessons.remove(match);
-            } else {
-                com.hango.hango_backend.entity.Lesson newLes = new com.hango.hango_backend.entity.Lesson();
-                newLes.setSection(targetSec);
-                newLes.setTitle(draftLes.getTitle());
-                newLes.setLessonType(draftLes.getLessonType());
-                newLes.setDisplayOrder(draftLes.getDisplayOrder());
-                newLes.setDescription(draftLes.getDescription());
-                newLes.setContent(draftLes.getContent());
-                newLes.setPdfName(draftLes.getPdfName());
-                newLes.setQuestionImageUrl(draftLes.getQuestionImageUrl());
-                newLes.setEstimatedTime(draftLes.getEstimatedTime());
-                newLes.setCode(draftLes.getCode());
-                newLes.setMediaDurationSeconds(draftLes.getMediaDurationSeconds());
-                newLes.setMediaSizeBytes(draftLes.getMediaSizeBytes());
-                newLes.setEstimatedTimeMinutes(draftLes.getEstimatedTimeMinutes());
-                newLes.setLearningObjectives(draftLes.getLearningObjectives());
-                newLes.setVersion(draftLes.getVersion());
-                newLes.setSkill(draftLes.getSkill());
-                newLes.setDifficulty(draftLes.getDifficulty());
-                newLes.setExam(draftLes.getExam());
-                lessonRepository.save(newLes);
-            }
-        }
-        
-        lessonRepository.deleteAll(targetLessons);
     }
 
     @Override
