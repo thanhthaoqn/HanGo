@@ -158,7 +158,8 @@ public class ExamImportController {
 
                     Long skillParamId = resolveSystemParam(skillStr);
                     Long difficultyId = resolveSystemParam(diffStr);
-                    Long categoryId = resolveCategory(groupTypeStr);
+                    Long groupTypeId = resolveSystemParam(groupTypeStr);
+                    Long categoryId = null; // Excel does not provide category
 
                     if (skillParamId == null)
                         throw new IllegalArgumentException(
@@ -168,7 +169,7 @@ public class ExamImportController {
                                 "Invalid Difficulty '" + diffStr + "' at Exam " + currentExamCode);
 
                     if (isGroup) {
-                        if (categoryId == null)
+                        if (groupTypeId == null)
                             throw new IllegalArgumentException(
                                     "Invalid Group Type '" + groupTypeStr + "' for passage at Exam " + currentExamCode);
 
@@ -176,9 +177,10 @@ public class ExamImportController {
                         GeneratedKeyHolder kh = new GeneratedKeyHolder();
                         jdbcTemplate.update(con -> {
                             var ps = con.prepareStatement(
-                                    "INSERT INTO question_groups (context_text, group_type_param_id) VALUES (?, 17)",
+                                    "INSERT INTO question_groups (context_text, group_type_param_id) VALUES (?, ?)",
                                     java.sql.Statement.RETURN_GENERATED_KEYS);
                             ps.setString(1, passageText);
+                            ps.setLong(2, groupTypeId);
                             return ps;
                         }, kh);
                         Number k = kh.getKey();
