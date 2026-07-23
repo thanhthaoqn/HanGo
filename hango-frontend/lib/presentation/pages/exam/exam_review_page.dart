@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../domain/entities/exam.dart';
+import '../../../data/repositories/exam_repository.dart';
 import '../../widgets/shared_footer.dart';
 import '../../widgets/shared_header.dart';
 
@@ -18,84 +19,13 @@ class ExamReviewPage extends StatefulWidget {
 }
 
 class _ExamReviewPageState extends State<ExamReviewPage> {
-  late List<Map<String, dynamic>> _examQuestions;
+  List<Map<String, dynamic>> _examQuestions = [];
   late Map<int, int> _userAnswers;
+  bool _isLoadingQuestions = true;
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _questionKeys = {};
   final ValueNotifier<double> _sidebarOffsetY = ValueNotifier<double>(0.0);
 
-  final List<Map<String, dynamic>> _baseQuestions = [
-    {
-      "content": "The book _______ you lent me yesterday is very interesting.",
-      "options": ["who", "whom", "which", "whose"],
-      "correctIndex": 2,
-      "skill": "Grammar",
-      "explanation": "'Which' is used as a relative pronoun to refer to things/objects (the book)."
-    },
-    {
-      "content": "If I _______ you, I would study harder for the final exam.",
-      "options": ["am", "was", "were", "would be"],
-      "correctIndex": 2,
-      "skill": "Grammar",
-      "explanation": "In Type 2 conditional sentences, 'were' is used for all subjects in the 'if' clause."
-    },
-    {
-      "content": "She has been working here _______ she graduated from university.",
-      "options": ["for", "since", "in", "during"],
-      "correctIndex": 1,
-      "skill": "Vocabulary",
-      "explanation": "'Since' is used to indicate a starting point in time for Present Perfect tense."
-    },
-    {
-      "content": "The weather was _______ bad that we had to cancel the outdoor picnic.",
-      "options": ["such", "so", "very", "too"],
-      "correctIndex": 1,
-      "skill": "Grammar",
-      "explanation": "The structure is 'so + adjective + that + clause' (so bad that...)."
-    },
-    {
-      "content": "By the time the police arrived, the bank robbers _______.",
-      "options": ["escaped", "have escaped", "had escaped", "escape"],
-      "correctIndex": 2,
-      "skill": "Grammar",
-      "explanation": "The past perfect 'had escaped' represents an action completed before another past action (arrived)."
-    },
-    {
-      "content": "He is very keen _______ learning foreign languages.",
-      "options": ["on", "in", "at", "for"],
-      "correctIndex": 0,
-      "skill": "Vocabulary",
-      "explanation": "The adjective phrase is 'keen on' doing something (interested in)."
-    },
-    {
-      "content": "The project was completed _______ schedule, which pleased the management.",
-      "options": ["ahead of", "in front of", "prior to", "before"],
-      "correctIndex": 0,
-      "skill": "Vocabulary",
-      "explanation": "'Ahead of schedule' is a standard idiom meaning faster or earlier than planned."
-    },
-    {
-      "content": "Could you please _______ me a favor and carry this heavy suitcase?",
-      "options": ["make", "do", "give", "take"],
-      "correctIndex": 1,
-      "skill": "Vocabulary",
-      "explanation": "The standard collocation is 'do someone a favor'."
-    },
-    {
-      "content": "Many species are in danger of extinction _______ habitat loss.",
-      "options": ["because", "despite", "due to", "instead of"],
-      "correctIndex": 2,
-      "skill": "Reading Comprehension",
-      "explanation": "'Due to' is a preposition meaning 'because of', followed by a noun phrase."
-    },
-    {
-      "content": "The novel is widely considered a masterpiece, _______ it was written in only three weeks.",
-      "options": ["although", "because", "since", "despite"],
-      "correctIndex": 0,
-      "skill": "Reading Comprehension",
-      "explanation": "'Although' introduces a concession clause contradicting the first statement."
-    }
-  ];
 
   @override
   void initState() {
@@ -109,23 +39,28 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
       _userAnswers = {};
     }
 
-    // Generate same question set as take_exam_page.dart
-    int targetCount = widget.exam.questionCount > 0 ? widget.exam.questionCount : 10;
-    _examQuestions = [];
-    for (int i = 0; i < targetCount; i++) {
-      final base = _baseQuestions[i % _baseQuestions.length];
-      _examQuestions.add({
-        "id": i + 1,
-        "content": base['content'],
-        "options": base['options'],
-        "correctIndex": base['correctIndex'],
-        "skill": base['skill'],
-        "explanation": base['explanation'],
-      });
-      _questionKeys[i] = GlobalKey();
-    }
-
+    _fetchQuestions();
     _scrollController.addListener(_updateSidebarOffset);
+  }
+
+  Future<void> _fetchQuestions() async {
+    try {
+      final repository = ExamRepository();
+      final questions = await repository.fetchExamQuestions(widget.exam.id);
+      
+      setState(() {
+        _examQuestions = questions;
+        for (int i = 0; i < _examQuestions.length; i++) {
+          _questionKeys[i] = GlobalKey();
+        }
+        _isLoadingQuestions = false;
+      });
+    } catch (e) {
+      debugPrint("Error fetching exam questions: $e");
+      setState(() {
+        _isLoadingQuestions = false;
+      });
+    }
   }
 
   @override
@@ -176,8 +111,12 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
-      body: SingleChildScrollView(
-        controller: _scrollController,
+      body: _isLoadingQuestions
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+            )
+          : SingleChildScrollView(
+              controller: _scrollController,
         child: Column(
           children: [
             Center(
