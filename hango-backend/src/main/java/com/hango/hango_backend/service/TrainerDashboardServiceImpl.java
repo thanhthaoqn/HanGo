@@ -56,11 +56,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         List<TrainerCourseDetailProjection> baseProjections = courseRepository.findTrainerCoursesDetailBase(trainerId, "ALL", null);
-        Map<String, List<TrainerCourseDetailProjection>> groupedByCode = baseProjections.stream()
-                .filter(p -> p.getCode() != null)
-                .collect(Collectors.groupingBy(TrainerCourseDetailProjection::getCode));
+        Map<Long, List<TrainerCourseDetailProjection>> groupedById = baseProjections.stream()
+                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
 
-        List<TrainerCourseDTO> courses = groupedByCode.values().stream()
+        List<TrainerCourseDTO> courses = groupedById.values().stream()
                 .map(group -> {
                     TrainerCourseDetailProjection latest = group.stream()
                             .max((p1, p2) -> {
@@ -173,63 +172,76 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         Long trainerId = user.getId();
 
-        // 1. Status Counts
-        long allCount = courseRepository.countByCreatorIdAndDeletedAtIsNull(trainerId);
-        long draftCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "DRAFT");
-        long publishedCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "PUBLISHED");
-        long hiddenCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "HIDDEN");
-        long pendingCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "PENDING_APPROVAL");
+        // 1. Fetch All courses for the trainer
+        List<TrainerCourseDetailProjection> allProjections = courseRepository.findTrainerCoursesDetailBase(trainerId, "ALL", null);
 
-        // 2. Fetch Base courses
-        String searchParam = (search == null || search.trim().isEmpty()) ? null : search.trim();
-        List<TrainerCourseDetailProjection> projections = courseRepository.findTrainerCoursesDetailBase(trainerId, status, searchParam);
+        // 2. Group by Root ID and get the Latest Version for each course
+        Map<Long, List<TrainerCourseDetailProjection>> groupedById = allProjections.stream()
+                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
 
-        // 3. Time Period Filter in Java
-        if (timePeriod != null && !timePeriod.equalsIgnoreCase("ALL")) {
-            LocalDateTime cutoff = LocalDateTime.now();
-            if (timePeriod.equalsIgnoreCase("THIS_WEEK")) {
-                cutoff = cutoff.minusWeeks(1);
-            } else if (timePeriod.equalsIgnoreCase("THIS_MONTH")) {
-                cutoff = cutoff.minusMonths(1);
-            }
-            final LocalDateTime finalCutoff = cutoff;
-            projections = projections.stream()
-                    .filter(p -> p.getCreatedAt() != null && p.getCreatedAt().isAfter(finalCutoff))
-                    .collect(Collectors.toList());
-        }
+        List<TrainerCourseDetailProjection> latestProjections = groupedById.values().stream()
+                .map(group -> group.stream()
+                        .max((p1, p2) -> {
+                            if (p1.getCreatedAt() == null) return -1;
+                            if (p2.getCreatedAt() == null) return 1;
+                            return p1.getCreatedAt().compareTo(p2.getCreatedAt());
+                        }).orElse(group.get(0)))
+                .collect(Collectors.toList());
 
-        // 4. Sort in Java
-        List<TrainerCourseDetailProjection> mutableProjections = new ArrayList<>(projections);
+        // 3. Status Counts based on the Latest Versions
+        long allCount = latestProjections.size();
+        long draftCount = latestProjections.stream().filter(p -> "DRAFT".equalsIgnoreCase(p.getStatus())).count();
+        long publishedCount = latestProjections.stream().filter(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus())).count();
+        long hiddenCount = latestProjections.stream().filter(p -> "HIDDEN".equalsIgnoreCase(p.getStatus())).count();
+        long pendingCount = latestProjections.stream().filter(p -> "PENDING_APPROVAL".equalsIgnoreCase(p.getStatus())).count();
+
+        // 4. Apply Filters (Status, Search, Time Period)
+        String searchParam = (search == null || search.trim().isEmpty()) ? null : search.trim().toLowerCase();
+        
+        List<TrainerCourseDetailProjection> filteredProjections = latestProjections.stream()
+                .filter(p -> status.equalsIgnoreCase("ALL") || status.equalsIgnoreCase(p.getStatus()))
+                .filter(p -> searchParam == null || (p.getTitle() != null && p.getTitle().toLowerCase().contains(searchParam)))
+                .filter(p -> {
+                    if (timePeriod == null || timePeriod.equalsIgnoreCase("ALL")) return true;
+                    if (p.getCreatedAt() == null) return false;
+                    LocalDateTime cutoff = LocalDateTime.now();
+                    if (timePeriod.equalsIgnoreCase("THIS_WEEK")) cutoff = cutoff.minusWeeks(1);
+                    else if (timePeriod.equalsIgnoreCase("THIS_MONTH")) cutoff = cutoff.minusMonths(1);
+                    return p.getCreatedAt().isAfter(cutoff);
+                })
+                .collect(Collectors.toList());
+
+        // 5. Sort
         if (sortBy != null) {
             if (sortBy.equalsIgnoreCase("OLDEST")) {
-                mutableProjections.sort((p1, p2) -> {
+                filteredProjections.sort((p1, p2) -> {
                     if (p1.getCreatedAt() == null) return 1;
                     if (p2.getCreatedAt() == null) return -1;
                     return p1.getCreatedAt().compareTo(p2.getCreatedAt());
                 });
             } else if (sortBy.equalsIgnoreCase("ALPHABETICAL")) {
-                mutableProjections.sort((p1, p2) -> {
+                filteredProjections.sort((p1, p2) -> {
                     String t1 = p1.getTitle() != null ? p1.getTitle() : "";
                     String t2 = p2.getTitle() != null ? p2.getTitle() : "";
                     return t1.compareToIgnoreCase(t2);
                 });
             } else { // "NEWEST"
-                mutableProjections.sort((p1, p2) -> {
+                filteredProjections.sort((p1, p2) -> {
                     if (p1.getCreatedAt() == null) return 1;
                     if (p2.getCreatedAt() == null) return -1;
                     return p2.getCreatedAt().compareTo(p1.getCreatedAt());
                 });
             }
         } else {
-            mutableProjections.sort((p1, p2) -> {
+            filteredProjections.sort((p1, p2) -> {
                 if (p1.getCreatedAt() == null) return 1;
                 if (p2.getCreatedAt() == null) return -1;
                 return p2.getCreatedAt().compareTo(p1.getCreatedAt());
             });
         }
 
-        // 5. Map to DTOs
-        List<TrainerCourseDetailDTO> courses = mutableProjections.stream().map(p -> {
+        // 6. Map to DTOs
+        List<TrainerCourseDetailDTO> courses = filteredProjections.stream().map(p -> {
             List<String> catKeys = new ArrayList<>();
             List<String> catNames = new ArrayList<>();
             com.hango.hango_backend.entity.Course c = courseRepository.findById(p.getId()).orElse(null);
@@ -393,26 +405,16 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             // Clone V1 → V2: Create a new DRAFT version preserving the original published course (V1).
             // V2 links back to V1 via parentId for version tracking.
             String newVersion = incrementVersion(course.getVersion());
-            String baseCode = course.getCode() != null ? course.getCode().replaceAll("\\s+$", "") : "";
+            String baseCode = course.getCode() != null ? course.getCode() : "COURSE";
+            String newCode = baseCode + "-" + newVersion.toUpperCase();
             
-            // Strip any existing version suffix (e.g. -V2) to prevent COURSE-1-V2-V3
-            if (baseCode.matches(".*-V\\d+")) {
-                baseCode = baseCode.replaceAll("-V\\d+$", "");
-            }
-            
-            String newCode = "";
-            if (!baseCode.isEmpty()) {
-                newCode = baseCode + "-" + newVersion.toUpperCase();
-            }
-            
-            // Resolve unique constraint conflicts if code was used by a soft-deleted course
             int suffix = 1;
             String candidateCode = newCode;
-            while (candidateCode != null && !candidateCode.isEmpty() && courseRepository.existsByCodeIgnoreCase(candidateCode)) {
-                candidateCode = newCode + "_" + suffix;
-                suffix++;
+            while (courseRepository.existsByCodeIgnoreCase(candidateCode)) {
+                candidateCode = newCode + "_" + suffix++;
             }
             newCode = candidateCode;
+            
             com.hango.hango_backend.entity.Course draftCourse = com.hango.hango_backend.entity.Course.builder()
                     .title(request.getTitle())
                     .code(newCode)
@@ -893,9 +895,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Override
     @Transactional
     public void approveTrainerCourse(Long id, String email) {
-        // This approves a PENDING_APPROVAL draft (V2) submitted by a trainer.
-        // V2 becomes PUBLISHED, and V1 remains PUBLISHED so existing learners can continue viewing it.
-        // V1.latestVersionId is set to V2.id so existing learners are notified.
         com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 
@@ -907,19 +906,128 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("This course is not a draft version. Cannot approve.");
         }
 
-        // Publish the draft (V2)
-        draftCourse.setStatus("PUBLISHED");
-        draftCourse.setPublishedAt(java.time.LocalDateTime.now());
-        draftCourse.setLatestVersionId(draftCourse.getId());
-        courseRepository.save(draftCourse);
-
-        // Update original published version (V1) to point latestVersionId to V2 (keep V1 PUBLISHED)
         com.hango.hango_backend.entity.Course originalCourse = courseRepository.findById(draftCourse.getParentId())
                 .orElseThrow(() -> new RuntimeException("Original course (V1) not found"));
-        if ("PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
-            originalCourse.setLatestVersionId(draftCourse.getId());
-            courseRepository.save(originalCourse);
+                
+        mergeDraftIntoOriginal(draftCourse, originalCourse);
+    }
+
+    private void mergeDraftIntoOriginal(com.hango.hango_backend.entity.Course draft, com.hango.hango_backend.entity.Course original) {
+        original.setTitle(draft.getTitle());
+        original.setDescription(draft.getDescription());
+        original.setObjectives(draft.getObjectives());
+        original.setCategory(draft.getCategory());
+        if (draft.getCategories() != null) {
+            original.setCategories(new java.util.HashSet<>(draft.getCategories()));
+        } else {
+            original.setCategories(new java.util.HashSet<>());
         }
+        original.setDifficulty(draft.getDifficulty());
+        original.setThumbnailUrl(draft.getThumbnailUrl());
+        original.setPrice(draft.getPrice());
+        original.setVersion(draft.getVersion());
+        original.setEstimatedDuration(draft.getEstimatedDuration());
+        
+        courseRepository.save(original);
+
+        List<com.hango.hango_backend.entity.Section> draftSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(draft.getId());
+        List<com.hango.hango_backend.entity.Section> originalSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(original.getId());
+
+        for (com.hango.hango_backend.entity.Section draftSec : draftSections) {
+            com.hango.hango_backend.entity.Section match = originalSections.stream()
+                .filter(s -> s.getTitle() != null && s.getTitle().equalsIgnoreCase(draftSec.getTitle()))
+                .findFirst()
+                .orElse(null);
+                
+            if (match != null) {
+                match.setDescription(draftSec.getDescription());
+                match.setDisplayOrder(draftSec.getDisplayOrder());
+                match.setVersion(draftSec.getVersion());
+                sectionRepository.save(match);
+                
+                mergeLessons(draftSec, match);
+                originalSections.remove(match);
+            } else {
+                com.hango.hango_backend.entity.Section newSec = new com.hango.hango_backend.entity.Section();
+                newSec.setCourse(original);
+                newSec.setTitle(draftSec.getTitle());
+                newSec.setDescription(draftSec.getDescription());
+                newSec.setDisplayOrder(draftSec.getDisplayOrder());
+                newSec.setVersion(draftSec.getVersion());
+                com.hango.hango_backend.entity.Section savedSec = sectionRepository.save(newSec);
+                
+                mergeLessons(draftSec, savedSec);
+            }
+        }
+        
+        for (com.hango.hango_backend.entity.Section oldSec : originalSections) {
+            List<com.hango.hango_backend.entity.Lesson> oldLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(oldSec.getId());
+            lessonRepository.deleteAll(oldLessons);
+            sectionRepository.delete(oldSec);
+        }
+        
+        for (com.hango.hango_backend.entity.Section draftSec : draftSections) {
+            List<com.hango.hango_backend.entity.Lesson> dLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(draftSec.getId());
+            lessonRepository.deleteAll(dLessons);
+            sectionRepository.delete(draftSec);
+        }
+        courseRepository.delete(draft);
+    }
+    
+    private void mergeLessons(com.hango.hango_backend.entity.Section draftSec, com.hango.hango_backend.entity.Section targetSec) {
+        List<com.hango.hango_backend.entity.Lesson> draftLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(draftSec.getId());
+        List<com.hango.hango_backend.entity.Lesson> targetLessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(targetSec.getId());
+        
+        for (com.hango.hango_backend.entity.Lesson draftLes : draftLessons) {
+            com.hango.hango_backend.entity.Lesson match = targetLessons.stream()
+                .filter(l -> l.getTitle() != null && l.getTitle().equalsIgnoreCase(draftLes.getTitle()))
+                .findFirst()
+                .orElse(null);
+                
+            if (match != null) {
+                match.setLessonType(draftLes.getLessonType());
+                match.setDisplayOrder(draftLes.getDisplayOrder());
+                match.setDescription(draftLes.getDescription());
+                match.setContent(draftLes.getContent());
+                match.setPdfName(draftLes.getPdfName());
+                match.setQuestionImageUrl(draftLes.getQuestionImageUrl());
+                match.setEstimatedTime(draftLes.getEstimatedTime());
+                match.setCode(draftLes.getCode());
+                match.setMediaDurationSeconds(draftLes.getMediaDurationSeconds());
+                match.setMediaSizeBytes(draftLes.getMediaSizeBytes());
+                match.setEstimatedTimeMinutes(draftLes.getEstimatedTimeMinutes());
+                match.setLearningObjectives(draftLes.getLearningObjectives());
+                match.setVersion(draftLes.getVersion());
+                match.setSkill(draftLes.getSkill());
+                match.setDifficulty(draftLes.getDifficulty());
+                match.setExam(draftLes.getExam());
+                lessonRepository.save(match);
+                targetLessons.remove(match);
+            } else {
+                com.hango.hango_backend.entity.Lesson newLes = new com.hango.hango_backend.entity.Lesson();
+                newLes.setSection(targetSec);
+                newLes.setTitle(draftLes.getTitle());
+                newLes.setLessonType(draftLes.getLessonType());
+                newLes.setDisplayOrder(draftLes.getDisplayOrder());
+                newLes.setDescription(draftLes.getDescription());
+                newLes.setContent(draftLes.getContent());
+                newLes.setPdfName(draftLes.getPdfName());
+                newLes.setQuestionImageUrl(draftLes.getQuestionImageUrl());
+                newLes.setEstimatedTime(draftLes.getEstimatedTime());
+                newLes.setCode(draftLes.getCode());
+                newLes.setMediaDurationSeconds(draftLes.getMediaDurationSeconds());
+                newLes.setMediaSizeBytes(draftLes.getMediaSizeBytes());
+                newLes.setEstimatedTimeMinutes(draftLes.getEstimatedTimeMinutes());
+                newLes.setLearningObjectives(draftLes.getLearningObjectives());
+                newLes.setVersion(draftLes.getVersion());
+                newLes.setSkill(draftLes.getSkill());
+                newLes.setDifficulty(draftLes.getDifficulty());
+                newLes.setExam(draftLes.getExam());
+                lessonRepository.save(newLes);
+            }
+        }
+        
+        lessonRepository.deleteAll(targetLessons);
     }
 
     @Override
