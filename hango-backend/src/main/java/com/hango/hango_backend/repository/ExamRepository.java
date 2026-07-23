@@ -18,4 +18,8 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     long countByCreatedByIdAndDeletedAtIsNull(@Param("createdById") Long createdById);
 
     List<Exam> findByDeletedAtIsNullOrderByCreatedAtDesc();
+
+    List<Exam> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String status);
+
+    List<Exam> findByStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(List<String> statuses);
 }

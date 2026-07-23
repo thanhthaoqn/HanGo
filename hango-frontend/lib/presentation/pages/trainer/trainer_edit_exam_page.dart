@@ -13,6 +13,7 @@ import 'trainer_dashboard_page.dart';
 import 'trainer_exams_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../../../services/hango_api.dart';
+import '../../../data/services/course_manager_api.dart';
 
 class OptionState {
   TextEditingController textController = TextEditingController();
@@ -155,6 +156,75 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
         );
       },
     );
+  }
+
+  void _showRejectDialog() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Reject Exam', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Please provide a reason for rejecting this exam:', style: TextStyle(fontFamily: 'Outfit')),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter reason...',
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (reasonController.text.trim().isEmpty) {
+                  ToastHelper.show(context, 'Reason is required', isError: true);
+                  return;
+                }
+                Navigator.pop(context);
+                try {
+                  await CourseManagerApi().rejectExam(widget.examId, reason: reasonController.text.trim());
+                  if (mounted) {
+                    ToastHelper.show(context, 'Exam rejected successfully!');
+                    Navigator.pop(context); // Go back to list
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ToastHelper.show(context, 'Error rejecting exam: $e', isError: true);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              child: const Text('Reject', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _publishExamAsManager() async {
+    try {
+      await CourseManagerApi().publishExam(widget.examId);
+      if (mounted) {
+        ToastHelper.show(context, 'Exam approved and published successfully!');
+        Navigator.pop(context); // Go back to list
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.show(context, 'Error approving exam: $e', isError: true);
+      }
+    }
   }
 
   void _addBlockListeners(QuestionBlockState b) {
@@ -519,7 +589,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
     setState(() => _isSubmitting = true);
     try {
       final api = await _getApi();
-      await api.updateExamStatus(widget.examId, 'SUBMITTED');
+      await api.updateExamStatus(widget.examId, 'PENDING_APPROVAL');
       if (mounted) {
         ToastHelper.show(context, 'Exam submitted for review successfully!');
         Navigator.pop(context);
@@ -799,9 +869,9 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                               ),
                       ),
                     ] else if (widget.courseManagerActionStatus != null) ...[
-                      if (widget.courseManagerActionStatus == 'SUBMITTED' || widget.courseManagerActionStatus == 'PENDING') ...[
+                      if (widget.courseManagerActionStatus == 'PENDING_APPROVAL' || widget.courseManagerActionStatus == 'PENDING' || widget.courseManagerActionStatus == 'SUBMITTED') ...[
                         ElevatedButton.icon(
-                          onPressed: () => _showActionDialog('Reject', 'REJECTED', const Color(0xFFEF4444)),
+                          onPressed: _showRejectDialog,
                           icon: const Icon(Icons.close, color: Colors.white, size: 18),
                           label: const Text('Reject', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
                           style: ElevatedButton.styleFrom(
@@ -813,7 +883,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          onPressed: () => _showActionDialog('Approve', 'APPROVED', const Color(0xFF38C9A6)),
+                          onPressed: _publishExamAsManager,
                           icon: const Icon(Icons.check, color: Colors.white, size: 18),
                           label: const Text('Approve', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
                           style: ElevatedButton.styleFrom(

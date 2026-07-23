@@ -164,6 +164,52 @@ class CourseManagerApi {
     }
   }
 
+  Future<List<dynamic>> getExamsForReview(String status) async {
+    final response = await _get('/exams/review?status=$status');
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return decoded;
+    }
+    throw Exception('Failed to get exams for review: ${response.statusCode} ${response.body}');
+  }
+
+  Future<void> publishExam(int examId) async {
+    final response = await _post('/exams/$examId/publish');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to publish exam: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  Future<void> rejectExam(int examId, {String? reason}) async {
+    final response = await _post(
+      '/exams/$examId/reject',
+      body: reason != null && reason.isNotEmpty ? jsonEncode({'reason': reason}) : null,
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to reject exam: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  Future<dynamic> getExamDetails(int examId) async {
+    // Note: uses trainer endpoint because COURSE_MANAGER role is allowed to call it to view full exam details
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    
+    final uri = Uri.parse('${EnvConfig.apiBaseUrl}/api/v1/trainer/exams/$examId/questions');
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    throw Exception('Failed to get exam details: ${response.statusCode} ${response.body}');
+  }
+
   Future<List<Map<String, dynamic>>> getExamMatrices() async {
     final response = await _get('/matrices');
 
