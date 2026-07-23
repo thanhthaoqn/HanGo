@@ -71,6 +71,30 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
                 systemParameterRepository.save(param);
             }
         }
-        log.info("Successfully recreated COURSE_CATEGORY, SKILL_TYPE, and SKILL in system_parameters.");
+        
+        // --- Bắt đầu cập nhật GROUP_TYPE ---
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
+        jdbcTemplate.update("DELETE FROM system_parameters WHERE param_type = 'GROUP_TYPE'");
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+
+        Map<String, String> newGroupTypes = new LinkedHashMap<>();
+        newGroupTypes.put("NOTICE_COMPLETION", "Read and Fill in a Notice");
+        newGroupTypes.put("LEAFLET_ADVERTISEMENT", "Read and Fill in a Leaflet/Advertisement");
+        newGroupTypes.put("PARAGRAPH_TEXT_REORDERING", "Paragraph/Text Reordering");
+        newGroupTypes.put("GUIDED_CLOZE_TEST", "Guided Cloze Test");
+        newGroupTypes.put("READING_COMPREHENSION_8_QUESTIONS", "Reading Comprehension - 8 questions");
+        newGroupTypes.put("READING_COMPREHENSION_10_QUESTIONS", "Reading Comprehension - 10 questions");
+
+        for (Map.Entry<String, String> entry : newGroupTypes.entrySet()) {
+            SystemParameter param = SystemParameter.builder()
+                    .paramType("GROUP_TYPE")
+                    .paramKey(entry.getKey())
+                    .paramValue(entry.getValue())
+                    .isActive(true)
+                    .build();
+            systemParameterRepository.save(param);
+        }
+        
+        log.info("Successfully recreated COURSE_CATEGORY, SKILL_TYPE, SKILL, and GROUP_TYPE in system_parameters.");
     }
 }

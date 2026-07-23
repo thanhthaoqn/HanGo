@@ -1206,11 +1206,12 @@ class _AddMultipleChoiceQuestionPageState
                                 ),
                                 icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
                                 items: [
-                                  'Notice Completion',
-                                  'Flyer Completion',
-                                  'Passage Arrangement',
-                                  'Information Gap Filling',
-                                  'Reading Comprehension'
+                                  'Read and Fill in a Notice',
+                                  'Read and Fill in a Leaflet/Advertisement',
+                                  'Paragraph/Text Reordering',
+                                  'Guided Cloze Test',
+                                  'Reading Comprehension - 8 questions',
+                                  'Reading Comprehension - 10 questions'
                                 ].map((String val) {
                                   return DropdownMenuItem<String>(
                                     value: val,
