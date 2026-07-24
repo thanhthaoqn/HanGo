@@ -157,6 +157,7 @@ Backend **tự đánh giá quy mô Course** (số Lesson, số Quiz, thời lư�
 | Enroll / Purchase / Continue Course | ❌ | ✅ | ✅ (Learner mode) | ❌ | ❌ |
 | Attempt Quiz / Exam | ❌ | ✅ | ✅ (Learner mode) | ❌ | ❌ |
 | Rate Course | ❌ | ✅ | ✅ (Learner mode) | ❌ | ❌ |
+| View Course Rating Notification (low rating / low average) | ❌ | ❌ | ❌ | ✅ | ❌ |
 | View Recommendation | ❌ | ✅ | ✅ (Learner mode) | ❌ | ❌ |
 | Comment / Reply (Lesson & Quiz) | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Moderate Comment | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -294,7 +295,7 @@ FE-14 Notification
 
 | ID | Requirement |
 |---|---|
-| FR-AUTH-01 | Đăng ký tài khoản bằng email, mật khẩu, họ tên. |
+| FR-AUTH-01 | Đăng ký tài khoản bằng email, mật khẩu, họ tên; có thể chọn role **Learner** hoặc **Trainer** ngay lúc đăng ký (`RegisterRequest.role`, whitelist LEARNER/TRAINER — cập nhật 2026-07-17 để khớp code đã triển khai, xem BR-TRN-01). |
 | FR-AUTH-02 | Gửi **OTP** qua email; tài khoản chỉ active sau khi xác minh OTP thành công (**bắt buộc**). |
 | FR-AUTH-03 | Đăng nhập bằng email + mật khẩu; cấp **access token + refresh token** (JWT). |
 | FR-AUTH-04 | Quên mật khẩu → nhận OTP qua email. |
@@ -322,14 +323,14 @@ FE-14 Notification
 
 | ID | Requirement |
 |---|---|
-| FR-RBAC-01 | Xem danh sách tài khoản; tìm kiếm & lọc theo role/status. |
-| FR-RBAC-02 | Activate / Deactivate (lock/unlock) tài khoản. |
-| FR-RBAC-03 | Tạo tài khoản thủ công (ví dụ Course Manager). |
-| FR-RBAC-04 | Gán / cập nhật role. |
-| FR-RBAC-05 | Xem & cấu hình permission theo role. 📌 *(tĩnh hay động)* |
-| FR-RBAC-06 | Dashboard & Analytics toàn nền tảng (user, course, enrollment, doanh thu, top courses). |
-| FR-RBAC-07 | Giám sát AI Usage (lượt, token, chi phí). |
-| FR-RBAC-08 | Xem **audit log** các hành động quản trị (approve/publish/payment). |
+| FR-RBAC-01 | Xem danh sách tài khoản; tìm kiếm & lọc theo role/status (`GET /api/admin/users`). |
+| FR-RBAC-02 | Activate / Deactivate (lock/unlock) tài khoản; whitelist status `ACTIVE`/`INACTIVE`; Admin không tự khoá chính mình (`PUT /api/admin/users/{id}/status`). |
+| FR-RBAC-03 | Tạo tài khoản thủ công (Learner/Trainer/Course Manager/Admin), whitelist role hợp lệ — `AuthService.createUserByAdmin` (`POST /api/admin/users`). |
+| FR-RBAC-04 | Gán / cập nhật role + profile + status qua cùng 1 endpoint (`PUT /api/admin/users/{id}`) — status đi qua whitelist + tự-khoá-chính-mình giống FR-RBAC-02. |
+| FR-RBAC-05 | Xem permission theo role. **Quyết định 2026-07-22 (theo yêu cầu tester):** giữ **static/read-only** — không xây dựng permission matrix động (không có `Permission`/`RolePermission` entity, không đổi `@PreAuthorize("hasRole(...)")` sang `hasAuthority()`). Tab "Roles" ở FE mô tả **đúng** quyền hạn thật đang được enforce trong code, không còn là text marketing hardcode tuỳ ý — nhưng vẫn không có khả năng "cấu hình" (không có nút Save, không gọi API). |
+| FR-RBAC-06 | Dashboard & Analytics toàn nền tảng: `totalUsers`, `totalRoles`, `totalCourses`, `totalEnrollments`, weekly registration chart (7 ngày, **số thật, không fabricate** — trước đây bug tự bịa số khi không có đăng ký mới, đã sửa 2026-07-22), Top 5 Courses theo số lượt enroll. **Không có doanh thu** — module Payment/Revenue chưa tồn tại (100% Planned), nên không thể hiển thị mà không bịa số. |
+| FR-RBAC-07 | Giám sát AI Usage: tổng số lượt gọi Gemini (Chat + Embedding), tỉ lệ thành công, breakdown theo loại, biểu đồ 7 ngày — dữ liệu **thật**, ghi nhận tại điểm chốt duy nhất `GeminiClientService` (mọi lời gọi AI trong toàn hệ thống đều đi qua đây). Không ước tính token/chi phí vì chưa có price model. |
+| FR-RBAC-08 | Xem **audit log** hành động Admin trên user/role (tạo account, đổi role/profile/status) — `GET /api/admin/audit-log`. **Phạm vi cố tình giới hạn** trong RBAC; không mở rộng sang approve/publish/payment ở module khác (quyết định 2026-07-22, tránh refactor cross-module quá lớn). |
 
 ### 7.4 Trainer Onboarding (`TRN`)
 **Actors:** Guest/Learner (nộp), Administrator (duyệt).
@@ -343,7 +344,7 @@ FE-14 Notification
 | FR-TRN-05 | Admin xem thông tin & minh chứng; Approve/Reject kèm ghi chú. |
 | FR-TRN-06 | Khi Approve → kích hoạt tài khoản Trainer, lưu TrainerType & RevenueShareRate. |
 
-**BR-TRN-01:** Trainer phải qua duyệt Admin.
+**BR-TRN-01:** Trainer phải qua duyệt Admin **trước khi được publish/bán Course** — đây là điểm chặn thật sự (enforced tại `TrainerDashboardServiceImpl.publishTrainerCourse`: publish bị chặn với lỗi "Bạn cần hoàn thiện hồ sơ và được Admin phê duyệt để bắt đầu bán khóa học." trừ khi `TrainerProfile.status = VERIFIED`). *(Cập nhật 2026-07-17 để khớp code đã triển khai)* — role **Trainer** trên tài khoản (và quyền vào Trainer Dashboard để tạo Course/Exam **ở trạng thái Draft**) hiện được cấp **ngay lập tức**, qua 1 trong 2 đường: (a) tự chọn role Trainer lúc đăng ký (FR-AUTH-01), hoặc (b) gọi `POST /api/v1/trainers/become-trainer` — cả hai đều **không chờ Admin duyệt hồ sơ**. Nói cách khác: gán role Trainer ≠ được phép kiếm tiền; ranh giới doanh thu vẫn do Admin gác qua `TrainerProfile.status`, nhưng ranh giới "có phải Trainer hay không" (nhìn thấy Trainer Dashboard) đã dịch chuyển sớm hơn so với thiết kế FR-TRN-01..06 gốc (nộp đơn → Admin duyệt → mới có role). Nếu team muốn giữ đúng luồng gốc (chỉ có role sau khi Admin duyệt), đây là điểm cần sửa code, không phải chỉ sửa doc.
 **BR-TRN-02:** Course **đầu tiên bắt buộc miễn phí**.
 
 ### 7.5 Course Management (`CRS`)
@@ -437,13 +438,18 @@ FE-14 Notification
 | FR-LRN-05 | Theo dõi Progress (% = số Lesson hoàn thành / tổng Lesson). |
 | FR-LRN-06 | Quiz Attempt: start/submit/review; **không giới hạn** số lần; xem attempt history. |
 | FR-LRN-07 | Learning History — lịch sử học & làm bài. |
-| FR-LRN-08 | Rate Course (sao + nhận xét) cho Course đã enroll. |
+| FR-LRN-08 | Rate Course (1-5 sao + nhận xét optional) — chỉ cho Course đã **enroll và hoàn thành 100%** (`Enrollment.status='COMPLETED'`); nhận xét không bắt buộc. |
+| FR-LRN-09 | `averageRating`/`totalRatings` của Course được **tính lại và cache thẳng trên `Course` entity** mỗi khi có rating mới/sửa/xoá (không tính lại từ đầu mỗi lần hiển thị) — phục vụ Course Detail (rating trung bình, tổng số rating, phân bố 1-5 sao, danh sách review mới nhất trước). |
+| FR-LRN-10 | Rating ≤3 sao → tự động tạo notification cho **Course Manager** (`NotificationService.notifyCourseManagers`, type `LOW_RATING`). |
+| FR-LRN-11 | Sau khi tính lại average, nếu average **chuyển từ >4.0 xuống ≤4.0** → tạo notification `LOW_AVERAGE_RATING` cho **Course Manager** — chỉ bắn 1 lần lúc "vượt ngưỡng", không lặp lại ở các rating thấp tiếp theo, và không bắn ở lượt rating đầu tiên (chưa có baseline để so sánh "vượt ngưỡng"). |
 
 **BR-LRN-01:** chỉ Learner đã enroll mới xem nội dung Lesson & làm Quiz.
 **BR-LRN-02:** học **tuần tự theo Lesson** — hoàn thành Lesson N mới mở Lesson N+1 (Quiz không bắt buộc để mở Lesson kế tiếp).
 **BR-LRN-03:** Lesson "hoàn thành" khi Learner đánh dấu hoàn thành / xem hết nội dung.
-**BR-LRN-04:** mỗi Learner rate **đúng một lần** / Course.
+**BR-LRN-04:** mỗi Learner rate **1 slot / Course** — có thể sửa lại rating/nhận xét của chính mình bất kỳ lúc nào sau đó (upsert), không phải hành động một-lần-duy-nhất không sửa được.
 **BR-LRN-05:** Course mua rồi truy cập **trọn đời**.
+**BR-LRN-06:** rating/review đã xoá không tính vào average (xoá thì tính lại ngay).
+**BR-LRN-07:** Notification rating (FR-LRN-10/11) chỉ gửi cho **Course Manager**, không gửi Administrator — theo nguyên tắc phân việc đã có: Course Manager lo chất lượng nội dung, Administrator lo user/hệ thống (§4.1, BR-G05/BR-G11).
 
 ### 7.11 Recommendation (`REC`)
 **Actors:** hệ thống (cho Learner) sau Exam.
@@ -477,16 +483,20 @@ FE-14 Notification
 **BR-PAY-04:** kỳ doanh thu theo tháng, timezone **Asia/Ho_Chi_Minh**; **kỳ chốt có thể cấu hình** (để phục vụ test), không hard-code cứng.
 
 ### 7.13 Comment Management (`CMT`)
-**Actors:** Learner, Trainer (comment/reply), Administrator (moderate).
+**Actors:** Learner, Trainer (comment/reply/xóa comment của mình), Administrator (moderate).
+
+> Chi tiết đầy đủ (Rule Engine, workflow từng bước, API, edge cases) xem `doc/specs/13-comment-management.md`.
 
 | ID | Requirement |
 |---|---|
-| FR-CMT-01 | Xem danh sách comment trong **Lesson và Quiz**. |
-| FR-CMT-02 | Đăng comment trong Lesson/Quiz. |
-| FR-CMT-03 | Reply comment (nested). |
-| FR-CMT-04 | **Administrator** moderate (ẩn/xóa) comment vi phạm. |
+| FR-CMT-01 | Xem danh sách comment trong **Lesson và Quiz** — chỉ hiện comment `APPROVED`; riêng tác giả vẫn thấy comment `PENDING` của chính mình (đang chờ duyệt). Comment `REJECTED` **ẩn hoàn toàn kể cả với tác giả** — tác giả chỉ nhận thông báo lúc đăng, không thấy lại comment đó trong luồng thảo luận. |
+| FR-CMT-02 | Đăng comment trong Lesson/Quiz — qua **Rule Engine** (normalize text → check blacklist keyword + regex pattern) để tự động gán status `APPROVED`/`PENDING`/`REJECTED`, **không có bước AI moderation**. |
+| FR-CMT-03 | Reply comment (nested), cũng qua Rule Engine như comment gốc. |
+| FR-CMT-04 | **Administrator** xem danh sách comment (filter theo status/lesson-quiz), xem **Comment Detail** (nội dung gốc, nội dung đã normalize, lý do bị gắn cờ), **Approve/Reject** comment `PENDING`, **Delete** bất kỳ comment nào. |
+| FR-CMT-05 | User tự sửa/xóa **comment của chính mình**; sửa lại nội dung sẽ chạy lại Rule Engine (có thể đổi status). |
 
 **BR-CMT-01:** comment gắn ở Lesson & Quiz; ở cấp Course chỉ có **Rating** (không comment).
+**BR-CMT-02:** comment `REJECTED` do khớp **blacklist keyword** (vi phạm — offensive); comment `PENDING` do khớp **regex pattern** nghi vấn (số điện thoại/link/email/mời liên hệ ngoài nền tảng) nhưng chưa chắc vi phạm — chờ Admin duyệt. Không khớp gì → `APPROVED` ngay, không qua Admin.
 
 ### 7.14 Notification (`NTF`)
 **Actors:** tất cả role.
@@ -526,9 +536,16 @@ Learner/Trainer --Admin lock--> Locked --Unlock--> (previous role)
 ```
 
 ### 9.2 Trainer Application
+
+> Cập nhật 2026-07-17 để khớp code đã triển khai (`TrainerOnboardingServiceImpl`) — tên trạng thái thật là `TrainerProfile.status`, không phải Draft/Submitted/Approved/Rejected như bản thiết kế gốc; role **Trainer** được gán ngay khi bắt đầu (xem BR-TRN-01), không chờ tới bước Approve.
+
 ```
-Draft --Submit--> Submitted --Approve--> Approved(→Trainer)
-                              --Reject--> Rejected --Resubmit--> Submitted
+Guest/Learner --chọn role Trainer lúc Register, hoặc gọi become-trainer--> role TRAINER gán ngay
+  --> TrainerProfile{status=PENDING_VERIFICATION} (JIT-tạo nếu chưa có; Trainer Dashboard dùng được, chỉ tạo Course/Exam ở Draft)
+PENDING_VERIFICATION --saveProfileDraft (lặp lại)--> PENDING_VERIFICATION
+PENDING_VERIFICATION --submitProfileForReview (đủ bio+phone+≥1 minh chứng)--> AWAITING_APPROVAL
+AWAITING_APPROVAL --Admin reviewTrainerProfile: status=VERIFIED--> VERIFIED (publish/bán Course mở khóa)
+AWAITING_APPROVAL --Admin reviewTrainerProfile: status khác (vd SUSPENDED/từ chối)--> (không cho saveProfileDraft nếu SUSPENDED; các status khác quay lại chỉnh sửa được)
 ```
 
 ### 9.3 Course (theo từng version — §9.7)
@@ -641,8 +658,10 @@ Course Manager: auto-generate Monthly Statement → Trainer Confirm
 | OrderStatus | Pending · Paid · Completed · Failed |
 | StatementStatus | Generated · TrainerConfirmed · Paid |
 | CommentTargetType | Lesson · Quiz |
-| CommentStatus | Visible · Hidden |
-| NotificationType | PurchaseSuccess · CourseUpdated · CommentReply · NewEnrollment · ContentApproved · ContentRejected · StatementReady |
+| CommentStatus | APPROVED (visible) · PENDING (Admin review, hidden) · REJECTED (hidden) — quyết định bởi Rule Engine (§7.13), không phải quyết định thủ công của Admin tại thời điểm đăng |
+| NotificationType | PurchaseSuccess · CourseUpdated · CommentReply · NewEnrollment · ContentApproved · ContentRejected · StatementReady · **LOW_RATING · LOW_AVERAGE_RATING** (2 loại đã có code thật qua `NotificationService`, chỉ lưu DB — chưa realtime WebSocket/email; các loại còn lại trong danh sách này vẫn **Planned**, chưa có `NotificationService`/entity nào phục vụ chúng trước 2026-07-22) |
+| AuditActionType | CREATE_USER · UPDATE_USER · UPDATE_USER_STATUS — String tự do trên `AuditLog.actionType`, không phải Java enum thật; chỉ log hành động Admin trên user/role (FR-RBAC-08) |
+| AiUsageCallType | CHAT (`generateChatResponse`) · EMBEDDING (`generateEmbedding`) — trên `AiUsageLog.callType`, ghi tại điểm chốt `GeminiClientService` |
 
 ---
 
@@ -688,6 +707,7 @@ Course Manager: auto-generate Monthly Statement → Trainer Confirm
 | UI language | **English** |
 | Audit log | có (mức cơ bản) |
 | Login | email/mật khẩu **và Google OAuth2** (JIT provisioning, role mặc định Learner) — cập nhật 2026-07-11 để khớp code đã triển khai (`AuthService.googleLogin`, `POST /api/v1/auth/google`) |
+| Trainer role vs. duyệt Admin | Role **Trainer** gán ngay khi đăng ký chọn role Trainer hoặc gọi `become-trainer`, **không** chờ Admin duyệt hồ sơ trước; điểm chặn thật của BR-TRN-01 dịch xuống bước **publish Course** (`TrainerProfile.status = VERIFIED`) — cập nhật 2026-07-17 để khớp code đã triển khai (`TrainerOnboardingServiceImpl.becomeTrainer`, `TrainerDashboardServiceImpl.publishTrainerCourse`). Xem BR-TRN-01 (§7.4) và §9.2. |
 
 ### 15.2 Future phase (ngoài v1)
 

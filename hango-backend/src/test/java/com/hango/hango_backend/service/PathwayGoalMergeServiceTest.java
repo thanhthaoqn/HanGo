@@ -1,19 +1,19 @@
 package com.hango.hango_backend.service;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import static org.mockito.Mockito.when;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.MergePreviewDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.LearningPathwayGoalRepository;
 import com.hango.hango_backend.repository.LearningPathwayRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.when;
 
 class PathwayGoalMergeServiceTest {
 

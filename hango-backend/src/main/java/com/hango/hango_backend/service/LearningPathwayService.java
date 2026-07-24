@@ -1,11 +1,22 @@
 package com.hango.hango_backend.service;
 
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
 import com.hango.hango_backend.dto.PathwayGenerateRequestDTO;
-import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.dto.PathwayNodeDTO;
+import com.hango.hango_backend.dto.PathwayScheduleRequestDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.ExamAttempt;
 import com.hango.hango_backend.entity.LearningPathway;
@@ -18,22 +29,9 @@ import com.hango.hango_backend.repository.LearningPathwayRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import com.hango.hango_backend.dto.PathwayScheduleRequestDTO;
-import com.hango.hango_backend.service.PathwayTimeboxingScheduler;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 
 @Service

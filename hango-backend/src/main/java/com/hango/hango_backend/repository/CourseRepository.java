@@ -63,4 +63,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                                                      @Param("search") String search);
 
     long countByStatus(String status);
+
+    @Query(value = "SELECT c.id AS id, c.title AS title, COUNT(e.id) AS enrollmentCount " +
+           "FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id " +
+           "WHERE c.deleted_at IS NULL " +
+           "GROUP BY c.id, c.title " +
+           "ORDER BY enrollmentCount DESC " +
+           "LIMIT :limit",
+           nativeQuery = true)
+    List<TopCourseProjection> findTopCoursesByEnrollment(@Param("limit") int limit);
 }

@@ -57,22 +57,24 @@ QA Agent phải ưu tiên test theo mức độ nghiệp vụ quan trọng:
 
 ## 4. Test Structure — Backend
 
+> **Cập nhật 2026-07-17 để khớp thực tế đang làm (chỉ đạo tester):** unit test **chỉ tập trung ở Service layer**. Không viết/duy trì test Controller (MockMvc) hay integration test (Testcontainers) — cấu trúc `controller/`/`integration/` bên dưới là **định hướng tương lai, chưa áp dụng**, không phải mô tả hiện trạng. Ngoại lệ: class không có Service riêng (business logic nằm thẳng trong Controller, ví dụ `AdminController.updateUserStatus`) vẫn được test trực tiếp bằng Mockito thuần (không phải MockMvc) vì đó là nơi duy nhất chứa logic cần test.
+
 ```
 hango-backend/src/test/java/com/.../
-├── service/          # Unit tests (mock Repository)
+├── service/          # Unit tests (mock Repository) — SCOPE HIỆN TẠI
 │   ├── AuthServiceTest.java
-│   ├── PaymentServiceTest.java
+│   ├── TrainerOnboardingServiceTest.java
 │   └── ExamServiceTest.java
-├── controller/       # Integration tests (MockMvc)
-│   ├── AuthControllerTest.java
-│   └── ...
-└── integration/      # Full stack tests (Testcontainers)
+├── controller/       # Chỉ giữ các class KHÔNG có Service riêng (vd AdminControllerTest.java, Mockito thuần)
+├── controller/       # [Định hướng tương lai — chưa làm] Integration tests (MockMvc) cho phần còn lại
+└── integration/      # [Định hướng tương lai — chưa làm] Full stack tests (Testcontainers)
     └── PaymentFlowTest.java
 ```
 
-**Quy tắc đặt tên:**
+**Quy tắc đặt tên (khớp code hiện tại):**
 - Unit test: `{ClassName}Test.java`
-- Method: `given{Condition}_when{Action}_then{Expected}`
+- Method: `{methodUnderTest}Should{ExpectedBehavior}When{Condition}` (fluent style, ví dụ `authenticateUserShouldRejectInactiveAccount`) — không dùng `given/when/then` như bản cũ ghi.
+- Comment trong file test: chỉ dùng divider 3 dòng theo tên method (`// === methodName ===`), không viết Javadoc giải thích logic production.
 
 **Coverage requirement:** ≥ 80% cho Service layer của mọi module CRITICAL.
 

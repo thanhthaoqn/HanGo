@@ -146,6 +146,8 @@ public class AuthService {
         return mapToUserResponse(savedUser);
     }
 
+    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "TRAINER_LEAD", "ADMINISTRATOR");
+
     public UserResponse createUserByAdmin(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
             throw new IllegalArgumentException("Error: Email is already in use!");
@@ -160,6 +162,10 @@ public class AuthService {
             if (targetRole.equals("ADMIN")) {
                 targetRole = "ADMINISTRATOR";
             }
+        }
+
+        if (!ADMIN_CREATABLE_ROLES.contains(targetRole)) {
+            throw new IllegalArgumentException("Error: Invalid role! Must be one of " + ADMIN_CREATABLE_ROLES);
         }
 
         final String roleName = targetRole;

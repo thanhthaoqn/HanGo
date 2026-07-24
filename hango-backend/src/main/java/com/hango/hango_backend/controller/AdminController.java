@@ -2,22 +2,32 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.repository.AuditLogRepository;
+import com.hango.hango_backend.repository.AiUsageLogRepository;
+import com.hango.hango_backend.repository.CourseRepository;
+import com.hango.hango_backend.repository.EnrollmentRepository;
+import com.hango.hango_backend.repository.TopCourseProjection;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.Role;
+import com.hango.hango_backend.entity.AuditLog;
+import com.hango.hango_backend.entity.AiUsageLog;
 import com.hango.hango_backend.service.AuthService;
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
 import com.hango.hango_backend.dto.AdminUserUpdateRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -35,6 +45,18 @@ public class AdminController {
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
+    private AiUsageLogRepository aiUsageLogRepository;
+
+    @Autowired
+    private CourseRepository courseRepository;
+
+    @Autowired
+    private EnrollmentRepository enrollmentRepository;
 
     @GetMapping("/dashboard/stats")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
@@ -61,28 +83,24 @@ public class AdminController {
                 values.add(count);
             }
 
-            boolean hasAnyRecent = values.stream().anyMatch(v -> v > 0);
-            if (!hasAnyRecent && totalUsers > 0) {
-                values.clear();
-                long base = totalUsers / 7;
-                if (base == 0) base = 1;
-                values.add(base);
-                values.add(base + 1);
-                values.add(base);
-                values.add(base + 2);
-                values.add(base + 3);
-                values.add(base + 1);
-                values.add(totalUsers - (base * 5 + 7));
-                for (int i = 0; i < values.size(); i++) {
-                    if (values.get(i) < 0) values.set(i, 0L);
-                }
-            }
+            long totalCourses = courseRepository.count();
+            long totalEnrollments = enrollmentRepository.count();
+            List<TopCourseProjection> topCourses = courseRepository.findTopCoursesByEnrollment(5);
 
             Map<String, Object> response = new HashMap<>();
             response.put("totalUsers", totalUsers);
             response.put("totalRoles", totalRoles);
+            response.put("totalCourses", totalCourses);
+            response.put("totalEnrollments", totalEnrollments);
             response.put("weeklyLabels", labels);
             response.put("weeklyValues", values);
+            response.put("topCourses", topCourses.stream().map(tc -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("id", tc.getId());
+                m.put("title", tc.getTitle());
+                m.put("enrollmentCount", tc.getEnrollmentCount());
+                return m;
+            }).toList());
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -226,6 +244,7 @@ public class AdminController {
 
                 user.setStatus(normalizedStatus);
                 userRepository.save(user);
+                logAudit(currentAdmin, "UPDATE_USER_STATUS", id, "Status changed to " + normalizedStatus);
                 return ResponseEntity.ok(Map.of("success", true, "message", "User status updated successfully"));
             } else {
                 return ResponseEntity.status(404).body("User not found");
@@ -235,12 +254,13 @@ public class AdminController {
         }
     }
 
-    // 🔥 ĐÃ SỬA: Đóng ngoặc khối try-catch và hàm getUserDetail đầy đủ
     @GetMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getUserDetail(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(authService.getUserById(id));
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("Error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -248,9 +268,12 @@ public class AdminController {
 
     @PostMapping("/users")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
-    public ResponseEntity<?> createUserByAdmin(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<?> createUserByAdmin(@Valid @RequestBody RegisterRequest registerRequest,
+            @AuthenticationPrincipal UserDetails currentAdmin) {
         try {
             UserResponse response = authService.createUserByAdmin(registerRequest);
+            logAudit(currentAdmin, "CREATE_USER", response.getId(),
+                    "Created account " + response.getEmail() + " with role(s) " + response.getRoles());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
@@ -260,40 +283,53 @@ public class AdminController {
     @PutMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateUserByAdmin(
-            @PathVariable Long id, 
-            @Valid @RequestBody AdminUserUpdateRequest updateRequest) {
+            @PathVariable Long id,
+            @Valid @RequestBody AdminUserUpdateRequest updateRequest,
+            @AuthenticationPrincipal UserDetails currentAdmin) {
         try {
             Optional<User> userOpt = userRepository.findById(id);
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
-                
+                List<String> changes = new ArrayList<>();
+
                 if (updateRequest.getFullName() != null) {
                     user.setFullName(updateRequest.getFullName());
+                    changes.add("fullName");
                 }
-                
+
                 if (updateRequest.getEmail() != null && !updateRequest.getEmail().equalsIgnoreCase(user.getEmail())) {
                     if (userRepository.existsByEmail(updateRequest.getEmail())) {
                         throw new IllegalArgumentException("Error: Email is already in use!");
                     }
                     user.setEmail(updateRequest.getEmail());
+                    changes.add("email");
                 }
-                
+
                 if (updateRequest.getPhoneNumber() != null) {
                     user.setPhoneNumber(updateRequest.getPhoneNumber());
                 }
-                
+
                 if (updateRequest.getGender() != null) {
                     user.setGender(updateRequest.getGender());
                 }
-                
+
                 if (updateRequest.getDateOfBirth() != null) {
                     user.setDateOfBirth(updateRequest.getDateOfBirth());
                 }
-                
+
                 if (updateRequest.getStatus() != null) {
-                    user.setStatus(updateRequest.getStatus().toUpperCase());
+                    String normalizedStatus = updateRequest.getStatus().trim().toUpperCase();
+                    if (!ALLOWED_USER_STATUSES.contains(normalizedStatus)) {
+                        return ResponseEntity.badRequest().body("Error: status must be one of " + ALLOWED_USER_STATUSES);
+                    }
+                    if (!normalizedStatus.equals(user.getStatus())
+                            && currentAdmin != null && currentAdmin.getUsername().equalsIgnoreCase(user.getEmail())) {
+                        return ResponseEntity.badRequest().body("Error: Admin cannot change the status of their own account");
+                    }
+                    user.setStatus(normalizedStatus);
+                    changes.add("status=" + normalizedStatus);
                 }
-                
+
                 if (updateRequest.getRole() != null) {
                     Role roleObj = roleRepository.findByRoleName(updateRequest.getRole().toUpperCase()).orElse(null);
                     if (roleObj == null) {
@@ -302,9 +338,13 @@ public class AdminController {
                     Set<Role> roles = new HashSet<>();
                     roles.add(roleObj);
                     user.setRoles(roles);
+                    changes.add("role=" + roleObj.getRoleName());
                 }
-                
+
                 userRepository.save(user);
+                if (!changes.isEmpty()) {
+                    logAudit(currentAdmin, "UPDATE_USER", id, "Updated fields: " + String.join(", ", changes));
+                }
                 return ResponseEntity.ok(authService.getUserById(id));
             } else {
                 return ResponseEntity.status(404).body("User not found");
@@ -312,5 +352,85 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Audit Log (FR-RBAC-08) — scoped to admin actions on users/roles
+    // ------------------------------------------------------------------
+
+    private void logAudit(UserDetails currentAdmin, String actionType, Long targetUserId, String details) {
+        User actor = currentAdmin != null
+                ? userRepository.findByEmail(currentAdmin.getUsername()).orElse(null)
+                : null;
+        AuditLog log = AuditLog.builder()
+                .actor(actor)
+                .actionType(actionType)
+                .targetUserId(targetUserId)
+                .details(details)
+                .build();
+        auditLogRepository.save(log);
+    }
+
+    @GetMapping("/audit-log")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getAuditLog(@RequestParam(defaultValue = "50") int limit) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        List<AuditLog> logs = auditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit));
+
+        List<Map<String, Object>> response = logs.stream().map(l -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", l.getId());
+            map.put("actorName", l.getActor() != null ? l.getActor().getFullName() : "System");
+            map.put("actorEmail", l.getActor() != null ? l.getActor().getEmail() : null);
+            map.put("actionType", l.getActionType());
+            map.put("targetUserId", l.getTargetUserId());
+            map.put("details", l.getDetails());
+            map.put("createdAt", l.getCreatedAt() != null ? l.getCreatedAt().format(formatter) : "");
+            return map;
+        }).toList();
+
+        return ResponseEntity.ok(response);
+    }
+
+    // ------------------------------------------------------------------
+    // AI Usage Monitoring (FR-RBAC-07) — real counts from AiUsageLog,
+    // populated by GeminiClientService on every generateChatResponse/generateEmbedding call
+    // ------------------------------------------------------------------
+
+    @GetMapping("/ai-usage")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getAiUsageStats() {
+        long totalCalls = aiUsageLogRepository.count();
+        long successCount = aiUsageLogRepository.countBySuccess(true);
+        long failureCount = aiUsageLogRepository.countBySuccess(false);
+        long chatCalls = aiUsageLogRepository.countByCallType("CHAT");
+        long embeddingCalls = aiUsageLogRepository.countByCallType("EMBEDDING");
+        double successRate = totalCalls == 0 ? 0.0 : Math.round((double) successCount / totalCalls * 1000) / 10.0;
+
+        List<AiUsageLog> lastWeekLogs = aiUsageLogRepository.findByCreatedAtAfter(LocalDateTime.now().minusDays(7));
+        List<String> labels = new ArrayList<>();
+        List<Long> values = new ArrayList<>();
+        DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("d/M");
+        LocalDate today = LocalDate.now();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            labels.add(date.format(labelFormatter));
+            long count = lastWeekLogs.stream()
+                    .filter(l -> l.getCreatedAt() != null && l.getCreatedAt().toLocalDate().equals(date))
+                    .count();
+            values.add(count);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("totalCalls", totalCalls);
+        response.put("successCount", successCount);
+        response.put("failureCount", failureCount);
+        response.put("chatCalls", chatCalls);
+        response.put("embeddingCalls", embeddingCalls);
+        response.put("successRate", successRate);
+        response.put("weeklyLabels", labels);
+        response.put("weeklyValues", values);
+
+        return ResponseEntity.ok(response);
     }
 }

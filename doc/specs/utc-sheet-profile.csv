@@ -1,195 +1,25 @@
-Code Module	Profile				Method						getUserProfile
-Created By	DucPM				Executed By						DucPM
-Test requirement	Return the current user's profile data by email, mapped from the User entity.
-Passed	Failed	Untested						N/A/B			Total Test Cases
-2	0	0						1	1	0	2
+Module	Class	Method	UTCID	Test Case (test method name)	Precondition	Input	Expected Result	Exception	Case Type (N/A/B)	Status	Exec Date	Defect ID	Created By	Executed By
+Profile	AuthService	getUserProfile	UTC01	getUserProfileShouldThrowWhenUserNotFound	no User row for email='unknown@example.com'	email='unknown@example.com'	Error	UsernameNotFoundException: 'User not found with email: unknown@example.com'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	getUserProfile	UTC02	getUserProfileShouldReturnMappedUserResponse	User row exists: id=1, email='known@example.com', fullName='Active User', roles=['LEARNER']	email='known@example.com'	UserResponse{email='known@example.com', roles=['LEARNER']}	None	N	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	getUserById	UTC01	getUserByIdShouldThrowWhenUserNotFound	no User row for id=99	id=99	Error	UsernameNotFoundException: 'User not found with id: 99'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	getUserById	UTC02	getUserByIdShouldReturnMappedUserResponse	User row exists: id=1, email='known@example.com'	id=1	UserResponse{id=1, email='known@example.com'}	None	N	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateProfile	UTC01	updateProfileShouldThrowWhenUserNotFound	no User row for email='unknown@example.com'	(empty request)	Error	UsernameNotFoundException: 'User not found with email: unknown@example.com'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateProfile	UTC02	updateProfileShouldOnlyChangeFieldsPresentOnRequest	User row exists: id=1, phoneNumber='0000000000'	fullName='Updated Name' (other fields null)	UserResponse{fullName='Updated Name', phoneNumber='0000000000' unchanged} — null = unchanged	None	N	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateProfile	UTC03	updateProfileShouldResetIsVerifiedWhenEmailChanges	User row exists: id=1, isVerified=true; existsByEmail('new@example.com')=false	email='new@example.com'	UserResponse{email='new@example.com'}; isVerified reset to false	None	B	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateProfile	UTC04	updateProfileShouldRejectUsernameAlreadyTaken	User row exists: username='olduser'; existsByUsername('takenuser')=true	username='takenuser'	Error, no save	IllegalArgumentException: 'Error: Username is already in use!'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateProfile	UTC05	updateProfileShouldNotCheckUsernameUniquenessWhenUnchanged	User row exists: username='sameuser'	username='sameuser' (same, case-insensitive)	UserResponse{username='sameuser'}; existsByUsername() never called	None	B	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateProfile	UTC06	updateProfileShouldRejectEmailAlreadyTaken	existsByEmail('taken@example.com')=true	email='taken@example.com'	Error, no save	IllegalArgumentException: 'Error: Email is already in use!'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	changePassword	UTC01	changePasswordShouldThrowWhenUserNotFound	no User row for email='unknown@example.com'	(empty request)	Error	UsernameNotFoundException: 'User not found with email: unknown@example.com'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	changePassword	UTC02	changePasswordShouldRejectIncorrectCurrentPassword	User row exists, passwordHash='hashed'; encoder.matches('wrongCurrent','hashed')=false	currentPassword='wrongCurrent', newPassword='newPass123'	Error, no save	IllegalArgumentException: 'Incorrect current password!'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	changePassword	UTC03	changePasswordShouldEncodeAndSaveNewPasswordWhenCurrentPasswordMatches	User row exists, passwordHash='hashed'; encoder.matches('correctCurrent','hashed')=true	currentPassword='correctCurrent', newPassword='newPass123'	users row updated: passwordHash='NEW_ENCODED_HASH'	None	N	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateAvatar	UTC01	updateAvatarShouldThrowWhenUserNotFound	no User row for email='unknown@example.com'	file=(unstubbed mock)	Error	UsernameNotFoundException: 'User not found with email: unknown@example.com'	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateAvatar	UTC02	updateAvatarShouldUploadToCloudinaryAndSaveReturnedUrl	User row exists; cloudinaryService.uploadImage() returns URL	file: size=500KB, contentType='image/png'	users row updated: avatarUrl='https://cloudinary.example/avatar.png'	None	N	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateAvatar	UTC03	updateAvatarShouldPropagateIOExceptionFromCloudinaryUpload	cloudinaryService.uploadImage() throws IOException	file: size=500KB, contentType='image/png'	Error, no save	IOException: 'Cloudinary unreachable' (propagated, not wrapped)	A	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateAvatar	UTC04	updateAvatarShouldRejectFileLargerThan2MB	User row exists	file: size=3MB	Error, upload never attempted	IllegalArgumentException: 'Error: Avatar file must not exceed 2MB.'	B	Passed	2026-07-14		DucPM	DucPM
+Profile	AuthService	updateAvatar	UTC05	updateAvatarShouldRejectUnsupportedContentType	User row exists	file: size=1KB, contentType='application/pdf'	Error, upload never attempted	IllegalArgumentException: 'Error: Avatar must be a .jpg, .jpeg, or .png image.'	B	Passed	2026-07-14		DucPM	DucPM
+Profile	—	getLearningProfile / getTrainerPublicProfile	—	Not implemented	no Service/endpoint exists for either	—	getLearningProfile (FR-PROF-04) needs a new aggregation across enrollments/progress/exam-history/weakness; getTrainerPublicProfile (FR-PROF-05) still marked open/undecided in HanGo_Documentation.md itself	—	Blocked	Untested		GAP-PROF-01 / GAP-PROF-02	—	—
 
-					UTCID01	UTCID02
-Condition	Precondition
-		Mocked dependencies wired		O	O
-	User row (DB)
-		no row for email='unknown@example.com'		O
-		row exists: id=1, email='known@example.com', fullName='Active User', roles=['LEARNER']			O
-Confirm	Verify
-		UserResponse{id=1, email='known@example.com', fullName='Active User', roles=['LEARNER']}			O
-	Exception
-		UsernameNotFoundException: 'User not found with email: unknown@example.com'		O
-	Log message
-Result	Type(N/A/B)		A	N
-	Passed/Failed		P	P
-	Executed Date		2026-07-14	2026-07-14
-	Defect ID
-
-
-
-Code Module	Profile				Method						getUserById
-Created By	DucPM				Executed By						DucPM
-Test requirement	Return a user's profile data by numeric id (used by RBAC's admin "view user detail").
-Passed	Failed	Untested						N/A/B			Total Test Cases
-2	0	0						1	1	0	2
-
-					UTCID01	UTCID02
-Condition	Precondition
-		Mocked dependencies wired		O	O
-	User row (DB)
-		no row for id=99		O
-		row exists: id=1, email='known@example.com'			O
-Confirm	Verify
-		UserResponse{id=1, email='known@example.com'}			O
-	Exception
-		UsernameNotFoundException: 'User not found with id: 99'		O
-	Log message
-Result	Type(N/A/B)		A	N
-	Passed/Failed		P	P
-	Executed Date		2026-07-14	2026-07-14
-	Defect ID
-
-
-
-Code Module	Profile				Method						updateProfile
-Created By	DucPM				Executed By						DucPM
-Test requirement	Partially update profile fields (null = unchanged), enforce username/email uniqueness, reset isVerified when email changes.
-Passed	Failed	Untested						N/A/B			Total Test Cases
-6	0	0						1	3	2	6
-
-					UTCID01	UTCID02	UTCID03	UTCID04	UTCID05	UTCID06
-Condition	Precondition
-		Mocked dependencies wired		O	O	O	O	O	O
-	User row (DB)
-		no row for email='unknown@example.com'		O
-		row exists: id=1, email='known@example.com', phoneNumber='0000000000'			O
-		row exists: id=1, username='olduser'				O
-		row exists: id=1, username='sameuser'					O
-		row exists: id=1, isVerified=true						O
-		row exists: id=1							O
-	Uniqueness check
-		-		-	-	existsByUsername('takenuser')=true	(never called — unchanged)	existsByEmail('new@example.com')=false	existsByEmail('taken@example.com')=true
-	Request body
-		(empty request)		O
-		fullName='Updated Name'			O
-		username='takenuser'				O
-		username='sameuser' (same, case-insensitive)					O
-		email='new@example.com'						O
-		email='taken@example.com'							O
-Confirm	Verify
-		UserResponse{fullName='Updated Name', phoneNumber='0000000000' unchanged}			O
-		UserResponse{username='sameuser'}					O
-		UserResponse{email='new@example.com'}, isVerified reset to false						O
-	Exception
-		UsernameNotFoundException: 'User not found with email: unknown@example.com'		O
-		IllegalArgumentException: 'Error: Username is already in use!'				O
-		IllegalArgumentException: 'Error: Email is already in use!'							O
-	Log message
-Result	Type(N/A/B)		A	N	A	B	B	A
-	Passed/Failed		P	P	P	P	P	P
-	Executed Date		2026-07-14	2026-07-14	2026-07-14	2026-07-14	2026-07-14	2026-07-14
-	Defect ID
-
-
-Note UTCID05: NEW test 2026-07-14 (fix #6) — closes a data-integrity gap where a changed-but-unconfirmed email kept isVerified=true.
-
-
-
-Code Module	Profile				Method						changePassword
-Created By	DucPM				Executed By						DucPM
-Test requirement	Change the current user's password after verifying the current password matches.
-Passed	Failed	Untested						N/A/B			Total Test Cases
-3	0	0						1	2	0	3
-
-					UTCID01	UTCID02	UTCID03
-Condition	Precondition
-		Mocked dependencies wired		O	O	O
-	User row (DB)
-		no row for email='unknown@example.com'		O
-		row exists: id=1, passwordHash='hashed'			O	O
-	CurrentPassword check
-		-		-	encoder.matches('wrongCurrent','hashed')=false	encoder.matches('correctCurrent','hashed')=true
-	NewPassword
-		-		-	-	newPass123
-Confirm	Verify
-		users row updated: passwordHash='NEW_ENCODED_HASH'				O
-	Exception
-		UsernameNotFoundException: 'User not found with email: unknown@example.com'		O
-		IllegalArgumentException: 'Incorrect current password!'			O
-	Log message
-Result	Type(N/A/B)		A	A	N
-	Passed/Failed		P	P	P
-	Executed Date		2026-07-14	2026-07-14	2026-07-14
-	Defect ID
-
-
-
-Code Module	Profile				Method						updateAvatar
-Created By	DucPM				Executed By						DucPM
-Test requirement	Upload a new avatar to Cloudinary and save the returned URL; validate file size (<=2MB) and type (jpg/jpeg/png) before upload.
-Passed	Failed	Untested						N/A/B			Total Test Cases
-5	0	0						1	2	2	5
-
-					UTCID01	UTCID02	UTCID03	UTCID04	UTCID05
-Condition	Precondition
-		Mocked dependencies wired		O	O	O	O	O
-	User row (DB)
-		no row for email='unknown@example.com'		O
-		row exists: id=1, email='known@example.com'			O	O	O	O
-	File
-		-		size=500KB, contentType='image/png'	size=500KB, contentType='image/png'	size=3MB, contentType='image/png'	size=1KB, contentType='application/pdf'
-	CloudinaryService.uploadImage()
-		-		returns 'https://cloudinary.example/avatar.png'	throws IOException('Cloudinary unreachable')	(never called — rejected before upload)	(never called — rejected before upload)
-Confirm	Verify
-		users row updated: avatarUrl='https://cloudinary.example/avatar.png'			O
-	Exception
-		UsernameNotFoundException: 'User not found with email: unknown@example.com'		O
-		IOException: 'Cloudinary unreachable' (propagated, not wrapped)				O
-		IllegalArgumentException: 'Error: Avatar file must not exceed 2MB.'					O
-		IllegalArgumentException: 'Error: Avatar must be a .jpg, .jpeg, or .png image.'						O
-	Log message
-Result	Type(N/A/B)		A	N	A	B	B
-	Passed/Failed		P	P	P	P	P
-	Executed Date		2026-07-14	2026-07-14	2026-07-14	2026-07-14	2026-07-14
-	Defect ID
-
-
-Note UTCID04/UTCID05: NEW tests 2026-07-14 (fix #5) — file validation did not exist before; spec 02-profile-management.md §3 requires it.
-Note: uploadAvatar's HTTP endpoint (POST /api/auth/profile/avatar) lives in AuthController — its status-code UTC is tracked in utc-sheet-authentication.csv, not duplicated here.
-
-
-
-Code Module	Profile				Method						Controller layer — status-code + DTO Validation (UserController)
-Created By	DucPM				Executed By						DucPM
-Test requirement	Verify 401 when unauthenticated, 404 when the account no longer exists, and Bean Validation (@Valid) for ChangePasswordRequest; also documents that ProfileUpdateRequest has NO validation annotations at all.
-Passed	Failed	Untested						N/A/B			Total Test Cases
-6	0	0						0	5	1	6
-
-					UTCID01	UTCID02	UTCID03	UTCID04	UTCID05	UTCID06
-Condition	Precondition
-		GET /api/v1/users/me, @AuthenticationPrincipal=null		O
-		PUT /api/v1/users/me, @AuthenticationPrincipal=null			O
-		PUT /api/v1/users/change-password, @AuthenticationPrincipal=null				O
-		GET /api/v1/users/me, principal='ghost@example.com', Service throws UsernameNotFoundException					O
-		PUT /api/v1/users/change-password, body {currentPassword:''}						O
-		PUT /api/v1/users/me, body {email:'not-an-email-at-all'} — ProfileUpdateRequest has ZERO validation annotations							O
-Confirm	Verify
-		(none — all cases below are error/boundary responses, except UTCID06 which is a boundary PASS)
-	Exception / Error status
-		HTTP 401		O	O	O
-		HTTP 404					O
-		HTTP 400 (Bean Validation @NotBlank)						O
-		HTTP 200 — malformed email ACCEPTED, not rejected (real gap, see note)							O
-	Log message
-Result	Type(N/A/B)		B	B	B	B	B	B
-	Passed/Failed		P	P	P	P	P	P
-	Executed Date		2026-07-14	2026-07-14	2026-07-14	2026-07-14	2026-07-14	2026-07-14
-	Defect ID						GAP-PROF-03
-
-
-Note UTCID06: real finding, not a fabricated expectation — ProfileUpdateRequest.java has no @Email/@NotBlank/@Size annotations despite the controller using @Valid, unlike every other DTO in this project. Documented, not fixed this round (tester asked only for tests).
-
-
-
-Code Module	Profile				Method						getLearningProfile / getTrainerPublicProfile
-Created By					Executed By
-Test requirement	Not implemented — no endpoint/service exists for either. getLearningProfile (FR-PROF-04) needs a new aggregation across enrollments/progress/exam-history/weakness. getTrainerPublicProfile (FR-PROF-05) is marked open (still undecided) in HanGo_Documentation.md itself.
-Passed	Failed	Untested/Blocked						N/A/B			Total Test Cases
-0	0	0 / Blocked						0/0/0			0
-
-Defect ID: GAP-PROF-01 (getLearningProfile), GAP-PROF-02 (getTrainerPublicProfile — confirm scope with product owner first).
+Note UTC03 (updateProfile): closes a real data-integrity gap found 2026-07-14 — a changed-but-unconfirmed email used to keep isVerified=true. Fixed in production, test added same round.
+Note UTC04/05 (updateAvatar): file-size/type validation did not exist before 2026-07-14 (spec 02-profile-management.md §3 requires it) — added to production + tested same round.
+Note (real gap, documented not fixed): ProfileUpdateRequest.java has zero Bean Validation annotations (@Email/@NotBlank/@Size) despite the controller using @Valid — a malformed email is currently accepted, not rejected. This was previously covered by a Controller-layer @WebMvcTest (GAP-PROF-03); that test was removed 2026-07-17 along with the rest of the Controller layer per tester instruction to focus on Service-only unit tests. The gap itself is still real and unfixed in production — just no longer covered by an automated test. Flag to dev if Controller-layer validation coverage is wanted again later.
+Note: Controller-layer tests (status codes, DTO @Valid validation) were intentionally removed 2026-07-17 per tester instruction to focus unit testing on the Service layer only.

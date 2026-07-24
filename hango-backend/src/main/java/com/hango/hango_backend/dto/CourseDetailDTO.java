@@ -13,6 +13,7 @@ public class CourseDetailDTO {
     private String creatorName;
     private String difficultyName;
     private Double rating;
+    private Integer totalRatings;
     private Integer learnersCount;
     private String description;
     private String objectives;
