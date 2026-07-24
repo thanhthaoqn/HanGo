@@ -38,6 +38,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("SELECT c.id, cat.paramValue FROM Course c JOIN c.categories cat WHERE c.id IN :courseIds")
     List<Object[]> findCategoriesByCourseIds(@Param("courseIds") List<Long> courseIds);
 
+    @Query("SELECT c.id, cat.paramKey, cat.paramValue FROM Course c JOIN c.categories cat WHERE c.id IN :courseIds")
+    List<Object[]> findCategoryDetailsByCourseIds(@Param("courseIds") List<Long> courseIds);
+
+    @Query("SELECT c.id, c.category.paramKey, c.category.paramValue FROM Course c WHERE c.id IN :courseIds AND c.category IS NOT NULL")
+    List<Object[]> findSingleCategoryDetailsByCourseIds(@Param("courseIds") List<Long> courseIds);
+
     @Query("SELECT c FROM Course c WHERE c.code = :code AND c.status = 'PUBLISHED' ORDER BY COALESCE(c.publishedAt, c.createdAt) DESC")
     List<Course> findPublishedByCodeOrderByPublishedAtDesc(@Param("code") String code);
 

@@ -246,25 +246,33 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .map(p -> p.getId())
                 .collect(Collectors.toList());
 
-        Map<Long, com.hango.hango_backend.entity.Course> courseMap = new java.util.HashMap<>();
+        Map<Long, List<String>> courseCategoryKeys = new java.util.HashMap<>();
+        Map<Long, List<String>> courseCategoryNames = new java.util.HashMap<>();
+
         if (!filteredCourseIds.isEmpty()) {
-            courseRepository.findAllByIdWithDetails(filteredCourseIds)
-                    .forEach(c -> courseMap.put(c.getId(), c));
+            List<Object[]> multipleCats = courseRepository.findCategoryDetailsByCourseIds(filteredCourseIds);
+            for (Object[] row : multipleCats) {
+                Long cid = (Long) row[0];
+                String key = (String) row[1];
+                String val = (String) row[2];
+                courseCategoryKeys.computeIfAbsent(cid, k -> new ArrayList<>()).add(key);
+                courseCategoryNames.computeIfAbsent(cid, k -> new ArrayList<>()).add(val);
+            }
+            List<Object[]> singleCats = courseRepository.findSingleCategoryDetailsByCourseIds(filteredCourseIds);
+            for (Object[] row : singleCats) {
+                Long cid = (Long) row[0];
+                String key = (String) row[1];
+                String val = (String) row[2];
+                if (!courseCategoryKeys.containsKey(cid)) {
+                    courseCategoryKeys.computeIfAbsent(cid, k -> new ArrayList<>()).add(key);
+                    courseCategoryNames.computeIfAbsent(cid, k -> new ArrayList<>()).add(val);
+                }
+            }
         }
 
         List<TrainerCourseDetailDTO> courses = filteredProjections.stream().map(p -> {
-            List<String> catKeys = new ArrayList<>();
-            List<String> catNames = new ArrayList<>();
-            com.hango.hango_backend.entity.Course c = courseMap.get(p.getId());
-            if (c != null && c.getCategories() != null && !c.getCategories().isEmpty()) {
-                for (com.hango.hango_backend.entity.SystemParameter sp : c.getCategories()) {
-                    catKeys.add(sp.getParamKey());
-                    catNames.add(sp.getParamValue());
-                }
-            } else if (c != null && c.getCategory() != null) {
-                catKeys.add(c.getCategory().getParamKey());
-                catNames.add(c.getCategory().getParamValue());
-            }
+            List<String> catKeys = courseCategoryKeys.getOrDefault(p.getId(), new ArrayList<>());
+            List<String> catNames = courseCategoryNames.getOrDefault(p.getId(), new ArrayList<>());
 
             return TrainerCourseDetailDTO.builder()
                 .id(p.getId())
