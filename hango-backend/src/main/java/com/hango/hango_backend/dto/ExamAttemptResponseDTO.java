@@ -22,4 +22,5 @@ public class ExamAttemptResponseDTO {
     private String status;
     private Map<String, Integer> answers;
     private Map<String, Boolean> correctness;
+    private Map<String, Integer> correctAnswers;
 }

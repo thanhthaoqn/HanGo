@@ -171,12 +171,19 @@ public class ExamService {
             userAnswerText = rawValue == null ? null : rawValue.toString();
         }
         
+        Integer correctOptIndex = null;
         if (question != null && userAnswerText != null) {
             try {
                 int selectedOptIndex = Integer.parseInt(userAnswerText);
                 List<QuestionOption> options = question.getOptions();
                 if (selectedOptIndex >= 0 && selectedOptIndex < options.size()) {
                     isCorrect = Boolean.TRUE.equals(options.get(selectedOptIndex).getIsCorrect());
+                }
+                for (int i = 0; i < options.size(); i++) {
+                    if (Boolean.TRUE.equals(options.get(i).getIsCorrect())) {
+                        correctOptIndex = i;
+                        break;
+                    }
                 }
             } catch (NumberFormatException e) {
             }
@@ -186,6 +193,7 @@ public class ExamService {
         
         record.put("userAnswer", userAnswerText);
         record.put("isCorrect", isCorrect);
+        record.put("correctAnswer", correctOptIndex);
         record.put("skill", normalizeSkill(skill));
         record.put("topic", normalizeSkill(skill));
 
@@ -211,6 +219,7 @@ public class ExamService {
     private ExamAttemptResponseDTO mapToAttemptDTO(ExamAttempt attempt, int attemptNumber) {
         Map<String, Integer> answers = new java.util.HashMap<>();
         Map<String, Boolean> correctness = new java.util.HashMap<>();
+        Map<String, Integer> correctAnswers = new java.util.HashMap<>();
         try {
             if (attempt.getAnswersJson() != null && !attempt.getAnswersJson().equals("{}")) {
                 List<Map<String, Object>> enrichedList = objectMapper.readValue(attempt.getAnswersJson(), List.class);
@@ -228,6 +237,22 @@ public class ExamService {
                                 correctness.put(indexStr, Boolean.parseBoolean(isCorrectObj.toString()));
                             }
                         } catch (NumberFormatException ex) {
+                        }
+                    }
+                }
+            }
+            
+            // Build correctAnswers map dynamically from DB so old attempts work too
+            if (attempt.getExam() != null) {
+                List<Question> questions = questionRepository.findByExamIdOrderByQuestionOrder(attempt.getExam().getId());
+                for (int i = 0; i < questions.size(); i++) {
+                    Question q = questions.get(i);
+                    if (q != null && q.getOptions() != null) {
+                        for (int j = 0; j < q.getOptions().size(); j++) {
+                            if (Boolean.TRUE.equals(q.getOptions().get(j).getIsCorrect())) {
+                                correctAnswers.put(String.valueOf(i + 1), j);
+                                break;
+                            }
                         }
                     }
                 }
@@ -255,6 +280,7 @@ public class ExamService {
                 .status(isPassed ? "PASSED" : "FAILED")
                 .answers(answers)
                 .correctness(correctness)
+                .correctAnswers(correctAnswers)
                 .build();
     }
     
