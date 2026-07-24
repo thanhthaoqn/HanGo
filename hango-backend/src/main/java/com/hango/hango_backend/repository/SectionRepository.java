@@ -9,4 +9,7 @@ import java.util.List;
 @Repository
 public interface SectionRepository extends JpaRepository<Section, Long> {
     List<Section> findByCourseIdOrderByDisplayOrderAsc(Long courseId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(s) FROM Section s WHERE s.course.id = :courseId")
+    long countByCourseId(@org.springframework.data.repository.query.Param("courseId") Long courseId);
 }
