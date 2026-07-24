@@ -22,7 +22,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _adminEmail = 'thao@hango.edu';
   String _adminInitials = 'T';
   String _adminAvatarUrl = '';
-  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Comment, 5: Profile
+  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Comment, 5: Profile, 6: Approvals, 7: Audit Log
   String _currentCommentTab = 'Lesson';
 
   // Profile tab state variables
@@ -39,8 +39,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isLoadingStats = true;
   String _totalUsers = '0';
   String _totalRoles = '0';
+  String _totalCourses = '0';
+  String _totalEnrollments = '0';
+  List<Map<String, dynamic>> _topCourses = [];
   List<String> _chartLabels = ['18/5', '19/5', '20/5', '21/5', '22/5', '23/5', '24/5'];
   List<double> _chartValues = [0, 0, 0, 0, 0, 0, 0];
+
+  // AI usage stats (FR-RBAC-07) fetched dynamically from DB
+  bool _isLoadingAiUsage = true;
+  int _aiTotalCalls = 0;
+  double _aiSuccessRate = 0.0;
+  int _aiChatCalls = 0;
+  int _aiEmbeddingCalls = 0;
+  List<String> _aiChartLabels = ['18/5', '19/5', '20/5', '21/5', '22/5', '23/5', '24/5'];
+  List<double> _aiChartValues = [0, 0, 0, 0, 0, 0, 0];
+
+  // Audit log entries (FR-RBAC-08) fetched dynamically from DB
+  bool _isLoadingAuditLog = true;
+  List<Map<String, dynamic>> _auditLogEntries = [];
 
   // Accounts tab state and variables
   String _accountsTab = 'trainer'; // 'trainer' | 'course_manager' | 'learner'
@@ -83,6 +99,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _loadAdminInfo();
     _fetchDashboardStats();
     _fetchAccounts();
+    _fetchAiUsageStats();
+    _fetchAuditLog();
   }
 
   @override
@@ -160,9 +178,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final List<dynamic> rawLabels = data['weeklyLabels'] ?? [];
         final List<dynamic> rawValues = data['weeklyValues'] ?? [];
 
+        final List<dynamic> rawTopCourses = data['topCourses'] ?? [];
+
         setState(() {
           _totalUsers = (data['totalUsers'] ?? 0).toString();
           _totalRoles = (data['totalRoles'] ?? 0).toString();
+          _totalCourses = (data['totalCourses'] ?? 0).toString();
+          _totalEnrollments = (data['totalEnrollments'] ?? 0).toString();
+          _topCourses = rawTopCourses.map((c) => Map<String, dynamic>.from(c as Map)).toList();
 
           if (rawLabels.isNotEmpty) {
             _chartLabels = List<String>.from(rawLabels);
@@ -182,6 +205,104 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       debugPrint('Error fetching dashboard stats from DB: $e');
       setState(() {
         _isLoadingStats = false;
+      });
+    }
+  }
+
+  Future<void> _fetchAiUsageStats() async {
+    setState(() {
+      _isLoadingAiUsage = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _isLoadingAiUsage = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse('$apiBaseUrl/admin/ai-usage');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> rawLabels = data['weeklyLabels'] ?? [];
+        final List<dynamic> rawValues = data['weeklyValues'] ?? [];
+
+        setState(() {
+          _aiTotalCalls = (data['totalCalls'] ?? 0) as int;
+          _aiSuccessRate = (data['successRate'] ?? 0).toDouble();
+          _aiChatCalls = (data['chatCalls'] ?? 0) as int;
+          _aiEmbeddingCalls = (data['embeddingCalls'] ?? 0) as int;
+          if (rawLabels.isNotEmpty) {
+            _aiChartLabels = List<String>.from(rawLabels);
+          }
+          if (rawValues.isNotEmpty) {
+            _aiChartValues = rawValues.map((v) => (v as num).toDouble()).toList();
+          }
+          _isLoadingAiUsage = false;
+        });
+      } else {
+        debugPrint('Failed to load AI usage stats: ${response.statusCode} - ${response.body}');
+        setState(() {
+          _isLoadingAiUsage = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching AI usage stats: $e');
+      setState(() {
+        _isLoadingAiUsage = false;
+      });
+    }
+  }
+
+  Future<void> _fetchAuditLog() async {
+    setState(() {
+      _isLoadingAuditLog = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _isLoadingAuditLog = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse('$apiBaseUrl/admin/audit-log?limit=50');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _auditLogEntries = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _isLoadingAuditLog = false;
+        });
+      } else {
+        debugPrint('Failed to load audit log: ${response.statusCode} - ${response.body}');
+        setState(() {
+          _isLoadingAuditLog = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching audit log: $e');
+      setState(() {
+        _isLoadingAuditLog = false;
       });
     }
   }
@@ -1144,7 +1265,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   title: 'Approvals',
                   isMobileDrawer: isMobileDrawer,
                 ),
-                
+                const SizedBox(height: 8),
+                _buildSidebarMenuItem(
+                  index: 7,
+                  icon: Icons.history_outlined,
+                  title: 'Audit Log',
+                  isMobileDrawer: isMobileDrawer,
+                ),
+
                 const Spacer(),
                 const Divider(color: Color(0xFFE5E7EB)),
                 const SizedBox(height: 12),
@@ -1292,6 +1420,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         return _buildProfileTab(isDesktop);
       case 6:
         return const AdminTrainerReviewsPage();
+      case 7:
+        return _buildAuditLogTab();
       default:
         return _buildDashboardTab(isDesktop);
     }
@@ -1364,8 +1494,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // Summary Cards
         LayoutBuilder(
           builder: (context, constraints) {
-            final cardWidth = isDesktop ? (constraints.maxWidth - 24) / 2 : constraints.maxWidth;
-            
+            final cardWidth = isDesktop ? (constraints.maxWidth - 48) / 4 : constraints.maxWidth;
+
             final cardsList = [
               _buildSummaryCard(
                 title: 'Account',
@@ -1379,10 +1509,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               _buildSummaryCard(
                 title: 'Roles',
                 value: _totalRoles,
-                subtitle: 'Total account created',
+                subtitle: 'Total roles defined',
                 icon: Icons.settings_outlined,
                 iconColor: const Color(0xFF059669), // Green
                 bgColor: const Color(0xFFECFDF5), // Soft Green
+                width: cardWidth,
+              ),
+              _buildSummaryCard(
+                title: 'Courses',
+                value: _totalCourses,
+                subtitle: 'Total courses on platform',
+                icon: Icons.menu_book_outlined,
+                iconColor: const Color(0xFFD97706), // Amber
+                bgColor: const Color(0xFFFFFBEB), // Soft amber
+                width: cardWidth,
+              ),
+              _buildSummaryCard(
+                title: 'Enrollments',
+                value: _totalEnrollments,
+                subtitle: 'Total course enrollments',
+                icon: Icons.school_outlined,
+                iconColor: const Color(0xFF7C3AED), // Purple
+                bgColor: const Color(0xFFF5F3FF), // Soft purple
                 width: cardWidth,
               ),
             ];
@@ -1394,11 +1542,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               );
             } else {
               return Column(
-                children: [
-                  cardsList[0],
-                  const SizedBox(height: 16),
-                  cardsList[1],
-                ],
+                children: cardsList
+                    .expand((card) => [card, const SizedBox(height: 16)])
+                    .toList()
+                  ..removeLast(),
               );
             }
           },
@@ -1471,6 +1618,81 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         }
                       ),
                     ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 28),
+
+        // Top Courses by Enrollment
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Top Courses by Enrollment',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_isLoadingStats)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                    ),
+                  ),
+                )
+              else if (_topCourses.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'No enrollment data yet.',
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 14, fontFamily: 'Outfit'),
+                    ),
+                  ),
+                )
+              else
+                ...List.generate(_topCourses.length, (index) {
+                  final course = _topCourses[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          child: Text(
+                            '${index + 1}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6B7280), fontFamily: 'Outfit'),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            (course['title'] ?? 'Untitled').toString(),
+                            style: const TextStyle(fontSize: 14, color: Color(0xFF1F2937), fontFamily: 'Outfit'),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${course['enrollmentCount'] ?? 0} learners',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
             ],
           ),
         ),
@@ -2109,7 +2331,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Monitor AI tutor usage, accuracy metrics, and response benchmarks.',
+          'Real call counts logged from every Gemini API call (chat + embedding), across AI Assistant, '
+          'Question Generation, and Recommendation. No cost/token estimate — no pricing model is configured yet.',
           style: TextStyle(
             fontSize: 14,
             color: Color(0xFF6B7280),
@@ -2122,9 +2345,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         LayoutBuilder(builder: (context, constraints) {
           final double cardWidth = isDesktop ? (constraints.maxWidth - 32) / 3 : constraints.maxWidth;
           final widgets = [
-            _buildAnalyticsCard('Total AI Consults', '24,805', '+18.4% from last week', Icons.bolt, Colors.amber, cardWidth),
-            _buildAnalyticsCard('AI Success Rate', '98.2%', '0.3% error margin', Icons.check_circle_outline, Colors.teal, cardWidth),
-            _buildAnalyticsCard('Avg Response Time', '0.42s', 'Superfast resolution time', Icons.timer_outlined, Colors.purple, cardWidth),
+            _buildAnalyticsCard(
+                'Total AI Calls',
+                _isLoadingAiUsage ? '…' : '$_aiTotalCalls',
+                'Chat + Embedding calls, all-time',
+                Icons.bolt,
+                Colors.amber,
+                cardWidth),
+            _buildAnalyticsCard(
+                'AI Success Rate',
+                _isLoadingAiUsage ? '…' : '$_aiSuccessRate%',
+                '$_aiTotalCalls calls recorded',
+                Icons.check_circle_outline,
+                Colors.teal,
+                cardWidth),
+            _buildAnalyticsCard(
+                'Call Type Split',
+                _isLoadingAiUsage ? '…' : '$_aiChatCalls / $_aiEmbeddingCalls',
+                'Chat calls / Embedding calls',
+                Icons.pie_chart_outline,
+                Colors.purple,
+                cardWidth),
           ];
 
           if (isDesktop) {
@@ -2146,8 +2387,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         }),
 
         const SizedBox(height: 24),
-        
-        // Log history box
+
+        // Weekly call volume chart
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -2159,13 +2400,34 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Recent AI Interactions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Outfit')),
+              const Text('Weekly AI Call Volume - Last 7 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Outfit')),
               const SizedBox(height: 16),
-              _buildInteractionRow('15 seconds ago', 'Summarized course "Lý thuyết Hóa học lớp 12"', 'Status: SUCCESS'),
-              const Divider(),
-              _buildInteractionRow('2 mins ago', 'Generated quiz questions for Exam "Vật lý 10"', 'Status: SUCCESS'),
-              const Divider(),
-              _buildInteractionRow('5 mins ago', 'Answered quiz clarification for "Toán Học Giải Tích"', 'Status: SUCCESS'),
+              _isLoadingAiUsage
+                  ? const SizedBox(
+                      height: 220,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                        ),
+                      ),
+                    )
+                  : SizedBox(
+                      height: 220,
+                      width: double.infinity,
+                      child: Builder(builder: (context) {
+                        double maxVal = _aiChartValues.isEmpty ? 10 : _aiChartValues.reduce((a, b) => a > b ? a : b);
+                        if (maxVal < 10) maxVal = 10;
+                        maxVal = maxVal * 1.25;
+                        return CustomPaint(
+                          painter: LineChartPainter(
+                            values: _aiChartValues,
+                            labels: _aiChartLabels,
+                            maxVal: maxVal,
+                            minVal: 0,
+                          ),
+                        );
+                      }),
+                    ),
             ],
           ),
         ),
@@ -2198,6 +2460,86 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Text(desc, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Outfit')),
         ],
       ),
+    );
+  }
+
+  // ------------------------------------------------------------------------
+  // TAB 7: AUDIT LOG (FR-RBAC-08) — admin actions on user accounts & roles
+  // ------------------------------------------------------------------------
+  Widget _buildAuditLogTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Audit Log',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Recent admin actions on user accounts and roles (create account, update role/profile, activate/deactivate). '
+          'Does not cover other modules\' approve/publish/payment actions.',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF6B7280),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Recent Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Outfit')),
+              const SizedBox(height: 16),
+              if (_isLoadingAuditLog)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                    ),
+                  ),
+                )
+              else if (_auditLogEntries.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'No admin actions recorded yet.',
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 14, fontFamily: 'Outfit'),
+                    ),
+                  ),
+                )
+              else
+                ...List.generate(_auditLogEntries.length, (index) {
+                  final entry = _auditLogEntries[index];
+                  final actorName = (entry['actorName'] ?? 'System').toString();
+                  final details = (entry['details'] ?? '').toString();
+                  final actionType = (entry['actionType'] ?? '').toString();
+                  final createdAt = (entry['createdAt'] ?? '').toString();
+                  return Column(
+                    children: [
+                      _buildInteractionRow(createdAt, '$actorName — $details', actionType),
+                      if (index != _auditLogEntries.length - 1) const Divider(),
+                    ],
+                  );
+                }),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -2241,7 +2583,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Configure permissions and visibility rules for system roles.',
+          'Read-only reference of what each role can actually do today, enforced in backend code '
+          '(Spring Security @PreAuthorize per endpoint). There is no dynamic permission matrix yet — '
+          'permissions are fixed per role at the code level, not configurable from this screen.',
           style: TextStyle(
             fontSize: 14,
             color: Color(0xFF6B7280),
@@ -2252,30 +2596,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
         LayoutBuilder(builder: (context, constraints) {
           final double cardWidth = isDesktop ? (constraints.maxWidth - 20) / 2 : constraints.maxWidth;
-          
+
           final cardsList = [
             _buildRoleConfigCard(
               'LEARNER',
-              'The default role for platform users. Allows access to browse courses, review materials, receive AI learning recommendations, and run exams standard to high school syllabus.',
-              ['Take Exams', 'Browse Courses', 'AI Recommendations'],
+              'Default role for platform users. Enroll in and learn Courses, attempt Quiz/Exam (unlimited retakes), rate completed Courses, comment/reply on Lesson & Quiz, and use the AI Learning Assistant.',
+              ['Enroll & Learn Courses', 'Attempt Quiz & Exam', 'Rate Courses & Comment', 'AI Learning Assistant'],
               cardWidth,
             ),
             _buildRoleConfigCard(
               'TRAINER',
-              'Intended for teachers or content curators. Grants privileges to create exams, write course sections, compile sample test libraries, and inspect student performance stats.',
-              ['Create Course Contents', 'Manage Practice Tests', 'Grade Essay Submissions'],
+              'Content creator role (Teacher/Tutor). Create and manage own Course/Section/Lesson/Quiz, manage own Question Bank, create Exams, and track own revenue. Also has Learner mode (dual-mode).',
+              ['Create & Manage Own Courses', 'Manage Question Bank', 'Create Exams', 'View Own Revenue'],
               cardWidth,
             ),
             _buildRoleConfigCard(
-              'TRAINER LEAD',
-              'Managerial supervisor role. Has the access right to assign syllabus, audit trainer profiles, verify courses before publishing, and read learning analytics.',
-              ['Audit Courses', 'Approve Syllabus Releases', 'Read Training Analytics'],
+              'COURSE MANAGER  (role: TRAINER_LEAD)',
+              'Content-quality oversight role. Views platform dashboard stats, creates/manages Exams, and receives Course rating-quality notifications (low rating / low average). '
+              'Note: a full Course review/approve/publish workflow is not implemented in the backend yet — this role currently cannot approve or reject a Trainer\'s Course.',
+              ['View Platform Dashboard', 'Create & Manage Exams', 'View Rating Notifications'],
               cardWidth,
             ),
             _buildRoleConfigCard(
               'ADMINISTRATOR',
-              'Total administrative system controls. Grants the capability to view administrative summaries, configure application settings, create/delete accounts, assign security roles, and monitor AI parameters.',
-              ['User Account Control', 'Access System Settings', 'Override Database records'],
+              'System/user administration role. Manages user accounts (create/activate/deactivate/assign role), moderates comments, reviews Trainer applications, and views the platform dashboard, audit log, and AI usage stats. Does not manage revenue/payouts (Course Manager\'s job).',
+              ['Manage Accounts & Roles', 'Moderate Comments', 'Review Trainer Applications', 'Audit Log & AI Usage'],
               cardWidth,
             ),
           ];
@@ -2319,9 +2664,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF28B79B), fontFamily: 'Outfit')),
+              Expanded(
+                child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF28B79B), fontFamily: 'Outfit')),
+              ),
+              const SizedBox(width: 8),
               const Icon(Icons.shield_outlined, color: Color(0xFF28B79B), size: 20),
             ],
           ),

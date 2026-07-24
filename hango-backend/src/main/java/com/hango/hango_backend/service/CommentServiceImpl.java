@@ -21,6 +21,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentRepository commentRepository;
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
+    private final CommentRuleEngineService ruleEngineService;
 
     private CommentDTO convertToDTO(Comment comment, Long currentUserId) {
         return CommentDTO.builder()
@@ -34,6 +35,7 @@ public class CommentServiceImpl implements CommentService {
                 .likeCount(comment.getLikedUsers() != null ? comment.getLikedUsers().size() : 0)
                 .isLiked(currentUserId != null && comment.getLikedUsers() != null &&
                         comment.getLikedUsers().stream().anyMatch(u -> u.getId().equals(currentUserId)))
+                .status(comment.getStatus())
                 .build();
     }
 
@@ -41,8 +43,26 @@ public class CommentServiceImpl implements CommentService {
     public List<CommentDTO> getCommentsByLesson(Long lessonId, Long currentUserId) {
         return commentRepository.findByLessonIdOrderByCreatedAtDesc(lessonId)
                 .stream()
+                .filter(comment -> isVisibleTo(comment, currentUserId))
                 .map(comment -> convertToDTO(comment, currentUserId))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * APPROVED is visible to everyone. PENDING (awaiting Admin review) is still visible to its own
+     * author, so they know it wasn't lost. REJECTED is hidden from everyone, including the author —
+     * the author already got the "violates community guidelines" message at submit time, and the
+     * spec is explicit that a rejected comment is Hidden with no exception.
+     */
+    private boolean isVisibleTo(Comment comment, Long currentUserId) {
+        String status = comment.getStatus();
+        if (CommentRuleEngineService.STATUS_APPROVED.equals(status)) {
+            return true;
+        }
+        if (CommentRuleEngineService.STATUS_PENDING.equals(status)) {
+            return currentUserId != null && comment.getUser().getId().equals(currentUserId);
+        }
+        return false;
     }
 
     @Override
@@ -58,12 +78,16 @@ public class CommentServiceImpl implements CommentService {
                     .orElseThrow(() -> new RuntimeException("Parent comment not found"));
         }
 
+        CommentModerationResult moderation = ruleEngineService.evaluate(request.getContent());
+
         Comment comment = Comment.builder()
                 .lesson(lesson)
                 .user(user)
                 .content(request.getContent())
+                .normalizedContent(moderation.normalizedContent())
+                .detectionReason(moderation.detectionReason())
                 .parentComment(parent)
-                .status("APPROVED")
+                .status(moderation.status())
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
@@ -79,7 +103,11 @@ public class CommentServiceImpl implements CommentService {
             throw new RuntimeException("You are not allowed to edit this comment");
         }
 
+        CommentModerationResult moderation = ruleEngineService.evaluate(request.getContent());
         comment.setContent(request.getContent());
+        comment.setNormalizedContent(moderation.normalizedContent());
+        comment.setDetectionReason(moderation.detectionReason());
+        comment.setStatus(moderation.status());
         Comment savedComment = commentRepository.save(comment);
         return convertToDTO(savedComment, userId);
     }

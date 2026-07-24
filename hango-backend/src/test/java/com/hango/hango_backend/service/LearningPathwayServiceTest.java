@@ -371,4 +371,156 @@ class LearningPathwayServiceTest {
                 .creator(User.builder().id(100L).build())
                 .build();
     }
+
+    // =================================================================
+    // getMyPathway
+    // =================================================================
+
+    @Test
+    void getMyPathwayShouldThrowWhenNoActivePathwayFound() {
+        when(learningPathwayRepository.findByStudentIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.empty());
+
+        ApiException exception = assertThrows(ApiException.class, () -> learningPathwayService.getMyPathway(1L));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+    }
+
+    @Test
+    void getMyPathwayShouldReturnActivePathwayForStudent() {
+        User student = User.builder().id(1L).build();
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(student).status("ACTIVE").build();
+        when(learningPathwayRepository.findByStudentIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(pathway));
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+
+        LearningPathwayResponseDTO result = learningPathwayService.getMyPathway(1L);
+
+        assertEquals(10L, result.getPathwayId());
+    }
+
+    // =================================================================
+    // getScheduleStatus
+    // =================================================================
+
+    @Test
+    void getScheduleStatusShouldRejectOtherLearnersPathway() {
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(User.builder().id(2L).build()).build();
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        ApiException exception = assertThrows(ApiException.class, () -> learningPathwayService.getScheduleStatus(10L, 1L));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+    }
+
+    @Test
+    void getScheduleStatusShouldReturnNoneWhenNotSet() {
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(User.builder().id(1L).build()).build();
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        String result = learningPathwayService.getScheduleStatus(10L, 1L);
+
+        assertEquals("NONE", result);
+    }
+
+    @Test
+    void getScheduleStatusShouldReturnStoredValueWhenSet() {
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(User.builder().id(1L).build()).scheduleStatus("BEHIND").build();
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        String result = learningPathwayService.getScheduleStatus(10L, 1L);
+
+        assertEquals("BEHIND", result);
+    }
+
+    // =================================================================
+    // chatWithMentor
+    // =================================================================
+
+    @Test
+    void chatWithMentorShouldRejectOtherLearnersPathway() {
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(User.builder().id(2L).build()).build();
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> learningPathwayService.chatWithMentor(10L, 1L, "What's my score?"));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+    }
+
+    @Test
+    void chatWithMentorShouldNotLeakRawAnswersJsonIntoThePrompt() {
+        User student = User.builder().id(1L).build();
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(student).build();
+        PathwayNode nodeItem = PathwayNode.builder().stepOrder(1).course(course(1L, "Grammar Basics", "PUBLISHED")).status("IN_PROGRESS").build();
+        pathway.addNode(nodeItem);
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+        when(examResultAnalyzerService.analyzeLearnerAttempts(eq(1L), any())).thenReturn(
+                com.hango.hango_backend.dto.ExamResultAnalysisDTO.builder()
+                        .knowledgeGapsJson("{\"weak_skills\":[\"Reading\"]}")
+                        .hints(java.util.Map.of("score_avg", 6.0))
+                        .build());
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("Mentor reply");
+
+        String reply = learningPathwayService.chatWithMentor(10L, 1L, "What's my latest score?");
+
+        assertEquals("Mentor reply", reply);
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
+        assertTrue(promptCaptor.getValue().contains("Grammar Basics"));
+    }
+
+    // =================================================================
+    // applySchedule
+    // =================================================================
+
+    @Test
+    void applyScheduleShouldSetGoalFieldsAndScheduleStatusOnTrack() {
+        User student = User.builder().id(1L).build();
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(student).build();
+        PathwayNode nodeItem = PathwayNode.builder().stepOrder(1).course(course(1L, "Grammar Basics", "PUBLISHED")).status("IN_PROGRESS").build();
+        pathway.addNode(nodeItem);
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(learningPathwayRepository.save(any(LearningPathway.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(lessonRepository.countByCourseId(1L)).thenReturn(4L);
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 1L)).thenReturn(0L);
+
+        com.hango.hango_backend.dto.PathwayScheduleRequestDTO req = new com.hango.hango_backend.dto.PathwayScheduleRequestDTO();
+        req.setGoalName("Pass IELTS 6.5");
+        req.setTargetDate(java.time.LocalDate.now().plusWeeks(4));
+        req.setHoursPerWeek(5);
+
+        LearningPathwayResponseDTO result = learningPathwayService.applySchedule(10L, 1L, req);
+
+        assertEquals("Pass IELTS 6.5", result.getGoalName());
+        assertEquals("ON_TRACK", result.getScheduleStatus());
+        assertNotNull(pathway.getNodes().get(0).getEstimatedHours());
+    }
+
+    // =================================================================
+    // generatePathway — empty course catalogue fallback
+    // =================================================================
+
+    @Test
+    void generatePathwayShouldReturnEmptyPathwayMessageWhenNoCoursesExistAtAll() {
+        User student = User.builder().id(1L).build();
+        ExamAttempt examAttempt = examAttempt(student);
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(student));
+        when(examAttemptRepository.findById(5L)).thenReturn(Optional.of(examAttempt));
+        when(courseRepository.findAll()).thenReturn(List.of());
+        when(learningPathwayRepository.findByStudentIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.empty());
+        when(learningPathwayRepository.save(any(LearningPathway.class))).thenAnswer(inv -> {
+            LearningPathway p = inv.getArgument(0);
+            p.setId(200L);
+            return p;
+        });
+
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(5L);
+        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, req);
+
+        assertTrue(result.getMentorSummary().contains("No courses are available"));
+        assertTrue(result.getNodes() == null || result.getNodes().isEmpty());
+        verify(geminiClientService, never()).generateChatResponse(anyString(), any());
+    }
 }

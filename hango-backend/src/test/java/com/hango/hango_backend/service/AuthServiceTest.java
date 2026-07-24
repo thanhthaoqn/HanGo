@@ -280,18 +280,27 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerUserShouldIgnoreClientSuppliedRoleAndAlwaysAssignLearner() {
+    void registerUserShouldAllowSelfRegistrationAsTrainerWhenRoleRequested() {
         when(userRepository.existsByEmail("new3@example.com")).thenReturn(false);
-        when(roleRepository.findByRoleName("LEARNER"))
-                .thenReturn(Optional.of(Role.builder().id(1L).roleName("LEARNER").build()));
+        when(roleRepository.findByRoleName("TRAINER"))
+                .thenReturn(Optional.of(Role.builder().id(2L).roleName("TRAINER").build()));
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UserResponse response = authService.registerUser(registerRequest("new3@example.com", "pass1234", "TRAINER"));
 
-        assertEquals(List.of("LEARNER"), response.getRoles());
-        verify(roleRepository, never()).findByRoleName("TRAINER");
-        verify(roleRepository, never()).findByRoleName("ADMINISTRATOR");
+        assertEquals(List.of("TRAINER"), response.getRoles());
+        verify(roleRepository, never()).findByRoleName("LEARNER");
+    }
+
+    @Test
+    void registerUserShouldRejectRoleOutsideLearnerTrainerWhitelist() {
+        when(userRepository.existsByEmail("new5@example.com")).thenReturn(false);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.registerUser(registerRequest("new5@example.com", "pass1234", "ADMINISTRATOR")));
+        assertTrue(ex.getMessage().contains("Invalid registration role"));
+        verify(userRepository, never()).save(any());
     }
 
     @Test
@@ -306,6 +315,89 @@ class AuthServiceTest {
         UserResponse response = assertDoesNotThrow(
                 () -> authService.registerUser(registerRequest("new4@example.com", "pass1234", null)));
         assertEquals("new4@example.com", response.getEmail());
+    }
+
+    // =================================================================
+    // createUserByAdmin
+    // =================================================================
+
+    @Test
+    void createUserByAdminShouldRejectDuplicateEmail() {
+        when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.createUserByAdmin(registerRequest("existing@example.com", "pass1234", "TRAINER")));
+        assertTrue(ex.getMessage().contains("already in use"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void createUserByAdminShouldDefaultToTrainerRoleWhenNoneRequested() {
+        when(userRepository.existsByEmail("cm1@example.com")).thenReturn(false);
+        when(roleRepository.findByRoleName("TRAINER"))
+                .thenReturn(Optional.of(Role.builder().id(2L).roleName("TRAINER").build()));
+        when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = authService.createUserByAdmin(registerRequest("cm1@example.com", "pass1234", null));
+
+        assertEquals(List.of("TRAINER"), response.getRoles());
+    }
+
+    @Test
+    void createUserByAdminShouldAllowCreatingTrainerLeadRole() {
+        when(userRepository.existsByEmail("cm2@example.com")).thenReturn(false);
+        when(roleRepository.findByRoleName("TRAINER_LEAD"))
+                .thenReturn(Optional.of(Role.builder().id(3L).roleName("TRAINER_LEAD").build()));
+        when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = authService.createUserByAdmin(registerRequest("cm2@example.com", "pass1234", "TRAINER_LEAD"));
+
+        assertEquals(List.of("TRAINER_LEAD"), response.getRoles());
+    }
+
+    @Test
+    void createUserByAdminShouldNormalizeAdminAliasToAdministrator() {
+        when(userRepository.existsByEmail("admin2@example.com")).thenReturn(false);
+        when(roleRepository.findByRoleName("ADMINISTRATOR"))
+                .thenReturn(Optional.of(Role.builder().id(4L).roleName("ADMINISTRATOR").build()));
+        when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = authService.createUserByAdmin(registerRequest("admin2@example.com", "pass1234", "admin"));
+
+        assertEquals(List.of("ADMINISTRATOR"), response.getRoles());
+    }
+
+    @Test
+    void createUserByAdminShouldRejectRoleOutsideWhitelistInsteadOfSilentlyCreatingGarbageRole() {
+        // Regression test: previously any non-empty string was accepted and, if the role didn't already
+        // exist, silently auto-created a new garbage row in the roles table (e.g. a typo'd role name).
+        when(userRepository.existsByEmail("typo@example.com")).thenReturn(false);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.createUserByAdmin(registerRequest("typo@example.com", "pass1234", "TRANIER")));
+        assertTrue(ex.getMessage().contains("Invalid role"));
+        verify(roleRepository, never()).findByRoleName(anyString());
+        verify(roleRepository, never()).save(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void createUserByAdminShouldMarkAccountVerifiedAndActiveByDefault() {
+        when(userRepository.existsByEmail("cm3@example.com")).thenReturn(false);
+        when(roleRepository.findByRoleName("TRAINER"))
+                .thenReturn(Optional.of(Role.builder().id(2L).roleName("TRAINER").build()));
+        when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.createUserByAdmin(registerRequest("cm3@example.com", "pass1234", "TRAINER"));
+
+        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(savedUser.capture());
+        assertTrue(savedUser.getValue().getIsVerified());
+        assertEquals("ACTIVE", savedUser.getValue().getStatus());
     }
 
     // =================================================================

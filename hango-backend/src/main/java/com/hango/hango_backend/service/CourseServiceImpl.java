@@ -15,8 +15,6 @@ import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.entity.CourseRating;
-import com.hango.hango_backend.repository.CourseRatingRepository;
 import com.hango.hango_backend.repository.TrainerProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,7 +36,6 @@ public class CourseServiceImpl implements CourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final LessonProgressRepository lessonProgressRepository;
-    private final CourseRatingRepository courseRatingRepository;
     private final TrainerProfileRepository trainerProfileRepository;
 
     @Override
@@ -155,18 +152,9 @@ public class CourseServiceImpl implements CourseService {
             // Ignore
         }
 
-        // Calculate average rating dynamically from DB reviews/ratings
-        double averageRating = 0.0;
-        List<CourseRating> ratings = courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(id);
-        if (!ratings.isEmpty()) {
-            double sum = 0;
-            for (CourseRating r : ratings) {
-                sum += (r.getRating() != null ? r.getRating() : 0);
-            }
-            averageRating = sum / ratings.size();
-            // Round to 1 decimal place
-            averageRating = Math.round(averageRating * 10.0) / 10.0;
-        }
+        // Average rating / total ratings are cached on Course by CourseRatingServiceImpl for quick display.
+        double averageRating = course.getAverageRating() != null ? course.getAverageRating() : 0.0;
+        int totalRatings = course.getTotalRatings() != null ? course.getTotalRatings() : 0;
 
         return CourseDetailDTO.builder()
                 .id(course.getId())
@@ -178,6 +166,7 @@ public class CourseServiceImpl implements CourseService {
                 .categoryName(categoryName)
                 .thumbnailUrl(course.getThumbnailUrl())
                 .rating(averageRating)
+                .totalRatings(totalRatings)
                 .learnersCount(learnersCount)
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
