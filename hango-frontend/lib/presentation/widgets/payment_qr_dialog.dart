@@ -5,14 +5,16 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../data/repositories/payment_repository.dart';
 
 class PaymentQrDialog extends StatefulWidget {
-  final int courseId;
+  final int? courseId;
+  final List<int>? courseIds;
   final String courseTitle;
   final double price;
   final VoidCallback onPaymentSuccess;
 
   const PaymentQrDialog({
     super.key,
-    required this.courseId,
+    this.courseId,
+    this.courseIds,
     required this.courseTitle,
     required this.price,
     required this.onPaymentSuccess,
@@ -55,7 +57,10 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
 
   Future<void> _createPayment() async {
     try {
-      final result = await _paymentRepository.createPayment(widget.courseId);
+      final result = await _paymentRepository.createPayment(
+        courseId: widget.courseId,
+        courseIds: widget.courseIds,
+      );
       if (!mounted) return;
       setState(() {
         _paymentUrl = result['paymentUrl'] as String?;
@@ -115,6 +120,14 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
             setState(() {
               _isPolling = false;
               _errorMessage = 'Thanh toán thất bại. Vui lòng thử lại.';
+            });
+          }
+        } else if (paymentStatus == 'EXPIRED') {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _isPolling = false;
+              _errorMessage = 'Mã thanh toán đã hết hạn. Vui lòng đóng popup và thử lại.';
             });
           }
         }

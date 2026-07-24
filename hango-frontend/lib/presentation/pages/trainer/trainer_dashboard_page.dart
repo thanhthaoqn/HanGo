@@ -13,9 +13,11 @@ import 'trainer_exams_page.dart';
 import '../../../utils/toast_helper.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import 'trainer_profile_page.dart';
+import 'trainer_revenue_page.dart';
 
 class TrainerDashboardPage extends StatefulWidget {
-  const TrainerDashboardPage({super.key});
+  final bool isEmbedded;
+  const TrainerDashboardPage({super.key, this.isEmbedded = false});
 
   @override
   State<TrainerDashboardPage> createState() => _TrainerDashboardPageState();
@@ -169,6 +171,10 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    if (widget.isEmbedded) {
+      return _buildBodyContent(context, isDesktop, size);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
@@ -181,43 +187,48 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               children: [
                 _buildHeader(context, !isDesktop),
                 Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486)))
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildWelcomeSection(),
-                              const SizedBox(height: 32),
-                              _buildMetricCards(size.width),
-                              const SizedBox(height: 32),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: _buildChartSection(),
-                                  ),
-                                  if (isDesktop) const SizedBox(width: 24),
-                                  if (isDesktop)
-                                    Expanded(
-                                      flex: 1,
-                                      child: _buildRecentActivitySection(),
-                                    ),
-                                ],
-                              ),
-                              if (!isDesktop) const SizedBox(height: 32),
-                              if (!isDesktop) _buildRecentActivitySection(),
-                              const SizedBox(height: 32),
-                              _buildCoursesSection(),
-                            ],
-                          ),
-                        ),
+                  child: _buildBodyContent(context, isDesktop, size),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBodyContent(BuildContext context, bool isDesktop, Size size) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF20B486)));
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildWelcomeSection(),
+          const SizedBox(height: 32),
+          _buildMetricCards(size.width),
+          const SizedBox(height: 32),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: _buildChartSection(),
+              ),
+              if (isDesktop) const SizedBox(width: 24),
+              if (isDesktop)
+                Expanded(
+                  flex: 1,
+                  child: _buildRecentActivitySection(),
+                ),
+            ],
+          ),
+          if (!isDesktop) const SizedBox(height: 32),
+          if (!isDesktop) _buildRecentActivitySection(),
+          const SizedBox(height: 32),
+          _buildCoursesSection(),
         ],
       ),
     );
@@ -276,6 +287,18 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           _buildSidebarItem(Icons.quiz_rounded, 'Question Bank', onTap: () {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()));
           }),
+          _buildSidebarItem(
+            Icons.account_balance_wallet_rounded,
+            'Revenue',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerRevenuePage(),
+                ),
+              );
+            },
+          ),
           _buildSidebarItem(Icons.person_rounded, 'Profile', onTap: () {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerProfilePage()));
           }),

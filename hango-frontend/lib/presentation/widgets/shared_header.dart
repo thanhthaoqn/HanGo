@@ -14,7 +14,6 @@ import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/course_manager/course_manager_dashboard_page.dart';
 import '../pages/trainer/trainer_dashboard_page.dart';
 import '../pages/learner/my_learning_page.dart';
-import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
 
 import '../../utils/toast_helper.dart';
@@ -55,8 +54,7 @@ class _SharedHeaderState extends State<SharedHeader> {
   int _cartCount = 0;
   List<String> _userRoles = [];
 
-  List<Course> _allCourses = [];
-  List<String> _cartIds = [];
+  List<Course> _cartCourses = [];
 
   OverlayEntry? _cartOverlayEntry;
   final LayerLink _cartLink = LayerLink();
@@ -66,14 +64,36 @@ class _SharedHeaderState extends State<SharedHeader> {
   @override
   void initState() {
     super.initState();
-    _loadUserInfo();
     _isVietnamese = LanguageManager.isVi;
-    LanguageManager.isVietnamese.addListener(_onLanguageChanged);
-    CartManager.cartCountNotifier.addListener(_onCartChanged);
-    CartManager.updateCount();
 
-    _loadCartIds();
-    _fetchAllCoursesForDropdowns();
+    // Instant synchronous in-memory populate (0ms lag)
+    if (AuthService.cachedIsLoggedIn != null) {
+      _isLoggedIn = AuthService.cachedIsLoggedIn!;
+      _userFullName = AuthService.cachedFullName ?? 'Learner';
+      _userEmail = AuthService.cachedEmail ?? '';
+      _userAvatarUrl = AuthService.cachedAvatarUrl ?? '';
+      _updateInitials(_userFullName);
+    }
+
+    _cartCourses = CartManager.cartCoursesNotifier.value;
+    _cartCount = CartManager.cartCountNotifier.value;
+
+    LanguageManager.isVietnamese.addListener(_onLanguageChanged);
+    AuthService.userChangeNotifier.addListener(_onUserChanged);
+    CartManager.cartCountNotifier.addListener(_onCartChanged);
+    CartManager.cartCoursesNotifier.addListener(_onCartCoursesChanged);
+
+    _loadUserInfo();
+    CartManager.updateCount();
+  }
+
+  void _updateInitials(String name) {
+    if (name.trim().isNotEmpty) {
+      final parts = name.trim().split(' ');
+      if (parts.isNotEmpty) {
+        _userInitials = parts.last[0].toUpperCase();
+      }
+    }
   }
 
   void _onLanguageChanged() {
@@ -84,34 +104,26 @@ class _SharedHeaderState extends State<SharedHeader> {
     }
   }
 
+  void _onUserChanged() {
+    if (mounted) {
+      _loadUserInfo();
+    }
+  }
+
   void _onCartChanged() {
     if (mounted) {
       setState(() {
         _cartCount = CartManager.cartCountNotifier.value;
       });
-      _loadCartIds();
     }
   }
 
-  Future<void> _loadCartIds() async {
-    final prefs = await SharedPreferences.getInstance();
+  void _onCartCoursesChanged() {
     if (mounted) {
       setState(() {
-        _cartIds = prefs.getStringList('cart_course_ids') ?? [];
+        _cartCourses = CartManager.cartCoursesNotifier.value;
+        _cartCount = CartManager.cartCountNotifier.value;
       });
-    }
-  }
-
-  Future<void> _fetchAllCoursesForDropdowns() async {
-    try {
-      final courses = await CourseRepository().fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
-      if (mounted) {
-        setState(() {
-          _allCourses = courses;
-        });
-      }
-    } catch (e) {
-      // ignore
     }
   }
 
@@ -119,7 +131,9 @@ class _SharedHeaderState extends State<SharedHeader> {
   void dispose() {
     _hideCartOverlay();
     LanguageManager.isVietnamese.removeListener(_onLanguageChanged);
+    AuthService.userChangeNotifier.removeListener(_onUserChanged);
     CartManager.cartCountNotifier.removeListener(_onCartChanged);
+    CartManager.cartCoursesNotifier.removeListener(_onCartCoursesChanged);
     super.dispose();
   }
 
@@ -189,11 +203,9 @@ class _SharedHeaderState extends State<SharedHeader> {
     });
   }
 
-
-
   Widget _buildCartDropdown() {
     final isVi = _isVietnamese;
-    final cartCourses = _allCourses.where((c) => _cartIds.contains(c.id.toString())).toList();
+    final cartCourses = _cartCourses;
 
     int totalVal = 0;
     for (final c in cartCourses) {
@@ -369,15 +381,13 @@ class _SharedHeaderState extends State<SharedHeader> {
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final cartList = prefs.getStringList('cart_course_ids') ?? [];
-    final cartCount = cartList.length;
     final token = prefs.getString('auth_token');
 
     if (token == null) {
+      AuthService.cachedIsLoggedIn = false;
       if (mounted) {
         setState(() {
           _isLoggedIn = false;
-          _cartCount = cartCount;
         });
       }
       return;
@@ -386,6 +396,11 @@ class _SharedHeaderState extends State<SharedHeader> {
     final fullName = prefs.getString('user_fullname') ?? 'Learner';
     final email = prefs.getString('user_email') ?? '';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
+
+    AuthService.cachedFullName = fullName;
+    AuthService.cachedEmail = email;
+    AuthService.cachedAvatarUrl = avatarUrl;
+    AuthService.cachedIsLoggedIn = true;
 
     String initials = 'L';
     if (fullName.trim().isNotEmpty) {
@@ -404,7 +419,6 @@ class _SharedHeaderState extends State<SharedHeader> {
         _userEmail = email;
         _userInitials = initials;
         _userAvatarUrl = avatarUrl;
-        _cartCount = cartCount;
         _userRoles = roles;
       });
     }
@@ -853,9 +867,19 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     );
                   } else if (val == 'cart') {
-                    ToastHelper.show(context, _isVietnamese ? 'Mở giỏ hàng của bạn' : 'Opening your cart');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CartPage(),
+                      ),
+                    );
                   } else if (val == 'purchase_history') {
-                    ToastHelper.show(context, _isVietnamese ? 'Mở lịch sử mua hàng' : 'Opening purchase history');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyInformationPage(initialTab: 2),
+                      ),
+                    );
                   } else if (val == 'notifications') {
                     ToastHelper.show(context, _isVietnamese ? 'Không có thông báo mới' : 'No new notifications');
                   }
@@ -1039,21 +1063,6 @@ class _SharedHeaderState extends State<SharedHeader> {
                                 color: Color(0xFF1E293B),
                                 fontWeight: FontWeight.w500,
                                 fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF8B5CF6),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              '5',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),

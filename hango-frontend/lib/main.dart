@@ -6,6 +6,7 @@ import 'presentation/pages/learner/learner_home_page.dart';
 import 'presentation/pages/course_manager/course_manager_dashboard_page.dart';
 import 'presentation/pages/admin/admin_dashboard_page.dart';
 import 'presentation/pages/trainer/trainer_dashboard_page.dart';
+import 'presentation/pages/trainer/trainer_shell_page.dart';
 import 'presentation/pages/trainer/onboarding/trainer_type_selection_page.dart';
 import 'presentation/pages/trainer/onboarding/trainer_onboarding_status_page.dart';
 import 'presentation/pages/trainer/onboarding/trainer_onboarding_details_page.dart';
@@ -137,7 +138,7 @@ class _TrainerRouteGateState extends State<TrainerRouteGate> {
           } else {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
+              MaterialPageRoute(builder: (context) => const TrainerShellPage()),
             );
           }
         } else if (status == 'AWAITING_APPROVAL' ||

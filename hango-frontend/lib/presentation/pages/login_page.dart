@@ -12,6 +12,7 @@ import 'forgot_password_page.dart';
 import 'learner/learner_home_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'trainer/trainer_dashboard_page.dart';
+import 'trainer/trainer_shell_page.dart';
 import 'course_manager/course_manager_dashboard_page.dart';
 import 'trainer/onboarding/trainer_type_selection_page.dart';
 import 'trainer/onboarding/trainer_onboarding_status_page.dart';
@@ -19,6 +20,7 @@ import 'trainer/onboarding/trainer_onboarding_details_page.dart';
 import 'trainer/onboarding/trainer_onboarding_agreement_page.dart';
 import 'trainer/onboarding/trainer_payout_details_page.dart';
 import '../../data/services/trainer_onboarding_service.dart';
+import '../../utils/cart_manager.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -40,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
 
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId:
-        '793292778359-frlad2ktuqo6mo27fkilqbjqcdqbqko1.apps.googleusercontent.com',
+        '814191576087-mig0a1q44o8el7iqm8bkui1g0stb5a89.apps.googleusercontent.com',
     scopes: const ['email', 'profile'],
   );
 
@@ -111,6 +113,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _navigateAfterSuccess(List<String> roles) async {
+    await CartManager.syncGuestCartOnLogin();
     final prefs = await SharedPreferences.getInstance();
     final redirectFlag =
         prefs.getBool('redirect_to_trainer_onboarding') ?? false;
@@ -222,7 +225,7 @@ class _LoginPageState extends State<LoginPage> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const TrainerDashboardPage(),
+                  builder: (context) => const TrainerShellPage(),
                 ),
               );
             }
@@ -359,6 +362,7 @@ class _LoginPageState extends State<LoginPage> {
               size: web.GSIButtonSize.large,
               text: web.GSIButtonText.signinWith,
               shape: web.GSIButtonShape.rectangular,
+              locale: 'en',
             ),
           ),
         );

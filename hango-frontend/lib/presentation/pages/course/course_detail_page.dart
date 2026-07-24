@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course_detail.dart';
+import '../../../domain/model/course.dart';
 import '../../../domain/model/course_review_summary.dart';
 import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
@@ -1394,8 +1395,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   Future<void> _checkCartStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cart = prefs.getStringList('cart_course_ids') ?? [];
+    final cart = await CartManager.getCartIds();
     if (mounted) {
       setState(() {
         _isInCart = cart.contains(widget.courseId.toString());
@@ -1404,19 +1404,32 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   Future<void> _addToCart() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cart = prefs.getStringList('cart_course_ids') ?? [];
-    final courseIdStr = widget.courseId.toString();
+    final isVi = LanguageManager.isVi;
+    if (_courseDetail == null) return;
 
-    if (!cart.contains(courseIdStr)) {
-      cart.add(courseIdStr);
-      await prefs.setStringList('cart_course_ids', cart);
-      await CartManager.updateCount();
-      _showNotification('Added to cart successfully!');
-      setState(() {
-        _isInCart = true;
-      });
-    }
+    // 1. Optimistic UI update (0ms lag)
+    setState(() {
+      _isInCart = true;
+    });
+    _showNotification(isVi ? 'Đã thêm vào giỏ hàng thành công!' : 'Added to cart successfully!');
+
+    // 2. Convert detail to Course object and sync optimistically
+    final detail = _courseDetail!;
+    final courseObj = Course(
+      id: detail.id,
+      title: detail.title,
+      category: detail.difficultyName,
+      creatorName: detail.creatorName,
+      stars: detail.rating,
+      difficulty: detail.difficultyName,
+      learnerCount: '${detail.learnersCount}',
+      thumbnailUrl: detail.thumbnailUrl ?? '',
+      status: 'featured',
+      progressPercentage: 0.0,
+      price: detail.price,
+    );
+
+    await CartManager.addToCart(courseObj);
   }
 
   String _getCoursePrice(CourseDetail course) {

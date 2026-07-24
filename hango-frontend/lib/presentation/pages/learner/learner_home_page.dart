@@ -18,6 +18,7 @@ import '../../../utils/language_manager.dart';
 import '../../widgets/shared_footer.dart';
 import 'learning_pathway_page.dart';
 import '../exam/entry_exam_instruction_page.dart';
+import 'my_information_page.dart';
 import '../exam/take_exam_page.dart';
 import '../trainer/trainer_dashboard_page.dart';
 import '../trainer/onboarding/trainer_type_selection_page.dart';
@@ -800,6 +801,19 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const LearningPathwayPage(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.history_rounded),
+            title: const Text('Purchase History'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MyInformationPage(initialTab: 2),
                 ),
               );
             },

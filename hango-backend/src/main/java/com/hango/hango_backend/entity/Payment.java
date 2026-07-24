@@ -23,8 +23,11 @@ public class Payment {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id", nullable = false)
+    @JoinColumn(name = "course_id", nullable = true)
     private Course course;
+
+    @Column(name = "course_ids", length = 255)
+    private String courseIds;
 
     @Column(name = "txn_ref", nullable = false, unique = true, length = 100)
     private String txnRef;
@@ -47,4 +50,17 @@ public class Payment {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    @Column(name = "platform_fee", precision = 12, scale = 2)
+    private BigDecimal platformFee;
+
+    @Column(name = "trainer_earnings", precision = 12, scale = 2)
+    private BigDecimal trainerEarnings;
+
+    @Builder.Default
+    @Column(name = "settlement_status", length = 30)
+    private String settlementStatus = "PENDING"; // PENDING, IN_STATEMENT, SETTLED, REFUNDED
+
+    @Column(name = "statement_id")
+    private Long statementId;
 }

@@ -31,6 +31,7 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
     private final RoleRepository roleRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final JwtUtils jwtUtils;
+    private final EmailService emailService;
 
     @Override
     @Transactional
@@ -276,6 +277,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         }
 
         TrainerProfile saved = trainerProfileRepository.save(profile);
+        if (saved.getUser() != null && saved.getUser().getEmail() != null) {
+            emailService.sendTrainerStatusNotificationEmail(saved.getUser().getEmail(), newStatus, request.getAdminNotes());
+        }
         return mapToDTO(saved);
     }
 

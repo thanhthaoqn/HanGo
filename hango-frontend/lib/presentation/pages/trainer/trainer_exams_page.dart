@@ -14,9 +14,11 @@ import 'question_bank/trainer_question_bank_page.dart';
 import '../../../utils/toast_helper.dart';
 import 'matrix_management_page.dart';
 import 'trainer_profile_page.dart';
+import 'trainer_revenue_page.dart';
 
 class TrainerExamsPage extends StatefulWidget {
-  const TrainerExamsPage({super.key});
+  final bool isEmbedded;
+  const TrainerExamsPage({super.key, this.isEmbedded = false});
 
   @override
   State<TrainerExamsPage> createState() => _TrainerExamsPageState();
@@ -251,6 +253,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    if (widget.isEmbedded) {
+      return _buildBodyContent();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
@@ -263,31 +269,35 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               children: [
                 _buildHeader(context, !isDesktop),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildWelcomeSection(),
-                        const SizedBox(height: 24),
-                        _buildFilterContainer(),
-                        const SizedBox(height: 24),
-                        if (_isLoading)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(40.0),
-                              child: CircularProgressIndicator(color: Color(0xFF20B486)),
-                            ),
-                          )
-                        else
-                          _buildExamsTable(),
-                      ],
-                    ),
-                  ),
+                  child: _buildBodyContent(),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBodyContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildWelcomeSection(),
+          const SizedBox(height: 24),
+          _buildFilterContainer(),
+          const SizedBox(height: 24),
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(40.0),
+                child: CircularProgressIndicator(color: Color(0xFF20B486)),
+              ),
+            )
+          else
+            _buildExamsTable(),
         ],
       ),
     );
@@ -1111,6 +1121,18 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               ),
             );
           }),
+          _buildSidebarItem(
+            Icons.account_balance_wallet_outlined,
+            'Revenue',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerRevenuePage(),
+                ),
+              );
+            },
+          ),
           _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
             Navigator.pushReplacement(
               context,

@@ -76,8 +76,10 @@ public class SecurityConfig {
                         // đúng bản chất
                         .requestMatchers("/error").permitAll()
 
-                        // 💳 PayOS / VNPay callback: không có JWT, phải permitAll
+                        // 💳 PayOS / VNPay callback & Revenue Settlement endpoints: permitAll
                         .requestMatchers("/api/v1/payment/payos-webhook", "/api/v1/payment/vnpay-return").permitAll()
+                        .requestMatchers("/api/v1/course-manager/statements/**").permitAll()
+                        .requestMatchers("/api/v1/trainer/statements/**", "/api/v1/trainer/revenue-summary").permitAll()
 
                         .anyRequest().authenticated());
 

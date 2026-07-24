@@ -4,14 +4,28 @@ import '../pages/course_manager/course_manager_dashboard_page.dart';
 import '../pages/course_manager/course_manager_exams_page.dart';
 import '../pages/course_manager/course_manager_matrix_management_page.dart';
 import '../pages/course_manager/course_manager_question_bank_page.dart';
+import '../pages/course_manager/course_manager_settlement_page.dart';
 
 class CourseManagerSidebar extends StatelessWidget {
   final String currentRoute;
+  final Function(String route)? onSelectRoute;
 
   const CourseManagerSidebar({
     super.key,
     required this.currentRoute,
+    this.onSelectRoute,
   });
+
+  void _navigateSeamless(BuildContext context, Widget targetPage) {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => targetPage,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +41,10 @@ class CourseManagerSidebar extends StatelessWidget {
             'Dashboard',
             isActive: currentRoute == 'dashboard',
             onTap: () {
-              if (currentRoute != 'dashboard') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
-                );
+              if (onSelectRoute != null) {
+                onSelectRoute!('dashboard');
+              } else if (currentRoute != 'dashboard') {
+                _navigateSeamless(context, const CourseManagerDashboardPage());
               }
             },
           ),
@@ -41,11 +54,10 @@ class CourseManagerSidebar extends StatelessWidget {
             'Courses',
             isActive: currentRoute == 'courses',
             onTap: () {
-              if (currentRoute != 'courses') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CourseManagerCoursesPage()),
-                );
+              if (onSelectRoute != null) {
+                onSelectRoute!('courses');
+              } else if (currentRoute != 'courses') {
+                _navigateSeamless(context, const CourseManagerCoursesPage());
               }
             },
           ),
@@ -55,11 +67,10 @@ class CourseManagerSidebar extends StatelessWidget {
             'Exam',
             isActive: currentRoute == 'exams',
             onTap: () {
-              if (currentRoute != 'exams') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CourseManagerExamsPage()),
-                );
+              if (onSelectRoute != null) {
+                onSelectRoute!('exams');
+              } else if (currentRoute != 'exams') {
+                _navigateSeamless(context, const CourseManagerExamsPage());
               }
             },
           ),
@@ -69,18 +80,15 @@ class CourseManagerSidebar extends StatelessWidget {
             'Exam Matrix',
             isActive: currentRoute == 'matrix',
             onTap: () {
-              if (currentRoute != 'matrix') {
-                Navigator.pushReplacement(
+              if (onSelectRoute != null) {
+                onSelectRoute!('matrix');
+              } else if (currentRoute != 'matrix') {
+                _navigateSeamless(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseManagerMatrixManagementPage(
-                      onBack: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
-                        );
-                      },
-                    ),
+                  CourseManagerMatrixManagementPage(
+                    onBack: () {
+                      _navigateSeamless(context, const CourseManagerDashboardPage());
+                    },
                   ),
                 );
               }
@@ -92,11 +100,23 @@ class CourseManagerSidebar extends StatelessWidget {
             'Question Bank',
             isActive: currentRoute == 'question_bank',
             onTap: () {
-              if (currentRoute != 'question_bank') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CourseManagerQuestionBankPage()),
-                );
+              if (onSelectRoute != null) {
+                onSelectRoute!('question_bank');
+              } else if (currentRoute != 'question_bank') {
+                _navigateSeamless(context, const CourseManagerQuestionBankPage());
+              }
+            },
+          ),
+          _buildSidebarItem(
+            context,
+            Icons.account_balance_wallet_outlined,
+            'Revenue Settlement',
+            isActive: currentRoute == 'settlement',
+            onTap: () {
+              if (onSelectRoute != null) {
+                onSelectRoute!('settlement');
+              } else if (currentRoute != 'settlement') {
+                _navigateSeamless(context, const CourseManagerSettlementPage());
               }
             },
           ),
@@ -111,10 +131,9 @@ class CourseManagerSidebar extends StatelessWidget {
     IconData icon,
     String title, {
     bool isActive = false,
-    Color? color,
     VoidCallback? onTap,
   }) {
-    const activeColor = Color(0xFF20B486);
+    final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: InkWell(
@@ -130,14 +149,14 @@ class CourseManagerSidebar extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
+                color: isActive ? Colors.white : const Color(0xFF4B5563),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
+                  color: isActive ? Colors.white : const Color(0xFF1F2937),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',

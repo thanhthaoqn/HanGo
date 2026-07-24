@@ -77,18 +77,9 @@ class _CourseManagerDashboardPageState
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
-                    child: _isLoading
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.only(top: 100.0),
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF20B486),
-                              ),
-                            ),
-                          )
-                        : _buildMetricCards(
-                            constraints: BoxConstraints(maxWidth: size.width),
-                          ),
+                    child: _buildMetricCards(
+                      constraints: BoxConstraints(maxWidth: size.width),
+                    ),
                   ),
                 ),
               ],

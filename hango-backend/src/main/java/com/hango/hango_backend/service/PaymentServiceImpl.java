@@ -1,18 +1,25 @@
 package com.hango.hango_backend.service;
 
+import com.hango.hango_backend.dto.PaymentHistoryDTO;
 import com.hango.hango_backend.dto.PaymentResponseDTO;
 import com.hango.hango_backend.dto.PaymentStatusDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.Payment;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.entity.TrainerProfile;
+import com.hango.hango_backend.repository.CartItemRepository;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.PaymentRepository;
+import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -23,11 +30,15 @@ import org.springframework.web.client.RestTemplate;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,6 +49,9 @@ public class PaymentServiceImpl implements PaymentService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final TrainerProfileRepository trainerProfileRepository;
+    private final CartItemRepository cartItemRepository;
+    private final EmailService emailService;
 
     @Value("${payos.client-id}")
     private String clientId;
@@ -51,23 +65,57 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentResponseDTO createPayment(Long courseId, Long userId, String ipAddress, String origin) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found"));
+        com.hango.hango_backend.dto.PaymentRequestDTO dto = new com.hango.hango_backend.dto.PaymentRequestDTO();
+        dto.setCourseId(courseId);
+        return createPayment(dto, userId, ipAddress, origin);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponseDTO createPayment(com.hango.hango_backend.dto.PaymentRequestDTO request, Long userId, String ipAddress, String origin) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Giá mặc định 50,000 VND nếu chưa có price trên course
-        BigDecimal amount = (course.getPrice() != null && course.getPrice().compareTo(BigDecimal.ZERO) > 0)
-                ? course.getPrice()
-                : new BigDecimal("50000");
+        List<Long> targetCourseIds = new ArrayList<>();
+        if (request.getCourseIds() != null && !request.getCourseIds().isEmpty()) {
+            targetCourseIds.addAll(request.getCourseIds());
+        } else if (request.getCourseId() != null) {
+            targetCourseIds.add(request.getCourseId());
+        } else {
+            throw new RuntimeException("Không tìm thấy thông tin khóa học thanh toán.");
+        }
+
+        List<Course> courses = courseRepository.findAllById(targetCourseIds);
+        if (courses.isEmpty()) {
+            throw new RuntimeException("Course not found");
+        }
+
+        Course primaryCourse = courses.get(0);
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<String> validIds = new ArrayList<>();
+
+        for (Course c : courses) {
+            validIds.add(c.getId().toString());
+            BigDecimal p = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                    ? c.getPrice()
+                    : new BigDecimal("50000");
+            totalAmount = totalAmount.add(p);
+        }
+
+        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            totalAmount = new BigDecimal("50000");
+        }
+
+        String courseIdsStr = String.join(",", validIds);
 
         // 1. Tạo payment PENDING để lấy ID làm orderCode duy nhất
         Payment payment = Payment.builder()
                 .user(user)
-                .course(course)
-                .amount(amount)
+                .course(primaryCourse)
+                .courseIds(courseIdsStr)
+                .amount(totalAmount)
                 .status("PENDING")
-                .txnRef("") // Sẽ cập nhật bằng ID sau
+                .txnRef("")
                 .build();
         payment = paymentRepository.save(payment);
 
@@ -86,7 +134,7 @@ public class PaymentServiceImpl implements PaymentService {
         String returnUrl = frontendBaseUrl + "/#/payment-success";
 
         // Tạo chữ ký cho PayOS: amount, cancelUrl, description, orderCode, returnUrl sorted alphabetically
-        String signatureData = "amount=" + amount.longValue() +
+        String signatureData = "amount=" + totalAmount.longValue() +
                 "&cancelUrl=" + cancelUrl +
                 "&description=" + description +
                 "&orderCode=" + orderCode +
@@ -97,7 +145,7 @@ public class PaymentServiceImpl implements PaymentService {
         // Build request body
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orderCode", orderCode);
-        requestBody.put("amount", amount.longValue());
+        requestBody.put("amount", totalAmount.longValue());
         requestBody.put("description", description);
         requestBody.put("cancelUrl", cancelUrl);
         requestBody.put("returnUrl", returnUrl);
@@ -108,12 +156,16 @@ public class PaymentServiceImpl implements PaymentService {
         String checkoutUrl = payOSResponse.get("checkoutUrl");
         String qrCode = payOSResponse.get("qrCode");
 
+        String displayTitle = courses.size() > 1
+                ? ("Thanh toán " + courses.size() + " khóa học trong giỏ hàng")
+                : primaryCourse.getTitle();
+
         return PaymentResponseDTO.builder()
                 .paymentUrl(checkoutUrl)
                 .qrCode(qrCode)
                 .txnRef(txnRef)
-                .amount(amount)
-                .courseTitle(course.getTitle())
+                .amount(totalAmount)
+                .courseTitle(displayTitle)
                 .build();
     }
 
@@ -180,7 +232,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         // 2. Cập nhật trạng thái Payment và Enroll khóa học
         String code = (String) payload.get("code");
-        
+
         // Bỏ qua nếu là request test/xác nhận từ PayOS
         if ("confirm".equals(payload.get("desc")) || data.get("orderCode") == null) {
             log.info("PayOS webhook confirm / test request received. Signature validated successfully.");
@@ -190,26 +242,89 @@ public class PaymentServiceImpl implements PaymentService {
         long orderCode = Long.parseLong(formatValue(data.get("orderCode")));
         String txnRef = String.valueOf(orderCode);
 
-        paymentRepository.findByTxnRef(txnRef).ifPresent(payment -> {
+        // Pessimistic Locking to avoid race conditions during concurrent webhooks
+        paymentRepository.findByTxnRefWithLock(txnRef).ifPresent(payment -> {
+            // Idempotency Check: Nếu đã SUCCESS rồi thì bỏ qua
+            if ("SUCCESS".equalsIgnoreCase(payment.getStatus())) {
+                log.info("Payment txnRef={} is already SUCCESS. Skipping duplicate webhook processing.", txnRef);
+                return;
+            }
+
             if ("00".equals(code)) {
                 payment.setStatus("SUCCESS");
                 payment.setVnpayTxnNo((String) data.get("reference"));
                 payment.setBankCode("VietQR");
                 payment.setPaidAt(LocalDateTime.now());
+
+                // Calculate Revenue Split (70/30 for PROFESSIONAL, 60/40 for PEER_TUTOR)
+                BigDecimal amount = payment.getAmount();
+                if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
+                    double platformRate = 0.30;
+                    if (payment.getCourse() != null && payment.getCourse().getCreator() != null) {
+                        Long creatorId = payment.getCourse().getCreator().getId();
+                        TrainerProfile profile = trainerProfileRepository.findById(creatorId).orElse(null);
+                        if (profile != null && "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType())) {
+                            platformRate = 0.40;
+                        }
+                    }
+                    BigDecimal platformFee = amount.multiply(BigDecimal.valueOf(platformRate)).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal trainerEarnings = amount.subtract(platformFee);
+
+                    payment.setPlatformFee(platformFee);
+                    payment.setTrainerEarnings(trainerEarnings);
+                    payment.setSettlementStatus("PENDING");
+                }
+
                 paymentRepository.save(payment);
 
-                // Auto enroll
-                boolean alreadyEnrolled = enrollmentRepository
-                        .existsByUserIdAndCourseId(payment.getUser().getId(), payment.getCourse().getId());
-                if (!alreadyEnrolled) {
-                    Enrollment enrollment = Enrollment.builder()
-                            .user(payment.getUser())
-                            .course(payment.getCourse())
-                            .status("ENROLLED")
-                            .build();
-                    enrollmentRepository.save(enrollment);
-                    log.info("Auto-enrolled userId={} into courseId={} after PayOS payment",
-                            payment.getUser().getId(), payment.getCourse().getId());
+                // Auto enroll into all courses in payment
+                List<Long> targetIds = new ArrayList<>();
+                if (payment.getCourseIds() != null && !payment.getCourseIds().trim().isEmpty()) {
+                    for (String idStr : payment.getCourseIds().split(",")) {
+                        try {
+                            targetIds.add(Long.parseLong(idStr.trim()));
+                        } catch (Exception ignored) {}
+                    }
+                }
+                if (targetIds.isEmpty() && payment.getCourse() != null) {
+                    targetIds.add(payment.getCourse().getId());
+                }
+
+                for (Long cId : targetIds) {
+                    boolean alreadyEnrolled = enrollmentRepository.existsByUserIdAndCourseId(payment.getUser().getId(), cId);
+                    if (!alreadyEnrolled) {
+                        Course c = courseRepository.findById(cId).orElse(null);
+                        if (c != null) {
+                            Enrollment enrollment = Enrollment.builder()
+                                    .user(payment.getUser())
+                                    .course(c)
+                                    .status("ENROLLED")
+                                    .build();
+                            enrollmentRepository.save(enrollment);
+                            log.info("Auto-enrolled userId={} into courseId={} after PayOS payment",
+                                    payment.getUser().getId(), cId);
+
+                            // Clear paid items from DB cart
+                            cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
+
+                            // Send email confirmation
+                            try {
+                                String priceText = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                                        ? String.format("%,.0fđ", c.getPrice())
+                                        : "Miễn phí";
+                                emailService.sendEnrollmentSuccessEmail(
+                                        payment.getUser().getEmail(),
+                                        payment.getUser().getFullName(),
+                                        c.getTitle(),
+                                        priceText);
+                            } catch (Exception e) {
+                                log.warn("Failed to send enrollment email to {}: {}", payment.getUser().getEmail(), e.getMessage());
+                            }
+                        }
+                    } else {
+                        // Still ensure cart item is removed if user was somehow already enrolled
+                        cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
+                    }
                 }
             } else {
                 payment.setStatus("FAILED");
@@ -232,9 +347,61 @@ public class PaymentServiceImpl implements PaymentService {
         return PaymentStatusDTO.builder()
                 .txnRef(payment.getTxnRef())
                 .status(payment.getStatus())
-                .courseId(payment.getCourse().getId())
-                .courseTitle(payment.getCourse().getTitle())
+                .courseId(payment.getCourse() != null ? payment.getCourse().getId() : null)
+                .courseTitle(payment.getCourse() != null ? payment.getCourse().getTitle() : "Khóa học")
                 .paidAt(payment.getPaidAt())
+                .build();
+    }
+
+    @Override
+    public List<PaymentHistoryDTO> getMyPaymentHistory(Long userId) {
+        List<Payment> payments = paymentRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        return mapPaymentsToDTO(payments);
+    }
+
+    @Override
+    public Page<PaymentHistoryDTO> getMyPaymentHistory(Long userId, String status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Payment> paymentPage;
+        if (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status)) {
+            paymentPage = paymentRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        } else {
+            paymentPage = paymentRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status.toUpperCase(), pageable);
+        }
+        return paymentPage.map(this::mapPaymentToDTO);
+    }
+
+    private List<PaymentHistoryDTO> mapPaymentsToDTO(List<Payment> payments) {
+        return payments.stream().map(this::mapPaymentToDTO).collect(Collectors.toList());
+    }
+
+    private PaymentHistoryDTO mapPaymentToDTO(Payment payment) {
+        String title = null;
+        if (payment.getCourseIds() != null && !payment.getCourseIds().trim().isEmpty()) {
+            String[] ids = payment.getCourseIds().split(",");
+            if (ids.length > 1) {
+                title = "Thanh toán " + ids.length + " khóa học trong giỏ hàng";
+            }
+        }
+        if (title == null && payment.getCourse() != null) {
+            title = payment.getCourse().getTitle();
+        }
+        if (title == null) {
+            title = "Khóa học HanGo";
+        }
+
+        return PaymentHistoryDTO.builder()
+                .id(payment.getId())
+                .txnRef(payment.getTxnRef())
+                .courseId(payment.getCourse() != null ? payment.getCourse().getId() : null)
+                .courseTitle(title)
+                .courseThumbnail(payment.getCourse() != null ? payment.getCourse().getThumbnailUrl() : null)
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .bankCode(payment.getBankCode())
+                .vnpayTxnNo(payment.getVnpayTxnNo())
+                .paidAt(payment.getPaidAt())
+                .createdAt(payment.getCreatedAt())
                 .build();
     }
 

@@ -74,14 +74,7 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_isLoading)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(40.0),
-                              child: CircularProgressIndicator(color: Color(0xFF20B486)),
-                            ),
-                          )
-                        else if (_matrices.isEmpty)
+                        if (_matrices.isEmpty)
                           _buildEmptyState()
                         else
                           _buildMatrixTable(),

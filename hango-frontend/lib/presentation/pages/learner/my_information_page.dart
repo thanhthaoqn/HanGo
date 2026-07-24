@@ -4,14 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
+import '../../../data/repositories/payment_repository.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../utils/language_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'learner_home_page.dart';
 
 class MyInformationPage extends StatefulWidget {
-  const MyInformationPage({super.key});
+  final int initialTab;
+  const MyInformationPage({super.key, this.initialTab = 0});
 
   @override
   State<MyInformationPage> createState() => _MyInformationPageState();
@@ -20,7 +23,7 @@ class MyInformationPage extends StatefulWidget {
 class _MyInformationPageState extends State<MyInformationPage> {
   final _authService = AuthService();
   bool _isLoading = true;
-  int _activeTab = 0; // 0: Information & Contact, 1: Change Password
+  late int _activeTab; // 0: Information & Contact, 1: Change Password, 2: Payment History
 
   // Profile data
   String _fullName = '';
@@ -36,6 +39,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
   @override
   void initState() {
     super.initState();
+    _activeTab = widget.initialTab;
     _fetchProfile();
   }
 
@@ -144,7 +148,9 @@ class _MyInformationPageState extends State<MyInformationPage> {
                                       Expanded(
                                         child: _activeTab == 0
                                             ? _buildInformationTab(isDesktop)
-                                            : _buildChangePasswordTab(isDesktop),
+                                            : _activeTab == 1
+                                                ? _buildChangePasswordTab(isDesktop)
+                                                : const _PaymentHistoryPanel(),
                                       ),
                                     ],
                                   )
@@ -155,7 +161,9 @@ class _MyInformationPageState extends State<MyInformationPage> {
                                       const SizedBox(height: 20),
                                       _activeTab == 0
                                           ? _buildInformationTab(isDesktop)
-                                          : _buildChangePasswordTab(isDesktop),
+                                          : _activeTab == 1
+                                              ? _buildChangePasswordTab(isDesktop)
+                                              : const _PaymentHistoryPanel(),
                                     ],
                                   ),
                           ),
@@ -216,6 +224,14 @@ class _MyInformationPageState extends State<MyInformationPage> {
             index: 1,
             icon: Icons.lock_reset_rounded,
             label: 'Change Password',
+            isDesktop: isDesktop,
+          ),
+          const SizedBox(height: 8),
+          // Tab 2: Payment History
+          _buildSidebarTabButton(
+            index: 2,
+            icon: Icons.receipt_long_rounded,
+            label: 'Payment History',
             isDesktop: isDesktop,
           ),
         ],
@@ -1438,6 +1454,429 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------------------
+// PAYMENT HISTORY PANEL STATEFUL WIDGET
+// ------------------------------------------------------------------------
+class _PaymentHistoryPanel extends StatefulWidget {
+  const _PaymentHistoryPanel();
+
+  @override
+  State<_PaymentHistoryPanel> createState() => _PaymentHistoryPanelState();
+}
+
+class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
+  final PaymentRepository _paymentRepository = PaymentRepository();
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<dynamic> _historyList = [];
+  
+  int _currentPage = 0;
+  int _totalPages = 1;
+  int _totalElements = 0;
+  final int _pageSize = 10;
+  String _selectedStatus = 'ALL';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final res = await _paymentRepository.getMyPaymentHistory(
+        page: _currentPage,
+        size: _pageSize,
+        status: _selectedStatus,
+      );
+
+      if (mounted) {
+        setState(() {
+          if (res is Map<String, dynamic>) {
+            _historyList = res['content'] as List<dynamic>? ?? [];
+            _totalPages = res['totalPages'] as int? ?? 1;
+            _totalElements = res['totalElements'] as int? ?? _historyList.length;
+          } else if (res is List<dynamic>) {
+            _historyList = res;
+            _totalPages = 1;
+            _totalElements = res.length;
+          } else {
+            _historyList = [];
+            _totalPages = 1;
+            _totalElements = 0;
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _formatPrice(dynamic amount) {
+    if (amount == null) return '0 ₫';
+    double numVal = (amount is num) ? amount.toDouble() : (double.tryParse(amount.toString()) ?? 0);
+    final formatted = numVal.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formatted ₫';
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '--/--/----';
+    try {
+      final dt = DateTime.parse(dateStr);
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final isVi = LanguageManager.isVi;
+    Color bg;
+    Color fg;
+    String label;
+
+    switch (status.toUpperCase()) {
+      case 'SUCCESS':
+      case 'PAID':
+        bg = const Color(0xFFE6F4EA);
+        fg = const Color(0xFF137333);
+        label = isVi ? 'Thành công' : 'Success';
+        break;
+      case 'PENDING':
+        bg = const Color(0xFFFEF3C7);
+        fg = const Color(0xFFD97706);
+        label = isVi ? 'Đang xử lý' : 'Pending';
+        break;
+      case 'EXPIRED':
+        bg = const Color(0xFFF1F5F9);
+        fg = const Color(0xFF64748B);
+        label = isVi ? 'Hết hạn' : 'Expired';
+        break;
+      default:
+        bg = const Color(0xFFFEE2E2);
+        fg = const Color(0xFFDC2626);
+        label = isVi ? 'Thất bại' : 'Failed';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fg,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Outfit',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _selectedStatus == value;
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : const Color(0xFF475569),
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 13,
+          fontFamily: 'Outfit',
+        ),
+      ),
+      selected: isSelected,
+      selectedColor: const Color(0xFF28B79B),
+      backgroundColor: const Color(0xFFF1F5F9),
+      showCheckmark: false,
+      onSelected: (selected) {
+        if (selected && _selectedStatus != value) {
+          setState(() {
+            _selectedStatus = value;
+            _currentPage = 0;
+          });
+          _loadHistory();
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isVi = LanguageManager.isVi;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isVi ? 'Lịch sử thanh toán' : 'Payment History',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              IconButton(
+                onPressed: _loadHistory,
+                icon: const Icon(Icons.refresh_rounded, color: Color(0xFF28B79B)),
+                tooltip: isVi ? 'Tải lại' : 'Refresh',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Status Filter Chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildFilterChip(isVi ? 'Tất cả' : 'All', 'ALL'),
+              _buildFilterChip(isVi ? 'Thành công' : 'Success', 'SUCCESS'),
+              _buildFilterChip(isVi ? 'Đang xử lý' : 'Pending', 'PENDING'),
+              _buildFilterChip(isVi ? 'Thất bại' : 'Failed', 'FAILED'),
+              _buildFilterChip(isVi ? 'Hết hạn' : 'Expired', 'EXPIRED'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 20),
+
+          _isLoading
+              ? const SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+                  ),
+                )
+              : _errorMessage != null
+                  ? SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: Colors.red, size: 40),
+                            const SizedBox(height: 12),
+                            Text(_errorMessage!, style: const TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadHistory,
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
+                              child: Text(isVi ? 'Thử lại' : 'Retry', style: const TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : _historyList.isEmpty
+                      ? SizedBox(
+                          height: 200,
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.receipt_long_outlined, size: 48, color: Color(0xFF94A3B8)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  isVi ? 'Chưa có lịch sử giao dịch nào.' : 'No transaction history available.',
+                                  style: const TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontSize: 15),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _historyList.length,
+                              separatorBuilder: (context, index) => const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                final item = _historyList[index] as Map<String, dynamic>;
+                                final txnRef = item['txnRef'] ?? '${item['id']}';
+                                final courseTitle = item['courseTitle'] ?? (isVi ? 'Khóa học' : 'Course');
+                                final courseThumbnail = item['courseThumbnail'] as String?;
+                                final amount = item['amount'];
+                                final status = item['status'] ?? 'PENDING';
+                                final bankCode = item['bankCode'] as String?;
+                                final date = item['paidAt'] ?? item['createdAt'];
+
+                                return Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Container(
+                                          width: 48,
+                                          height: 48,
+                                          color: Colors.white,
+                                          child: (courseThumbnail != null && courseThumbnail.isNotEmpty)
+                                              ? Image.network(
+                                                  courseThumbnail,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) =>
+                                                      const Icon(Icons.receipt_outlined, color: Color(0xFF28B79B), size: 24),
+                                                )
+                                              : Container(
+                                                  padding: const EdgeInsets.all(10),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                                  ),
+                                                  child: const Icon(Icons.receipt_outlined, color: Color(0xFF28B79B), size: 24),
+                                                ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              courseTitle,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF1E293B),
+                                                fontFamily: 'Outfit',
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${isVi ? "Mã GD" : "Txn Ref"}: #$txnRef${bankCode != null && bankCode.isNotEmpty ? (isVi ? ' · Phương thức: ' : ' · Method: ') + bankCode : ''} · ${isVi ? "Ngày" : "Date"}: ${_formatDate(date)}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF64748B),
+                                                fontFamily: 'Outfit',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            _formatPrice(amount),
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF0F172A),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          _buildStatusBadge(status.toString()),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            
+                            // Pagination Controls
+                            if (_totalPages > 1) ...[
+                              const SizedBox(height: 24),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    isVi 
+                                      ? 'Trang ${_currentPage + 1} / $_totalPages (Tổng $_totalElements giao dịch)'
+                                      : 'Page ${_currentPage + 1} of $_totalPages (Total $_totalElements transactions)',
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontSize: 13,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        onPressed: _currentPage > 0
+                                            ? () {
+                                                setState(() {
+                                                  _currentPage--;
+                                                });
+                                                _loadHistory();
+                                              }
+                                            : null,
+                                        icon: const Icon(Icons.chevron_left_rounded),
+                                        tooltip: isVi ? 'Trang trước' : 'Previous page',
+                                      ),
+                                      IconButton(
+                                        onPressed: _currentPage < _totalPages - 1
+                                            ? () {
+                                                setState(() {
+                                                  _currentPage++;
+                                                });
+                                                _loadHistory();
+                                              }
+                                            : null,
+                                        icon: const Icon(Icons.chevron_right_rounded),
+                                        tooltip: isVi ? 'Trang sau' : 'Next page',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
         ],
       ),
     );
