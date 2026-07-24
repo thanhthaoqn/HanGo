@@ -150,4 +150,17 @@ class TrainerQuestionAIServiceTest {
         org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
         assertTrue(promptCaptor.getValue().contains("SINGLE multiple-choice questions"));
     }
+
+    @Test
+    void generatePayloadShouldTreatUnknownModeAsMultipleModeBranch() {
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"p\",\"subQuestions\":[]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        service.generatePayload(request("BOGUS", "Grammar tenses", 1));
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
+        assertTrue(promptCaptor.getValue().contains("reading comprehension"),
+                "mode is only validated for blank, not for a known enum value — any non-SINGLE string silently falls through to the MULTIPLE prompt branch");
+    }
 }

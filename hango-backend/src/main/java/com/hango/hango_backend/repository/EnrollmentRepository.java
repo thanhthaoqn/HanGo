@@ -32,4 +32,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     Optional<Enrollment> findByUserIdAndCourseIdWithLock(@Param("userId") Long userId, @Param("courseId") Long courseId);
 
     List<Enrollment> findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(Long creatorId);
+
+    List<Enrollment> findByCourseIdIn(List<Long> courseIds);
 }

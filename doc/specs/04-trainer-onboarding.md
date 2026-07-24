@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.4 (TRN)
 
+> ⚠️ **Ghi chú 2026-07-24:** trạng thái đơn thật trên `TrainerProfile.status` là `PENDING_VERIFICATION → AWAITING_APPROVAL → VERIFIED` (hoặc `SUSPENDED`), **không phải** `Draft/Submitted/Approved/Rejected` như tài liệu này ngụ ý. Vai trò **Trainer** (và quyền vào Trainer Dashboard tạo Course/Exam ở Draft) được cấp **ngay khi** chọn role lúc Register hoặc gọi `become-trainer` — **không** chờ Admin duyệt hồ sơ trước; ranh giới Admin duyệt chỉ chặn ở bước publish/bán Course (`TrainerProfile.status=VERIFIED`). Chi tiết đầy đủ + state machine thật: [`HanGo_Documentation.md`](../HanGo_Documentation.md) §9.2 và BR-TRN-01.
+
 ## 1. Business Context
 To become a Trainer on HanGo, standard Learners or Guests must submit an application containing their credentials, banking info, and chosen Trainer type (Teacher or Tutor). Administrators review these applications to maintain the quality of instruction on the platform.
 

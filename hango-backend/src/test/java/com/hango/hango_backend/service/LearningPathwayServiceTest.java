@@ -397,6 +397,24 @@ class LearningPathwayServiceTest {
         assertEquals(10L, result.getPathwayId());
     }
 
+    @Test
+    void getMyPathwayShouldExtractWeakSkillsFromKnowledgeGapsJson() throws Exception {
+        User student = User.builder().id(1L).build();
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(student).status("ACTIVE").build();
+        when(learningPathwayRepository.findByStudentIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(pathway));
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+        when(examResultAnalyzerService.analyzeLearnerAttempts(eq(1L), any())).thenReturn(
+                com.hango.hango_backend.dto.ExamResultAnalysisDTO.builder()
+                        .knowledgeGapsJson("{\"weak_skills\":[\"Reading\",\"Listening\"]}")
+                        .build());
+        when(objectMapper.readValue(anyString(), eq(java.util.Map.class)))
+                .thenReturn(java.util.Map.of("weak_skills", List.of("Reading", "Listening")));
+
+        LearningPathwayResponseDTO result = learningPathwayService.getMyPathway(1L);
+
+        assertEquals(List.of("Reading", "Listening"), result.getWeakSkills());
+    }
+
     // =================================================================
     // getScheduleStatus
     // =================================================================
@@ -498,7 +516,7 @@ class LearningPathwayServiceTest {
     }
 
     // =================================================================
-    // generatePathway — empty course catalogue fallback
+    // generatePathway
     // =================================================================
 
     @Test
@@ -522,5 +540,168 @@ class LearningPathwayServiceTest {
         assertTrue(result.getMentorSummary().contains("No courses are available"));
         assertTrue(result.getNodes() == null || result.getNodes().isEmpty());
         verify(geminiClientService, never()).generateChatResponse(anyString(), any());
+    }
+
+    @Test
+    void generatePathwayShouldThrowWhenUserNotFound() {
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
+
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(5L);
+        ApiException exception = assertThrows(ApiException.class,
+                () -> learningPathwayService.generatePathway(1L, req));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        assertEquals("User not found", exception.getMessage());
+        verify(examAttemptRepository, never()).findById(any());
+    }
+
+    @Test
+    void generatePathwayShouldRejectExamAttemptBelongingToAnotherStudent() {
+        User student = User.builder().id(1L).build();
+        User otherStudent = User.builder().id(2L).build();
+        ExamAttempt examAttempt = examAttempt(otherStudent);
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(student));
+        when(examAttemptRepository.findById(5L)).thenReturn(Optional.of(examAttempt));
+
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(5L);
+        ApiException exception = assertThrows(ApiException.class,
+                () -> learningPathwayService.generatePathway(1L, req));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+        assertEquals("Access denied to this exam attempt", exception.getMessage());
+        verify(courseRepository, never()).findAll();
+    }
+
+    @Test
+    void generatePathwayShouldAddFallbackNodesWhenAiResponseReturnsOnlyInvalidCourseIds() throws Exception {
+        User student = User.builder().id(1L).build();
+        ExamAttempt examAttempt = examAttempt(student);
+        Course grammarCourse = course(10L, "Grammar Basics", "PUBLISHED");
+        Course readingCourse = course(20L, "Reading Practice", "PUBLISHED");
+        LearningPathwayResponseDTO aiResponse = LearningPathwayResponseDTO.builder()
+                .mentorSummary("AI could not find any usable course.")
+                .nodes(List.of(
+                        PathwayNodeDTO.builder().step(1).courseId(404L).status("In_Progress").reasonWhy("Hallucinated").build()))
+                .build();
+
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(student));
+        when(examAttemptRepository.findById(5L)).thenReturn(Optional.of(examAttempt));
+        when(courseRepository.findAll()).thenReturn(List.of(grammarCourse, readingCourse));
+        when(examResultAnalyzerService.analyzeLatestExamAttempt(any(ExamAttempt.class)))
+                .thenReturn(com.hango.hango_backend.dto.ExamResultAnalysisDTO.builder()
+                        .examAttemptId(5L)
+                        .score(42)
+                        .rawAnswersJson(examAttempt.getAnswersJson())
+                        .knowledgeGapsJson("{\"critical_topics\":[],\"weak_skills\":[],\"incorrect_count\":0}")
+                        .hints(null)
+                        .build());
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("{}");
+        when(objectMapper.readValue(anyString(), eq(LearningPathwayResponseDTO.class))).thenReturn(aiResponse);
+        when(learningPathwayRepository.findByStudentIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.empty());
+        when(learningPathwayRepository.save(any(LearningPathway.class))).thenAnswer(invocation -> {
+            LearningPathway pathway = invocation.getArgument(0);
+            pathway.setId(300L);
+            return pathway;
+        });
+
+        PathwayGenerateRequestDTO req = new PathwayGenerateRequestDTO();
+        req.setExamAttemptId(5L);
+        LearningPathwayResponseDTO result = learningPathwayService.generatePathway(1L, req);
+
+        assertEquals(2, result.getNodes().size());
+        assertEquals(10L, result.getNodes().get(0).getCourseId());
+        assertEquals("IN_PROGRESS", result.getNodes().get(0).getStatus());
+        assertEquals(20L, result.getNodes().get(1).getCourseId());
+        assertEquals("LOCKED", result.getNodes().get(1).getStatus());
+    }
+
+    // =================================================================
+    // reroutePathway
+    // =================================================================
+
+    @Test
+    void reroutePathwayShouldThrowNotFoundWhenPathwayDoesNotExist() {
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.empty());
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> learningPathwayService.reroutePathway(10L, 1L));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        assertEquals("Pathway not found", exception.getMessage());
+    }
+
+    @Test
+    void reroutePathwayShouldRejectOtherLearnersPathway() {
+        LearningPathway pathway = LearningPathway.builder()
+                .id(10L)
+                .student(User.builder().id(2L).build())
+                .status("ACTIVE")
+                .build();
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> learningPathwayService.reroutePathway(10L, 1L));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+        assertEquals("Access denied", exception.getMessage());
+    }
+
+    @Test
+    void reroutePathwayShouldKeepAlreadyCompletedNodesUnchangedForHighScore() {
+        User student = User.builder().id(1L).build();
+        LearningPathway pathway = LearningPathway.builder()
+                .id(10L)
+                .student(student)
+                .status("ACTIVE")
+                .build();
+
+        PathwayNode firstNode = PathwayNode.builder()
+                .stepOrder(1)
+                .course(course(1L, "Grammar Basics", "PUBLISHED"))
+                .status("LOCKED")
+                .progressPercent(0)
+                .build();
+        PathwayNode completedNode = PathwayNode.builder()
+                .stepOrder(2)
+                .course(course(2L, "Reading Practice", "PUBLISHED"))
+                .status("COMPLETED")
+                .progressPercent(100)
+                .build();
+        pathway.addNode(firstNode);
+        pathway.addNode(completedNode);
+
+        ExamAttempt highScoreAttempt = examAttempt(student);
+        highScoreAttempt.setScore(java.math.BigDecimal.valueOf(80));
+
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(learningPathwayRepository.save(any(LearningPathway.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of(highScoreAttempt));
+        when(lessonRepository.countByCourseId(1L)).thenReturn(4L);
+        when(lessonRepository.countByCourseId(2L)).thenReturn(4L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 1L)).thenReturn(0L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 2L)).thenReturn(4L);
+
+        LearningPathwayResponseDTO result = learningPathwayService.reroutePathway(10L, 1L);
+
+        assertTrue(result.getMentorSummary().contains("chấp nhận được"));
+        assertEquals("COMPLETED", result.getNodes().get(1).getStatus());
+        assertEquals(100, result.getNodes().get(1).getProgressPercent());
+    }
+
+    // =================================================================
+    // getPathwayById
+    // =================================================================
+
+    @Test
+    void getPathwayByIdShouldThrowWhenPathwayNotFound() {
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.empty());
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> learningPathwayService.getPathwayById(10L, 1L));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        assertEquals("Pathway not found", exception.getMessage());
     }
 }

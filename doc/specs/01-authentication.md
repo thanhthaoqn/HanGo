@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.1 (AUTH)
 
+> ⚠️ **Ghi chú 2026-07-24 (đối chiếu `AuthServiceTest`/`unit_test_plan.md`):** hệ thống hiện chỉ cấp **1 JWT duy nhất** lúc login — chưa có `refreshToken`/`logout` endpoint thật, dù tài liệu tổng (`HanGo_Documentation.md` §5) mô tả "access + refresh token". `authenticateUser` hiện chỉ chặn đăng nhập khi `User.status == "INACTIVE"` — tài khoản mang status khác (vd `"LOCKED"`) vẫn đăng nhập được bình thường (GAP-AUTH-01, chưa sửa). Xem `AUDIT_REPORT.md` MED-11/HIGH-09 trước khi giả định 2 hành vi này đã có.
+
 ## 1. Business Context
 The Authentication feature ensures that only valid users can access the HanGo system. It includes Registration, Login (using traditional Email/Password and Google OAuth2), as well as Forgot Password and Account Verification via OTP. This is the first layer of defense for the EdTech system, ensuring personalized learning paths and data security.
 

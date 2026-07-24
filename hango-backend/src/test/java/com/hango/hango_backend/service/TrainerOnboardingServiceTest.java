@@ -45,6 +45,8 @@ class TrainerOnboardingServiceTest {
     private TrainerProfileRepository trainerProfileRepository;
     @Mock
     private JwtUtils jwtUtils;
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private TrainerOnboardingServiceImpl service;
@@ -172,6 +174,31 @@ class TrainerOnboardingServiceTest {
         verify(trainerProfileRepository, never()).save(any());
     }
 
+    @Test
+    void becomeTrainerShouldLeaveProfileUnchangedWhenTrainerTypeIsNullAndProfileExists() {
+        User user = learnerUser(1L, "known@example.com");
+        user.getRoles().add(Role.builder().id(2L).roleName("TRAINER").build());
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        TrainerProfile existing = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(jwtUtils.generateJwtTokenFromUsername(anyString())).thenReturn("trainer-jwt-token");
+
+        service.becomeTrainer("known@example.com", null);
+
+        assertEquals("PROFESSIONAL", existing.getTrainerType());
+        verify(trainerProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void becomeTrainerShouldThrowNullPointerExceptionWhenTrainerTypeIsNullAndNoProfileExists() {
+        User user = learnerUser(1L, "known@example.com");
+        user.getRoles().add(Role.builder().id(2L).roleName("TRAINER").build());
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(NullPointerException.class, () -> service.becomeTrainer("known@example.com", null));
+    }
+
     // =================================================================
     // getTrainerProfile
     // =================================================================
@@ -191,6 +218,9 @@ class TrainerOnboardingServiceTest {
         TrainerProfileDTO dto = service.getTrainerProfile("known@example.com");
 
         assertEquals("VERIFIED", dto.getStatus());
+        assertEquals("N/A", dto.getFullName());
+        assertEquals("N/A", dto.getEmail());
+        assertNull(dto.getGender());
         verify(trainerProfileRepository, never()).save(any());
     }
 
@@ -493,6 +523,7 @@ class TrainerOnboardingServiceTest {
         assertEquals("VERIFIED", result.getStatus());
         assertEquals(0.75, result.getRevenueShare());
         assertNotNull(p.getReviewedAt());
+        verify(emailService, never()).sendTrainerStatusNotificationEmail(anyString(), anyString(), any());
     }
 
     @Test
@@ -538,5 +569,22 @@ class TrainerOnboardingServiceTest {
 
         assertEquals("SUSPENDED", result.getStatus());
         assertEquals(0.70, result.getRevenueShare());
+    }
+
+    @Test
+    void reviewTrainerProfileShouldSendStatusNotificationEmailWhenUserPresent() {
+        User user = learnerUser(1L, "trainer@example.com");
+        TrainerProfile p = profile(1L, "AWAITING_APPROVAL", "PROFESSIONAL");
+        p.setUser(user);
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainerReviewRequest req = new TrainerReviewRequest();
+        req.setStatus("VERIFIED");
+        req.setAdminNotes("Welcome aboard");
+
+        service.reviewTrainerProfile(1L, req);
+
+        verify(emailService).sendTrainerStatusNotificationEmail("trainer@example.com", "VERIFIED", "Welcome aboard");
     }
 }

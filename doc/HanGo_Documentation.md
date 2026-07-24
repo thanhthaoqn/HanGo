@@ -23,6 +23,15 @@
 12. [Enums tổng hợp](#12-enums-tổng-hợp)
 13. [Non-Functional Requirements](#13-non-functional-requirements)
 14. [Decision Log & Future Items](#14-decision-log--future-items)
+15. [Package Structure chi tiết (Backend & Frontend)](#15-package-structure-chi-tiết-backend--frontend)
+16. [Tổng quan Cơ sở dữ liệu (Database Overview)](#16-tổng-quan-cơ-sở-dữ-liệu-database-overview)
+17. [Tổng quan API (API Overview)](#17-tổng-quan-api-api-overview)
+18. [Sequence Diagram — Luồng nghiệp vụ chính](#18-sequence-diagram--luồng-nghiệp-vụ-chính)
+19. [Deployment](#19-deployment)
+20. [Configuration](#20-configuration)
+21. [Testing Strategy](#21-testing-strategy)
+22. [Known Limitations & Rủi ro kỹ thuật](#22-known-limitations--rủi-ro-kỹ-thuật)
+23. [Future Roadmap](#23-future-roadmap)
 
 ---
 
@@ -65,7 +74,7 @@ HanGo **không tự sản xuất nội dung**; nền tảng kết nối Trainer 
 | **Weakness Analysis** | Phân tích điểm yếu theo SkillType sau khi làm Exam. |
 | **Recommendation** | Gợi ý Course/lộ trình dựa trên kết quả Exam. |
 | **Trainer** | Người tạo nội dung; hai loại: Teacher / Tutor. |
-| **Course Manager** | Người kiểm duyệt trình bày & xuất bản nội dung, kế thừa các chức năng chính của Trainer nhưng có thêm các công cụ trong đó; tạo và quản lý Exam. |
+| **Course Manager** | Người kiểm duyệt trình bày & xuất bản nội dung, kế thừa các chức năng chính của Trainer nhưng có thêm các công cụ trong đó; tạo và quản lý Exam. *Lưu ý code: các endpoint dành cho role này hiện chấp nhận **cả 2** authority string `TRAINER_LEAD` và `COURSE_MANAGER` song song (`hasAnyRole`/`hasAnyAuthority` liệt kê cả hai) — có vẻ là dấu vết của một lần đổi tên role chưa dọn dẹp hết, chưa xác nhận role nào thực sự được cấp cho user Course Manager mới.* |
 | **Monthly Statement** | Báo cáo doanh thu hàng tháng của Trainer. |
 
 ---
@@ -85,7 +94,7 @@ Marketplace-based Learning Management System — HanGo là nền tảng trung gi
 
 **Quy tắc doanh thu:**
 - Course **đầu tiên** của mỗi Trainer **bắt buộc miễn phí**; sau đó tự do đặt free/paid.
-- Course trả phí: Learner thanh toán qua HanGo (VNPay) → ghi nhận doanh thu theo Course → cuối kỳ tổng hợp thành Monthly Statement → Trainer xác nhận → **Course Manager** chi trả (chuyển khoản thủ công + ghi nhận).
+- Course trả phí: Learner thanh toán qua HanGo (**PayOS** — đổi từ thiết kế VNPay ban đầu, xem §14) → ghi nhận doanh thu theo Course → cuối kỳ tổng hợp thành Monthly Statement → Trainer xác nhận → **Course Manager** chi trả (chuyển khoản thủ công + ghi nhận).
 
 ### 3.3 Định giá Course (Price Tier)
 
@@ -181,7 +190,7 @@ Backend **tự đánh giá quy mô Course** (số Lesson, số Quiz, thời lư�
 | **Auth** | **JWT** (access token + refresh token); đăng nhập email/mật khẩu, **và Google OAuth2** (Sign-in with Google) |
 | **Realtime** | **WebSocket** (dùng cho Notification) |
 | **Media / File** | **Cloudinary** (video, pdf, ảnh của Lesson) |
-| **Payment** | **VNPay** (tiền tệ **VND**) |
+| **Payment** | **PayOS** (tiền tệ **VND**) — *cập nhật 2026-07-24: đổi từ VNPay ban đầu; xem §5.1 và §14* |
 | **Email** | Email Service cho **OTP verification** (bắt buộc) & thông báo |
 | **AI** | LLM API (đã tích hợp; chi tiết tích hợp ngoài phạm vi tài liệu này) |
 | **Deployment** | **AWS** |
@@ -468,9 +477,9 @@ FE-14 Notification
 
 | ID | Requirement |
 |---|---|
-| FR-PAY-01 | Learner mua Course trả phí qua **VNPay**. |
-| FR-PAY-02 | Tạo Order; theo dõi trạng thái (Pending/Paid/Completed/Failed). |
-| FR-PAY-03 | Nhận **IPN** từ VNPay → verify checksum + amount → **auto** mark Paid → **auto-enroll** (idempotent). |
+| FR-PAY-01 | Learner mua Course trả phí qua **PayOS** *(cập nhật 2026-07-24 để khớp code đã triển khai — thiết kế ban đầu là VNPay, xem §14)*. |
+| FR-PAY-02 | Tạo Payment; theo dõi trạng thái thật trong code: `PENDING` → `SUCCESS`/`FAILED`; `PaymentExpirationScheduler` tự động chuyển `PENDING` quá 30 phút sang `EXPIRED` (chạy mỗi 15 phút). |
+| FR-PAY-03 | Nhận **webhook** từ PayOS (`POST /api/v1/payment/payos-webhook`) → verify chữ ký HMAC-SHA256 (checksum key) → **auto** mark `SUCCESS` → **auto-enroll** (idempotent — kiểm tra trạng thái đã `SUCCESS` thì bỏ qua xử lý trùng). |
 | FR-PAY-04 | **Auto** ghi nhận doanh thu theo Course, chia tỷ lệ theo TrainerType (70/30 · 60/40). |
 | FR-PAY-05 | Trainer xem doanh thu, sales, enroll statistics. |
 | FR-PAY-06 | **Auto** generate Monthly Statement cuối kỳ. |
@@ -610,14 +619,18 @@ Trainer/Course Manager: Create Exam → Exam Questions → Publish
 → Weakness Analysis (SkillType) → Rule-based + AI Recommendation → AI Learning Pathway
 ```
 
-### 10.4 Payment (VNPay pay-in) → Settlement
+### 10.4 Payment (PayOS pay-in) → Settlement
+
+> Cập nhật 2026-07-24 để khớp code đã triển khai (`PaymentServiceImpl`) — cổng thanh toán thật là **PayOS**, không phải VNPay như thiết kế ban đầu (xem §14). Cột mốc trạng thái thật: `Payment.status` = `PENDING → SUCCESS|FAILED|EXPIRED`; `MonthlyStatement.status` = `PENDING_TRAINER_CONFIRM → TRAINER_CONFIRMED → PAID`.
+
 ```
-Learner: Purchase → tạo Order (Pending) → redirect VNPay payment URL → thanh toán
-→ VNPay gọi IPN → backend verify checksum + amount → Order = Paid (idempotent) → auto-enroll
-→ auto RevenueRecord (split theo TrainerType)
+Learner: Purchase → tạo Payment (PENDING) → redirect PayOS payment link → thanh toán (QR/thẻ)
+→ PayOS gọi webhook → backend verify chữ ký HMAC-SHA256 → Payment = SUCCESS (idempotent) → auto-enroll
+→ auto tính RevenueRecord ngay trên Payment (platformFee/trainerEarnings, split theo TrainerType)
+→ PaymentExpirationScheduler tự động đánh EXPIRED cho Payment PENDING quá 30 phút (chạy mỗi 15 phút)
 --- cuối kỳ ---
-Course Manager: auto-generate Monthly Statement → Trainer Confirm
-→ Course Manager chuyển khoản thủ công → record transfer → Statement = Paid
+Course Manager/Admin: gọi API generate → gom Payment SUCCESS+chưa-vào-statement theo Trainer → tạo MonthlyStatement (PENDING_TRAINER_CONFIRM)
+→ Trainer Confirm (TRAINER_CONFIRMED) → Course Manager chuyển khoản thủ công → record transfer (PAID) + email thông báo Trainer
 ```
 
 ---
@@ -641,22 +654,22 @@ Course Manager: auto-generate Monthly Statement → Trainer Confirm
 
 | Enum | Giá trị |
 |---|---|
-| Role | Learner · Trainer · CourseManager · Administrator |
-| ActiveMode *(Trainer UI)* | TrainerMode · LearnerMode |
-| TrainerType | Teacher · Tutor |
-| AccountStatus | Active · Locked |
-| ApplicationStatus | Draft · Submitted · Approved · Rejected |
-| CourseVersionStatus | Draft · Submitted · Rejected · Approved · Published · Archived |
+| Role | Learner · Trainer · CourseManager · Administrator — *giá trị thật lưu trên `roles.role_name`/JWT authority: `LEARNER`, `TRAINER`, `TRAINER_LEAD` hoặc `COURSE_MANAGER` (2 tên cùng tồn tại trong code cho vai trò Course Manager, xem §22), `ADMINISTRATOR`* |
+| ActiveMode *(Trainer UI)* | TrainerMode · LearnerMode — UI/session state, chưa thấy claim riêng trong JWT hiện tại (xem §22) |
+| TrainerType | Business label "Teacher/Tutor" — *giá trị thật trên `TrainerProfile.trainerType`: `PROFESSIONAL` (Teacher, 70/30) · `PEER_TUTOR` (Tutor, 60/40)* |
+| AccountStatus | Active · Locked — *giá trị thật trên `User.status`: chuỗi tự do, `AuthService` chỉ chặn đăng nhập khi status = `"INACTIVE"` (xem GAP-AUTH-01, §22)* |
+| ApplicationStatus | Draft · Submitted · Approved · Rejected — *tên gọi nghiệp vụ; giá trị thật trên `TrainerProfile.status` là `PENDING_VERIFICATION → AWAITING_APPROVAL → VERIFIED` (hoặc `SUSPENDED`), xem §9.2* |
+| CourseVersionStatus | Draft · Submitted · Rejected · Approved · Published · Archived — *giá trị thật trên `Course.status`: `DRAFT`, `PENDING_APPROVAL` (gộp Submitted), `PUBLISHED`, `ARCHIVED`; không thấy giá trị `REJECTED`/`APPROVED` tách riêng trong code hiện tại — Course Manager reject gọi thẳng `returnCourseToDraft` (→ `DRAFT`), Trainer's own reject path (`rejectTrainerCourseDraft`) lại set `REJECTED` (2 luồng khác nhau, xem §22 HIGH-04)* |
 | CourseOverallStatus | HasDraft · Published · Archived |
-| ExamVersionStatus | Draft · Submitted · Approved · Published · Archived |
+| ExamVersionStatus | Draft · Submitted · Approved · Published · Archived — *giá trị thật trên `Exam.status` tương tự Course: `DRAFT`, `PENDING_APPROVAL`/`SUBMITTED` (cả 2 chuỗi được chấp nhận), `PUBLISHED`, `ARCHIVED`* |
 | LessonBlockType | Text · Video · PDF · Image |
 | QuestionType | SingleChoice |
 | Difficulty | Easy · Medium · Hard |
 | Visibility | Public · Private |
 | SkillType | Conversation/Short Sentences · Synonym · Antonym · Pronunciation · Grammar · Sentence Meaning · Sentence Combining · Fill in Blank · Reading Comprehension · Arrangement |
 | GroupType | Notice Completion · Flyer Completion · Passage Arrangement · Information Gap Filling · Reading Comprehension |
-| OrderStatus | Pending · Paid · Completed · Failed |
-| StatementStatus | Generated · TrainerConfirmed · Paid |
+| OrderStatus *(→ `Payment.status`)* | Business label "Pending/Paid/Completed/Failed" — *giá trị thật trong code: `PENDING → SUCCESS` hoặc `FAILED`; `PaymentExpirationScheduler` thêm `EXPIRED` cho Payment PENDING quá 30 phút. Không có giá trị "Completed" riêng — enroll xảy ra ngay khi webhook set `SUCCESS`.* |
+| StatementStatus | Generated · TrainerConfirmed · Paid — *giá trị thật trên `MonthlyStatement.status`: `PENDING_TRAINER_CONFIRM` (sau generate) → `TRAINER_CONFIRMED` (Trainer xác nhận) → `PAID` (Course Manager/Admin settle)* |
 | CommentTargetType | Lesson · Quiz |
 | CommentStatus | APPROVED (visible) · PENDING (Admin review, hidden) · REJECTED (hidden) — quyết định bởi Rule Engine (§7.13), không phải quyết định thủ công của Admin tại thời điểm đăng |
 | NotificationType | PurchaseSuccess · CourseUpdated · CommentReply · NewEnrollment · ContentApproved · ContentRejected · StatementReady · **LOW_RATING · LOW_AVERAGE_RATING** (2 loại đã có code thật qua `NotificationService`, chỉ lưu DB — chưa realtime WebSocket/email; các loại còn lại trong danh sách này vẫn **Planned**, chưa có `NotificationService`/entity nào phục vụ chúng trước 2026-07-22) |
@@ -681,7 +694,7 @@ Course Manager: auto-generate Monthly Statement → Trainer Confirm
 
 ## 14. Decision Log & Future Items
 
-### 15.1 Đã chốt (v1)
+### 14.1 Đã chốt (v1)
 
 | Vấn đề | Quyết định |
 |---|---|
@@ -709,9 +722,339 @@ Course Manager: auto-generate Monthly Statement → Trainer Confirm
 | Login | email/mật khẩu **và Google OAuth2** (JIT provisioning, role mặc định Learner) — cập nhật 2026-07-11 để khớp code đã triển khai (`AuthService.googleLogin`, `POST /api/v1/auth/google`) |
 | Trainer role vs. duyệt Admin | Role **Trainer** gán ngay khi đăng ký chọn role Trainer hoặc gọi `become-trainer`, **không** chờ Admin duyệt hồ sơ trước; điểm chặn thật của BR-TRN-01 dịch xuống bước **publish Course** (`TrainerProfile.status = VERIFIED`) — cập nhật 2026-07-17 để khớp code đã triển khai (`TrainerOnboardingServiceImpl.becomeTrainer`, `TrainerDashboardServiceImpl.publishTrainerCourse`). Xem BR-TRN-01 (§7.4) và §9.2. |
 
-### 15.2 Future phase (ngoài v1)
+### 14.2 Future phase (ngoài v1)
 
-Mobile app; refund policy & auto-payout; AI usage limit & cost model; pass-score cho Quiz; GroupType trong course-authoring & analytics; đa ngôn ngữ giao diện; công thức price-tier chi tiết; role Finance riêng.
+Mobile app; refund policy & auto-payout; AI usage limit & cost model; pass-score cho Quiz; GroupType trong course-authoring & analytics; đa ngôn ngữ giao diện; công thức price-tier chi tiết; role Finance riêng. *(Chi tiết đầy đủ, có ưu tiên: [`ROADMAP.md`](ROADMAP.md) §23.)*
+
+---
+
+## 15. Package Structure chi tiết (Backend & Frontend)
+
+> Cấu trúc tổng quan xem thêm [`ARCHITECTURE.md`](ARCHITECTURE.md). Mục này liệt kê **inventory thật** của source code tại thời điểm audit (2026-07-24) để làm tài liệu tra cứu nhanh.
+
+### 15.1 Backend — `hango-backend/src/main/java/com/hango/hango_backend/`
+
+N-Tier: `Controller → Service → Repository`, entity không bao giờ trả thẳng ra client (map qua DTO thủ công, xem §20).
+
+| Package | Số file | Vai trò |
+|---|---|---|
+| `config/` | 7 | Bean & `@ConfigurationProperties` cho JWT, Gemini, AI guardrail, Cloudinary, Google OAuth2; `SystemParameterDataInitializer` seed dữ liệu lookup lúc khởi động. |
+| `controller/` | 26 | REST endpoint, nhận/trả DTO, khai báo `@PreAuthorize`/`hasAnyRole` (chi tiết §17). |
+| `dto/` | 83 | Request/Response payload — tách biệt hoàn toàn với entity. |
+| `entity/` | 34 | JPA model map trực tiếp bảng MySQL (chi tiết §16). |
+| `exeption/` *(tên gói thật trong code — không phải "exception")* | 2 | `ApiException` (RuntimeException + HttpStatus) + `GlobalExceptionHandler` (`@RestControllerAdvice`, hiện chỉ bắt `ApiException` — xem §22). |
+| `repository/` | 36 | 33 `JpaRepository` (1:1 với entity) + 3 projection interface thuần (`TopCourseProjection`, `TrainerCourseProjection`, `TrainerCourseDetailProjection`). |
+| `sercurity/` *(tên gói thật trong code — không phải "security")* | 5 | `SecurityConfig` (filter chain, CORS, `permitAll` list), `JwtAuthFilter`, `JwtUtils`-adjacent helpers, `UserDetailsImpl`/`UserDetailsServiceImpl`. |
+| `service/` (+1 file trong `service/impl/`) | 46 + 1 | Business logic. 12 cặp interface+Impl, 22 class cụ thể không interface (vd `AuthService`, `GeminiClientService`, `EmailService`), vài record helper nội bộ. *Chỉ `CourseManagerDashboardServiceImpl` nằm trong `service/impl/` — 11 impl còn lại nằm phẳng trong `service/`, có vẻ là một lần tái cấu trúc dở dang (xem §22).* |
+| `util/` | 2 | `JwtUtils` (sinh/validate JWT), `VectorUtil` (embedding vector JSON + cosine similarity, workaround cho MySQL không có kiểu vector gốc). |
+
+**Danh sách Service (theo domain nghiệp vụ):**
+
+| Domain | Service chính |
+|---|---|
+| Identity/Auth | `AuthService`, `UserDetailsServiceImpl` |
+| Trainer Onboarding | `TrainerOnboardingService`/`Impl` |
+| Course & Content | `CourseService`/`Impl`, `LessonService`/`Impl`, `CourseImportService`, `SectionQuestionController` (logic nằm thẳng trong controller — xem §22) |
+| Question Bank & Exam | `TrainerQuestionService`/`Impl`, `TrainerQuestionAIService`, `ExamService`, `TrainerExamMatrixService`/`Impl` |
+| Course Manager Review | `CourseManagerDashboardService`/`Impl` |
+| Trainer Dashboard | `TrainerDashboardService`/`Impl` |
+| AI Assistant | `AIAssistantService`, `AIPromptBuilder`, `ScopeGuardrailService`, `LessonEmbeddingService`, `GeminiClientService` (điểm chốt duy nhất gọi Gemini API) |
+| Recommendation / Learning Pathway | `ExamCourseRecommendationAIService`, `ExamResultAnalyzerService`, `LearningPathwayService`, `PathwayGoalMergeService`, `PathwayMutationService`, `PathwayProgressSnapshotService`, `PathwayReroutePolicyService`, `PathwayTimeboxingScheduler` |
+| Learning / Rating | `CourseRatingService`/`Impl` (rating + cache `Course.averageRating`) |
+| Payment & Revenue | `PaymentService`/`Impl` (PayOS), `PaymentExpirationScheduler`, `MonthlyStatementService`/`Impl`, `CartService`/`Impl` |
+| Comment | `CommentService`/`Impl`, `CommentRuleEngineService` |
+| Notification | `NotificationService` |
+| Hạ tầng dùng chung | `CloudinaryService`, `EmailService` |
+
+### 15.2 Frontend — `hango-frontend/lib/`
+
+> ⚠️ Cấu trúc **thật** khác với mô tả "Clean Architecture + Riverpod + go_router" trong `CONSTITUTION.md` bản gốc — đã cập nhật `CONSTITUTION.md`/`ARCHITECTURE.md` để khớp code. Chi tiết đầy đủ và bằng chứng: [`AUDIT_REPORT.md`](AUDIT_REPORT.md) HIGH-06, HIGH-07, MED-07, MED-08.
+
+143 file `.dart` trong `lib/`:
+
+| Thư mục | Nội dung thật |
+|---|---|
+| `data/models/` (1 file) | `course_manager_dashboard_summary.dart` — model thứ 3 song song với `domain/model/` và `domain/entities/` (xem ghi chú trùng lặp bên dưới). |
+| `data/repositories/` (10 file) | `cart_`, `course_`, `exam_`, `exam_ai_recommendation_`, `lesson_`, `notification_`, `pathway_` (+ extension mock agentic), `payment_`, `trainer_ai_recommendation_` — mỗi file tự gọi `http` trực tiếp, tự đính JWT thủ công từ `SharedPreferences`. |
+| `data/services/` (5 file) | `auth_service.dart` (phiên đăng nhập qua `SharedPreferences`), `course_service.dart`, `course_manager_api.dart`, `trainer_onboarding_service.dart`, `revenue_settlement_service.dart`. |
+| `domain/model/` (12 file) | Model "cũ hơn", có `fromJson`: `course`, `course_detail`, `exam_models`, `lesson_detail`, `recommendation`, `notification_item`, `ai_*`, `auth_session`, `trainer_ai_question_models`, `course_review_summary`. |
+| `domain/entities/` (3 file) | `exam.dart`, `learning_pathway.dart`, `learning_pathway_agentic_mocks.dart` — thêm sau (tính năng AI Learning Pathway), **có `Exam` class khác kiểu, không tương thích** với `domain/model/exam_models.dart`'s `Exam` (xem §22). |
+| `presentation/pages/` (67 file, 6 role folder + 5 trang auth gốc) | `admin/` (3, nhưng `admin_dashboard_page.dart` một file **5648 dòng**), `course/` (6), `course_manager/` (8), `exam/` (6), `learner/` (4, `learner_home_page.dart` **3071 dòng**), `trainer/` (35 — role có nhiều tính năng nhất: course authoring, exam authoring, question bank, matrix builder, onboarding). |
+| `presentation/widgets/` (19 file, có `learning_pathway/`, `learner/` con) | Widget tái sử dụng — Node Tree, AI Mentor panel, comment box, exam card... |
+| `services/` (3 file) | `app_state.dart` (`ChangeNotifier` toàn app — **cơ chế state-management thật duy nhất**, không phải Riverpod), `hango_api.dart` (client `HangoApi` dùng ở 7 trang), `secure_session_store.dart` (`flutter_secure_storage`, dùng song song với `SharedPreferences` của `AuthService` — 2 nơi lưu session không đồng bộ tường minh, xem §22). |
+| `utils/` (21 file) | `config.dart` (`EnvConfig` — base URL branch theo `Uri.base.host`, không dùng `--dart-define`), `app_theme.dart` (màu chủ đạo `#20B486`), `cart_manager`, `wishlist_manager`, các cặp `*_stub.dart`/`*_web.dart` cho conditional import (web vs mobile). |
+
+**Trùng lặp cần biết khi điều hướng code:** `domain/model/` vs `domain/entities/` vs `data/models/` là **3 vị trí model khác nhau** hình thành từ 3 đợt phát triển không đồng bộ (không phải chủ ý kiến trúc); `lib/services/` vs `lib/data/services/` tương tự — là 2 tầng "service" hình thành cách nhau ~1 tháng, chưa gộp lại. Xem [`AUDIT_REPORT.md`](AUDIT_REPORT.md) MED-07/MED-08 để biết bằng chứng cụ thể trước khi thêm code mới vào bất kỳ vị trí nào trong số này — nên hỏi lại nếu không chắc chắn nên đặt file mới ở đâu.
+
+---
+
+## 16. Tổng quan Cơ sở dữ liệu (Database Overview)
+
+> Không dùng migration tool (Flyway/Liquibase) — schema quản lý qua Hibernate `ddl-auto` (mặc định thật trong `application.properties` là `update`, xem §20 và §22 HIGH-01). 34 entity, chỉ 1 enum Java thật (`AIMessage.MessageRole`) — mọi field status/type khác đều là `String` tự do (xem §12).
+
+```mermaid
+erDiagram
+    USER ||--o{ TRAINER_PROFILE : "1-1 (shared PK)"
+    USER }o--o{ ROLE : "user_roles"
+    USER ||--o{ COURSE : creates
+    COURSE ||--o{ SECTION : has
+    SECTION ||--o{ LESSON : has
+    COURSE ||--o{ ENROLLMENT : "learner enrolls"
+    USER ||--o{ ENROLLMENT : enrolls
+    LESSON ||--o{ LESSON_PROGRESS : tracks
+    LESSON ||--o{ LESSON_QUIZ_ATTEMPT : attempts
+    COURSE ||--o{ COURSE_RATING : rated_by
+    COURSE ||--o{ COMMENT : "via Lesson/Quiz"
+    QUESTION_GROUP ||--o{ QUESTION : groups
+    QUESTION ||--o{ QUESTION_OPTION : has
+    EXAM ||--o{ EXAM_QUESTION : "private questions"
+    QUESTION ||--o{ EXAM_QUESTION : "via composite key"
+    EXAM ||--o{ EXAM_ATTEMPT : attempted_by
+    USER ||--o{ EXAM_ATTEMPT : attempts
+    EXAM_MATRIX ||--o{ EXAM_MATRIX_DETAIL : defines
+    USER ||--o{ CART_ITEM : has
+    COURSE ||--o{ CART_ITEM : in_cart
+    USER ||--o{ PAYMENT : pays
+    COURSE ||--o{ PAYMENT : purchased
+    USER ||--o{ MONTHLY_STATEMENT : "trainer receives"
+    USER ||--o{ AI_CONVERSATION : has
+    AI_CONVERSATION ||--o{ AI_MESSAGE : contains
+    USER ||--o{ LEARNING_PATHWAY : owns
+    LEARNING_PATHWAY ||--o{ PATHWAY_NODE : contains
+    LEARNING_PATHWAY ||--o{ LEARNING_PATHWAY_GOAL : has
+    USER ||--o{ NOTIFICATION : receives
+    USER ||--o{ AUDIT_LOG : "actor (admin)"
+```
+
+*(Sơ đồ trên lược giản để dễ đọc — không vẽ toàn bộ FK phụ như `Course.parentId`/`latestVersionId` hay các trường "denormalized" khác, xem ghi chú bên dưới.)*
+
+### 16.1 Theo cụm nghiệp vụ
+
+| Cụm | Entity | Ghi chú |
+|---|---|---|
+| **Identity** | `User`, `Role`, `TrainerProfile`, `PasswordResetOtp` | `User↔Role` là M:M qua `user_roles`, fetch EAGER. `TrainerProfile` là 1:1 mở rộng theo `user_id`. |
+| **Content** | `Course`, `Section`, `Lesson` | Cây nội dung Course→Section→Lesson. `Course.parentId`/`latestVersionId` là **plain Long**, không phải `@ManyToOne` — cơ chế versioning dựa vào convention ở tầng Service, Hibernate không thấy được quan hệ này. |
+| **Learning** | `Enrollment`, `LessonProgress`, `LessonQuizAttempt`, `CourseRating`, `Comment` | Đều treo trên `User` + `Course`/`Lesson`. |
+| **Question Bank & Exam** | `QuestionCategory`, `QuestionGroup`, `Question`, `QuestionOption`, `Exam`, `ExamQuestion`(+`ExamQuestionId` composite key), `ExamMatrix`, `ExamMatrixDetail`, `ExamAttempt` | Độc lập phần lớn với Course — chỉ nối qua `Lesson.exam` (optional, quiz trong Lesson) và `Question.section` (optional). |
+| **AI** | `AIConversation`, `AIMessage`, `AiUsageLog` | `AIMessage.MessageRole` (USER/ASSISTANT) — enum Java thật duy nhất trong toàn bộ `entity/`. |
+| **Learning Pathway** | `LearningPathway`, `LearningPathwayGoal`, `PathwayNode`, `PathwayEvent` | `PathwayNode.parentNodeId`, `PathwayEvent.pathwayId`/`learnerId` đều là plain Long, không phải JPA relation. |
+| **Commerce** | `CartItem`, `Payment`, `MonthlyStatement` | `Payment.statementId` là plain Long trỏ tới `MonthlyStatement` (không có `@ManyToOne`). `Payment.vnpayTxnNo`/cột `vnpay_txn_no` là tên cũ còn sót lại từ thiết kế VNPay ban đầu — cổng thanh toán thật hiện tại là PayOS (xem §22). |
+| **Notification & Audit** | `Notification`, `AuditLog` | `Notification` hỗ trợ 2 chế độ target loại trừ nhau: theo `user` (cụ thể) hoặc theo `recipientRole` (broadcast). |
+| **Lookup chung** | `SystemParameter` | Bảng EAV dùng chung cho SkillType/Difficulty/Category/GroupType — không tách bảng lookup riêng cho từng loại. |
+
+**Điểm cần lưu ý khi thêm entity mới:** phần lớn field trạng thái là `String` tự do (không `@Enumerated`), và nhiều quan hệ là Long thô thay vì JPA association — xem §22 (MED-05, MED-06) trước khi giả định một truy vấn JPA sẽ tự động join được các quan hệ này.
+
+---
+
+## 17. Tổng quan API (API Overview)
+
+> Danh sách đầy đủ 26 Controller. `@PreAuthorize`/`permitAll` lấy trực tiếp từ code — không phải suy đoán. Base URL: `/api/...` (một số endpoint cũ dùng `/api/auth/**`, phần lớn dùng `/api/v1/**`).
+
+| Controller | Base path | Endpoint chính | Role gate |
+|---|---|---|---|
+| `AuthController` | `/api/auth` | login, register, google, forgot/verify/reset-password, resend-verification, avatar upload | Public (trừ avatar upload — role đã đăng nhập) |
+| `UserController` | `/api/v1/users` | GET/PUT `/me`, PUT `/change-password` | Authenticated |
+| `AdminController` | `/api/admin` | dashboard/stats, users CRUD, `/users/{id}/status`, audit-log, ai-usage | `ADMINISTRATOR` |
+| `AdminCommentController` | `/api/admin` | comments list/detail/status/delete | `ADMINISTRATOR` |
+| `TrainerOnboardingController` | `/api/v1` | become-trainer, trainers/profile (draft/submit), admin/trainer-profiles (review) | Authenticated → Trainer roles → `ADMINISTRATOR` cho review |
+| `CourseController` | `/api/v1/courses` | list/detail (public), enroll/unenroll, switch-version, reviews | Public browse; enroll cần login |
+| `TrainerDashboardController` | `/api/v1/trainer` | course/exam CRUD, submit/publish/approve/reject (controller lớn nhất, ~20 endpoint) | `TRAINER`/`ADMINISTRATOR`/`TRAINER_LEAD`/`COURSE_MANAGER`; approve/reject loại trừ Trainer |
+| `CourseManagerDashboardController` | `/api/v1/course-manager` | dashboard, notifications, courses/exams review-publish-reject | `TRAINER_LEAD`/`COURSE_MANAGER`/`ADMINISTRATOR` |
+| `SectionQuestionController` | `/api/v1/trainer` | sections/questions CRUD (raw `JdbcTemplate`) | ⚠️ **Không có `@PreAuthorize`** (xem §22 CRIT-04) |
+| `TrainerQuestionController` | `/api/v1/trainer/question-bank` | CRUD + status patch | `TRAINER`/`ADMINISTRATOR`/`TRAINER_LEAD` |
+| `TrainerQuestionAIController` | `/api/v1/trainer/questions/ai` | AI generate question | Authenticated (không role-gate riêng) |
+| `TrainerExamMatrixController` | `/api/v1/trainer/matrices` | list/generate | `TRAINER`+ (tạo matrix chỉ `ADMINISTRATOR`/`COURSE_MANAGER`) |
+| `CourseManagerExamMatrixController` | `/api/v1/course-manager/matrices` | list/create/generate | `COURSE_MANAGER`/`ADMINISTRATOR` |
+| `ExamController` | `/api/v1/exams` | list/questions (public), my-attempts, submit | Public browse; attempts cần login |
+| `ExamImportController` | `/api/v1/trainer/exams` | import-excel-multiple, template | `TRAINER`/`ADMINISTRATOR`/`TRAINER_LEAD` |
+| `ExamCourseRecommendationController` | `/api/v1/exams` | POST `/ai/recommend-courses` | Không role-gate riêng |
+| `LessonController` | `/api/v1/lessons` | detail, complete, quiz-attempts | ⚠️ `permitAll()` ở filter chain + nhận `userId` qua `@RequestParam` (xem §22 CRIT-02) |
+| `CommentController` | `/api/v1/comments` | CRUD lesson comment + like/unlike | ⚠️ `permitAll()` + `userId` qua `@RequestParam` (xem §22 CRIT-02) |
+| `AIAssistantController` | `/api/v1/ai-assistant` | messages, conversations, status | `permitAll()` (messages/conversations có check `isAuthenticated()` ở URL riêng) |
+| `LearningPathwayController` | `/api/v1/pathways` | generate/get/reroute/schedule/merge/chat (nhiều endpoint nhất) | `LEARNER` (riêng `/me` mở thêm cho Trainer/Admin/CM) |
+| `PaymentController` | `/api/v1/payment` | create, payos-webhook, my-history, status | Không role-gate riêng; webhook `permitAll()` |
+| `CartController` | `/api/v1/cart` | get/add/remove/clear/sync | Authenticated (check thủ công, không `@PreAuthorize`) |
+| `MonthlyStatementController` | `/api/v1` | trainer/revenue-summary, trainer/statements(+confirm), course-manager/statements(+generate/settle) | `TRAINER`/`TRAINER_LEAD`/`TEACHER` (trainer side) · `TRAINER_LEAD`/`COURSE_MANAGER`/`ADMINISTRATOR` (CM side) |
+| `NotificationController` | `/api/v1/notifications` | list, unread-count, mark read/read-all | Authenticated (mới thêm — chồng chéo với notifications trong `CourseManagerDashboardController`, xem §22) |
+| `MetadataController` | `/api/v1/metadata` | parameters, categories | Public (read-only lookup) |
+| `TestDBController` | `/api/test-db*` | seed/init/test data | ⚠️ **`permitAll()`, không auth, chạy raw SQL kể cả reset mật khẩu** (xem §22 CRIT-01 — nghiêm trọng nhất trong toàn bộ audit) |
+
+---
+
+## 18. Sequence Diagram — Luồng nghiệp vụ chính
+
+### 18.1 Payment (PayOS) → Enroll → Revenue
+
+```mermaid
+sequenceDiagram
+    participant L as Learner (Flutter)
+    participant BE as Backend (PaymentController)
+    participant PayOS
+    participant DB as MySQL
+
+    L->>BE: POST /api/v1/payment/create
+    BE->>DB: tạo Payment(status=PENDING)
+    BE->>PayOS: tạo payment-requests (checksum HMAC-SHA256)
+    PayOS-->>L: trả payment link (QR/thẻ)
+    L->>PayOS: thanh toán
+    PayOS->>BE: POST /api/v1/payment/payos-webhook (permitAll)
+    BE->>BE: verify chữ ký (TreeMap-sorted + HMAC-SHA256)
+    alt chữ ký hợp lệ & code=00
+        BE->>DB: Payment.status=SUCCESS (idempotent — bỏ qua nếu đã SUCCESS)
+        BE->>DB: auto-enroll Learner vào Course
+        BE->>DB: tính platformFee/trainerEarnings theo TrainerType
+        BE->>DB: tạo Notification cho Trainer (NewEnrollment)
+    else code=01/thất bại
+        BE->>DB: Payment.status=FAILED
+    end
+    Note over BE,DB: PaymentExpirationScheduler (mỗi 15p) tự set EXPIRED cho PENDING quá 30p
+```
+
+### 18.2 Course Authoring → Review → Publish (+ Versioning)
+
+```mermaid
+sequenceDiagram
+    participant T as Trainer
+    participant CM as Course Manager
+    participant BE as Backend
+    participant L as Learner
+
+    T->>BE: tạo/sửa Course (status=DRAFT)
+    T->>BE: submit → status=PENDING_APPROVAL
+    CM->>BE: GET /course-manager/courses/review
+    alt Approve
+        CM->>BE: POST /courses/{id}/publish → status=PUBLISHED
+        BE->>L: Notification ContentApproved (Trainer) / CourseUpdated (learner bản cũ nếu là version mới)
+    else Reject
+        CM->>BE: POST /courses/{id}/reject → status=DRAFT
+        BE->>T: Notification ContentRejected
+    end
+    Note over T,BE: Sửa Course đã Published tạo bản clone mới (Draft) — bản live giữ nguyên cho Learner đang học, xem §9.7
+```
+
+### 18.3 Trainer Onboarding
+
+```mermaid
+sequenceDiagram
+    participant G as Guest/Learner
+    participant BE as Backend
+    participant A as Admin
+
+    G->>BE: chọn role Trainer lúc Register HOẶC POST /trainers/become-trainer
+    BE->>BE: gán role TRAINER ngay lập tức (JIT TrainerProfile status=PENDING_VERIFICATION)
+    Note over BE: Trainer Dashboard dùng được ngay, chỉ tạo Course/Exam ở Draft — CHƯA publish/bán được
+    G->>BE: saveProfileDraft (lặp lại, upload minh chứng)
+    G->>BE: submitProfileForReview (đủ bio+phone+≥1 minh chứng) → status=AWAITING_APPROVAL
+    A->>BE: reviewTrainerProfile → status=VERIFIED
+    Note over BE: publishTrainerCourse / enrollCourse (Learner mode) đều chỉ mở khóa khi status=VERIFIED
+```
+
+---
+
+## 19. Deployment
+
+> Hướng dẫn từng bước đầy đủ: [`DEPLOY_GUIDE.md`](../DEPLOY_GUIDE.md). Mục này tóm tắt kiến trúc triển khai thật.
+
+**Hạ tầng:** 1 AWS EC2 (Ubuntu 24.04) chạy Docker Compose gồm 4 service — `backend` (Spring Boot JAR, port 8080 nội bộ), `frontend` (Flutter Web build tĩnh, phục vụ qua Nginx port 80 nội bộ), `nginx` (reverse proxy + TLS, expose 80/443 ra ngoài), `certbot` (tự renew Let's Encrypt mỗi 12h). Database: MySQL ngoài (Aiven Cloud), không chạy trong Docker Compose.
+
+**Domain:** `hangog92.online`/`www.hangog92.online` → Frontend; `api.hangog92.online` → Backend (`nginx/conf.d/hango.conf` định tuyến theo `server_name`).
+
+**Build image:**
+- Backend: `eclipse-temurin:17-jre-alpine` (JRE **17**, không phải 21 — khớp `pom.xml`, xem §22 MED-01), copy `hango-backend-0.0.1-SNAPSHOT.jar`.
+- Frontend: `nginx:alpine`, copy `build/web` (Flutter Web release build).
+
+**CI/CD (`.github/workflows/`):**
+| Workflow | Trigger | Việc làm |
+|---|---|---|
+| `backend-ci.yml` | PR → `main`/`develop` | Setup JDK 21 (runner toolchain — build vẫn compile theo `java.version=17` trong pom), `mvn clean verify -DskipTests` |
+| `frontend-ci.yml` | PR → `main`/`develop` | Flutter 3.44.0, `flutter analyze --no-fatal-infos --no-fatal-warnings`, `flutter test` |
+| `deploy.yml` | push → `dev` | Build JAR (`-DskipTests`) + Flutter Web release → zip cùng `docker-compose.yml`/Dockerfiles/nginx → SCP lên EC2 → SSH `docker-compose up -d --build` + restart nginx + prune image cũ |
+
+**Lưu ý vận hành:** secrets (PayOS, JWT, Cloudinary, DB, mail) truyền qua `.env` trên EC2 + `${VAR}` trong `docker-compose.yml`/GitHub Secrets — không hardcode trong repo (xem §22 CRIT-03 về sự cố đã phát hiện và xử lý trong audit này). Deploy tự động chỉ chạy khi push vào `dev`, không tự động deploy `main`.
+
+---
+
+## 20. Configuration
+
+> File mẫu: `hango-backend/src/main/resources/application.properties.example` (không chứa giá trị thật — copy thành `application.properties` và điền theo môi trường).
+
+| Nhóm cấu hình | Property prefix | Ghi chú |
+|---|---|---|
+| Datasource | `spring.datasource.*` | MySQL, `driver-class-name=com.mysql.cj.jdbc.Driver`. |
+| JPA/Hibernate | `spring.jpa.hibernate.ddl-auto` | File thật dùng default `update` qua biến môi trường (`${SPRING_JPA_HIBERNATE_DDL_AUTO:update}`); file `.example` khuyến nghị `validate`. **Chưa có Flyway/Liquibase** — xem §22 HIGH-01. |
+| JWT | `hango.jwt.secret`, `hango.jwt.expirationMs` | Bind qua `JwtProperties`, nhưng `JwtUtils`/`AuthService` thực tế đọc `@Value` riêng, không inject `JwtProperties` (dead-weight nhẹ). |
+| Cloudinary | `cloudinary.cloud-name/api-key/api-secret` | Dùng bởi `CloudinaryService`; cloud-name cũng bị hardcode lặp lại ở 4 file frontend thay vì đọc từ config tập trung (xem §22). |
+| Google OAuth2 | `google.client-id` | Dùng bởi `GoogleAuthConfig` để verify Google ID Token (Sign-in with Google, JIT provisioning role Learner). |
+| Mail (SMTP) | `spring.mail.*` | Gmail SMTP, dùng bởi `EmailService` cho OTP/thông báo email; có fallback log ra console nếu mail lỗi (không chặn luồng chính). |
+| PayOS | `payos.client-id/api-key/checksum-key` | Dùng bởi `PaymentServiceImpl` — cổng thanh toán thật của hệ thống (không phải VNPay, xem §22). |
+| AI (Gemini) | `hango.gemini.*` | apiKey/chatModel/embeddingModel/baseUrl/timeoutSeconds — bind qua `GeminiProperties`, dùng bởi `GeminiClientService` (điểm chốt duy nhất gọi Gemini). |
+| AI Guardrail | `hango.ai-assistant.*` | `scopeSimilarityThreshold`, `maxPromptLength` — dùng bởi `ScopeGuardrailService`. |
+
+**Frontend:** không có file `.env`/`--dart-define` — base URL resolve động trong `lib/utils/config.dart` (`EnvConfig`) theo `Uri.base.host` lúc runtime (web) hoặc literal `10.0.2.2:8080` (Android emulator). Xem §22 MED-10.
+
+---
+
+## 21. Testing Strategy
+
+> Chiến lược đầy đủ: [`TESTING.md`](TESTING.md) · Quy tắc QA Agent: [`agent_qa.md`](agent_qa.md) · Danh sách method + trạng thái từng module: [`specs/unit_test_plan.md`](specs/unit_test_plan.md) · Báo cáo coverage chi tiết nhất: [`TEST_AUDIT_REPORT.md`](TEST_AUDIT_REPORT.md).
+
+**Trạng thái thật tại thời điểm audit (2026-07-24):**
+
+| | Backend | Frontend |
+|---|---|---|
+| Framework | JUnit 5 + Mockito (`@ExtendWith(MockitoExtension.class)`) | `flutter_test` |
+| Phạm vi | **Chỉ Service layer** (quy tắc team, xem `agent_qa.md`) — 2 ngoại lệ Controller khi logic nằm thẳng trong Controller không qua Service (`AdminController`, `SectionQuestionController`) | Model/widget đơn lẻ |
+| Test class | 34 | 2 |
+| Test case | 517 | ~2 nhóm test (model `Course.fromJson`, widget `InteractiveNodeTree`) |
+| Kết quả lần chạy gần nhất | **517/517 pass, 0 fail, 0 error** | Chưa có CI riêng chạy song song coverage report |
+| Coverage theo Service | 28/34 class có test (82%) — 6 class chưa có test là các wrapper mỏng quanh dịch vụ ngoài (`CloudinaryService`, `EmailService`, `GeminiClientService` — không có seam để mock) hoặc đã hoãn có chủ đích (`CourseImportService`, 737 dòng) | 0/67 trang, 0/~15 repository/service |
+| Tích hợp/E2E | **Chưa có** `@SpringBootTest`/`Testcontainers`/MockMvc thật nào trong suite hiện tại — dù `TESTING.md`/`CONSTITUTION.md` mô tả chiến lược này | Chưa có |
+
+**Nguyên tắc code-first (đã áp dụng xuyên suốt):** test phản ánh **hành vi thật của code hiện tại**, không phải ý định thiết kế ban đầu trong Markdown — khi phát hiện lệch (method đổi tên, chưa tồn tại, hành vi khác doc), test + `unit_test_plan.md` cập nhật theo code, không viết test theo doc rồi để fail. Toàn bộ gap/gap đã sửa được log có ngày tháng trong `unit_test_plan.md` §2.
+
+Chi tiết đầy đủ (coverage summary theo module, danh sách method còn thiếu test, ưu tiên khuyến nghị): xem [`TEST_AUDIT_REPORT.md`](TEST_AUDIT_REPORT.md).
+
+---
+
+## 22. Known Limitations & Rủi ro kỹ thuật
+
+> Danh sách đầy đủ, có mức độ nghiêm trọng và bằng chứng file:line: [`AUDIT_REPORT.md`](AUDIT_REPORT.md). Mục này tóm tắt để người đọc tài liệu (không phải người audit) biết trước khi build tiếp lên hệ thống.
+
+**🔴 Bảo mật — cần xử lý trước khi có traffic thật đáng kể:**
+- `TestDBController` (`/api/test-db/**`) không yêu cầu đăng nhập và chạy SQL trực tiếp, bao gồm một endpoint reset mật khẩu tài khoản Trainer về giá trị cố định rồi trả về email+mật khẩu trong response.
+- `CommentController`/`LessonController` nhận `userId` từ query param do client gửi thay vì lấy từ JWT/SecurityContext — bất kỳ ai cũng có thể mạo danh user khác để đăng/sửa/xóa comment hoặc nộp quiz.
+- `SectionQuestionController` (CRUD câu hỏi/section của Trainer) không có `@PreAuthorize` — bất kỳ role đã đăng nhập nào (kể cả Learner) đều gọi được.
+- Một bản `DEPLOY_GUIDE.md` cũ từng chứa giá trị thật của PayOS credentials + email cá nhân, đã commit lên remote — đã được thay bằng placeholder trong audit này, nhưng **cần rotate lại key thật trên PayOS Dashboard** vì giá trị cũ coi như đã lộ.
+
+**🟠 Kiến trúc & hạ tầng:**
+- Chưa có migration tool (Flyway/Liquibash) — schema dựa vào Hibernate `ddl-auto=update` (môi trường thật) — rủi ro schema drift.
+- Không có error-handling nhất quán toàn API — nhiều nơi lộ tên class exception ra response.
+- Cổng thanh toán thật là PayOS nhưng nhiều tài liệu (đã sửa trong đợt audit này) và một số tên field/cột (`vnpayTxnNo`) vẫn mang tên VNPay cũ.
+- Có 2 luồng "approve/reject Course" xử lý khác nhau (`TrainerDashboardServiceImpl` vs `CourseManagerDashboardServiceImpl`) với status/notification không đồng nhất.
+
+**🟡 Frontend:**
+- Stack thật là `StatefulWidget` + `setState()` + 1 `ChangeNotifierProvider` gốc (package `provider`), **không phải Riverpod**; routing thật là `Navigator`/`MaterialPageRoute` thủ công, **không phải `go_router`** (dù `CONSTITUTION.md` bản gốc mô tả vậy — đã sửa).
+- 2 vị trí lưu session song song (`SharedPreferences` và `flutter_secure_storage`) không đồng bộ tường minh.
+- Gần như chưa có test coverage (2/67 trang có test gián tiếp).
+
+**🟡 Data modeling:** hầu hết field trạng thái là `String` tự do, không phải Java enum — không có bảo vệ compile-time khỏi lỗi chính tả trạng thái; một số quan hệ là Long thô thay vì JPA association (không hiện trong ERD tự động).
+
+**Đầy đủ, xếp hạng mức độ, và khuyến nghị xử lý:** xem [`AUDIT_REPORT.md`](AUDIT_REPORT.md) (Critical/High/Medium/Low) và kế hoạch theo phiên bản tại [`ROADMAP.md`](ROADMAP.md).
+
+---
+
+## 23. Future Roadmap
+
+Bản kế hoạch phiên bản tiếp theo — đầy đủ, có sắp xếp ưu tiên — nằm ở tài liệu riêng: **[`ROADMAP.md`](ROADMAP.md)**.
+
+Tóm tắt 5 hạng mục ưu tiên cao nhất (chi tiết đầy đủ trong ROADMAP.md):
+1. Vá 4 lỗ hổng bảo mật Critical (§22) trước khi mở rộng traffic thật.
+2. Rotate PayOS credentials đã lộ; xác nhận không còn giá trị thật nào khác bị commit.
+3. Thêm Flyway + baseline schema hiện tại; chuyển `ddl-auto` sang `validate`.
+4. Thống nhất 1 luồng approve/reject Course/Exam duy nhất (bỏ luồng trùng lặp).
+5. Chuẩn hoá error-handling response toàn API (`GlobalExceptionHandler` catch-all).
+
+Các hạng mục ngoài v1 đã liệt kê ở §14.2 (mobile app, refund/auto-payout, AI usage limit, GroupType mở rộng, đa ngôn ngữ, price-tier chi tiết, role Finance riêng...) được giữ nguyên trong ROADMAP.md kèm mức ưu tiên cụ thể hơn.
 
 ---
 

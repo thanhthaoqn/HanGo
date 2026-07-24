@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.11 (REC)
 
+> ⚠️ **Ghi chú 2026-07-24 — module ít được test nhất trong toàn hệ thống:** chỉ nhánh **AI Recommendation** (`ExamCourseRecommendationAIService.recommendCoursesAI`) được xác nhận tồn tại trong code; nhánh **Rule-based Recommendation** thuần (map SkillType yếu → Course, không qua AI) mà tài liệu này mô tả **chưa tìm thấy method tương ứng** — có thể chưa implement hoặc đã gộp vào logic AI, cần xác nhận lại trước khi viết test hoặc claim "Implemented". Trước đợt audit này, `recommendCoursesAI` **hoàn toàn chưa có unit test** — đã bổ sung `ExamCourseRecommendationAIServiceTest.java` (7 test: null-check, not-found, mapping thành công, strip markdown fence, giới hạn tối đa 3 course, và 2 kịch bản AI fail/response không hợp lệ → fallback rỗng). Contract function-calling (`triggerReroute`, `getPathwayById`, `getUserProgressSnapshot`) mô tả ở §2 vẫn thuộc phạm vi "Agentic Upgrade" chưa làm — xem `TODO.md` FE-11 Phase 5.
+
 ## 1. Business Context
 To personalize learning paths, the Recommendation System runs a **Weakness Analysis by SkillType** after each Exam attempt, then matches weak SkillTypes to Courses tagged with that SkillType (every Course carries **up to 3 SkillTypes** — BR-REC-01). On top of the rule-based match, an AI Recommendation and an AI Learning Pathway (generated roadmap) personalize the suggestion further. There is no "flashcard" concept and no Course "Basic/Advanced level" tiering in HanGo — matching is purely SkillType-based, not a numeric score threshold mapped to a difficulty tier.
 

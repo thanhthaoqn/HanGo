@@ -23,6 +23,11 @@ class VectorUtilTest {
         assertEquals(original, result);
     }
 
+    @Test
+    void fromJsonShouldThrowRuntimeExceptionWhenJsonIsMalformed() {
+        assertThrows(RuntimeException.class, () -> VectorUtil.fromJson("not valid json"));
+    }
+
     // =================================================================
     // cosineSimilarity
     // =================================================================

@@ -47,6 +47,7 @@ public class CourseServiceImpl implements CourseService {
     private final LessonProgressRepository lessonProgressRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @Override
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
@@ -307,6 +308,11 @@ public class CourseServiceImpl implements CourseService {
                 .build();
 
         enrollmentRepository.save(enrollment);
+
+        notificationService.notifyUser(courseToEnroll.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
+                "New enrollment",
+                user.getFullName() + " enrolled in your course \"" + courseToEnroll.getTitle() + "\".",
+                courseToEnroll);
 
         // Gửi email xác nhận cho Learner
         try {

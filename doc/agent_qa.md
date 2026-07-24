@@ -40,10 +40,10 @@ QA Agent hoạt động trên **toàn bộ repo** (không bị giới hạn doma
 QA Agent phải ưu tiên test theo mức độ nghiệp vụ quan trọng:
 
 ### 🔴 CRITICAL — Bắt buộc có test trước khi Done
-1. **Payment & Revenue** (FE-12): VNPay IPN idempotency, checksum verification, amount reconciliation, revenue split (Teacher 70% / Tutor 60%)
+1. **Payment & Revenue** (FE-12): **PayOS** webhook idempotency, chữ ký HMAC-SHA256, đối soát amount, revenue split (Teacher/`PROFESSIONAL` 70% · Tutor/`PEER_TUTOR` 60%) — *đã có test đầy đủ tại `PaymentServiceImplTest`/`MonthlyStatementServiceImplTest`/`CartServiceImplTest`, cập nhật tên lớp cũ "VNPay IPN" vì cổng thanh toán thật là PayOS.*
 2. **RBAC / Authorization** (FE-03): Mọi API endpoint phải test với đúng role và sai role
 3. **Exam Grading** (FE-08): Tính điểm tự động, 40 câu / 50 phút
-4. **Authentication** (FE-01): JWT validation, refresh token, OTP verification
+4. **Authentication** (FE-01): JWT validation, OTP verification — *lưu ý: hiện chỉ cấp 1 JWT, chưa có refresh token/logout endpoint thật (xem `AUDIT_REPORT.md` MED-11) — đừng viết test cho refresh token cho tới khi tính năng này thực sự tồn tại.*
 
 ### 🟡 IMPORTANT — Cần có test
 5. **Course Versioning** (FE-05, FE-06): Published course tạo version mới khi sửa
@@ -110,7 +110,7 @@ Trước khi viết test, QA Agent phải đọc Acceptance Criteria trong `/doc
 cd hango-backend && mvnw test
 
 # Backend — chỉ một class
-mvnw test -Dtest=PaymentServiceTest
+mvnw test -Dtest=PaymentServiceImplTest
 
 # Frontend — tất cả tests
 cd hango-frontend && flutter test

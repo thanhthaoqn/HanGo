@@ -325,6 +325,22 @@ class LessonServiceTest {
     }
 
     @Test
+    void getQuizAttemptsShouldDefaultToEmptyMapWhenAnswersJsonIsMalformed() {
+        LessonQuizAttempt attempt = LessonQuizAttempt.builder()
+                .attemptNumber(1)
+                .state("Finished")
+                .score(8.5)
+                .answersJson("not-valid-json")
+                .submittedAt(LocalDateTime.now())
+                .build();
+        when(quizAttemptRepository.findByLessonIdAndStudentIdOrderByAttemptNumberAsc(1L, 1L)).thenReturn(List.of(attempt));
+
+        List<LessonQuizAttemptDTO> result = lessonService.getQuizAttempts(1L, 1L);
+
+        assertEquals(Map.of(), result.get(0).getAnswers());
+    }
+
+    @Test
     void getQuizAttemptsShouldLeaveAnswersNullWhenAnswersJsonIsNull() {
         LessonQuizAttempt attempt = LessonQuizAttempt.builder()
                 .attemptNumber(1)

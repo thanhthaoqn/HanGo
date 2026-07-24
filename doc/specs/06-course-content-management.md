@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.6 (CNT). Course **metadata**/review-publish workflow lives in [05-course-management.md](05-course-management.md) (FE-05) — not duplicated here.
 
+> ⚠️ **Lưu ý 2026-07-24:** theo ghi nhận của `unit_test_plan.md` (khảo sát method list ngày 2026-07-18), `CourseImportService` (737 dòng) hiện đọc nội dung `.xlsx` bằng cách tự parse XML thô bên trong file (`org.w3c.dom` — file `.xlsx` thực chất là 1 zip chứa XML) thay vì gọi API của **Apache POI** như §2 mô tả — dù dependency `poi-ooxml` vẫn có trong `pom.xml`. Class này được đánh giá "quá lớn/phức tạp" nên **chưa có unit test** trong đợt audit này (quyết định có chủ đích, không phải bỏ sót — xem `TEST_AUDIT_REPORT.md` §2.1). Nếu sửa file này, nên đọc lại code hiện tại trước vì cách parse thật khác đáng kể so với mô tả bên dưới.
+
 ## 1. Business Context
 Once a Course version exists, Trainers populate it with structure and content, owned exclusively by them (BR-G06): manage **Section** (create/edit/delete/reorder), manage **Lesson** within a Section (create/edit/delete/reorder), and author Lesson content as **LessonBlocks** — text-first, with optional inserted video/pdf/image blocks (not a single freeform rich-text document per lesson). Each Lesson can also have a **Quiz**, built from questions pulled from the Trainer's reusable Question Bank (FR-CNT-03, BR-G07 — Quiz questions are reusable, unlike Exam questions which are locked to the Exam). Bulk authoring is supported via **Excel (.xlsx) import** (FR-CNT-05). Structure: `Course version → Section → Lesson → (LessonBlock, Quiz)` — BR-CNT-01.
 

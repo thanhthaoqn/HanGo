@@ -52,6 +52,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final CartItemRepository cartItemRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @Value("${payos.client-id}")
     private String clientId;
@@ -277,6 +278,11 @@ public class PaymentServiceImpl implements PaymentService {
 
                 paymentRepository.save(payment);
 
+                notificationService.notifyUser(payment.getUser(), NotificationService.TYPE_PURCHASE_SUCCESS,
+                        "Payment successful",
+                        "Your payment of " + amount + " VND was successful. Enjoy your course(s)!",
+                        payment.getCourse());
+
                 // Auto enroll into all courses in payment
                 List<Long> targetIds = new ArrayList<>();
                 if (payment.getCourseIds() != null && !payment.getCourseIds().trim().isEmpty()) {
@@ -303,6 +309,11 @@ public class PaymentServiceImpl implements PaymentService {
                             enrollmentRepository.save(enrollment);
                             log.info("Auto-enrolled userId={} into courseId={} after PayOS payment",
                                     payment.getUser().getId(), cId);
+
+                            notificationService.notifyUser(c.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
+                                    "New enrollment",
+                                    payment.getUser().getFullName() + " enrolled in your course \"" + c.getTitle() + "\".",
+                                    c);
 
                             // Clear paid items from DB cart
                             cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);

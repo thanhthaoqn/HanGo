@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
@@ -119,6 +120,18 @@ class CourseRatingServiceTest {
         CourseReviewSummaryDTO result = courseRatingService.getCourseReviews(1L);
 
         assertEquals("a***@example.com", result.getReviews().get(0).getUserName());
+    }
+
+    @Test
+    void getCourseReviewsShouldDefaultEmailAndNullUserIdWhenStudentIsNull() {
+        CourseRating r = CourseRating.builder().id(1L).student(null).rating((short) 5).reviewContent("Nice").build();
+        when(courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(r));
+
+        CourseReviewSummaryDTO result = courseRatingService.getCourseReviews(1L);
+
+        assertEquals("unknow********@domain.com", result.getReviews().get(0).getUserName());
+        assertEquals("U", result.getReviews().get(0).getUserInitial());
+        assertNull(result.getReviews().get(0).getUserId());
     }
 
     @Test
@@ -258,6 +271,21 @@ class CourseRatingServiceTest {
 
         verify(notificationService).notifyCourseManagers(
                 org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_RATING), anyString(), anyString(), any());
+    }
+
+    @Test
+    void addCourseReviewShouldUseNoCommentFallbackTextInLowRatingNotificationWhenContentBlank() {
+        Course c = course(1L, 0.0, 0);
+        stubEligibleLearner(1L, 1L, c);
+        when(courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(
+                rating(1L, student(1L, "a@example.com"), (short) 2, "")));
+
+        courseRatingService.addCourseReview(1L, 1L, (short) 2, "");
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(notificationService).notifyCourseManagers(
+                org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_RATING), anyString(), messageCaptor.capture(), any());
+        assertTrue(messageCaptor.getValue().contains("(no comment provided)"));
     }
 
     @Test

@@ -35,9 +35,11 @@ Khi bắt đầu session mới hoặc tiếp nhận task, Agent **PHẢI** đọ
 
 1. **Security & Principles:** [`/doc/CONSTITUTION.md`](doc/CONSTITUTION.md)
 2. **System Architecture:** [`/doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md)
-3. **Business Requirements:** [`/doc/HanGo_Documentation.md`](doc/HanGo_Documentation.md) ← v1.0, ưu tiên tuyệt đối
+3. **Business + Technical Master Doc:** [`/doc/HanGo_Documentation.md`](doc/HanGo_Documentation.md) ← v1.0, ưu tiên tuyệt đối cho requirement; §15-22 có package structure/DB/API/deployment/known limitations chi tiết
 4. **Current State:** [`/TODO.md`](TODO.md)
-5. **Feature Spec** (nếu có): `/doc/specs/0X-<tên-module>.md`
+5. **Known gaps & audit findings** (nếu task liên quan tới bug/refactor/security): [`/doc/AUDIT_REPORT.md`](doc/AUDIT_REPORT.md), [`/doc/TEST_AUDIT_REPORT.md`](doc/TEST_AUDIT_REPORT.md)
+6. **Feature Spec** (nếu có): `/doc/specs/0X-<tên-module>.md`
+7. **Kế hoạch phiên bản sau** (nếu task thuộc phạm vi ngoài v1): [`/doc/ROADMAP.md`](doc/ROADMAP.md)
 
 ---
 
@@ -94,7 +96,7 @@ Agent **KHÔNG ĐƯỢC** check `[x] Done` trong `/TODO.md` nếu chưa pass t�
 ## 7. Database
 
 > Quy tắc naming/relationship tại [`CONSTITUTION.md`](doc/CONSTITUTION.md) §5. Riêng cho multi-agent workflow:
-- Dùng **migration** (Flyway/Liquibase) cho mọi thay đổi schema — không sửa DB tay; không sửa migration đã merge/chạy trên môi trường chung.
+- **Trạng thái thật (2026-07-24):** dự án **chưa** dùng Flyway/Liquibase — schema hiện quản lý qua Hibernate `ddl-auto` (`update` trong `application.properties` thật). Mục tiêu vẫn là chuyển sang migration tool (xem [`ROADMAP.md`](doc/ROADMAP.md) mục ưu tiên cao), nhưng **cho tới khi có migration tool**, không tự thêm Flyway/Liquibase cho một task đơn lẻ — đây là thay đổi hạ tầng cần xác nhận trước theo §10. Trước mắt: không sửa DB tay ngoài Hibernate auto-ddl; báo cho Human nếu cần đổi schema lớn.
 - Tôn trọng **versioning** của Course/Exam ([`HanGo_Documentation.md`](doc/HanGo_Documentation.md) §9): sửa nội dung đã Published tạo version mới, không ghi đè bản live.
 
 ---

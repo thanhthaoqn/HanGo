@@ -17,6 +17,7 @@ import com.hango.hango_backend.entity.Lesson;
 import com.hango.hango_backend.entity.Question;
 import com.hango.hango_backend.entity.QuestionGroup;
 import com.hango.hango_backend.entity.QuestionOption;
+import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.entity.TrainerProfile;
@@ -82,6 +83,10 @@ class TrainerDashboardServiceImplTest {
     private QuestionRepository questionRepository;
     @Mock
     private TrainerProfileRepository trainerProfileRepository;
+    @Mock
+    private com.hango.hango_backend.repository.PaymentRepository paymentRepository;
+    @Mock
+    private com.hango.hango_backend.repository.CourseRatingRepository courseRatingRepository;
 
     @InjectMocks
     private TrainerDashboardServiceImpl service;
@@ -121,18 +126,24 @@ class TrainerDashboardServiceImplTest {
         when(courseRepository.countByCreatorIdAndDeletedAtIsNull(1L)).thenReturn(3L);
         when(enrollmentRepository.countDistinctStudentsByCourseCreatorId(1L)).thenReturn(20L);
         when(examRepository.countByCreatedByIdAndDeletedAtIsNull(1L)).thenReturn(2L);
-        TrainerCourseProjection projection = mock(TrainerCourseProjection.class);
-        when(projection.getId()).thenReturn(10L);
-        when(projection.getTitle()).thenReturn("Course A");
+        when(paymentRepository.sumRevenueByTrainerId(1L)).thenReturn(new java.math.BigDecimal("1000000"));
+        when(courseRatingRepository.getAverageRatingByTrainerId(1L)).thenReturn(4.5);
+        TrainerCourseDetailProjection projection = detailProjection(10L, "Course A", LocalDateTime.now());
         when(projection.getLearnersCount()).thenReturn(null);
         when(projection.getLessonsCount()).thenReturn(5L);
-        when(courseRepository.findTrainerCourses(1L)).thenReturn(List.of(projection));
+        when(courseRepository.findTrainerCoursesDetailBase(1L, "ALL", null)).thenReturn(List.of(projection));
+        when(paymentRepository.getRevenueByMonthForCurrentYear(1L)).thenReturn(List.of());
+        when(paymentRepository.findTop5ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(1L, "SUCCESS")).thenReturn(List.of());
+        when(enrollmentRepository.findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(1L)).thenReturn(List.of());
+        when(courseRatingRepository.findTop5ByCourseCreatorIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
 
         TrainerDashboardSummaryDTO result = service.getTrainerDashboardSummary("trainer@example.com");
 
         assertEquals(3L, result.getCoursesCount());
         assertEquals(20L, result.getLearnersCount());
         assertEquals(2L, result.getExamsCount());
+        assertEquals(new java.math.BigDecimal("1000000"), result.getTotalRevenue());
+        assertEquals(4.5, result.getAverageRating());
         assertEquals(1, result.getCourses().size());
         assertEquals(0L, result.getCourses().get(0).getLearnersCount());
     }
@@ -153,6 +164,10 @@ class TrainerDashboardServiceImplTest {
         org.mockito.Mockito.lenient().when(p.getId()).thenReturn(id);
         org.mockito.Mockito.lenient().when(p.getTitle()).thenReturn(title);
         org.mockito.Mockito.lenient().when(p.getCreatedAt()).thenReturn(createdAt);
+        // Mockito defaults unstubbed boxed Long getters to 0L (not null), which would otherwise
+        // collapse every projection into a single "version group" (see getTrainerCourses grouping-by-
+        // parentId logic) — stub it explicitly so each projection here is treated as its own course.
+        org.mockito.Mockito.lenient().when(p.getParentId()).thenReturn(null);
         return p;
     }
 
@@ -160,18 +175,13 @@ class TrainerDashboardServiceImplTest {
     void getTrainerCoursesShouldReturnStatusCountsAndMappedCourses() {
         User user = trainer(1L, "trainer@example.com");
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(user));
-        when(courseRepository.countByCreatorIdAndDeletedAtIsNull(1L)).thenReturn(5L);
-        when(courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(1L, "DRAFT")).thenReturn(1L);
-        when(courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(3L);
-        when(courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(1L, "HIDDEN")).thenReturn(0L);
-        when(courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(1L, "PENDING")).thenReturn(1L);
         TrainerCourseDetailProjection projectionA = detailProjection(1L, "Course A", LocalDateTime.now());
         when(courseRepository.findTrainerCoursesDetailBase(1L, "ALL", null)).thenReturn(List.of(projectionA));
 
         TrainerCoursesResponseDTO result = service.getTrainerCourses("trainer@example.com", "ALL", null, null, "ALL");
 
-        assertEquals(5L, result.getAllCount());
-        assertEquals(3L, result.getPublishedCount());
+        assertEquals(1L, result.getAllCount());
+        assertEquals(0L, result.getPublishedCount());
         assertEquals(1, result.getCourses().size());
     }
 
@@ -340,6 +350,46 @@ class TrainerDashboardServiceImplTest {
         assertEquals("New Course", captor.getValue().getTitle());
     }
 
+    @Test
+    void createTrainerCourseShouldThrowWhenMoreThanThreeCategoriesProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        TrainerCreateCourseRequestDTO request = createCourseRequest(null, "MEDIUM");
+        request.setCategoryKeys(List.of("GRAMMAR", "READING", "SPEAKING", "WRITING"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createTrainerCourse("trainer@example.com", request));
+    }
+
+    @Test
+    void createTrainerCourseShouldThrowWhenNoCategoryProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        TrainerCreateCourseRequestDTO request = createCourseRequest(null, "MEDIUM");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createTrainerCourse("trainer@example.com", request));
+    }
+
+    @Test
+    void createTrainerCourseShouldAcceptUpToThreeCategoryKeys() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(systemParameterRepository.findByParamTypeAndParamKey("COURSE_CATEGORY", "GRAMMAR"))
+                .thenReturn(Optional.of(param(1L, "Grammar")));
+        when(systemParameterRepository.findByParamTypeAndParamKey("COURSE_CATEGORY", "READING_COMPREHENSION"))
+                .thenReturn(Optional.of(param(2L, "Reading")));
+        when(systemParameterRepository.findByParamTypeAndParamKey("COURSE_CATEGORY", "PRONUNCIATION"))
+                .thenReturn(Optional.of(param(3L, "Pronunciation")));
+        when(systemParameterRepository.findByParamTypeAndParamKey("ACADEMIC_LEVEL", "MEDIUM"))
+                .thenReturn(Optional.of(param(4L, "Medium")));
+        TrainerCreateCourseRequestDTO request = createCourseRequest(null, "MEDIUM");
+        request.setCategoryKeys(List.of("GRAMMAR", "READING", "SPEAKING"));
+
+        service.createTrainerCourse("trainer@example.com", request);
+
+        ArgumentCaptor<Course> captor = ArgumentCaptor.forClass(Course.class);
+        verify(courseRepository).save(captor.capture());
+        assertEquals(3, captor.getValue().getCategories().size());
+    }
+
     // =================================================================
     // getSystemParametersByType
     // =================================================================
@@ -444,6 +494,35 @@ class TrainerDashboardServiceImplTest {
         verify(lessonRepository).delete(obsoleteLesson);
     }
 
+    @Test
+    void updateTrainerCourseShouldCreateNewDraftVersionWhenPublishedCourseHasEnrollments() {
+        Course c = course(1L, trainer(1L, "trainer@example.com"));
+        c.setStatus("PUBLISHED");
+        c.setVersion("v1");
+        c.setCode("ENG-101");
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        when(systemParameterRepository.findByParamTypeAndParamKey("COURSE_CATEGORY", "GRAMMAR")).thenReturn(Optional.of(param(1L, "Grammar")));
+        when(systemParameterRepository.findByParamTypeAndParamKey("ACADEMIC_LEVEL", "MEDIUM")).thenReturn(Optional.of(param(2L, "Medium")));
+        when(enrollmentRepository.countByCourseId(1L)).thenReturn(3);
+        when(courseRepository.existsByCodeIgnoreCase(any())).thenReturn(false);
+        when(courseRepository.save(any(Course.class))).thenAnswer(inv -> {
+            Course saved = inv.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(2L);
+            }
+            return saved;
+        });
+
+        Long resultId = service.updateTrainerCourse(1L, "trainer@example.com", createCourseRequest("GRAMMAR", "MEDIUM"));
+
+        ArgumentCaptor<Course> captor = ArgumentCaptor.forClass(Course.class);
+        verify(courseRepository, times(1)).save(captor.capture());
+        assertEquals("DRAFT", captor.getValue().getStatus());
+        assertEquals(1L, captor.getValue().getParentId());
+        assertEquals("v2", captor.getValue().getVersion());
+        assertEquals(2L, resultId);
+    }
+
     // =================================================================
     // getTrainerExams
     // =================================================================
@@ -462,7 +541,8 @@ class TrainerDashboardServiceImplTest {
         exam.setId(1L);
         exam.setTitle("Exam A");
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(user));
-        when(examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(1L)).thenReturn(List.of(exam));
+        when(examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(1L))
+                .thenReturn(new java.util.ArrayList<>(List.of(exam)));
         when(examQuestionRepository.countByIdExamId(1L)).thenReturn(5);
 
         List<TrainerExamResponseDTO> result = service.getTrainerExams("trainer@example.com");
@@ -470,6 +550,37 @@ class TrainerDashboardServiceImplTest {
         assertEquals("private", result.get(0).getStatus());
         assertEquals("PRIVATE", result.get(0).getVisibility());
         assertEquals(5, result.get(0).getQuestionCount());
+    }
+
+    @Test
+    void getTrainerExamsShouldIncludeAllExamsButFilterOutOtherUsersDraftsWhenCallerIsManager() {
+        User manager = trainer(1L, "manager@example.com");
+        manager.setRoles(java.util.Set.of(Role.builder().roleName("COURSE_MANAGER").build()));
+        when(userRepository.findByEmail("manager@example.com")).thenReturn(Optional.of(manager));
+
+        Exam ownDraft = new Exam();
+        ownDraft.setId(1L);
+        ownDraft.setStatus("DRAFT");
+        ownDraft.setCreatedBy(manager);
+
+        Exam othersDraft = new Exam();
+        othersDraft.setId(2L);
+        othersDraft.setStatus("DRAFT");
+        othersDraft.setCreatedBy(trainer(2L, "other@example.com"));
+
+        Exam published = new Exam();
+        published.setId(3L);
+        published.setStatus("PUBLISHED");
+        published.setCreatedBy(trainer(2L, "other@example.com"));
+
+        when(examRepository.findByDeletedAtIsNullOrderByCreatedAtDesc())
+                .thenReturn(new java.util.ArrayList<>(List.of(ownDraft, othersDraft, published)));
+        when(examQuestionRepository.countByIdExamId(any())).thenReturn(0);
+
+        List<TrainerExamResponseDTO> result = service.getTrainerExams("manager@example.com");
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().noneMatch(e -> e.getId().equals(2L)));
     }
 
     // =================================================================
@@ -720,5 +831,222 @@ class TrainerDashboardServiceImplTest {
 
         assertEquals("PUBLISHED", c.getStatus());
         verify(courseRepository).save(c);
+    }
+
+    // =================================================================
+    // submitTrainerCourse
+    // =================================================================
+
+    @Test
+    void submitTrainerCourseShouldThrowWhenCourseNotFound() {
+        when(courseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.submitTrainerCourse(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void submitTrainerCourseShouldThrowWhenNotAuthorized() {
+        Course c = course(1L, trainer(1L, "owner@example.com"));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        assertThrows(RuntimeException.class, () -> service.submitTrainerCourse(1L, "intruder@example.com"));
+    }
+
+    @Test
+    void submitTrainerCourseShouldThrowWhenCourseNotDraft() {
+        Course c = course(1L, trainer(1L, "trainer@example.com"));
+        c.setStatus("PUBLISHED");
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        assertThrows(RuntimeException.class, () -> service.submitTrainerCourse(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void submitTrainerCourseShouldSetPendingApprovalWhenDraft() {
+        Course c = course(1L, trainer(1L, "trainer@example.com"));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        service.submitTrainerCourse(1L, "trainer@example.com");
+
+        assertEquals("PENDING_APPROVAL", c.getStatus());
+        verify(courseRepository).save(c);
+    }
+
+    // =================================================================
+    // updateExamVisibility
+    // =================================================================
+
+    @Test
+    void updateExamVisibilityShouldThrowWhenUserNotFound() {
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.updateExamVisibility(1L, "unknown@example.com", "PUBLIC"));
+    }
+
+    @Test
+    void updateExamVisibilityShouldThrowWhenExamNotFound() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(examRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.updateExamVisibility(1L, "trainer@example.com", "PUBLIC"));
+    }
+
+    @Test
+    void updateExamVisibilityShouldThrowWhenNotOwner() {
+        when(userRepository.findByEmail("intruder@example.com")).thenReturn(Optional.of(trainer(2L, "intruder@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setCreatedBy(trainer(1L, "owner@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        assertThrows(RuntimeException.class, () -> service.updateExamVisibility(1L, "intruder@example.com", "PUBLIC"));
+    }
+
+    @Test
+    void updateExamVisibilityShouldSetNewVisibility() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        service.updateExamVisibility(1L, "trainer@example.com", "PUBLIC");
+
+        assertEquals("PUBLIC", exam.getVisibility());
+        verify(examRepository).save(exam);
+    }
+
+    // =================================================================
+    // deleteTrainerCourse
+    // =================================================================
+
+    @Test
+    void deleteTrainerCourseShouldThrowWhenUserNotFound() {
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.deleteTrainerCourse(1L, "unknown@example.com"));
+    }
+
+    @Test
+    void deleteTrainerCourseShouldThrowWhenCourseNotFound() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(courseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.deleteTrainerCourse(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void deleteTrainerCourseShouldThrowWhenNotOwner() {
+        when(userRepository.findByEmail("intruder@example.com")).thenReturn(Optional.of(trainer(2L, "intruder@example.com")));
+        Course c = course(1L, trainer(1L, "owner@example.com"));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        assertThrows(RuntimeException.class, () -> service.deleteTrainerCourse(1L, "intruder@example.com"));
+    }
+
+    @Test
+    void deleteTrainerCourseShouldSetDeletedAtWhenOwner() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Course c = course(1L, trainer(1L, "trainer@example.com"));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        service.deleteTrainerCourse(1L, "trainer@example.com");
+
+        assertTrue(c.getDeletedAt() != null);
+        verify(courseRepository).save(c);
+    }
+
+    // =================================================================
+    // approveTrainerCourse
+    // =================================================================
+
+    @Test
+    void approveTrainerCourseShouldThrowWhenCourseNotFound() {
+        when(courseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.approveTrainerCourse(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void approveTrainerCourseShouldThrowWhenNotPendingApproval() {
+        Course draft = course(1L, trainer(1L, "trainer@example.com"));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(draft));
+
+        assertThrows(RuntimeException.class, () -> service.approveTrainerCourse(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void approveTrainerCourseShouldThrowWhenNotADraftVersion() {
+        Course draft = course(1L, trainer(1L, "trainer@example.com"));
+        draft.setStatus("PENDING_APPROVAL");
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(draft));
+
+        assertThrows(RuntimeException.class, () -> service.approveTrainerCourse(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void approveTrainerCourseShouldPublishDraftAndUpdateOriginalLatestVersionId() {
+        Course original = course(10L, trainer(1L, "trainer@example.com"));
+        original.setStatus("PUBLISHED");
+        Course draft = course(11L, trainer(1L, "trainer@example.com"));
+        draft.setStatus("PENDING_APPROVAL");
+        draft.setParentId(10L);
+        when(courseRepository.findById(11L)).thenReturn(Optional.of(draft));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(original));
+
+        service.approveTrainerCourse(11L, "trainer@example.com");
+
+        assertEquals("PUBLISHED", draft.getStatus());
+        assertEquals(11L, draft.getLatestVersionId());
+        assertEquals(11L, original.getLatestVersionId());
+        verify(courseRepository, times(2)).save(any(Course.class));
+    }
+
+    @Test
+    void approveTrainerCourseShouldSucceedForAnyCallerEmailDueToMissingAuthorizationCheck() {
+        Course original = course(10L, trainer(1L, "trainer@example.com"));
+        original.setStatus("PUBLISHED");
+        Course draft = course(11L, trainer(1L, "trainer@example.com"));
+        draft.setStatus("PENDING_APPROVAL");
+        draft.setParentId(10L);
+        when(courseRepository.findById(11L)).thenReturn(Optional.of(draft));
+        when(courseRepository.findById(10L)).thenReturn(Optional.of(original));
+
+        service.approveTrainerCourse(11L, "not-a-registered-user@example.com");
+
+        assertEquals("PUBLISHED", draft.getStatus());
+        verify(userRepository, never()).findByEmail(any());
+    }
+
+    // =================================================================
+    // rejectTrainerCourseDraft
+    // =================================================================
+
+    @Test
+    void rejectTrainerCourseDraftShouldThrowWhenCourseNotFound() {
+        when(courseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.rejectTrainerCourseDraft(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void rejectTrainerCourseDraftShouldThrowWhenNotPendingApproval() {
+        Course draft = course(1L, trainer(1L, "trainer@example.com"));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(draft));
+
+        assertThrows(RuntimeException.class, () -> service.rejectTrainerCourseDraft(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void rejectTrainerCourseDraftShouldSetStatusRejectedRegardlessOfCallerEmail() {
+        Course draft = course(1L, trainer(1L, "trainer@example.com"));
+        draft.setStatus("PENDING_APPROVAL");
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(draft));
+
+        service.rejectTrainerCourseDraft(1L, "not-a-registered-user@example.com");
+
+        assertEquals("REJECTED", draft.getStatus());
+        verify(courseRepository).save(draft);
+        verify(userRepository, never()).findByEmail(any());
     }
 }

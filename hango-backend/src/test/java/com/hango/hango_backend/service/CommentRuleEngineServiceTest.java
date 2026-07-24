@@ -24,6 +24,11 @@ class CommentRuleEngineServiceTest {
         assertEquals("hello world", ruleEngine.normalize("h3ll0 w0rld"));
     }
 
+    @Test
+    void normalizeShouldReturnEmptyStringForNullInput() {
+        assertEquals("", ruleEngine.normalize(null));
+    }
+
     // =================================================================
     // evaluate - REJECTED
     // =================================================================
@@ -79,6 +84,22 @@ class CommentRuleEngineServiceTest {
                 ruleEngine.evaluate("Check this out: https://example.com/promo").status());
     }
 
+    @Test
+    void evaluateShouldFlagEmailAddressAsPending() {
+        CommentModerationResult result = ruleEngine.evaluate("Contact me at learner@example.com for extra help");
+
+        assertEquals(CommentRuleEngineService.STATUS_PENDING, result.status());
+        assertEquals("Contains an email address", result.detectionReason());
+    }
+
+    @Test
+    void evaluateShouldFlagOffPlatformContactKeywordAsPending() {
+        CommentModerationResult result = ruleEngine.evaluate("Add me on Zalo to chat more");
+
+        assertEquals(CommentRuleEngineService.STATUS_PENDING, result.status());
+        assertEquals("Solicits off-platform contact", result.detectionReason());
+    }
+
     // =================================================================
     // evaluate - APPROVED
     // =================================================================
@@ -88,6 +109,15 @@ class CommentRuleEngineServiceTest {
         CommentModerationResult result = ruleEngine.evaluate("Bài giảng rất hay, cảm ơn thầy cô!");
 
         assertEquals(CommentRuleEngineService.STATUS_APPROVED, result.status());
+        assertNull(result.detectionReason());
+    }
+
+    @Test
+    void evaluateShouldApproveNullContentWithoutThrowing() {
+        CommentModerationResult result = ruleEngine.evaluate(null);
+
+        assertEquals(CommentRuleEngineService.STATUS_APPROVED, result.status());
+        assertEquals("", result.normalizedContent());
         assertNull(result.detectionReason());
     }
 }

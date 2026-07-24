@@ -34,7 +34,7 @@ The HanGo system manages 14 core feature modules serving multiple user roles: **
 | **[FE-09] AI Assistant**              | Explain concepts/questions chatbot for Learners, generate questions drafts for Trainers.      | Learner, Trainer              |
 | **[FE-10] Learning Management**       | Enrollment, sequential lesson learning unlocks (N -> N+1), course progress, limited reviews.   | Learner                       |
 | **[FE-11] Recommendation**            | Weakness analysis by SkillType, rule-based recommendation, AI Learning Pathway.               | Learner                       |
-| **[FE-12] Payment & Revenue**         | Purchases using VNPay, order tracking, revenue split records, and monthly settlement (manual transfer recorded by Course Manager). | Learner, Trainer, CourseManager |
+| **[FE-12] Payment & Revenue**         | Purchases using PayOS, order tracking, revenue split records, and monthly settlement (manual transfer recorded by Course Manager). | Learner, Trainer, CourseManager |
 | **[FE-13] Comment Management**        | Nested comments under lessons and quizzes with moderation capability by Admin.                | Learner, Trainer, Admin       |
 | **[FE-14] Notification**              | Realtime WebSocket push notifications and transactional emails for system events.             | All                           |
 
@@ -45,15 +45,15 @@ The HanGo system manages 14 core feature modules serving multiple user roles: **
 ### 💻 Frontend (Client Side)
 
 - **Framework:** Flutter (using Dart SDK `^3.12.0`).
-- **State Management & DI:** Riverpod (separating business logic from UI).
-- **Navigation:** `go_router` supporting deep linking and role-based screen routing.
-- **Networking:** `dio` HTTP client with custom interceptors for automatic JWT injection.
+- **State Management:** *(as currently implemented)* a single root `ChangeNotifierProvider<AppState>` (package `provider`) for the auth session, plus per-page `StatefulWidget` + `setState()` — not Riverpod. See [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md) §3.1 and [doc/AUDIT_REPORT.md](doc/AUDIT_REPORT.md) HIGH-07 for the full picture and rationale.
+- **Navigation:** imperative `Navigator.push`/`MaterialPageRoute` — not `go_router` (no centralized route table today).
+- **Networking:** `package:http`, called directly from each repository/service (the `dio` dependency is declared but currently unused).
 - **UI & Animation:** Responsive design layouts for Mobile, Tablet, and Desktop using `LayoutBuilder` & `MediaQuery`. Brand primary color: Teal Green (`#20B486`).
 
 ### ⚙️ Backend (Server Side)
 
-- **Language:** Java 21.
-- **Core Framework:** Spring Boot 3.x (managed via Maven).
+- **Language:** Java 17 (`pom.xml` `java.version`; CI/deploy toolchains install JDK 21 but the compiled language level is 17).
+- **Core Framework:** Spring Boot 4.0.6 (managed via Maven).
 - **Security:** Spring Security & `jjwt` (stateless auth, RBAC using `@PreAuthorize`).
 - **Data Access:** Spring Data JPA, Hibernate ORM.
 - **Database:** MySQL.
@@ -88,31 +88,35 @@ graph TD
 
 ```text
 HanGo/
-├── hango-backend/               # Spring Boot Application (Java 21)
+├── hango-backend/               # Spring Boot Application (Java 17, Spring Boot 4.0.6)
 │   ├── src/main/java/com/.../
 │   │   ├── config/              # Security configurations, CORS, beans
 │   │   ├── controller/          # REST Endpoints receiving/returning DTOs
 │   │   ├── dto/                 # Data Transfer Objects
 │   │   ├── entity/              # JPA models mapping to MySQL (snake_case)
-│   │   ├── exception/           # Global exception handling (@ControllerAdvice)
+│   │   ├── exeption/             # Global exception handling (@ControllerAdvice) — package literally named "exeption" in code
 │   │   ├── repository/          # JPA database query interfaces
-│   │   ├── security/            # JWT filters and authorization
-│   │   └── service/             # Core business logic implementation
+│   │   ├── sercurity/            # JWT filters and authorization — package literally named "sercurity" in code
+│   │   └── service/             # Core business logic implementation (+ service/impl/ for 1 class)
 │   └── pom.xml                  # Maven dependencies configuration
 │
 ├── hango-frontend/              # Flutter Project (Dart)
 │   ├── lib/
-│   │   ├── data/                # Remote API services, local caching, and models
-│   │   ├── domain/              # Core business layers, entity schemas, repos interfaces
+│   │   ├── data/                # Remote API services (http), local caching, and models
+│   │   ├── domain/               # Core business layers, entity/model schemas (model/ and entities/ — two overlapping locations, see AUDIT_REPORT.md)
 │   │   ├── presentation/        # User interface (pages/ and widgets/)
+│   │   ├── services/             # App-level state (Provider) + a second API client + secure session store
 │   │   └── utils/               # App helper utilities & design colors (#20B486)
 │   └── pubspec.yaml             # Flutter dependencies configuration
 │
 ├── doc/                         # Tất cả tài liệu nội bộ
-│   ├── HanGo_Documentation.md  # 📖 v1.0 — Business requirements (SINGLE SOURCE OF TRUTH)
+│   ├── HanGo_Documentation.md  # 📖 v1.0 — Master documentation (business + technical, SINGLE SOURCE OF TRUTH)
 │   ├── ARCHITECTURE.md          # 🏗️ System architecture details
 │   ├── CONSTITUTION.md          # 📜 Security & coding constitution
 │   ├── TESTING.md               # 🧪 QA & testing strategy
+│   ├── AUDIT_REPORT.md          # 🔎 Full project audit (Critical/High/Medium/Low findings)
+│   ├── TEST_AUDIT_REPORT.md     # 🧪 Unit test coverage audit
+│   ├── ROADMAP.md               # 🗺️ Prioritized plan for versions after v1
 │   ├── agent_backend.md         # ⚙️ Backend Agent guidelines
 │   ├── agent_frontend.md        # ⚙️ Frontend Agent guidelines
 │   ├── agent_qa.md              # ⚙️ QA Agent guidelines
@@ -129,7 +133,7 @@ HanGo/
 
 ### 1. Prerequisites
 
-- Install Java 21 JDK and Maven.
+- Install Java 17 JDK and Maven.
 - Install Flutter SDK (recommended Dart SDK `^3.12.0`).
 - Install and start a MySQL Server instance.
 

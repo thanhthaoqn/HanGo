@@ -1,10 +1,11 @@
 package com.hango.hango_backend.repository;
 
-import com.hango.hango_backend.entity.CourseRating;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import com.hango.hango_backend.entity.CourseRating;
 
 @Repository
 public interface CourseRatingRepository extends JpaRepository<CourseRating, Long> {

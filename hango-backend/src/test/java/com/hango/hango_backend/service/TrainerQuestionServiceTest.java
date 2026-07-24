@@ -258,6 +258,27 @@ class TrainerQuestionServiceTest {
     }
 
     @Test
+    void createQuestionBankGroupShouldUseSubQuestionSkillParamOverrideWhenProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(new QuestionCategory()));
+        when(systemParameterRepository.findById(2L)).thenReturn(Optional.of(SystemParameter.builder().id(2L).build()));
+        when(systemParameterRepository.findById(3L)).thenReturn(Optional.of(SystemParameter.builder().id(3L).build()));
+        when(systemParameterRepository.findById(88L)).thenReturn(Optional.of(SystemParameter.builder().id(88L).paramValue("Listening").build()));
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        CreateSubQuestionDTO subQ = CreateSubQuestionDTO.builder()
+                .questionText("Q1")
+                .explanation("exp")
+                .skillParamId(88L)
+                .options(List.of())
+                .build();
+        service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQ)));
+
+        assertEquals(88L, captor.getValue().getSkillParam().getId());
+    }
+
+    @Test
     void createQuestionBankGroupShouldPersistOptionsForEachSubQuestion() {
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(new QuestionCategory()));
@@ -344,6 +365,21 @@ class TrainerQuestionServiceTest {
         assertEquals("Passage text", result.getPassageText());
         assertEquals(1, result.getSubQuestions().size());
         assertEquals("PUBLIC", result.getStatus());
+    }
+
+    @Test
+    void getQuestionDetailGroupShouldBypassOwnershipCheckWhenGroupHasNoQuestions() {
+        when(userRepository.findByEmail("intruder@example.com")).thenReturn(Optional.of(trainer(2L, "intruder@example.com")));
+        QuestionGroup group = new QuestionGroup();
+        group.setId(500L);
+        group.setContextText("Passage text");
+        when(questionGroupRepository.findById(500L)).thenReturn(Optional.of(group));
+        when(questionRepository.findByQuestionGroup(group)).thenReturn(List.of());
+
+        CreateGroupQuestionRequestDTO result = service.getQuestionDetail("intruder@example.com", 500L, true);
+
+        assertTrue(result.getSubQuestions().isEmpty());
+        assertNull(result.getStatus());
     }
 
     @Test
@@ -441,6 +477,23 @@ class TrainerQuestionServiceTest {
     }
 
     @Test
+    void updateQuestionBankGroupGroupShouldBypassOwnershipCheckWhenGroupHasNoQuestions() {
+        when(userRepository.findByEmail("intruder@example.com")).thenReturn(Optional.of(trainer(2L, "intruder@example.com")));
+        QuestionGroup group = new QuestionGroup();
+        group.setId(500L);
+        when(questionGroupRepository.findById(500L)).thenReturn(Optional.of(group));
+        when(questionRepository.findByQuestionGroup(group)).thenReturn(List.of());
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateQuestionBankGroup("intruder@example.com", 500L, true,
+                groupRequest("Hijacked passage", List.of(subQuestion("New Q1", null, null))));
+
+        assertEquals("Hijacked passage", group.getContextText());
+        verify(questionRepository).deleteAll(List.of());
+        verify(questionRepository).save(any(Question.class));
+    }
+
+    @Test
     void updateQuestionBankGroupSingleShouldThrowWhenQuestionNotFound() {
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
         when(questionRepository.findById(10L)).thenReturn(Optional.empty());
@@ -522,6 +575,19 @@ class TrainerQuestionServiceTest {
         assertEquals("PUBLIC", q1.getStatus());
         assertEquals("PUBLIC", q2.getStatus());
         verify(questionRepository, times(2)).save(any(Question.class));
+    }
+
+    @Test
+    void updateQuestionStatusGroupShouldDoNothingWhenGroupHasNoQuestions() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        QuestionGroup group = new QuestionGroup();
+        group.setId(500L);
+        when(questionGroupRepository.findById(500L)).thenReturn(Optional.of(group));
+        when(questionRepository.findByQuestionGroup(group)).thenReturn(List.of());
+
+        service.updateQuestionStatus("trainer@example.com", 500L, "PUBLIC", true);
+
+        verify(questionRepository, never()).save(any());
     }
 
     @Test
