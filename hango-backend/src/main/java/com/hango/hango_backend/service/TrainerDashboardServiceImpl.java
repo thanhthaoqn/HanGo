@@ -242,10 +242,20 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         // 6. Map to DTOs
+        List<Long> filteredCourseIds = filteredProjections.stream()
+                .map(p -> p.getId())
+                .collect(Collectors.toList());
+
+        Map<Long, com.hango.hango_backend.entity.Course> courseMap = new java.util.HashMap<>();
+        if (!filteredCourseIds.isEmpty()) {
+            courseRepository.findAllByIdWithDetails(filteredCourseIds)
+                    .forEach(c -> courseMap.put(c.getId(), c));
+        }
+
         List<TrainerCourseDetailDTO> courses = filteredProjections.stream().map(p -> {
             List<String> catKeys = new ArrayList<>();
             List<String> catNames = new ArrayList<>();
-            com.hango.hango_backend.entity.Course c = courseRepository.findById(p.getId()).orElse(null);
+            com.hango.hango_backend.entity.Course c = courseMap.get(p.getId());
             if (c != null && c.getCategories() != null && !c.getCategories().isEmpty()) {
                 for (com.hango.hango_backend.entity.SystemParameter sp : c.getCategories()) {
                     catKeys.add(sp.getParamKey());

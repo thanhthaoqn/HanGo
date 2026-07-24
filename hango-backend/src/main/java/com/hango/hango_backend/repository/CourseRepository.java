@@ -90,4 +90,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @EntityGraph(attributePaths = {"categories", "category", "difficulty", "creator"})
     @Query("SELECT c FROM Course c WHERE c.id = :id")
     Optional<Course> findByIdWithDetails(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"categories", "category", "difficulty", "creator"})
+    @Query("SELECT c FROM Course c WHERE c.id IN :ids")
+    List<Course> findAllByIdWithDetails(@Param("ids") List<Long> ids);
 }

@@ -266,6 +266,7 @@ public class CourseServiceImpl implements CourseService {
         int estimatedDuration = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 12;
         return CourseDetailDTO.builder()
                 .id(course.getId())
+                .status(course.getStatus())
                 .title(course.getTitle())
                 .code(course.getCode())
                 .creatorName(creatorName)
