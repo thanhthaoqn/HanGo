@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -41,9 +40,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   final TextEditingController _learningObjectivesController = TextEditingController();
   final TextEditingController _estimatedTimeController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
-  final TextEditingController _questionController = TextEditingController();
-
-  bool _isPreviewMode = false;
+  final MarkdownTextEditingController _questionController = MarkdownTextEditingController();
 
   // Upload states
   String? _uploadedImageUrl;
@@ -200,16 +197,41 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     final text = _questionController.text;
     final selection = _questionController.selection;
     if (selection.start >= 0 && selection.end >= 0) {
-      final selectedText = text.substring(selection.start, selection.end);
+      final start = selection.start;
+      final end = selection.end;
+      final selectedText = text.substring(start, end);
+
+      // Case 1: The selection INCLUDES the tags (e.g., they selected "**bold**")
+      if (tagOpen.isNotEmpty && tagClose.isNotEmpty && selectedText.startsWith(tagOpen) && selectedText.endsWith(tagClose)) {
+        final innerText = selectedText.substring(tagOpen.length, selectedText.length - tagClose.length);
+        final newText = text.replaceRange(start, end, innerText);
+        _questionController.text = newText;
+        _questionController.selection = TextSelection.collapsed(offset: start + innerText.length);
+        return;
+      }
+      
+      // Case 2: The selection is INSIDE the tags (e.g., they selected "bold" inside "**bold**", or they just have blinking cursor inside "**|**")
+      if (tagOpen.isNotEmpty && tagClose.isNotEmpty && start >= tagOpen.length && end <= text.length - tagClose.length) {
+        final before = text.substring(start - tagOpen.length, start);
+        final after = text.substring(end, end + tagClose.length);
+        if (before == tagOpen && after == tagClose) {
+          final newText = text.replaceRange(start - tagOpen.length, end + tagClose.length, selectedText);
+          _questionController.text = newText;
+          _questionController.selection = TextSelection.collapsed(offset: start - tagOpen.length + selectedText.length);
+          return;
+        }
+      }
+
+      // Default: Add tags
       final newText = text.replaceRange(
-        selection.start,
-        selection.end,
+        start,
+        end,
         '$tagOpen$selectedText$tagClose',
       );
       _questionController.text = newText;
       // Put cursor inside or after tag
       _questionController.selection = TextSelection.collapsed(
-        offset: selection.start + tagOpen.length + selectedText.length,
+        offset: start + tagOpen.length + selectedText.length,
       );
     } else {
       _questionController.text = '$text$tagOpen$tagClose';
@@ -1068,13 +1090,13 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Text Header Label and Toggle
+                // Text Header Label
                 Padding(
                   padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
+                    children: const [
+                      Text(
                         'Text *',
                         style: TextStyle(
                           fontSize: 13,
@@ -1083,197 +1105,113 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                           fontFamily: 'Outfit',
                         ),
                       ),
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _isPreviewMode = false;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: !_isPreviewMode
-                                    ? const Color(0xFFE2F9F3)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Write',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: !_isPreviewMode
-                                      ? const Color(0xFF20B486)
-                                      : const Color(0xFF94A3B8),
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _isPreviewMode = true;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _isPreviewMode
-                                    ? const Color(0xFFE2F9F3)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Preview',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: _isPreviewMode
-                                      ? const Color(0xFF20B486)
-                                      : const Color(0xFF94A3B8),
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (!_isPreviewMode) ...[
-                  // Rich Editor Toolbar
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF8FAFC),
-                      border: Border.symmetric(
-                        horizontal: BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.format_bold,
-                            size: 18,
-                            color: Color(0xFF475569),
-                          ),
-                          onPressed: () => _addMarkdownTag('**', '**'),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        const SizedBox(width: 16),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.format_italic,
-                            size: 18,
-                            color: Color(0xFF475569),
-                          ),
-                          onPressed: () => _addMarkdownTag('*', '*'),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        const SizedBox(width: 16),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.format_list_bulleted,
-                            size: 18,
-                            color: Color(0xFF475569),
-                          ),
-                          onPressed: () => _addMarkdownTag('- ', ''),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        const SizedBox(width: 16),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.link,
-                            size: 18,
-                            color: Color(0xFF475569),
-                          ),
-                          onPressed: () => _addMarkdownTag('[', '](url)'),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
+                // Rich Editor Toolbar
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    border: Border.symmetric(
+                      horizontal: BorderSide(color: Color(0xFFE2E8F0)),
                     ),
                   ),
-                  // Question Text Input
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextFormField(
-                      controller: _questionController,
-                      maxLines: 8,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter your lesson content here using Markdown...',
-                        hintStyle: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.format_bold,
+                          size: 18,
+                          color: Color(0xFF475569),
                         ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+                        tooltip: 'Bold',
+                        onPressed: () {
+                          _addMarkdownTag('**', '**');
+                          setState(() {});
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.format_italic,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
+                        tooltip: 'Italic',
+                        onPressed: () {
+                          _addMarkdownTag('*', '*');
+                          setState(() {});
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.format_list_bulleted,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
+                        tooltip: 'Bullet List',
+                        onPressed: () {
+                          _addMarkdownTag('- ', '');
+                          setState(() {});
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.link,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
+                        tooltip: 'Link',
+                        onPressed: () {
+                          _addMarkdownTag('[', '](url)');
+                          setState(() {});
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+                // Question Text Input
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: TextFormField(
+                    controller: _questionController,
+                    maxLines: 8,
+                    onChanged: (val) {
+                      setState(() {});
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Enter your lesson content here... (Format highlights in real-time)',
+                      hintStyle: TextStyle(
+                        color: Color(0xFF94A3B8),
                         fontSize: 14,
-                        color: Color(0xFF1E293B),
-                        height: 1.5,
+                        fontFamily: 'Outfit',
                       ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 14,
+                      color: Color(0xFF1E293B),
+                      height: 1.5,
                     ),
                   ),
-                ] else ...[
-                  // Markdown Preview
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    constraints: const BoxConstraints(minHeight: 180),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        top: BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                    ),
-                    child: _questionController.text.trim().isEmpty
-                        ? const Text(
-                            'Nothing to preview yet.',
-                            style: TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              fontFamily: 'Outfit',
-                            ),
-                          )
-                        : MarkdownBody(
-                            data: _questionController.text,
-                            styleSheet: MarkdownStyleSheet(
-                              p: const TextStyle(
-                                fontFamily: 'Outfit',
-                                fontSize: 14,
-                                color: Color(0xFF1E293B),
-                                height: 1.5,
-                              ),
-                              strong: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                              ),
-                              em: const TextStyle(
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ),
-                  ),
-                ],
+                ),
               ],
             ),
           ),
@@ -1643,3 +1581,106 @@ class DashedRoundedBorderPainter extends CustomPainter {
         oldDelegate.borderRadius != borderRadius;
   }
 }
+
+class MarkdownTextEditingController extends TextEditingController {
+  MarkdownTextEditingController({super.text});
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final List<TextSpan> children = [];
+    final pattern = RegExp(
+      r'(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|#+\s[^\n]+|\[[^\]]+\]\([^)]+\))',
+    );
+
+    text.splitMapJoin(
+      pattern,
+      onMatch: (Match match) {
+        final matchedText = match[0]!;
+        TextStyle matchStyle = style ?? const TextStyle();
+
+        if (matchedText.startsWith('**') && matchedText.endsWith('**')) {
+          final content = matchedText.substring(2, matchedText.length - 2);
+          children.add(const TextSpan(text: '**', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+          children.add(TextSpan(
+            text: content,
+            style: matchStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF0F172A),
+            ),
+          ));
+          children.add(const TextSpan(text: '**', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+        } else if (matchedText.startsWith('*') && matchedText.endsWith('*')) {
+          final content = matchedText.substring(1, matchedText.length - 1);
+          children.add(const TextSpan(text: '*', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+          children.add(TextSpan(
+            text: content,
+            style: matchStyle.copyWith(
+              fontStyle: FontStyle.italic,
+              color: const Color(0xFF0F172A),
+            ),
+          ));
+          children.add(const TextSpan(text: '*', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+        } else if (matchedText.startsWith('`') && matchedText.endsWith('`')) {
+          final content = matchedText.substring(1, matchedText.length - 1);
+          children.add(const TextSpan(text: '`', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+          children.add(TextSpan(
+            text: content,
+            style: matchStyle.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: const Color(0xFFF1F5F9),
+              color: const Color(0xFF0F172A),
+            ),
+          ));
+          children.add(const TextSpan(text: '`', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+        } else if (matchedText.startsWith('#')) {
+          final matchIndex = matchedText.indexOf(' ');
+          if (matchIndex != -1) {
+            final hashes = matchedText.substring(0, matchIndex + 1);
+            final content = matchedText.substring(matchIndex + 1);
+            children.add(TextSpan(text: hashes, style: const TextStyle(fontSize: 0, color: Colors.transparent)));
+            children.add(TextSpan(
+              text: content,
+              style: matchStyle.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: (style?.fontSize ?? 14) * 1.15,
+                color: const Color(0xFF20B486),
+              ),
+            ));
+          } else {
+            children.add(TextSpan(text: matchedText, style: matchStyle));
+          }
+        } else if (matchedText.startsWith('[')) {
+          final closeBracket = matchedText.indexOf(']');
+          final closeParen = matchedText.lastIndexOf(')');
+          if (closeBracket != -1 && closeParen != -1) {
+            final textPart = matchedText.substring(1, closeBracket);
+            final urlPart = matchedText.substring(closeBracket, closeParen + 1); // contains ](url)
+            children.add(const TextSpan(text: '[', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+            children.add(TextSpan(
+              text: textPart,
+              style: matchStyle.copyWith(
+                color: const Color(0xFF2563EB),
+                decoration: TextDecoration.underline,
+              ),
+            ));
+            children.add(TextSpan(text: urlPart, style: const TextStyle(fontSize: 0, color: Colors.transparent)));
+          } else {
+            children.add(TextSpan(text: matchedText, style: matchStyle));
+          }
+        }
+        return '';
+      },
+      onNonMatch: (String nonMatch) {
+        children.add(TextSpan(text: nonMatch, style: style));
+        return '';
+      },
+    );
+
+    return TextSpan(style: style, children: children);
+  }
+}
+
