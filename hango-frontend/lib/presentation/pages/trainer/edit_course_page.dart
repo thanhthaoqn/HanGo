@@ -1,6 +1,5 @@
 // ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -44,23 +43,22 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
   // Dynamic dropdown lists (populated from DB with default fallbacks)
   List<Map<String, dynamic>> _dbCategories = [
-    {'paramKey': 'CONVERSATION_SHORT_SENTENCES', 'paramValue': 'Conversation/Short Sentences'},
-    {'paramKey': 'SYNONYM', 'paramValue': 'Synonym'},
-    {'paramKey': 'ANTONYM', 'paramValue': 'Antonym'},
-    {'paramKey': 'PRONUNCIATION', 'paramValue': 'Pronunciation'},
+    {
+      'paramKey': 'READING_COMPREHENSION',
+      'paramValue': 'Reading Comprehension',
+    },
+    {'paramKey': 'VOCABULARY', 'paramValue': 'Vocabulary'},
     {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
-    {'paramKey': 'SENTENCE_MEANING', 'paramValue': 'Sentence Meaning'},
-    {'paramKey': 'SENTENCE_COMBINING', 'paramValue': 'Sentence Combining'},
-    {'paramKey': 'FILL_IN_BLANK', 'paramValue': 'Fill in Blank'},
-    {'paramKey': 'READING_COMPREHENSION', 'paramValue': 'Reading Comprehension'},
-    {'paramKey': 'ARRANGEMENT', 'paramValue': 'Arrangement'},
+    {'paramKey': 'WRITING_STRUCTURE', 'paramValue': 'Writing & Structure'},
+    {'paramKey': 'PRONUNCIATION', 'paramValue': 'Pronunciation'},
+    {'paramKey': 'TEST_PREPARATION', 'paramValue': 'Test Preparation'},
   ];
   List<Map<String, dynamic>> _dbLevels = [
     {'paramKey': 'BASIC', 'paramValue': 'Basic'},
     {'paramKey': 'INTERMEDIATE', 'paramValue': 'Intermediate'},
     {'paramKey': 'ADVANCED', 'paramValue': 'Advanced'},
   ];
-  List<String> _selectedCategoryKeys = ['GRAMMAR'];
+  String _selectedCategoryKey = 'GRAMMAR';
   String _selectedLevelKey = 'BASIC';
   final TextEditingController _versionController = TextEditingController(
     text: 'v1.0',
@@ -155,13 +153,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList();
 
-          if (_dbCategories.isNotEmpty) {
-            final hasSelectedCat = _selectedCategoryKeys.every(
-              (key) => _dbCategories.any((e) => e['paramKey'] == key),
-            );
-            if (!hasSelectedCat || _selectedCategoryKeys.isEmpty) {
-              _selectedCategoryKeys =
-                  [_dbCategories.first['paramKey'] ?? 'GRAMMAR'];
+          if (!_dbCategories.any(
+            (e) => e['paramKey'] == _selectedCategoryKey,
+          )) {
+            if (_dbCategories.isNotEmpty) {
+              _selectedCategoryKey =
+                  _dbCategories.first['paramKey'] ?? 'GRAMMAR';
             }
           }
           if (_dbLevels.isNotEmpty) {
@@ -209,13 +206,14 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _codeController.text = data['code'] ?? '';
           _priceController.text = data['price']?.toString() ?? '0';
           _objectivesController.text = data['objectives'] ?? '';
-          
-          if (data['categoryKeys'] != null && data['categoryKeys'] is List && (data['categoryKeys'] as List).isNotEmpty) {
-            _selectedCategoryKeys = List<String>.from((data['categoryKeys'] as List).map((e) => e.toString().toUpperCase()));
-          } else if (data['categoryKey'] != null &&
-              data['categoryKey'].toString().isNotEmpty) {
-            _selectedCategoryKeys = [data['categoryKey'].toString().toUpperCase()];
+
+          final currentCats = data['categories'] as List<dynamic>? ?? [];
+          if (currentCats.isNotEmpty) {
+            _selectedCategoryKey = currentCats.first['paramKey'] ?? 'GRAMMAR';
+          } else if (data['category'] != null) {
+            _selectedCategoryKey = data['category']['paramKey'] ?? 'GRAMMAR';
           }
+
           if (data['difficultyKey'] != null &&
               data['difficultyKey'].toString().isNotEmpty) {
             _selectedLevelKey = data['difficultyKey'].toString().toUpperCase();
@@ -322,8 +320,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ) ??
             0,
         'objectives': _objectivesController.text.trim(),
-        'categoryKey': _selectedCategoryKeys.first,
-        'categoryKeys': _selectedCategoryKeys,
+        'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
         'sessions': _sections,
@@ -418,8 +415,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ) ??
             0,
         'objectives': _objectivesController.text.trim(),
-        'categoryKey': _selectedCategoryKeys.first,
-        'categoryKeys': _selectedCategoryKeys,
+        'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
         'sessions': _sections,
@@ -1270,81 +1266,58 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ],
           ),
           const SizedBox(height: 20),
-          // Categories (1-3)
+          // Categories
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Text(
-                    'Categories (Select 1-3) *',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF4B5563),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '(${_selectedCategoryKeys.length}/3)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: _selectedCategoryKeys.isEmpty || _selectedCategoryKeys.length > 3
-                          ? Colors.red
-                          : const Color(0xFF20B486),
-                      fontFamily: 'Outfit',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              const Text(
+                'Category *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4B5563),
+                  fontFamily: 'Outfit',
+                ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _dbCategories.map((cat) {
-                  final key = cat['paramKey'] as String;
-                  final val = cat['paramValue'] as String;
-                  final isSelected = _selectedCategoryKeys.contains(key);
-                  return FilterChip(
-                    label: Text(val),
-                    selected: isSelected,
-                    selectedColor: const Color(0xFF20B486).withOpacity(0.15),
-                    checkmarkColor: const Color(0xFF20B486),
-                    labelStyle: TextStyle(
-                      color: isSelected ? const Color(0xFF20B486) : const Color(0xFF475569),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      fontFamily: 'Outfit',
-                      fontSize: 13,
-                    ),
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: BorderSide(
-                        color: isSelected ? const Color(0xFF20B486) : const Color(0xFFCBD5E1),
-                        width: isSelected ? 1.5 : 1.0,
-                      ),
-                    ),
-                    onSelected: (bool selected) {
-                      setState(() {
-                        if (selected) {
-                          if (_selectedCategoryKeys.length < 3) {
-                            _selectedCategoryKeys.add(key);
-                          } else {
-                            ToastHelper.showError(context, 'Chỉ được chọn tối đa 3 thể loại.');
-                          }
-                        } else {
-                          if (_selectedCategoryKeys.length > 1) {
-                            _selectedCategoryKeys.remove(key);
-                          } else {
-                            ToastHelper.showError(context, 'Cần chọn ít nhất 1 thể loại.');
-                          }
-                        }
-                      });
-                    },
+              DropdownButtonFormField<String>(
+                value: _selectedCategoryKey,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF20B486)),
+                  ),
+                ),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
+                items: _dbCategories.map((dynamic item) {
+                  return DropdownMenuItem<String>(
+                    value: item['paramKey'] as String,
+                    child: Text(item['paramValue'] as String),
                   );
                 }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedCategoryKey = newValue;
+                    });
+                  }
+                },
               ),
             ],
           ),
@@ -1372,21 +1345,15 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE2E8F0),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE2E8F0),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF20B486),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFF20B486)),
                   ),
                 ),
                 style: const TextStyle(

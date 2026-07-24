@@ -9,6 +9,7 @@ import '../trainer/trainer_create_exam_page.dart';
 import '../trainer/trainer_edit_exam_page.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
+import '../../../data/services/course_manager_api.dart';
 
 class CourseManagerExamsPage extends StatefulWidget {
   const CourseManagerExamsPage({super.key});
@@ -73,53 +74,25 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     });
 
     try {
-      final token = await _authService.getToken();
-      if (token == null) {
-        throw Exception('Authentication token not found');
-      }
-
-      final searchVal = _searchController.text.trim();
-      final queryParams = <String, String>{
-        'status': _selectedStatus,
-        'sortBy': _selectedSortBy,
-        'timePeriod': _selectedTimePeriod,
-      };
-      if (searchVal.isNotEmpty) {
-        queryParams['search'] = searchVal;
-      }
-
-      final uri = Uri.parse('$apiBaseUrl/trainer/exams').replace(queryParameters: queryParams);
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        setState(() {
-          if (data is Map) {
-            _allCount = (data['allCount'] ?? 0) as int;
-            _draftCount = (data['draftCount'] ?? 0) as int;
-            _publishedCount = (data['publishedCount'] ?? 0) as int;
-            _hiddenCount = (data['hiddenCount'] ?? 0) as int;
-            _pendingCount = (data['pendingCount'] ?? 0) as int;
-            _examsList = data['exams'] ?? [];
-          } else if (data is List) {
-            _examsList = data;
-            _allCount = data.length;
-            _draftCount = 0;
-            _publishedCount = 0;
-            _hiddenCount = 0;
-            _pendingCount = 0;
-          }
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Failed to load exams data: ${response.statusCode}');
-      }
+      final api = CourseManagerApi();
+      final data = await api.getExamsForReview(_selectedStatus);
+      
+      setState(() {
+        _examsList = data;
+        
+        // Calculate counts if we fetched ALL
+        if (_selectedStatus == 'ALL') {
+          _allCount = data.length;
+          _draftCount = data.where((e) => e['status'] == 'DRAFT').length;
+          _publishedCount = data.where((e) => e['status'] == 'PUBLISHED').length;
+          _hiddenCount = data.where((e) => e['status'] == 'HIDDEN').length;
+          _pendingCount = data.where((e) => e['status'] == 'PENDING_APPROVAL' || e['status'] == 'SUBMITTED').length;
+        } else {
+          // If we filtered, just update the selected count (or allCount as fallback)
+          _allCount = data.length;
+        }
+        _isLoading = false;
+      });
     } catch (e) {
       debugPrint('Error loading exams data: $e');
       setState(() {
@@ -161,10 +134,6 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       return str;
     }
   }
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -244,7 +213,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                 const SizedBox(width: 8),
                 _buildStatusTab('Hidden', 'HIDDEN', _hiddenCount),
                 const SizedBox(width: 8),
-                _buildStatusTab('Pending', 'PENDING', _pendingCount),
+                _buildStatusTab('Pending', 'PENDING_APPROVAL', _pendingCount),
               ],
             ),
           ),
@@ -689,45 +658,52 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                   final status = exam['status']?.toString().toUpperCase() ?? 'DRAFT';
                   final bool isCreator = _currentUserId != null && exam['creatorId'] == _currentUserId;
                   
-                  if (isCreator && status == 'DRAFT') {
-                    return IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => TrainerEditExamPage(
-                            examId: exam['id'],
-                            examTitle: exam['title'] ?? 'Untitled',
-                            examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
-                          )),
-                        );
-                        _fetchExamsData();
-                      },
-                      splashRadius: 20,
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    );
-                  } else {
-                    return IconButton(
-                      icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF38C9A6), size: 20),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => TrainerEditExamPage(
-                            examId: exam['id'],
-                            examTitle: exam['title'] ?? 'Untitled',
-                            examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
-                            isReadOnly: true,
-                            courseManagerActionStatus: status,
-                          )),
-                        );
-                        _fetchExamsData();
-                      },
-                      splashRadius: 20,
-                      constraints: const BoxConstraints(),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    );
-                  }
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Edit button for creator in draft
+                      if (isCreator && status == 'DRAFT')
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                                examId: exam['id'],
+                                examTitle: exam['title'] ?? 'Untitled',
+                                examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                              )),
+                            );
+                            _fetchExamsData();
+                          },
+                          splashRadius: 20,
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
+
+                      // View button for all others
+                      if (!isCreator || status != 'DRAFT')
+                        IconButton(
+                          icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF38C9A6), size: 20),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                                examId: exam['id'],
+                                examTitle: exam['title'] ?? 'Untitled',
+                                examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                                isReadOnly: true,
+                                courseManagerActionStatus: status,
+                              )),
+                            );
+                            _fetchExamsData();
+                          },
+                          splashRadius: 20,
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
+                    ],
+                  );
                 }),
               ],
             ),
@@ -746,7 +722,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     if (status == 'APPROVED') {
       bgColor = const Color(0xFFE6FFFA);
       textColor = const Color(0xFF20B486);
-    } else if (status == 'SUBMITTED' || status == 'PENDING') {
+    } else if (status == 'PENDING_APPROVAL' || status == 'PENDING' || status == 'SUBMITTED') {
       bgColor = const Color(0xFFFEF3C7);
       textColor = const Color(0xFFD97706);
     } else if (status == 'REJECTED') {
