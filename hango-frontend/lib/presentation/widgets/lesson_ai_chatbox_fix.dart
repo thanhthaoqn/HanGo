@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import 'package:hango/domain/model/ai_health.dart';
 import 'package:hango/domain/model/ai_models.dart';
@@ -442,11 +443,21 @@ class _ChatBubble extends StatelessWidget {
               ? Border.all(color: const Color(0xFFE11D48))
               : null,
         ),
-        child: Text(
-          message.content,
-          style: TextStyle(
-            color: mine ? Colors.white : AppTheme.ink,
-            height: 1.42,
+        child: MarkdownBody(
+          data: message.content,
+          selectable: true,
+          styleSheet: MarkdownStyleSheet(
+            p: TextStyle(
+              color: mine ? Colors.white : AppTheme.ink,
+              height: 1.42,
+            ),
+            listBullet: TextStyle(
+              color: mine ? Colors.white : AppTheme.ink,
+            ),
+            strong: TextStyle(
+              color: mine ? Colors.white : AppTheme.ink,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
