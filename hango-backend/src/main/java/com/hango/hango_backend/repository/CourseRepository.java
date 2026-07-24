@@ -81,7 +81,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     long countByStatus(String status);
 
+    @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
     List<Course> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String status);
+
+    @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
+    List<Course> findByDeletedAtIsNullOrderByCreatedAtDesc();
 
     long countByStatusAndDeletedAtIsNull(String status);
 
