@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter/services.dart';
 
 import 'package:hango/domain/model/ai_health.dart';
 import 'package:hango/domain/model/ai_models.dart';
@@ -371,11 +372,22 @@ class _ChatPanel extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: Focus(
+                      onKeyEvent: (node, event) {
+                        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.enter) {
+                          if (!HardwareKeyboard.instance.isShiftPressed) {
+                            onSend();
+                            return KeyEventResult.handled;
+                          }
+                        }
+                        return KeyEventResult.ignored;
+                      },
+                      child: TextField(
                       controller: messageController,
                       minLines: 1,
                       maxLines: 3,
                       maxLength: 500,
+                      textInputAction: TextInputAction.send,
                       onSubmitted: (_) => onSend(),
                       decoration: const InputDecoration(
                         hintText: 'Nhập câu hỏi trong bài học...',
@@ -400,6 +412,7 @@ class _ChatPanel extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
                   const SizedBox(width: 10),
                   IconButton.filled(
                     tooltip: 'Gửi',
@@ -430,6 +443,13 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mine = message.role == 'USER';
+    
+    // Tiền xử lý text: Chuyển đổi **text** thành TEXT viết hoa theo yêu cầu
+    String processedContent = message.content.replaceAllMapped(
+      RegExp(r'\*\*(.*?)\*\*'), 
+      (match) => match.group(1)!.toUpperCase(),
+    );
+
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -444,7 +464,7 @@ class _ChatBubble extends StatelessWidget {
               : null,
         ),
         child: MarkdownBody(
-          data: message.content,
+          data: processedContent,
           selectable: true,
           styleSheet: MarkdownStyleSheet(
             p: TextStyle(

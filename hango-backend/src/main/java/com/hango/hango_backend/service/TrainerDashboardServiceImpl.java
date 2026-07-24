@@ -33,6 +33,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final PaymentRepository paymentRepository;
     private final CourseRatingRepository courseRatingRepository;
+    private final YouTubeTranscriptService youtubeTranscriptService;
 
     @Override
     @Transactional(readOnly = true)
@@ -517,6 +518,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setDisplayOrder(lIdx + 1);
                 lesson.setDescription(lDto.getDescription());
                 lesson.setContent(lDto.getQuestionText());
+                
+                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                    String transcript = youtubeTranscriptService.fetchTranscript(lDto.getQuestionText());
+                    lesson.setVideoTranscript(transcript);
+                } else {
+                    lesson.setVideoTranscript(null);
+                }
+
                 lesson.setPdfName(lDto.getPdfName());
                 lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
                 lesson.setVersion(savedCourse.getVersion());
@@ -574,6 +583,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         .skill(category)
                         .difficulty(difficulty)
                         .build();
+
+                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                    String transcript = youtubeTranscriptService.fetchTranscript(lDto.getQuestionText());
+                    lesson.setVideoTranscript(transcript);
+                }
 
                 if (lDto.getExamId() != null) {
                     lesson.setExam(examRepository.findById(lDto.getExamId()).orElse(null));
