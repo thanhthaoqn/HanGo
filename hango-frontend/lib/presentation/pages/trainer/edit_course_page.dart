@@ -1391,8 +1391,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                     TextFormField(
                       controller: _priceController,
                       keyboardType: TextInputType.number,
+                      readOnly: true,
                       decoration: InputDecoration(
-                        hintText: 'e.g. 0',
+                        filled: true,
+                        fillColor: const Color(0xFFF1F5F9),
+                        hintText: 'Auto-calculated price',
                         hintStyle: const TextStyle(
                           color: Color(0xFF94A3B8),
                           fontSize: 14,
@@ -1424,6 +1427,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                       style: const TextStyle(
                         fontFamily: 'Outfit',
                         fontSize: 14,
+                        color: Color(0xFF64748B),
                       ),
                     ),
                   ],
