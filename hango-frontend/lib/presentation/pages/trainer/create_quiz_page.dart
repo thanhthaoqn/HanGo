@@ -170,41 +170,56 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
         children: [
           _buildHeader(context),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTitleSection(),
-                  const SizedBox(height: 24),
-                  if (isDesktop)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(width: 280, child: _buildLeftPanel(context)),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildMainFormCard(section),
-                            ],
-                          ),
+            child: isDesktop
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                        child: _buildTitleSection(),
+                      ),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 280,
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(24, 0, 0, 24),
+                                child: _buildLeftPanel(context),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(0, 0, 24, 24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildMainFormCard(section),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    )
-                  else
-                    Column(
+                      ),
+                    ],
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        _buildTitleSection(),
+                        const SizedBox(height: 24),
                         _buildLeftPanel(context),
                         const SizedBox(height: 24),
                         _buildMainFormCard(section),
                       ],
                     ),
-                ],
-              ),
-            ),
+                  ),
           ),
         ],
       ),
@@ -340,42 +355,6 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
             ),
           ),
         ),
-        Row(
-          children: [
-            const Text(
-              'OVERALL COMPLETION PROGRESS',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Outfit',
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              '68%',
-              style: TextStyle(
-                color: Color(0xFF20B486),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Outfit',
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 120,
-              height: 8,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: const LinearProgressIndicator(
-                  value: 0.68,
-                  backgroundColor: Color(0xFFE2E8F0),
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
-                ),
-              ),
-            ),
-          ],
-        )
       ],
     );
   }
@@ -405,136 +384,128 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Step 1: Introduction
+              // Item 1: Introduction
               InkWell(
                 onTap: () {
                   Navigator.pop(context, 'goToIntroduction');
                 },
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFEFF2F5)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF20B486),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.check, size: 14, color: Colors.white),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFEFF2F5)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFF94A3B8),
+                                width: 1.5,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Text(
+                              '1',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF94A3B8),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           const Text(
                             'Introduction',
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Completed',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: activeColor,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF94A3B8),
                               fontFamily: 'Outfit',
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              // Step 2: Syllabus
+              // Item 2: Syllabus
               InkWell(
                 onTap: () {
                   Navigator.pop(context);
                 },
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFEFF2F5)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 4,
-                          color: activeColor,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFEFF2F5)),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: Container(width: 4, color: activeColor),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: activeColor,
-                                  width: 1.5,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: activeColor,
+                                    width: 1.5,
+                                  ),
+                                  shape: BoxShape.circle,
                                 ),
-                                shape: BoxShape.circle,
+                                child: Text(
+                                  '2',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: activeColor,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                '2',
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Syllabus',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: activeColor,
+                                  color: Color(0xFF1E293B),
                                   fontFamily: 'Outfit',
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Syllabus',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1E293B),
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                  'In progress',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF94A3B8),
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -542,69 +513,94 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
           ),
         ),
         const SizedBox(height: 20),
-        // Progress Overview
+        // Trainer Tips Card
         Container(
-          padding: const EdgeInsets.all(20),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFEFF2F5)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
             children: [
-              const Text(
-                'PROGRESS OVERVIEW',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                  fontFamily: 'Outfit',
+              // Background Watermark
+              Positioned(
+                right: -24,
+                bottom: -24,
+                child: Icon(
+                  Icons.lightbulb_outline,
+                  size: 120,
+                  color: const Color(0xFF20B486).withOpacity(0.05),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '1/3 steps completed successfully. Complete the remaining steps to publish the course.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                  fontFamily: 'Outfit',
-                  height: 1.4,
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF20B486).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.lightbulb_outline,
+                            color: Color(0xFF20B486),
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Trainer Insights',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Engaging videos and clear syllabus help students stay motivated. Consider adding short quizzes after each section to reinforce learning.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        height: 1.5,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: () {},
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Explore more tips',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF20B486),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Color(0xFF20B486),
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.play_arrow, size: 16),
-                label: const Text(
-                  'Submit for Review',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20B486).withAlpha(102),
-                  disabledBackgroundColor: const Color(0xFF20B486).withAlpha(102),
-                  disabledForegroundColor: Colors.white.withAlpha(200),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'submit once 100% completed',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF94A3B8),
-                  fontFamily: 'Outfit',
-                ),
-              )
             ],
           ),
         ),
