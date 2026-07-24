@@ -22,7 +22,6 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   final _authService = AuthService();
   bool _isLoading = true;
   String _errorMessage = '';
-  bool _isSidebarVisible = true;
   int? _currentUserId;
   List<dynamic> _examsList = [];
   
@@ -152,7 +151,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'exams')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
+          if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -909,23 +908,13 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 12),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () {
-                setState(() {
-                  _isSidebarVisible = !_isSidebarVisible;
-                });
-              },
-            ),
-            const SizedBox(width: 12),
           ],
           const Text(
-            'Exam',
+            'Exam Management',
             style: TextStyle(
-              color: Color(0xFF20B486),
+              fontSize: 28,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              color: Color(0xFF1E293B),
               fontFamily: 'Outfit',
             ),
           ),
