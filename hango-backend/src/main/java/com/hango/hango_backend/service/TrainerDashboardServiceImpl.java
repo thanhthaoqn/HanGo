@@ -33,6 +33,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final PaymentRepository paymentRepository;
     private final CourseRatingRepository courseRatingRepository;
+    private final YouTubeTranscriptService youtubeTranscriptService;
 
     @Override
     @Transactional(readOnly = true)
@@ -241,19 +242,37 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         // 6. Map to DTOs
-        List<TrainerCourseDetailDTO> courses = filteredProjections.stream().map(p -> {
-            List<String> catKeys = new ArrayList<>();
-            List<String> catNames = new ArrayList<>();
-            com.hango.hango_backend.entity.Course c = courseRepository.findById(p.getId()).orElse(null);
-            if (c != null && c.getCategories() != null && !c.getCategories().isEmpty()) {
-                for (com.hango.hango_backend.entity.SystemParameter sp : c.getCategories()) {
-                    catKeys.add(sp.getParamKey());
-                    catNames.add(sp.getParamValue());
-                }
-            } else if (c != null && c.getCategory() != null) {
-                catKeys.add(c.getCategory().getParamKey());
-                catNames.add(c.getCategory().getParamValue());
+        List<Long> filteredCourseIds = filteredProjections.stream()
+                .map(p -> p.getId())
+                .collect(Collectors.toList());
+
+        Map<Long, List<String>> courseCategoryKeys = new java.util.HashMap<>();
+        Map<Long, List<String>> courseCategoryNames = new java.util.HashMap<>();
+
+        if (!filteredCourseIds.isEmpty()) {
+            List<Object[]> multipleCats = courseRepository.findCategoryDetailsByCourseIds(filteredCourseIds);
+            for (Object[] row : multipleCats) {
+                Long cid = (Long) row[0];
+                String key = (String) row[1];
+                String val = (String) row[2];
+                courseCategoryKeys.computeIfAbsent(cid, k -> new ArrayList<>()).add(key);
+                courseCategoryNames.computeIfAbsent(cid, k -> new ArrayList<>()).add(val);
             }
+            List<Object[]> singleCats = courseRepository.findSingleCategoryDetailsByCourseIds(filteredCourseIds);
+            for (Object[] row : singleCats) {
+                Long cid = (Long) row[0];
+                String key = (String) row[1];
+                String val = (String) row[2];
+                if (!courseCategoryKeys.containsKey(cid)) {
+                    courseCategoryKeys.computeIfAbsent(cid, k -> new ArrayList<>()).add(key);
+                    courseCategoryNames.computeIfAbsent(cid, k -> new ArrayList<>()).add(val);
+                }
+            }
+        }
+
+        List<TrainerCourseDetailDTO> courses = filteredProjections.stream().map(p -> {
+            List<String> catKeys = courseCategoryKeys.getOrDefault(p.getId(), new ArrayList<>());
+            List<String> catNames = courseCategoryNames.getOrDefault(p.getId(), new ArrayList<>());
 
             return TrainerCourseDetailDTO.builder()
                 .id(p.getId())
@@ -517,6 +536,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setDisplayOrder(lIdx + 1);
                 lesson.setDescription(lDto.getDescription());
                 lesson.setContent(lDto.getQuestionText());
+                
+                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                    String transcript = youtubeTranscriptService.fetchTranscript(lDto.getQuestionText());
+                    lesson.setVideoTranscript(transcript);
+                } else {
+                    lesson.setVideoTranscript(null);
+                }
+
                 lesson.setPdfName(lDto.getPdfName());
                 lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
                 lesson.setVersion(savedCourse.getVersion());
@@ -574,6 +601,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         .skill(category)
                         .difficulty(difficulty)
                         .build();
+
+                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                    String transcript = youtubeTranscriptService.fetchTranscript(lDto.getQuestionText());
+                    lesson.setVideoTranscript(transcript);
+                }
 
                 if (lDto.getExamId() != null) {
                     lesson.setExam(examRepository.findById(lDto.getExamId()).orElse(null));

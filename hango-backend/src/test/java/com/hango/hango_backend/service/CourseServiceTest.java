@@ -157,10 +157,10 @@ class CourseServiceTest {
     void getCoursesShouldEnrichDtoCategoriesFromCourseCategoriesSet() {
         CourseSummaryDTO dto = CourseSummaryDTO.builder().id(1L).build();
         when(courseRepository.findCoursesWithFilters(any(), any(), any(), any())).thenReturn(List.of(dto));
-        Course c = Course.builder().id(1L)
-                .categories(java.util.Set.of(SystemParameter.builder().paramValue("Grammar").build()))
-                .build();
-        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        
+        List<Object[]> categoryList = new java.util.ArrayList<>();
+        categoryList.add(new Object[]{1L, "Grammar"});
+        when(courseRepository.findCategoriesByCourseIds(any())).thenReturn(categoryList);
 
         List<CourseSummaryDTO> result = courseService.getCourses(null, null, null);
 
@@ -170,12 +170,9 @@ class CourseServiceTest {
 
     @Test
     void getCoursesShouldFallBackToSingleCategoryWhenCategoriesSetEmpty() {
-        CourseSummaryDTO dto = CourseSummaryDTO.builder().id(1L).build();
+        CourseSummaryDTO dto = CourseSummaryDTO.builder().id(1L).categoryName("Reading").build();
         when(courseRepository.findCoursesWithFilters(any(), any(), any(), any())).thenReturn(List.of(dto));
-        Course c = Course.builder().id(1L)
-                .category(SystemParameter.builder().paramValue("Reading").build())
-                .build();
-        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        when(courseRepository.findCategoriesByCourseIds(any())).thenReturn(new java.util.ArrayList<>());
 
         List<CourseSummaryDTO> result = courseService.getCourses(null, null, null);
 

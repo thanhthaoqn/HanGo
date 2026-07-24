@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class CourseDetailDTO {
     private Long id;
+    private String status;
     private String title;
     private String code;
     private String creatorName;

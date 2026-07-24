@@ -85,6 +85,10 @@ public class Lesson {
     @Column(name = "content_embedding", columnDefinition = "TEXT")
     private String contentEmbedding;
 
+    @Lob
+    @Column(name = "video_transcript", columnDefinition = "LONGTEXT")
+    private String videoTranscript;
+
     /** Đóng vai trò là cầu nối giúp AIPromptBuilder lấy nội dung không bị lỗi */
     public String getContentText() {
         return this.content;
