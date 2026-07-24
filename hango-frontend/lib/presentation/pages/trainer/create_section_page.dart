@@ -521,8 +521,16 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                     bottom: index == paginatedSections.length - 1 ? 0 : 12,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEDF5FF), // premium light blue bg
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFEFF2F5)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF1E293B).withOpacity(0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -530,42 +538,40 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 12,
+                          vertical: 14,
                         ),
                         child: Row(
                           children: [
                             // Circle Index Badge
                             Container(
-                              width: 32,
-                              height: 32,
+                              width: 36,
+                              height: 36,
                               alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFD0E7FF),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF20B486).withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
                                 '${originalIndex + 1}',
                                 style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0369A1),
+                                  color: Color(0xFF20B486),
                                   fontFamily: 'Outfit',
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
                             // Title and count
                             Expanded(
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          section['title'] ??
-                                              'Untitled Section',
+                                          section['title'] ?? 'Untitled Section',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 15,
@@ -573,7 +579,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                             fontFamily: 'Outfit',
                                           ),
                                         ),
-                                        const SizedBox(height: 2),
+                                        const SizedBox(height: 4),
                                         Text(
                                           '${lessons.length} ${lessons.length == 1 ? "item" : "items"}',
                                           style: const TextStyle(
@@ -587,7 +593,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                   ),
                                   IconButton(
                                     icon: const Icon(
-                                      Icons.edit_note,
+                                      Icons.edit_note_rounded,
                                       color: Color(0xFF64748B),
                                       size: 22,
                                     ),
@@ -595,12 +601,9 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                     onPressed: () {
                                       setState(() {
                                         _editingIndex = originalIndex;
-                                        _nameController.text =
-                                            section['title'] ?? '';
-                                        _codeController.text =
-                                            section['code'] ?? '';
-                                        _descController.text =
-                                            section['description'] ?? '';
+                                        _nameController.text = section['title'] ?? '';
+                                        _codeController.text = section['code'] ?? '';
+                                        _descController.text = section['description'] ?? '';
                                       });
                                     },
                                   ),
@@ -611,11 +614,11 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                             // Action buttons
                             IconButton(
                               icon: const Icon(
-                                Icons.edit,
+                                Icons.format_list_bulleted_add,
                                 color: Color(0xFFF59E0B),
                                 size: 20,
                               ),
-                              tooltip: 'Edit Section',
+                              tooltip: 'Manage Lessons',
                               onPressed: () async {
                                 final result = await Navigator.push(
                                   context,
@@ -627,25 +630,23 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                       trainerInitials: widget.trainerInitials,
                                       sections: _localSections,
                                       selectedSectionIndex: originalIndex,
-                                      onSectionsChanged:
-                                          (updatedSections) async {
-                                            setState(() {
-                                              _localSections = updatedSections;
-                                            });
-                                            await _notifyParent();
-                                          },
+                                      onSectionsChanged: (updatedSections) async {
+                                        setState(() {
+                                          _localSections = updatedSections;
+                                        });
+                                        await _notifyParent();
+                                      },
                                     ),
                                   ),
                                 );
-                                if (result == 'goToIntroduction' &&
-                                    widget.onStepChanged != null) {
+                                if (result == 'goToIntroduction' && widget.onStepChanged != null) {
                                   widget.onStepChanged!(1);
                                 }
                               },
                             ),
                             IconButton(
                               icon: const Icon(
-                                Icons.delete_outline,
+                                Icons.delete_outline_rounded,
                                 color: Color(0xFFEF4444),
                                 size: 20,
                               ),
@@ -655,8 +656,8 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                             IconButton(
                               icon: Icon(
                                 isExpanded
-                                    ? Icons.keyboard_arrow_up
-                                    : Icons.keyboard_arrow_down,
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.keyboard_arrow_down_rounded,
                                 color: const Color(0xFF64748B),
                                 size: 22,
                               ),

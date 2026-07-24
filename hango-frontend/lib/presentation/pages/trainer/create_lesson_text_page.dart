@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -38,11 +39,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _learningObjectivesController = TextEditingController();
-  final TextEditingController _mediaDurationController = TextEditingController();
-  final TextEditingController _mediaSizeController = TextEditingController();
   final TextEditingController _estimatedTimeController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
   final TextEditingController _questionController = TextEditingController();
+
+  bool _isPreviewMode = false;
 
   // Upload states
   String? _uploadedImageUrl;
@@ -66,8 +67,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       _titleController.text = lesson['title'] ?? '';
       _codeController.text = lesson['lessonCode'] ?? '';
       _learningObjectivesController.text = lesson['learningObjectives'] ?? '';
-      _mediaDurationController.text = lesson['mediaDurationSeconds']?.toString() ?? '';
-      _mediaSizeController.text = lesson['mediaSizeBytes']?.toString() ?? '';
       _estimatedTimeController.text = lesson['estimatedTimeMinutes']?.toString() ?? '';
       _descController.text = lesson['description'] ?? '';
       _questionController.text = lesson['questionText'] ?? lesson['content'] ?? '';
@@ -116,8 +115,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           _questionController.text = detail.content;
           if (detail.lessonCode != null) _codeController.text = detail.lessonCode!;
           if (detail.learningObjectives != null) _learningObjectivesController.text = detail.learningObjectives!;
-          if (detail.mediaDurationSeconds != null) _mediaDurationController.text = detail.mediaDurationSeconds.toString();
-          if (detail.mediaSizeBytes != null) _mediaSizeController.text = detail.mediaSizeBytes.toString();
           if (detail.estimatedTimeMinutes != null) _estimatedTimeController.text = detail.estimatedTimeMinutes.toString();
         });
       }
@@ -136,8 +133,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     _titleController.dispose();
     _codeController.dispose();
     _learningObjectivesController.dispose();
-    _mediaDurationController.dispose();
-    _mediaSizeController.dispose();
     _estimatedTimeController.dispose();
     _descController.dispose();
     _questionController.dispose();
@@ -225,8 +220,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     final title = _titleController.text.trim();
     final code = _codeController.text.trim();
     final objectives = _learningObjectivesController.text.trim();
-    final mediaDuration = int.tryParse(_mediaDurationController.text.trim()) ?? 0;
-    final mediaSize = int.tryParse(_mediaSizeController.text.trim()) ?? 0;
     final estimatedTime = int.tryParse(_estimatedTimeController.text.trim()) ?? 0;
     final desc = _descController.text.trim();
     final question = _questionController.text.trim();
@@ -271,8 +264,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         // Media fields (optional in template)
         'mediaFileUrl': _uploadedPdfName ?? '',
         'mediaType': 'pdf',
-        'mediaDurationSeconds': mediaDuration,
-        'mediaSizeBytes': mediaSize,
+        'mediaDurationSeconds': 0,
+        'mediaSizeBytes': 0,
         'learningObjectives': objectives,
         'estimatedTimeMinutes': estimatedTime,
         'version': 'v1.0',
@@ -319,35 +312,52 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         children: [
           _buildHeader(context),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTitleSection(),
-                  const SizedBox(height: 24),
-                  if (isDesktop)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(width: 280, child: _buildLeftPanel(context)),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildMainFormCard(section),
-                              const SizedBox(height: 24),
-                              _buildActionsRow(),
-                            ],
-                          ),
+            child: isDesktop
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                        child: _buildTitleSection(),
+                      ),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 280,
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(24, 0, 0, 24),
+                                child: _buildLeftPanel(context),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(0, 0, 24, 24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildMainFormCard(section),
+                                    const SizedBox(height: 24),
+                                    _buildActionsRow(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    )
-                  else
-                    Column(
+                      ),
+                    ],
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        _buildTitleSection(),
+                        const SizedBox(height: 24),
                         _buildLeftPanel(context),
                         const SizedBox(height: 24),
                         _buildMainFormCard(section),
@@ -355,9 +365,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                         _buildActionsRow(),
                       ],
                     ),
-                ],
-              ),
-            ),
+                  ),
           ),
         ],
       ),
@@ -497,42 +505,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             ),
           ),
         ),
-        Row(
-          children: [
-            const Text(
-              'Overall completion progress',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                fontFamily: 'Outfit',
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              '33%',
-              style: TextStyle(
-                color: Color(0xFF20B486),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Outfit',
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 120,
-              height: 8,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: const LinearProgressIndicator(
-                  value: 0.33,
-                  backgroundColor: Color(0xFFE2E8F0),
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
-                ),
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -562,145 +534,128 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Step 1: Introduction
+              // Item 1: Introduction
               InkWell(
                 onTap: () {
                   Navigator.pop(context, 'goToIntroduction');
                 },
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFEFF2F5)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF20B486),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.white,
-                        ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFEFF2F5)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFF94A3B8),
+                                width: 1.5,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Text(
+                              '1',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF94A3B8),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           const Text(
                             'Introduction',
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Completed',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: activeColor,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF94A3B8),
                               fontFamily: 'Outfit',
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              // Step 2: Syllabus
+              // Item 2: Syllabus
               InkWell(
                 onTap: () {
-                  Navigator.pop(
-                    context,
-                  ); // Pops back to CreateLessonPage (Syllabus)
+                  Navigator.pop(context); // Pops back to CreateLessonPage (Syllabus)
                 },
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFEFF2F5)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        child: Container(width: 4, color: activeColor),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFEFF2F5)),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: Container(width: 4, color: activeColor),
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: activeColor,
-                                  width: 1.5,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: activeColor,
+                                    width: 1.5,
+                                  ),
+                                  shape: BoxShape.circle,
                                 ),
-                                shape: BoxShape.circle,
+                                child: Text(
+                                  '2',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: activeColor,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                '2',
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Syllabus',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: activeColor,
+                                  color: Color(0xFF1E293B),
                                   fontFamily: 'Outfit',
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Syllabus',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1E293B),
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                  'In progress',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF94A3B8),
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -708,69 +663,92 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           ),
         ),
         const SizedBox(height: 20),
-        // Progress Overview
+        // Trainer Tips Card
         Container(
-          padding: const EdgeInsets.all(20),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFEFF2F5)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
             children: [
-              const Text(
-                'Progress Overview',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                  fontFamily: 'Outfit',
+              // Background Watermark
+              Positioned(
+                right: -24,
+                bottom: -24,
+                child: Icon(
+                  Icons.lightbulb_outline,
+                  size: 120,
+                  color: const Color(0xFF20B486).withOpacity(0.05),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '1/3 steps completed successfully. Complete the remaining steps to publish the course.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF64748B),
-                  fontFamily: 'Outfit',
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.play_arrow, size: 16),
-                label: const Text(
-                  'Submit for Review',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20B486).withAlpha(102),
-                  disabledBackgroundColor: const Color(
-                    0xFF20B486,
-                  ).withAlpha(102),
-                  disabledForegroundColor: Colors.white.withAlpha(200),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Submit once 100% completed',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF94A3B8),
-                  fontFamily: 'Outfit',
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF20B486).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.lightbulb_outline,
+                            color: Color(0xFF20B486),
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Trainer Insights',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Engaging videos and clear syllabus help students stay motivated. Consider adding short quizzes after each section to reinforce learning.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        height: 1.5,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: () {},
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Explore more tips',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF20B486),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Color(0xFF20B486),
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1090,116 +1068,212 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Text Header Label
-                const Padding(
-                  padding: EdgeInsets.only(left: 16, right: 16, top: 16),
-                  child: Text(
-                    'Text *',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4B5563),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Rich Editor Toolbar
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFC),
-                    border: Border.symmetric(
-                      horizontal: BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                  ),
+                // Text Header Label and Toggle
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.format_bold,
-                          size: 18,
-                          color: Color(0xFF475569),
+                      const Text(
+                        'Text *',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF4B5563),
+                          fontFamily: 'Outfit',
                         ),
-                        onPressed: () => _addMarkdownTag('**', '**'),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
                       ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.format_italic,
-                          size: 18,
-                          color: Color(0xFF475569),
-                        ),
-                        onPressed: () => _addMarkdownTag('*', '*'),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.format_list_bulleted,
-                          size: 18,
-                          color: Color(0xFF475569),
-                        ),
-                        onPressed: () => _addMarkdownTag('- ', ''),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.link,
-                          size: 18,
-                          color: Color(0xFF475569),
-                        ),
-                        onPressed: () => _addMarkdownTag('[', '](url)'),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.format_clear,
-                          size: 18,
-                          color: Color(0xFF475569),
-                        ),
-                        onPressed: () {
-                          // Clear formats/remove selected markdown helper
-                        },
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isPreviewMode = false;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: !_isPreviewMode
+                                    ? const Color(0xFFE2F9F3)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Write',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: !_isPreviewMode
+                                      ? const Color(0xFF20B486)
+                                      : const Color(0xFF94A3B8),
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isPreviewMode = true;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _isPreviewMode
+                                    ? const Color(0xFFE2F9F3)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Preview',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _isPreviewMode
+                                      ? const Color(0xFF20B486)
+                                      : const Color(0xFF94A3B8),
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                // Question Text Input
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextFormField(
-                    controller: _questionController,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter your question here...',
-                      hintStyle: TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 14,
-                        fontFamily: 'Outfit',
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+                const SizedBox(height: 12),
+                if (!_isPreviewMode) ...[
+                  // Rich Editor Toolbar
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                    style: const TextStyle(
-                      fontFamily: 'Outfit',
-                      fontSize: 14,
-                      color: Color(0xFF1E293B),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF8FAFC),
+                      border: Border.symmetric(
+                        horizontal: BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.format_bold,
+                            size: 18,
+                            color: Color(0xFF475569),
+                          ),
+                          onPressed: () => _addMarkdownTag('**', '**'),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 16),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.format_italic,
+                            size: 18,
+                            color: Color(0xFF475569),
+                          ),
+                          onPressed: () => _addMarkdownTag('*', '*'),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 16),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.format_list_bulleted,
+                            size: 18,
+                            color: Color(0xFF475569),
+                          ),
+                          onPressed: () => _addMarkdownTag('- ', ''),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 16),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.link,
+                            size: 18,
+                            color: Color(0xFF475569),
+                          ),
+                          onPressed: () => _addMarkdownTag('[', '](url)'),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                  // Question Text Input
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextFormField(
+                      controller: _questionController,
+                      maxLines: 8,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter your lesson content here using Markdown...',
+                        hintStyle: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  // Markdown Preview
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    constraints: const BoxConstraints(minHeight: 180),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                    ),
+                    child: _questionController.text.trim().isEmpty
+                        ? const Text(
+                            'Nothing to preview yet.',
+                            style: TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                              fontFamily: 'Outfit',
+                            ),
+                          )
+                        : MarkdownBody(
+                            data: _questionController.text,
+                            styleSheet: MarkdownStyleSheet(
+                              p: const TextStyle(
+                                fontFamily: 'Outfit',
+                                fontSize: 14,
+                                color: Color(0xFF1E293B),
+                                height: 1.5,
+                              ),
+                              strong: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                              em: const TextStyle(
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1442,119 +1516,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               color: Color(0xFF1E293B),
             ),
           ),
-          const SizedBox(height: 24),
-          // Media Duration & Size fields
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Duration (Seconds)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF4B5563),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _mediaDurationController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. 120',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF20B486),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 14,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Size (Bytes)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF4B5563),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _mediaSizeController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. 102400',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF20B486),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 14,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+
         ],
       ),
     );

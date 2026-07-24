@@ -190,11 +190,11 @@ class _LessonListWidgetState extends State<LessonListWidget> {
                       Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 18),
+                            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFFF59E0B), size: 22),
                             onPressed: () => widget.onEditLessonPressed(originalIndex),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
                             onPressed: () => widget.onDeleteLessonPressed(originalIndex),
                           ),
                           const SizedBox(width: 8),
