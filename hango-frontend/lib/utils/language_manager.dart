@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 
 class LanguageManager {
-  static final ValueNotifier<bool> isVietnamese = ValueNotifier<bool>(true);
+  static final ValueNotifier<bool> isVietnamese = ValueNotifier<bool>(false);
 
-  static bool get isVi => isVietnamese.value;
+  static bool get isVi => false;
 
   static void setLanguage(bool isVi) {
-    isVietnamese.value = isVi;
+    isVietnamese.value = false;
   }
 }

@@ -26,8 +26,38 @@ class TrainerOnboardingAgreementPage extends StatefulWidget {
 
 class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreementPage> {
   final _onboardingService = TrainerOnboardingService();
+  final ScrollController _termsScrollController = ScrollController();
+  bool _hasScrolledToBottom = false;
   bool _agreementSigned = false;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrainerHeaderInfo();
+    _termsScrollController.addListener(_onTermsScroll);
+  }
+
+  @override
+  void dispose() {
+    _termsScrollController.removeListener(_onTermsScroll);
+    _termsScrollController.dispose();
+    super.dispose();
+  }
+
+  void _onTermsScroll() {
+    if (_termsScrollController.hasClients) {
+      final maxScroll = _termsScrollController.position.maxScrollExtent;
+      final currentScroll = _termsScrollController.position.pixels;
+      if (currentScroll >= maxScroll - 30) {
+        if (!_hasScrolledToBottom) {
+          setState(() {
+            _hasScrolledToBottom = true;
+          });
+        }
+      }
+    }
+  }
 
   void _handleSubmit() async {
     if (!_agreementSigned) {
@@ -80,12 +110,6 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _loadTrainerHeaderInfo();
-  }
-
   Future<void> _loadTrainerHeaderInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? '';
@@ -123,8 +147,8 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
     final isPro = widget.trainerType == 'PROFESSIONAL';
 
     final splitText = isVi
-        ? 'Nhận chia sẻ doanh thu hấp dẫn theo chính sách của HanGo'
-        : 'Trainer receives attractive revenue share according to HanGo policies';
+        ? (isPro ? '70% doanh thu dành cho Giáo viên chuyên nghiệp (30% phí nền tảng HanGo)' : '60% doanh thu dành cho Gia sư đồng học (40% phí nền tảng HanGo)')
+        : (isPro ? '70% revenue share for Professional Teacher (30% HanGo platform fee)' : '60% revenue share for Peer Tutor (40% HanGo platform fee)');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -173,8 +197,10 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Scrollbar(
+                          controller: _termsScrollController,
                           thumbVisibility: true,
                           child: SingleChildScrollView(
+                            controller: _termsScrollController,
                             child: Padding(
                               padding: const EdgeInsets.only(right: 16.0),
                               child: Column(
@@ -183,14 +209,14 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                                   _buildTermTitle(isVi ? 'ĐIỀU 1: PHÂN CHIA DOANH THU' : 'ARTICLE 1: REVENUE SHARE'),
                                   _buildTermText(
                                     isVi
-                                        ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên chuyên nghiệp" : "Gia sư đồng học"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giảng viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
-                                        : 'Based on selected profile: ${isPro ? "Professional" : "Peer Tutor"}.\n- Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
+                                        ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên chuyên nghiệp (Chia 70/30)" : "Gia sư đồng học (Chia 60/40)"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giáo viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
+                                        : 'Based on selected profile: ${isPro ? "Professional Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Revenue Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
                                   ),
                                   const SizedBox(height: 16),
                                   _buildTermTitle(isVi ? 'ĐIỀU 2: BẢO MẬT & BẢN QUYỀN NỘI DUNG' : 'ARTICLE 2: CONTENT COPYRIGHTS'),
                                   _buildTermText(
                                     isVi
-                                        ? 'Giảng viên cam kết tự biên soạn nội dung bài giảng, đề thi và câu hỏi. Không sao chép hay sử dụng các nội dung của bên thứ ba chưa được cấp phép. Mọi tranh chấp liên quan đến bản quyền nội dung, giảng viên sẽ chịu trách nhiệm hoàn toàn trước pháp luật.'
+                                        ? 'Giáo viên cam kết tự biên soạn nội dung bài giảng, đề thi và câu hỏi. Không sao chép hay sử dụng các nội dung của bên thứ ba chưa được cấp phép. Mọi tranh chấp liên quan đến bản quyền nội dung, giáo viên sẽ chịu trách nhiệm hoàn toàn trước pháp luật.'
                                         : 'Instructors guarantee original ownership of syllabus, exams, and quizzes. No unlicensed duplication of third-party assets is permitted. The instructor assumes full legal responsibility for any copyrights violations.',
                                   ),
                                   const SizedBox(height: 16),
@@ -206,22 +232,53 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                           ),
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
+                      if (!_hasScrolledToBottom)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  isVi
+                                      ? 'Vui lòng cuộn xuống dưới cùng của khung điều khoản để mở khóa xác nhận.'
+                                      : 'Please scroll all the way to the bottom of the terms container to unlock agreement.',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E), fontFamily: 'Outfit'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 16),
                       // Agreement checkbox
                       CheckboxListTile(
                         title: Text(
                           isVi
                               ? 'Tôi cam đoan thông tin bằng cấp là thật và đồng ý với Bản thỏa thuận hợp tác này.'
                               : 'I certify that my credentials are true and agree to this contract.',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _hasScrolledToBottom ? const Color(0xFF334155) : const Color(0xFF94A3B8),
+                            fontFamily: 'Outfit',
+                          ),
                         ),
                         value: _agreementSigned,
                         activeColor: const Color(0xFF28B79B),
-                        onChanged: (val) {
-                          setState(() {
-                            _agreementSigned = val ?? false;
-                          });
-                        },
+                        onChanged: _hasScrolledToBottom
+                            ? (val) {
+                                setState(() {
+                                  _agreementSigned = val ?? false;
+                                });
+                              }
+                            : null,
                       ),
                       const SizedBox(height: 32),
                       // Submit action

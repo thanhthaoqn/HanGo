@@ -41,5 +41,15 @@ public class CreateTrainerQuestionAIRequestDTO {
      */
     private Long categoryId;
     private Long difficultyId;
+
+    /**
+     * groupType cho MULTIPLE (e.g., Reading Comprehension, Passage Arrangement)
+     */
+    private String groupType;
+
+    /**
+     * skillType cho cả 2 (e.g., Synonym, Antonym, Grammar)
+     */
+    private String skillType;
 }
 

@@ -4,6 +4,7 @@ import '../../../services/hango_api.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import 'package:flutter/foundation.dart';
+import '../../../utils/config.dart';
 class TrainerExamMatrixPage extends StatefulWidget {
   final VoidCallback onBack;
   const TrainerExamMatrixPage({super.key, required this.onBack});
@@ -19,12 +20,7 @@ class _TrainerExamMatrixPageState extends State<TrainerExamMatrixPage> {
   bool _isLoading = true;
   String? _selectedMatrixId;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
-    }
-    return 'http://localhost:8080';
-  }
+  String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   @override
   void initState() {

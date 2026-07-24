@@ -15,4 +15,5 @@ public class TrainerCourseDTO {
     private long learnersCount;
     private long lessonsCount;
     private String thumbnailUrl;
+    private long versionsCount;
 }

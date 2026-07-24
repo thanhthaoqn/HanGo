@@ -3,15 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
+import '../../utils/config.dart';
+
 class TrainerOnboardingService {
   final _authService = AuthService();
 
-  static String get baseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  static String get baseUrl => EnvConfig.v1BaseUrl;
 
   Future<Map<String, String>> _getHeaders() async {
     final token = await _authService.getToken();

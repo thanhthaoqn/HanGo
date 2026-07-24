@@ -20,4 +20,12 @@ public class LessonDetailDTO {
     private List<CommentDTO> comments;
     private List<QuizQuestionDTO> questions;
     private Boolean isCompleted;
+    private Integer estimatedTime;
+
+    // Added fields
+    private String lessonCode;
+    private Integer mediaDurationSeconds;
+    private Long mediaSizeBytes;
+    private Integer estimatedTimeMinutes;
+    private String learningObjectives;
 }

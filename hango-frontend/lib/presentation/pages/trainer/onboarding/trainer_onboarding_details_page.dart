@@ -37,14 +37,8 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
   String _userEmail = '';
   String _userFullName = '';
 
-  // Credentials Proofs
-  String? _degreeUrl;
-  String? _ieltsUrl;
-  String? _scoreReportUrl;
-
-  bool _isUploadingDegree = false;
-  bool _isUploadingIelts = false;
-  bool _isUploadingScoreReport = false;
+  // Credentials Proofs (Dynamic unlimited list)
+  List<Map<String, String>> _certificates = [];
 
   // Validation States
   bool _bioError = false;
@@ -70,11 +64,35 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
 
   void _populateFields(Map<String, dynamic> p) {
     _bioController.text = p['bio'] ?? '';
-    _degreeUrl = p['degreeUrl'];
-    _ieltsUrl = p['ieltsUrl'];
-    _scoreReportUrl = p['scoreReportUrl'];
     _avatarUrl = p['avatarUrl'];
     _gender = p['gender'];
+
+    _certificates.clear();
+    if (p['certificates'] != null && p['certificates'] is List) {
+      _certificates = (p['certificates'] as List)
+          .map((item) => Map<String, String>.from(item as Map))
+          .toList();
+    } else {
+      if (p['degreeUrl'] != null && p['degreeUrl'].toString().isNotEmpty) {
+        _certificates.add({'name': 'Degree / Qualification Certificate', 'url': p['degreeUrl'].toString()});
+      }
+      if (p['ieltsUrl'] != null && p['ieltsUrl'].toString().isNotEmpty) {
+        _certificates.add({'name': 'IELTS / Language Proficiency Certificate', 'url': p['ieltsUrl'].toString()});
+      }
+      if (p['scoreReportUrl'] != null && p['scoreReportUrl'].toString().isNotEmpty) {
+        final raw = p['scoreReportUrl'].toString();
+        if (raw.startsWith('[')) {
+          try {
+            final List parsed = jsonDecode(raw);
+            _certificates = parsed.map((item) => Map<String, String>.from(item as Map)).toList();
+          } catch (_) {
+            _certificates.add({'name': 'Score Report / Other Credential', 'url': raw});
+          }
+        } else {
+          _certificates.add({'name': 'Score Report / Other Credential', 'url': raw});
+        }
+      }
+    }
   }
 
   Future<void> _loadUserAccountInfo() async {
@@ -155,16 +173,48 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
   }
 
   Map<String, dynamic> _buildPayload() {
+    final degree = _certificates.isNotEmpty ? _certificates.first['url'] ?? '' : '';
+    final ielts = _certificates.length > 1 ? _certificates[1]['url'] ?? '' : '';
+    final score = _certificates.length > 2 ? jsonEncode(_certificates) : (_certificates.isNotEmpty ? _certificates.last['url'] ?? '' : '');
+
     return {
       'trainerType': widget.initialProfile['trainerType'] ?? 'PROFESSIONAL',
       'bio': _bioController.text.trim(),
       'phoneNumber': _phoneNumberController.text.trim(),
-      'degreeUrl': _degreeUrl ?? '',
-      'ieltsUrl': _ieltsUrl ?? '',
-      'scoreReportUrl': _scoreReportUrl ?? '',
+      'degreeUrl': degree,
+      'ieltsUrl': ielts,
+      'scoreReportUrl': score,
+      'certificates': _certificates,
       'gender': _gender ?? '',
       'avatarUrl': _avatarUrl ?? '',
     };
+  }
+
+  Future<String?> _uploadFileToCloudinary() async {
+    try {
+      final picked = await pickImage();
+      if (picked == null || picked.bytes == null) return null;
+
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'hango_preset'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          picked.bytes!,
+          filename: picked.name,
+        ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(responseBody);
+        return data['secure_url'] ?? data['url'];
+      }
+    } catch (e) {
+      debugPrint('Cloudinary upload error: $e');
+    }
+    return null;
   }
 
   Future<void> _pickAndUpload(String targetDoc) async {
@@ -173,9 +223,6 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
       if (picked == null) return;
 
       setState(() {
-        if (targetDoc == 'degree') _isUploadingDegree = true;
-        if (targetDoc == 'ielts') _isUploadingIelts = true;
-        if (targetDoc == 'score') _isUploadingScoreReport = true;
         if (targetDoc == 'avatar') _isUploadingAvatar = true;
       });
 
@@ -184,7 +231,7 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
         ..fields['upload_preset'] = 'hango_preset'
         ..files.add(http.MultipartFile.fromBytes(
           'file',
-          picked.bytes,
+          picked.bytes!,
           filename: picked.name,
         ));
 
@@ -196,18 +243,6 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
         final uploadedUrl = data['secure_url'] ?? data['url'];
 
         setState(() {
-          if (targetDoc == 'degree') {
-            _degreeUrl = uploadedUrl;
-            _isUploadingDegree = false;
-          }
-          if (targetDoc == 'ielts') {
-            _ieltsUrl = uploadedUrl;
-            _isUploadingIelts = false;
-          }
-          if (targetDoc == 'score') {
-            _scoreReportUrl = uploadedUrl;
-            _isUploadingScoreReport = false;
-          }
           if (targetDoc == 'avatar') {
             _avatarUrl = uploadedUrl;
             _isUploadingAvatar = false;
@@ -216,22 +251,292 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
         });
         _triggerAutoSave();
         if (mounted) {
-          ToastHelper.showSuccess(context, 'Tải lên thành công!');
+          ToastHelper.showSuccess(context, 'Tải lên avatar thành công!');
         }
-      } else {
-        throw Exception('Cloudinary returned status code ${response.statusCode}');
       }
     } catch (e) {
       setState(() {
-        _isUploadingDegree = false;
-        _isUploadingIelts = false;
-        _isUploadingScoreReport = false;
         _isUploadingAvatar = false;
       });
-      if (mounted) {
-        ToastHelper.showError(context, 'Tải ảnh lên thất bại: $e');
-      }
     }
+  }
+
+  void _showAddCertificateModal(bool isVi) {
+    final nameController = TextEditingController();
+    String? tempUrl;
+    bool isUploading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Container(
+                color: Colors.white,
+                constraints: const BoxConstraints(maxWidth: 550),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isVi ? 'Thêm chứng chỉ / Bằng cấp' : 'Add Degree & Certificate',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      isVi ? 'Tên chứng chỉ / Bằng cấp *' : 'Certificate / Degree Name *',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: nameController,
+                      onChanged: (_) => setModalState(() {}),
+                      decoration: InputDecoration(
+                        hintText: isVi ? 'Ví dụ: Bằng Cử nhân Sư phạm Anh, IELTS 8.0' : 'E.g.: Bachelor of English Pedagogy, IELTS 8.0',
+                        fillColor: Colors.white,
+                        filled: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      isVi ? 'Ảnh chứng chỉ / Bằng cấp *' : 'Certificate / Degree Image *',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: isUploading
+                          ? null
+                          : () async {
+                              setModalState(() => isUploading = true);
+                              final uploaded = await _uploadFileToCloudinary();
+                              setModalState(() {
+                                isUploading = false;
+                                if (uploaded != null) tempUrl = uploaded;
+                              });
+                            },
+                      child: Container(
+                        height: 220,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
+                        ),
+                        child: isUploading
+                            ? const Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)))
+                            : (tempUrl != null
+                                ? Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(tempUrl!, width: double.infinity, height: 220, fit: BoxFit.contain),
+                                      ),
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                          child: const Icon(Icons.check, color: Colors.white, size: 16),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.cloud_upload_outlined, color: Color(0xFF28B79B), size: 32),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        isVi ? 'Nhấp để chọn ảnh chứng chỉ' : 'Click to select certificate image',
+                                        style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                    ],
+                                  )),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(isVi ? 'Hủy' : 'Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: (tempUrl != null && nameController.text.trim().isNotEmpty)
+                              ? () {
+                                  setState(() {
+                                    _certificates.add({
+                                      'name': nameController.text.trim(),
+                                      'url': tempUrl!,
+                                    });
+                                  });
+                                  _triggerAutoSave();
+                                  Navigator.pop(context);
+                                  ToastHelper.showSuccess(context, isVi ? 'Đã thêm chứng chỉ!' : 'Certificate added!');
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF28B79B),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: Text(isVi ? 'Thêm chứng chỉ' : 'Add Certificate'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUnifiedUploadBox(bool isVi) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isVi ? 'Danh sách tài liệu đã tải lên' : 'Uploaded Documents',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155), fontSize: 13),
+              ),
+              Text(
+                '${_certificates.length} ${isVi ? 'tài liệu' : 'documents'}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_certificates.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  isVi ? 'Chưa có tài liệu nào được tải lên.' : 'No documents uploaded yet.',
+                  style: const TextStyle(color: Color(0xFF64748B), fontStyle: FontStyle.italic, fontSize: 12),
+                ),
+              ),
+            )
+          else
+            Column(
+              children: _certificates.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final item = entry.value;
+                final certName = item['name'] ?? (isVi ? 'Chứng chỉ ${idx + 1}' : 'Certificate ${idx + 1}');
+                final url = item['url'] ?? '';
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          url,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.insert_drive_file_outlined, color: Color(0xFF94A3B8)),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              certName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              url.split('/').last,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _certificates.removeAt(idx);
+                          });
+                          _triggerAutoSave();
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () => _showAddCertificateModal(isVi),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              height: 70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
+                color: Colors.white,
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF28B79B), size: 22),
+                    const SizedBox(width: 10),
+                    Text(
+                      isVi ? 'Thêm chứng chỉ, bằng cấp' : 'Add Degree & Certificate',
+                      style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _validateFields() {
@@ -279,9 +584,7 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
       return false;
     }
 
-    final hasProof = (_degreeUrl != null && _degreeUrl!.isNotEmpty) ||
-        (_ieltsUrl != null && _ieltsUrl!.isNotEmpty) ||
-        (_scoreReportUrl != null && _scoreReportUrl!.isNotEmpty);
+    final hasProof = _certificates.isNotEmpty;
 
     if (!hasProof) {
       ToastHelper.showError(
@@ -775,10 +1078,11 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
+            dropdownColor: Colors.white,
             value: _gender,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: Colors.white,
               filled: true,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -922,153 +1226,6 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildUnifiedUploadBox(bool isVi) {
-    final list = <Map<String, String>>[];
-    if (_degreeUrl != null && _degreeUrl!.isNotEmpty) {
-      list.add({'type': 'degree', 'url': _degreeUrl!, 'label': isVi ? 'Tài liệu minh chứng 1' : 'Credential 1'});
-    }
-    if (_ieltsUrl != null && _ieltsUrl!.isNotEmpty) {
-      list.add({'type': 'ielts', 'url': _ieltsUrl!, 'label': isVi ? 'Tài liệu minh chứng 2' : 'Credential 2'});
-    }
-    if (_scoreReportUrl != null && _scoreReportUrl!.isNotEmpty) {
-      list.add({'type': 'score', 'url': _scoreReportUrl!, 'label': isVi ? 'Tài liệu minh chứng 3' : 'Credential 3'});
-    }
-
-    final isFull = list.length >= 3;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            isVi ? 'Danh sách tài liệu đã tải lên' : 'Uploaded Documents',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155), fontSize: 13),
-          ),
-          const SizedBox(height: 12),
-          if (list.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  isVi ? 'Chưa có tài liệu nào được tải lên.' : 'No documents uploaded yet.',
-                  style: const TextStyle(color: Color(0xFF64748B), fontStyle: FontStyle.italic, fontSize: 12),
-                ),
-              ),
-            )
-          else
-            Column(
-              children: list.map((item) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.network(
-                          item['url']!,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.insert_drive_file_outlined, color: Color(0xFF94A3B8)),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['label']!,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item['url']!.split('/').last,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            if (item['type'] == 'degree') _degreeUrl = null;
-                            if (item['type'] == 'ielts') _ieltsUrl = null;
-                            if (item['type'] == 'score') _scoreReportUrl = null;
-                          });
-                          _triggerAutoSave();
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          if (!isFull) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: (_isUploadingDegree || _isUploadingIelts || _isUploadingScoreReport)
-                  ? null
-                  : () {
-                      if (_degreeUrl == null || _degreeUrl!.isEmpty) {
-                        _pickAndUpload('degree');
-                      } else if (_ieltsUrl == null || _ieltsUrl!.isEmpty) {
-                        _pickAndUpload('ielts');
-                      } else if (_scoreReportUrl == null || _scoreReportUrl!.isEmpty) {
-                        _pickAndUpload('score');
-                      }
-                    },
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                height: 80,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
-                ),
-                child: Center(
-                  child: (_isUploadingDegree || _isUploadingIelts || _isUploadingScoreReport)
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF28B79B)),
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.cloud_upload_outlined, color: Color(0xFF28B79B), size: 24),
-                            const SizedBox(width: 12),
-                            Text(
-                              isVi ? 'Nhấp để tải lên tài liệu minh chứng' : 'Click to upload credential',
-                              style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

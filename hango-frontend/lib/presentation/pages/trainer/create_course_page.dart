@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -18,7 +19,7 @@ class CreateCoursePage extends StatefulWidget {
 class _CreateCoursePageState extends State<CreateCoursePage> {
   final _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
-  
+
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
@@ -30,12 +31,15 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
 
   // Dynamic dropdown lists (populated from DB with default fallbacks)
   List<Map<String, dynamic>> _dbCategories = [
-    {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
+    {
+      'paramKey': 'READING_COMPREHENSION',
+      'paramValue': 'Reading Comprehension',
+    },
     {'paramKey': 'VOCABULARY', 'paramValue': 'Vocabulary'},
-    {'paramKey': 'LISTENING', 'paramValue': 'Listening'},
-    {'paramKey': 'READING_COMPREHENSION', 'paramValue': 'Reading Comprehension'},
-    {'paramKey': 'WRITING', 'paramValue': 'Writing'},
+    {'paramKey': 'GRAMMAR', 'paramValue': 'Grammar'},
+    {'paramKey': 'WRITING_STRUCTURE', 'paramValue': 'Writing & Structure'},
     {'paramKey': 'PRONUNCIATION', 'paramValue': 'Pronunciation'},
+    {'paramKey': 'TEST_PREPARATION', 'paramValue': 'Test Preparation'},
   ];
   List<Map<String, dynamic>> _dbLevels = [
     {'paramKey': 'BASIC', 'paramValue': 'Basic'},
@@ -44,19 +48,16 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   ];
   String _selectedCategoryKey = 'GRAMMAR';
   String _selectedLevelKey = 'BASIC';
-  final TextEditingController _versionController = TextEditingController(text: 'v1.0');
+  final TextEditingController _versionController = TextEditingController(
+    text: 'v1.0',
+  );
 
   // Image Upload state variables
   String? _uploadedImageUrl;
   bool _isUploadingImage = false;
   String _uploadStatusText = '';
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {
@@ -96,34 +97,56 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      final catUri = Uri.parse('$apiBaseUrl/trainer/system-parameters?type=course_category');
-      final catResponse = await http.get(catUri, headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      });
+      final catUri = Uri.parse(
+        '$apiBaseUrl/trainer/system-parameters?type=course_category',
+      );
+      final catResponse = await http.get(
+        catUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
 
-      final levelUri = Uri.parse('$apiBaseUrl/trainer/system-parameters?type=academic_level');
-      final levelResponse = await http.get(levelUri, headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      });
+      final levelUri = Uri.parse(
+        '$apiBaseUrl/trainer/system-parameters?type=academic_level',
+      );
+      final levelResponse = await http.get(
+        levelUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
 
       if (catResponse.statusCode == 200 && levelResponse.statusCode == 200) {
-        final List<dynamic> catData = jsonDecode(utf8.decode(catResponse.bodyBytes));
-        final List<dynamic> levelData = jsonDecode(utf8.decode(levelResponse.bodyBytes));
+        final List<dynamic> catData = jsonDecode(
+          utf8.decode(catResponse.bodyBytes),
+        );
+        final List<dynamic> levelData = jsonDecode(
+          utf8.decode(levelResponse.bodyBytes),
+        );
 
         setState(() {
-          _dbCategories = catData.map((e) => Map<String, dynamic>.from(e)).toList();
-          _dbLevels = levelData.map((e) => Map<String, dynamic>.from(e)).toList();
+          _dbCategories = catData
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          _dbLevels = levelData
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
 
-          if (_dbCategories.isNotEmpty) {
-            final hasSelectedCat = _dbCategories.any((e) => e['paramKey'] == _selectedCategoryKey);
-            if (!hasSelectedCat) {
-              _selectedCategoryKey = _dbCategories.first['paramKey'] ?? 'GRAMMAR';
+          if (!_dbCategories.any(
+            (e) => e['paramKey'] == _selectedCategoryKey,
+          )) {
+            if (_dbCategories.isNotEmpty) {
+              _selectedCategoryKey =
+                  _dbCategories.first['paramKey'] ?? 'GRAMMAR';
             }
           }
           if (_dbLevels.isNotEmpty) {
-            final hasSelectedLevel = _dbLevels.any((e) => e['paramKey'] == _selectedLevelKey);
+            final hasSelectedLevel = _dbLevels.any(
+              (e) => e['paramKey'] == _selectedLevelKey,
+            );
             if (!hasSelectedLevel) {
               _selectedLevelKey = _dbLevels.first['paramKey'] ?? 'BASIC';
             }
@@ -135,8 +158,6 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     }
   }
 
-
-
   Future<void> _pickAndUploadImage() async {
     try {
       final picked = await pickImage();
@@ -147,14 +168,18 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
         _uploadStatusText = 'Uploading...';
       });
 
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      );
       final request = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          picked.bytes,
-          filename: picked.name,
-        ));
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            picked.bytes,
+            filename: picked.name,
+          ),
+        );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
@@ -166,7 +191,9 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
           _isUploadingImage = false;
         });
       } else {
-        throw Exception('Cloudinary upload failed with status: ${response.statusCode}');
+        throw Exception(
+          'Cloudinary upload failed with status: ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -185,6 +212,11 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       return;
     }
 
+    if (_selectedCategoryKey.isEmpty) {
+      ToastHelper.showError(context, 'Vui lòng chọn thể loại cho khóa học');
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -200,6 +232,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'categoryKey': _selectedCategoryKey,
+        'categoryKeys': [_selectedCategoryKey],
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
       });
@@ -215,7 +248,10 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
-          ToastHelper.showSuccess(context, 'Course created successfully as DRAFT!');
+          ToastHelper.showSuccess(
+            context,
+            'Course created successfully as DRAFT!',
+          );
           Navigator.pop(context, true); // Return true to refresh list
         }
       } else {
@@ -282,8 +318,6 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       ),
     );
   }
-
-
 
   Widget _buildHeader(BuildContext context, bool showMenuButton) {
     return Container(
@@ -424,7 +458,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                   color: Color(0xFF20B486),
                   shape: BoxShape.circle,
                 ),
-              )
+              ),
             ],
           ),
         ],
@@ -494,8 +528,15 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             controller: _titleController,
             decoration: InputDecoration(
               hintText: 'Enter title of course....',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -518,111 +559,118 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             },
           ),
           const SizedBox(height: 20),
-          // Category & Academic Level side-by-side
-          Row(
+          // Categories
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Category',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4B5563),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategoryKey,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF20B486)),
-                        ),
-                      ),
-                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
-                      items: _dbCategories.map((dynamic item) {
-                        return DropdownMenuItem<String>(
-                          value: item['paramKey'] as String,
-                          child: Text(item['paramValue'] as String),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedCategoryKey = newValue;
-                          });
-                        }
-                      },
-                    ),
-                  ],
+              const Text(
+                'Category *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4B5563),
+                  fontFamily: 'Outfit',
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Academic Level',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4B5563),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedLevelKey,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF20B486)),
-                        ),
-                      ),
-                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
-                      items: _dbLevels.map((dynamic item) {
-                        return DropdownMenuItem<String>(
-                          value: item['paramKey'] as String,
-                          child: Text(item['paramValue'] as String),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedLevelKey = newValue;
-                          });
-                        }
-                      },
-                    ),
-                  ],
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedCategoryKey,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF20B486)),
+                  ),
                 ),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
+                items: _dbCategories.map((dynamic item) {
+                  return DropdownMenuItem<String>(
+                    value: item['paramKey'] as String,
+                    child: Text(item['paramValue'] as String),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedCategoryKey = newValue;
+                    });
+                  }
+                },
               ),
             ],
           ),
-           const SizedBox(height: 20),
+          const SizedBox(height: 20),
+          // Academic Level
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Academic Level',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4B5563),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedLevelKey,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF20B486)),
+                  ),
+                ),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                ),
+                items: _dbLevels.map((dynamic item) {
+                  return DropdownMenuItem<String>(
+                    value: item['paramKey'] as String,
+                    child: Text(item['paramValue'] as String),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedLevelKey = newValue;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           // Version
           const Text(
             'Version',
@@ -638,17 +686,36 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             controller: _versionController,
             decoration: InputDecoration(
               hintText: 'Enter version...',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               suffixIcon: PopupMenuButton<String>(
-                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                icon: const Icon(
+                  Icons.arrow_drop_down,
+                  color: Color(0xFF64748B),
+                ),
                 onSelected: (value) {
                   _versionController.text = value;
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'v1.0', child: Text('v1.0', style: TextStyle(fontFamily: 'Outfit'))),
-                  const PopupMenuItem(value: 'v2.0', child: Text('v2.0', style: TextStyle(fontFamily: 'Outfit'))),
-                  const PopupMenuItem(value: 'v3.0', child: Text('v3.0', style: TextStyle(fontFamily: 'Outfit'))),
+                  const PopupMenuItem(
+                    value: 'v1.0',
+                    child: Text('v1.0', style: TextStyle(fontFamily: 'Outfit')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'v2.0',
+                    child: Text('v2.0', style: TextStyle(fontFamily: 'Outfit')),
+                  ),
+                  const PopupMenuItem(
+                    value: 'v3.0',
+                    child: Text('v3.0', style: TextStyle(fontFamily: 'Outfit')),
+                  ),
                 ],
               ),
               border: OutlineInputBorder(
@@ -664,7 +731,11 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                 borderSide: const BorderSide(color: Color(0xFF20B486)),
               ),
             ),
-            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+            ),
           ),
           const SizedBox(height: 20),
           // Course Description
@@ -683,8 +754,15 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             maxLines: 6,
             decoration: InputDecoration(
               hintText: 'Enter course description......',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -732,7 +810,11 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
           // Section Header
           Row(
             children: const [
-              Icon(Icons.photo_library_outlined, color: Color(0xFF20B486), size: 20),
+              Icon(
+                Icons.photo_library_outlined,
+                color: Color(0xFF20B486),
+                size: 20,
+              ),
               SizedBox(width: 8),
               Text(
                 'Course Media',
@@ -780,7 +862,9 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF20B486),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -795,47 +879,47 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
                         ],
                       )
                     : _uploadedImageUrl != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              _uploadedImageUrl!,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.cloud_upload_outlined,
-                                color: Color(0xFF64748B),
-                                size: 40,
-                              ),
-                              SizedBox(height: 12),
-                              Text(
-                                'Click to upload or drag & drop',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF475569),
-                                  fontFamily: 'Outfit',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Recommended: 1280x720\n(PNG/JPG)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF94A3B8),
-                                  fontFamily: 'Outfit',
-                                  height: 1.4,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          _uploadedImageUrl!,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.cloud_upload_outlined,
+                            color: Color(0xFF64748B),
+                            size: 40,
                           ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Click to upload or drag & drop',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                              fontFamily: 'Outfit',
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Recommended: 1280x720\n(PNG/JPG)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                              fontFamily: 'Outfit',
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
               ),
             ),
           ),
@@ -910,28 +994,44 @@ class DashedBorderPainter extends CustomPainter {
     // Top border
     double x = 0;
     while (x < w) {
-      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth > w ? w : x + dashWidth, 0), paint);
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + dashWidth > w ? w : x + dashWidth, 0),
+        paint,
+      );
       x += dashWidth + dashSpace;
     }
 
     // Bottom border
     x = 0;
     while (x < w) {
-      canvas.drawLine(Offset(x, h), Offset(x + dashWidth > w ? w : x + dashWidth, h), paint);
+      canvas.drawLine(
+        Offset(x, h),
+        Offset(x + dashWidth > w ? w : x + dashWidth, h),
+        paint,
+      );
       x += dashWidth + dashSpace;
     }
 
     // Left border
     double y = 0;
     while (y < h) {
-      canvas.drawLine(Offset(0, y), Offset(0, y + dashWidth > h ? h : y + dashWidth), paint);
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(0, y + dashWidth > h ? h : y + dashWidth),
+        paint,
+      );
       y += dashWidth + dashSpace;
     }
 
     // Right border
     y = 0;
     while (y < h) {
-      canvas.drawLine(Offset(w, y), Offset(w, y + dashWidth > h ? h : y + dashWidth), paint);
+      canvas.drawLine(
+        Offset(w, y),
+        Offset(w, y + dashWidth > h ? h : y + dashWidth),
+        paint,
+      );
       y += dashWidth + dashSpace;
     }
   }

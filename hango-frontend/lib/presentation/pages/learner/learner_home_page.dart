@@ -12,10 +12,13 @@ import '../exam/list_exams_page.dart';
 import '../exam/exam_detail_history_page.dart';
 import '../course/list_courses_page.dart';
 import '../course/course_detail_page.dart';
+import '../course/lesson_detail_page.dart';
 import '../../widgets/shared_header.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_footer.dart';
 import 'learning_pathway_page.dart';
+import '../exam/entry_exam_instruction_page.dart';
+import 'my_information_page.dart';
 import '../exam/take_exam_page.dart';
 import '../trainer/trainer_dashboard_page.dart';
 import '../trainer/onboarding/trainer_type_selection_page.dart';
@@ -35,6 +38,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   final _courseRepository = CourseRepository();
   final _examRepository = ExamRepository();
 
+  bool _isLoggedIn = false;
   String _userFullName = 'Learner';
   String _userEmail = '';
   String _userInitials = 'L';
@@ -54,6 +58,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   void _startBannerTimer() {
     _bannerTimer?.cancel();
+    if (_isLoggedIn) return;
     _bannerTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
       if (mounted) {
         setState(() {
@@ -81,6 +86,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   // Fetch logged in user info from SharedPreferences
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
     final fullName = prefs.getString('user_fullname') ?? 'Learner';
     final email = prefs.getString('user_email') ?? '';
     final userId = prefs.getInt('user_id') ?? 0;
@@ -94,10 +100,20 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     }
 
     setState(() {
+      _isLoggedIn = token != null;
       _userFullName = fullName;
       _userEmail = email;
       _userInitials = initials;
     });
+
+    if (_isLoggedIn) {
+      _bannerTimer?.cancel();
+      setState(() {
+        _currentBannerIndex = 0;
+      });
+    } else {
+      _startBannerTimer();
+    }
 
     if (userId != 0) {
       final showOnboardingKey = 'show_onboarding_for_$userId';
@@ -105,6 +121,11 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       if (showOnboarding) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showOnboardingPopup(userId, showOnboardingKey);
+        });
+      } else {
+        // If no onboarding, check for entry exam suggestion
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkEntryExamStatus();
         });
       }
     }
@@ -118,7 +139,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       await prefs.setBool('redirect_to_trainer_onboarding', true);
       await prefs.setString('preselected_register_role', 'TRAINER');
       if (mounted) {
-        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng ký tài khoản giảng viên để bắt đầu' : 'Please register a trainer account to start');
+        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng ký tài khoản giáo viên để bắt đầu' : 'Please register a trainer account to start');
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const RegisterPage()),
@@ -194,6 +215,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       }
     }
   }
+
+
 
   void _showOnboardingPopup(int userId, String showOnboardingKey) {
     showDialog(
@@ -444,6 +467,147 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     );
   }
 
+  Future<void> _checkEntryExamStatus() async {
+    if (!_isLoggedIn) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('dismissed_entry_exam') == true) return;
+
+      final attempts = await _examRepository.fetchMyExamAttempts();
+      final hasCompleted = attempts.any((a) => a['examId'] == 60 || a['examId'] == '60');
+      
+      if (!hasCompleted) {
+        _showEntryExamSuggestion();
+      }
+    } catch (e) {
+      debugPrint("Error checking entry exam: $e");
+    }
+  }
+
+  void _showEntryExamSuggestion() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 12,
+          backgroundColor: Colors.white,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEFF6FF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.assignment_outlined,
+                    color: Colors.blueAccent,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Entry Exam!',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Take the entry exam so the system can generate a personalized learning pathway specifically for you.',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('dismissed_entry_exam', true);
+                          if (!mounted) return;
+                          Navigator.pop(ctx);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Later'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _navigateToEntryExam();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Take now'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _navigateToEntryExam() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (loadingCtx) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+        ),
+      ),
+    );
+    try {
+      final exams = await _examRepository.fetchExams();
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+      
+      final entryExam = exams.firstWhere(
+        (e) => e.id == '60',
+        orElse: () => exams.isNotEmpty ? exams.first : Exam(
+          id: '60',
+          title: 'Entry Exam',
+          description: 'Entry exam to assess your proficiency level.',
+          creatorName: 'System',
+          questionCount: 40,
+          durationMinutes: 50,
+          rating: 5.0,
+          learnerCountFormatted: '1k Learner',
+        ),
+      );
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => EntryExamInstructionPage(exam: entryExam)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ToastHelper.showError(context, 'Lỗi kết nối máy chủ');
+    }
+  }
+
   // Load courses depending on selected tab
   Future<void> _fetchCourses() async {
     setState(() {
@@ -551,9 +715,11 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         _buildExamsSection(isDesktop),
                         const SizedBox(height: 60),
 
-                        // 4. Trở thành giảng viên Section
-                        _buildTeacherSection(isDesktop),
-                        const SizedBox(height: 60),
+                        // 4. Trở thành giáo viên Section
+                        if (!_isLoggedIn) ...[
+                          _buildTeacherSection(isDesktop),
+                          const SizedBox(height: 60),
+                        ],
 
                         // 5. Testimonial Section
                         _buildTestimonialSection(isDesktop),
@@ -639,6 +805,19 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               );
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.history_rounded),
+            title: const Text('Purchase History'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MyInformationPage(initialTab: 2),
+                ),
+              );
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
@@ -658,6 +837,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   Widget _buildHeroBanner(bool isDesktop) {
     final isVi = LanguageManager.isVi;
+
+    if (_isLoggedIn) {
+      return _buildStudentHeroBanner(isDesktop, isVi);
+    }
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 800),
@@ -770,7 +953,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     constraints: const BoxConstraints(maxWidth: 650),
                     child: Text(
                       isVi
-                          ? 'Khóa học từ giáo viên hàng đầu và kho đề thi THPTQG miễn phí — tất cả trong một nền tảng hiện đại, dễ dùng. Bạn cũng có thể trở thành giảng viên và tạo khóa học của riêng mình.'
+                          ? 'Khóa học từ giáo viên hàng đầu và kho đề thi THPTQG miễn phí — tất cả trong một nền tảng hiện đại, dễ dùng. Bạn cũng có thể trở thành giáo viên và tạo khóa học của riêng mình.'
                           : 'Courses from top teachers and free exam prep — all in a modern, easy-to-use platform. You can also become a teacher and create your own courses.',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
@@ -969,7 +1152,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
                   // Main Title
                   Text(
-                    isVi ? 'Trở thành giảng viên,\nchia sẻ tri thức.' : 'Become a teacher,\nshare your knowledge.',
+                    isVi ? 'Trở thành giáo viên,\nchia sẻ tri thức.' : 'Become a teacher,\nshare your knowledge.',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: isDesktop ? 42 : 28,
@@ -1094,7 +1277,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               const Icon(Icons.school_rounded, color: Color(0xFF28B79B), size: 28),
               const SizedBox(width: 12),
               Text(
-                isVi ? 'Trở thành giảng viên' : 'Become a Trainer',
+                isVi ? 'Trở thành giáo viên' : 'Become a Trainer',
                 style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
@@ -1231,12 +1414,14 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   }
 
   String _getCoursePrice(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   int _getCourseLessonsCount(Course course) {
@@ -1336,24 +1521,26 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         _fetchCourses();
                       },
                     ),
-                    const SizedBox(width: 24),
-                    _buildTabSelector(
-                      isVi ? 'Đang học' : 'In progress',
-                      active: _activeCourseTab == 'in_progress',
-                      onTap: () {
-                        setState(() => _activeCourseTab = 'in_progress');
-                        _fetchCourses();
-                      },
-                    ),
-                    const SizedBox(width: 24),
-                    _buildTabSelector(
-                      isVi ? 'Đã hoàn thành' : 'Completed',
-                      active: _activeCourseTab == 'completed',
-                      onTap: () {
-                        setState(() => _activeCourseTab = 'completed');
-                        _fetchCourses();
-                      },
-                    ),
+                    if (_isLoggedIn) ...[
+                      const SizedBox(width: 24),
+                      _buildTabSelector(
+                        isVi ? 'Đang học' : 'In progress',
+                        active: _activeCourseTab == 'in_progress',
+                        onTap: () {
+                          setState(() => _activeCourseTab = 'in_progress');
+                          _fetchCourses();
+                        },
+                      ),
+                      const SizedBox(width: 24),
+                      _buildTabSelector(
+                        isVi ? 'Đã hoàn thành' : 'Completed',
+                        active: _activeCourseTab == 'completed',
+                        onTap: () {
+                          setState(() => _activeCourseTab = 'completed');
+                          _fetchCourses();
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1411,30 +1598,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
               )
-            : isDesktop
-            ? GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: isDesktop ? 0.85 : 0.85,
-                ),
-                itemCount: _courses.length,
-                itemBuilder: (context, index) {
-                  return _buildCourseCard(_courses[index]);
-                },
-              )
             : SizedBox(
-                height: 360,
+                height: isDesktop ? 390 : 360,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   itemCount: _courses.length,
                   itemBuilder: (context, index) {
                     return Container(
-                      width: 280,
-                      margin: const EdgeInsets.only(right: 16),
+                      width: isDesktop ? 300 : 280,
+                      margin: const EdgeInsets.only(right: 16, bottom: 12, top: 4),
                       child: _buildCourseCard(_courses[index]),
                     );
                   },
@@ -1461,10 +1634,19 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   String _getOriginalPrice(String currentPrice) {
     if (currentPrice == 'Miễn phí') return '';
-    if (currentPrice.contains('699')) return '999.000đ';
-    if (currentPrice.contains('899')) return '1.290.000đ';
-    if (currentPrice.contains('1.290')) return '1.800.000đ';
-    return '2.100.000đ';
+    try {
+      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
+      if (clean.isEmpty) return '';
+      final val = double.parse(clean);
+      final original = val * 1.3;
+      final formatted = original.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
+      return '$formattedđ';
+    } catch (_) {
+      return '';
+    }
   }
 
   Widget _buildCourseCardHeaderPlaceholder(Map<String, dynamic> theme) {
@@ -1845,15 +2027,17 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       _fetchExams();
                     },
                   ),
-                  const SizedBox(width: 24),
-                  _buildTabSelector(
-                    isVi ? 'Đã hoàn thành' : 'Completed',
-                    active: _activeExamTab == 'completed',
-                    onTap: () {
-                      setState(() => _activeExamTab = 'completed');
-                      _fetchExams();
-                    },
-                  ),
+                  if (_isLoggedIn) ...[
+                    const SizedBox(width: 24),
+                    _buildTabSelector(
+                      isVi ? 'Đã hoàn thành' : 'Completed',
+                      active: _activeExamTab == 'completed',
+                      onTap: () {
+                        setState(() => _activeExamTab = 'completed');
+                        _fetchExams();
+                      },
+                    ),
+                  ],
                 ],
               ),
               if (!isDesktop)
@@ -1909,30 +2093,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
               )
-            : isDesktop
-            ? GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: isDesktop ? 1.45 : 0.85,
-                ),
-                itemCount: _exams.length,
-                itemBuilder: (context, index) {
-                  return _buildExamCard(_exams[index]);
-                },
-              )
             : SizedBox(
-                height: 180,
+                height: isDesktop ? 210 : 180,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
                   itemCount: _exams.length,
                   itemBuilder: (context, index) {
                     return Container(
-                      width: 260,
-                      margin: const EdgeInsets.only(right: 16),
+                      width: isDesktop ? 300 : 260,
+                      margin: const EdgeInsets.only(right: 16, bottom: 10, top: 4),
                       child: _buildExamCard(_exams[index]),
                     );
                   },
@@ -2120,7 +2290,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         ),
         const SizedBox(height: 12),
         Text(
-          isVi ? 'Trở thành giảng viên trên HanGo' : 'Become an instructor on HanGo',
+          isVi ? 'Trở thành giáo viên trên HanGo' : 'Become an instructor on HanGo',
           style: const TextStyle(
             color: Colors.white,
             fontSize: 28,

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -37,7 +38,7 @@ public class TrainerDashboardController {
     private final CourseImportService courseImportService;
 
     @PostMapping("/courses/upload")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> uploadCourseThumbnail(@RequestPart("file") MultipartFile file) {
         try {
             String url = cloudinaryService.uploadImage(file);
@@ -49,7 +50,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/courses/import/template")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<byte[]> downloadCourseImportTemplate() {
         try {
             byte[] workbook = courseImportService.buildTemplateWorkbook();
@@ -64,7 +65,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/courses/import")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> importCoursesFromExcel(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestPart("file") MultipartFile file) {
@@ -81,7 +82,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/system-parameters")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> getSystemParameters(@RequestParam("type") String type) {
         try {
             return ResponseEntity.ok(trainerDashboardService.getSystemParametersByType(type));
@@ -92,7 +93,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/courses")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> createCourse(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody TrainerCreateCourseRequestDTO request) {
@@ -108,8 +109,25 @@ public class TrainerDashboardController {
         }
     }
 
+    @DeleteMapping("/courses/{id}")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> deleteTrainerCourse(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.deleteTrainerCourse(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course deleted successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @PutMapping("/courses/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> updateCourse(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -118,8 +136,11 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            trainerDashboardService.updateTrainerCourse(id, userDetails.getUsername(), request);
-            return ResponseEntity.ok("{\"message\": \"Course updated successfully\"}");
+            Long updatedCourseId = trainerDashboardService.updateTrainerCourse(id, userDetails.getUsername(), request);
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("message", "Course updated successfully");
+            response.put("courseId", updatedCourseId);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -127,7 +148,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/courses/{id}/publish")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> publishCourse(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -143,8 +164,59 @@ public class TrainerDashboardController {
         }
     }
 
+    @PostMapping("/courses/{id}/submit")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> submitCourseForReview(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.submitTrainerCourse(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course submitted for review\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/courses/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> approveCourse(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.approveTrainerCourse(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course approved and published successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/courses/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> rejectCourse(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.rejectTrainerCourseDraft(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course draft rejected\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> getTrainerDashboard(@AuthenticationPrincipal UserDetails userDetails) {
         try {
             if (userDetails == null) {
@@ -159,7 +231,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/courses")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> getTrainerCourses(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "ALL") String status,
@@ -180,7 +252,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/exams")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> getTrainerExams(@AuthenticationPrincipal UserDetails userDetails) {
         try {
             if (userDetails == null) {
@@ -195,7 +267,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/exams")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> createTrainerExam(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody com.hango.hango_backend.dto.TrainerCreateExamRequestDTO request) {
@@ -212,7 +284,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/exams/{id}/questions")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> saveExamQuestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -230,7 +302,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/exams/{id}/questions")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> getExamQuestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -247,7 +319,7 @@ public class TrainerDashboardController {
     }
 
     @org.springframework.web.bind.annotation.PatchMapping("/exams/{id}/status")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> updateExamStatus(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -268,8 +340,30 @@ public class TrainerDashboardController {
         }
     }
 
+    @org.springframework.web.bind.annotation.PatchMapping("/exams/{id}/visibility")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    public ResponseEntity<?> updateExamVisibility(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody java.util.Map<String, String> body) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            String newVisibility = body.get("visibility");
+            if (newVisibility == null || newVisibility.isBlank()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"Visibility is required\"}");
+            }
+            trainerDashboardService.updateExamVisibility(id, userDetails.getUsername(), newVisibility.toUpperCase());
+            return ResponseEntity.ok("{\"message\": \"Exam visibility updated to " + newVisibility.toUpperCase() + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @org.springframework.web.bind.annotation.DeleteMapping("/exams/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
     public ResponseEntity<?> deleteTrainerExam(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {

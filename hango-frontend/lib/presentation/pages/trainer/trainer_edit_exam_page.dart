@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
@@ -10,6 +13,7 @@ import 'trainer_dashboard_page.dart';
 import 'trainer_exams_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../../../services/hango_api.dart';
+import '../../../data/services/course_manager_api.dart';
 
 class OptionState {
   TextEditingController textController = TextEditingController();
@@ -49,11 +53,15 @@ class TrainerEditExamPage extends StatefulWidget {
   final int examId;
   final String examTitle;
   final int examExpectedCount;
+  final bool isReadOnly;
+  final String? courseManagerActionStatus;
   const TrainerEditExamPage({
     Key? key,
     required this.examId,
     required this.examTitle,
     this.examExpectedCount = 10,
+    this.isReadOnly = false,
+    this.courseManagerActionStatus,
   }) : super(key: key);
 
   @override
@@ -90,6 +98,132 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       setState(() {
         _isLoadingMetadata = false;
       });
+    }
+  }
+
+  Future<void> _updateExamStatus(String newStatus) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      
+      final String apiBaseUrl = EnvConfig.v1BaseUrl;
+          
+      final response = await http.patch(
+        Uri.parse('$apiBaseUrl/trainer/exams/${widget.examId}/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'status': newStatus}),
+      );
+      
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ToastHelper.show(context, 'Thành công!');
+          Navigator.pop(context);
+        }
+      } else {
+        if (mounted) {
+          ToastHelper.show(context, 'Lỗi cập nhật', isError: true);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error: $e');
+    }
+  }
+
+  void _showActionDialog(String actionName, String newStatus, Color confirmColor) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('$actionName Exam', style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+          content: Text('Are you sure you want to $actionName this exam?', style: const TextStyle(fontFamily: 'Outfit')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateExamStatus(newStatus);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
+              child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showRejectDialog() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Reject Exam', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Please provide a reason for rejecting this exam:', style: TextStyle(fontFamily: 'Outfit')),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter reason...',
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (reasonController.text.trim().isEmpty) {
+                  ToastHelper.show(context, 'Reason is required', isError: true);
+                  return;
+                }
+                Navigator.pop(context);
+                try {
+                  await CourseManagerApi().rejectExam(widget.examId, reason: reasonController.text.trim());
+                  if (mounted) {
+                    ToastHelper.show(context, 'Exam rejected successfully!');
+                    Navigator.pop(context); // Go back to list
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ToastHelper.show(context, 'Error rejecting exam: $e', isError: true);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              child: const Text('Reject', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _publishExamAsManager() async {
+    try {
+      await CourseManagerApi().publishExam(widget.examId);
+      if (mounted) {
+        ToastHelper.show(context, 'Exam approved and published successfully!');
+        Navigator.pop(context); // Go back to list
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.show(context, 'Error approving exam: $e', isError: true);
+      }
     }
   }
 
@@ -155,9 +289,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
 
   Future<HangoApi> _getApi() async {
     final token = await _authService.getToken();
-    final String apiBaseUrl = kIsWeb
-        ? 'http://localhost:8080'
-        : 'http://10.0.2.2:8080';
+    final String apiBaseUrl = EnvConfig.apiBaseUrl;
     return HangoApi(baseUrl: apiBaseUrl, token: token);
   }
 
@@ -166,7 +298,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       final api = await _getApi();
       final skills = await api.getSystemParameters('SKILL_TYPE');
       final difficulties = await api.getSystemParameters('DIFFICULTY');
-      final groupTypes = await api.getQuestionCategories();
+      final groupTypes = await api.getSystemParameters('GROUP_TYPE');
 
       setState(() {
         _skills = skills;
@@ -457,7 +589,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
     setState(() => _isSubmitting = true);
     try {
       final api = await _getApi();
-      await api.updateExamStatus(widget.examId, 'SUBMITTED');
+      await api.updateExamStatus(widget.examId, 'PENDING_APPROVAL');
       if (mounted) {
         ToastHelper.show(context, 'Exam submitted for review successfully!');
         Navigator.pop(context);
@@ -600,111 +732,101 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  children: [
-                    for (var i = 0; i < _blocks.length; i++)
-                      _buildQuestionBlock(i),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          setState(() {
-                            final newBlock = QuestionBlockState();
-                            _blocks.add(newBlock);
-                            _addBlockListeners(newBlock);
-                          });
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          foregroundColor: const Color(0xFF64748B),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Add More Question',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF64748B),
-                            side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            backgroundColor: Colors.white,
-                          ),
-                          child: const Text(
-                            'Back',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        // Hiện nút Submit for Review khi đã nhập đủ số câu
-                        if (_completedQuestions >= widget.examExpectedCount &&
-                            widget.examExpectedCount > 0) ...[
-                          ElevatedButton.icon(
-                            onPressed: _isSubmitting
-                                ? null
-                                : _handleSubmitForReview,
-                            icon: _isSubmitting
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.send_rounded,
-                                    size: 18,
-                                    color: Colors.white,
-                                  ),
-                            label: const Text(
-                              'Submit for Review',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 16,
-                              ),
+                IgnorePointer(
+                  ignoring: widget.isReadOnly,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _blocks.length; i++)
+                        _buildQuestionBlock(i),
+                      const SizedBox(height: 16),
+                      if (!widget.isReadOnly)
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                final newBlock = QuestionBlockState();
+                                _blocks.add(newBlock);
+                                _addBlockListeners(newBlock);
+                              });
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              foregroundColor: const Color(0xFF64748B),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Add More Question',
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                        ],
-                        ElevatedButton(
-                          onPressed: _isSaving ? null : _handleSave,
+                        ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        backgroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        'Back',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    if (!widget.isReadOnly) ...[
+                      if (_completedQuestions >= widget.examExpectedCount &&
+                          widget.examExpectedCount > 0) ...[
+                        ElevatedButton.icon(
+                          onPressed: _isSubmitting
+                              ? null
+                              : _handleSubmitForReview,
+                          icon: _isSubmitting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.send_rounded,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                          label: const Text(
+                            'Submit for Review',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF38C9A6),
+                            backgroundColor: const Color(0xFF6366F1),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
+                              horizontal: 20,
                               vertical: 16,
                             ),
                             shape: RoundedRectangleBorder(
@@ -712,26 +834,93 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                             ),
                             elevation: 0,
                           ),
-                          child: _isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Save Draft',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'Outfit',
-                                  ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      ElevatedButton(
+                        onPressed: _isSaving ? null : _handleSave,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF38C9A6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
                                 ),
+                              )
+                            : const Text(
+                                'Save Draft',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
+                      ),
+                    ] else if (widget.courseManagerActionStatus != null) ...[
+                      if (widget.courseManagerActionStatus == 'PENDING_APPROVAL' || widget.courseManagerActionStatus == 'PENDING' || widget.courseManagerActionStatus == 'SUBMITTED') ...[
+                        ElevatedButton.icon(
+                          onPressed: _showRejectDialog,
+                          icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                          label: const Text('Reject', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _publishExamAsManager,
+                          icon: const Icon(Icons.check, color: Colors.white, size: 18),
+                          label: const Text('Approve', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF38C9A6),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
                         ),
                       ],
-                    ),
+                      if (widget.courseManagerActionStatus == 'PUBLISHED') ...[
+                        ElevatedButton.icon(
+                          onPressed: () => _showActionDialog('Hide', 'HIDDEN', Colors.orange),
+                          icon: const Icon(Icons.visibility_off, color: Colors.white, size: 18),
+                          label: const Text('Hide Exam', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ],
+                      if (widget.courseManagerActionStatus == 'HIDDEN') ...[
+                        ElevatedButton.icon(
+                          onPressed: () => _showActionDialog('Publish', 'PUBLISHED', const Color(0xFF38C9A6)),
+                          icon: const Icon(Icons.visibility, color: Colors.white, size: 18),
+                          label: const Text('Publish Exam', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF38C9A6),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ],
+                    ],
                   ],
                 ),
               ],
@@ -933,7 +1122,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                         items: _groupTypes,
                         onChanged: (val) =>
                             setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),
@@ -1009,7 +1198,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                         items: _groupTypes,
                         onChanged: (val) =>
                             setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'name',
+                        displayKey: 'paramValue',
                       ),
                     ],
                   ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/lesson_repository.dart';
@@ -13,17 +16,20 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/string_utils.dart';
 import '../../widgets/lesson_ai_chatbox.dart';
 import 'package:provider/provider.dart';
+import 'course_detail_page.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
   final int lessonId;
   final bool startQuizImmediately;
+  final bool cameFromCourseDetail;
 
   const LessonDetailPage({
     Key? key,
     required this.courseId,
     required this.lessonId,
     this.startQuizImmediately = false,
+    this.cameFromCourseDetail = false,
   }) : super(key: key);
 
   @override
@@ -36,11 +42,18 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   CourseDetail? _courseDetail;
   LessonDetail? _lessonDetail;
+  String? _itemType;
+  YoutubePlayerController? _youtubeController;
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
   String? _errorMessage;
   bool _isLoading = true;
   bool _isNavigatingLesson = false;
   bool _isMarkingCompleted = false;
   late int _currentLessonId;
+  
+  bool _isPlayingYoutube = false;
+  String? _youtubeVideoId;
 
   int _currentUserId = 1; // Default
   String _currentUserAvatar = '';
@@ -107,15 +120,32 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         parsedAnswers.add(answersMap);
       }
 
+      String? foundItemType;
+      for (final s in course.sessions) {
+        for (final l in s.lessons) {
+          if (l.id == _currentLessonId) {
+            foundItemType = l.itemType;
+            break;
+          }
+        }
+        if (foundItemType != null) break;
+      }
+
       setState(() {
         _courseDetail = course;
         _lessonDetail = lesson;
+        _itemType = foundItemType;
         _mockAttempts = parsedAttempts;
         _attemptsAnswers = parsedAnswers;
         _isLoading = false;
       });
+
+      if (_itemType == 'video') {
+        _initializePlayer(lesson.content);
+      }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_lesson_id_for_${widget.courseId}', _currentLessonId);
+      _saveLastVisitedSession(_currentLessonId, _isDoingQuiz);
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -126,6 +156,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   Future<void> _navigateToLesson(int lessonId, {bool startQuiz = false}) async {
     if (lessonId == _currentLessonId) return;
+    _disposePlayers();
     setState(() {
       _isNavigatingLesson = true;
       _isDoingQuiz = startQuiz;
@@ -176,6 +207,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_lesson_id_for_${widget.courseId}', lessonId);
+      _saveLastVisitedSession(lessonId, startQuiz);
       if (startQuiz) {
         toggleFullscreen(true);
       } else {
@@ -208,11 +240,26 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     _loadCurrentUserId();
     _loadData();
+    _saveLastVisitedSession(widget.lessonId, widget.startQuizImmediately);
     if (widget.startQuizImmediately) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         toggleFullscreen(true);
       });
     }
+  }
+
+  Future<void> _saveLastVisitedSession(int lessonId, bool isDoingQuiz) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_visited_course_id', widget.courseId);
+    await prefs.setInt('last_visited_lesson_id', lessonId);
+    await prefs.setBool('last_visited_quiz_immediately', isDoingQuiz);
+  }
+
+  void _clearLastVisitedSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('last_visited_course_id');
+    await prefs.remove('last_visited_lesson_id');
+    await prefs.remove('last_visited_quiz_immediately');
   }
 
   Future<void> _loadCurrentUserId() async {
@@ -233,10 +280,75 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
   }
 
+  void _disposePlayers() {
+    _youtubeController?.close();
+    _chewieController?.dispose();
+    _videoPlayerController?.dispose();
+    _youtubeController = null;
+    _chewieController = null;
+    _videoPlayerController = null;
+    _isPlayingYoutube = false;
+    _youtubeVideoId = null;
+  }
+
+  String? _extractYouTubeVideoId(String url) {
+    final patterns = [
+      RegExp(r'(?:youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtu\.be\/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})'),
+    ];
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(url);
+      if (match != null) return match.group(1);
+    }
+    return null;
+  }
+
+  void _initializePlayer(String url) {
+    _disposePlayers();
+
+    final youtubeId = _extractYouTubeVideoId(url);
+    if (youtubeId != null) {
+      setState(() {
+        _youtubeVideoId = youtubeId;
+        _isPlayingYoutube = false;
+      });
+    } else if (url.isNotEmpty) {
+      final trimmedUrl = url.trim();
+      final isHtml = trimmedUrl.startsWith('<') || trimmedUrl.contains('iframe');
+      final isHttp = trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://');
+      
+      if (!isHtml && isHttp) {
+        try {
+          _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(trimmedUrl));
+          _videoPlayerController!.initialize().then((_) {
+            setState(() {
+              _chewieController = ChewieController(
+                videoPlayerController: _videoPlayerController!,
+                autoPlay: false,
+                looping: false,
+                aspectRatio: _videoPlayerController!.value.aspectRatio,
+              );
+            });
+          }).catchError((error) {
+            debugPrint('Video Player initialization error: $error');
+          });
+        } catch (e) {
+          debugPrint('Invalid video URL: $e');
+        }
+      } else {
+        debugPrint('Unsupported video format or iframe snippet: $trimmedUrl');
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _disposePlayers();
     _commentController.dispose();
     _editCommentController.dispose();
+    _clearLastVisitedSession();
     super.dispose();
   }
 
@@ -539,11 +651,13 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: 'Courses',
-        hideNavLinks: showHideNavLinks,
-      ),
+      appBar: _isDoingQuiz
+          ? null
+          : SharedHeader(
+              isDesktop: isDesktop,
+              activeTab: 'Courses',
+              hideNavLinks: showHideNavLinks,
+            ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
@@ -646,7 +760,21 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 child: Row(
                   children: [
                     InkWell(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () async {
+                        _clearLastVisitedSession();
+                        if (widget.cameFromCourseDetail) {
+                          Navigator.pop(context);
+                        } else {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CourseDetailPage(
+                                courseId: widget.courseId,
+                              ),
+                            ),
+                          );
+                        }
+                      },
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -817,6 +945,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           return Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
+              key: ValueKey('session_${session.id}_${session.lessons.any((l) => l.id == _currentLessonId)}'),
               initiallyExpanded: session.lessons.any(
                 (l) => l.id == _currentLessonId,
               ),
@@ -873,6 +1002,18 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                               : FontWeight.w500,
                         ),
                       ),
+                      subtitle: l.estimatedTime != null
+                          ? Text(
+                              '${l.estimatedTime} mins',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isCurrent
+                                    ? const Color(0xFF28B79B).withOpacity(0.8)
+                                    : const Color(0xFF94A3B8),
+                                fontFamily: 'Outfit',
+                              ),
+                            )
+                          : null,
                       trailing: l.isCompleted
                           ? const Icon(
                               Icons.check_circle_rounded,
@@ -1015,7 +1156,68 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
+  Widget _buildVideoPlayer() {
+    if (_youtubeVideoId != null) {
+      if (!_isPlayingYoutube) {
+        return Stack(
+          alignment: Alignment.center,
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              'https://img.youtube.com/vi/$_youtubeVideoId/hqdefault.jpg',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(color: Colors.black87),
+            ),
+            Container(color: Colors.black.withOpacity(0.3)),
+            IconButton(
+              icon: const Icon(Icons.play_circle_fill, size: 64, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _isPlayingYoutube = true;
+                  _youtubeController = YoutubePlayerController.fromVideoId(
+                    videoId: _youtubeVideoId!,
+                    autoPlay: true,
+                    params: const YoutubePlayerParams(
+                      showControls: true,
+                      mute: false,
+                      showFullscreenButton: true,
+                      loop: false,
+                    ),
+                  );
+                });
+              },
+            ),
+          ],
+        );
+      }
+      return _youtubeController != null 
+          ? YoutubePlayer(controller: _youtubeController!, aspectRatio: 16 / 9)
+          : const Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)));
+    } else if (_chewieController != null && _videoPlayerController != null) {
+      return Chewie(controller: _chewieController!);
+    } else {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+      );
+    }
+  }
+
   Widget _buildHtmlContent(LessonDetail lesson) {
+    if (_itemType == 'video') {
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: _buildVideoPlayer(),
+        ),
+      );
+    }
+
     return lesson.content.isEmpty
         ? const Center(
             child: Padding(

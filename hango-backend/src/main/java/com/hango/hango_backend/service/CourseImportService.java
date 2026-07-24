@@ -96,6 +96,7 @@ public class CourseImportService {
         int importedQuestions = 0;
 
         Set<String> knownCourseCodes = new java.util.HashSet<>();
+        Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
         for (Map<String, String> courseRow : courseRows) {
             String courseCode = required(courseRow, "Course Code", "COURSE");
             if (!knownCourseCodes.add(courseCode)) {
@@ -122,6 +123,8 @@ public class CourseImportService {
                 warnings.add("Course " + courseCode + " was imported as DRAFT because trainer imports still require review before publishing.");
             }
 
+            String persistedCourseCode = resolveUniqueCourseCode(courseCode, reservedPersistedCourseCodes, warnings);
+
             Course course = Course.builder()
                     .title(required(courseRow, "Title", "COURSE"))
                     .description(valueOrDefault(courseRow, "Description", ""))
@@ -129,6 +132,10 @@ public class CourseImportService {
                     .category(category)
                     .difficulty(difficulty)
                     .thumbnailUrl(valueOrDefault(courseRow, "Thumbnail URL", ""))
+                    .code(persistedCourseCode)
+                    .price(parseDecimal(valueOrDefault(courseRow, "Price", "0"), null))
+                    .version(valueOrDefault(courseRow, "Version", ""))
+                    .objectives(valueOrDefault(courseRow, "Objectives", ""))
                     .status("DRAFT")
                     .build();
             Course savedCourse = courseRepository.save(course);
@@ -147,9 +154,11 @@ public class CourseImportService {
 
                 Section section = Section.builder()
                         .course(savedCourse)
+                        .code(sectionCode)
                         .title(required(sectionRow, "Section Title", "SECTIONS"))
                         .description(valueOrDefault(sectionRow, "Section Description", ""))
                         .displayOrder(parseInt(valueOrDefault(sectionRow, "Section Order Index", ""), sectionIndex + 1))
+                        .version(valueOrDefault(sectionRow, "Version", ""))
                         .build();
                 Section savedSection = sectionRepository.save(section);
                 sectionsByImportKey.put(buildLessonKey(courseCode, sectionCode), savedSection);
@@ -169,6 +178,7 @@ public class CourseImportService {
 
                     Lesson lesson = Lesson.builder()
                             .section(savedSection)
+                            .code(lessonCode)
                             .title(required(lessonRow, "Lesson Title", "LESSONS"))
                             .lessonType(normalizeLessonType(valueOrDefault(lessonRow, "Lesson Type", "TEXT")))
                             .skill(category)
@@ -178,6 +188,10 @@ public class CourseImportService {
                             .description(valueOrDefault(lessonRow, "Learning Objectives", ""))
                             .pdfName(resolvePdfName(lessonRow))
                             .questionImageUrl(resolveImageUrl(lessonRow))
+                            .mediaDurationSeconds(parseInteger(valueOrDefault(lessonRow, "Media Duration", ""), null))
+                            .mediaSizeBytes(parseLong(valueOrDefault(lessonRow, "Media Size", ""), null))
+                            .estimatedTimeMinutes(parseInteger(valueOrDefault(lessonRow, "Estimated Time", ""), null))
+                            .version(valueOrDefault(lessonRow, "Version", ""))
                             .build();
                     Lesson savedLesson = lessonRepository.save(lesson);
                     lessonsByImportKey.put(buildLessonKey(courseCode, sectionCode, lessonCode), savedLesson);
@@ -218,6 +232,7 @@ public class CourseImportService {
             SystemParameter courseDifficulty = difficultyByCourseCode.get(courseCode);
             Question question = new Question();
             question.setCreatedBy(trainer);
+            question.setCode(valueOrDefault(questionRow, "Question Code", ""));
             question.setCategory(resolveQuestionCategory(valueOrDefault(questionRow, "Category", ""), warnings));
             question.setQuestionText(required(questionRow, "Question Text", "QUESTIONS"));
             question.setExplanation(valueOrDefault(questionRow, "Explaination", valueOrDefault(questionRow, "Explanation", "")));
@@ -721,6 +736,38 @@ public class CourseImportService {
         return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
+    private String resolveUniqueCourseCode(
+            String requestedCode,
+            Set<String> reservedCodes,
+            List<String> warnings
+    ) {
+        String baseCode = trimToMaxLength(requestedCode.trim(), 100);
+        String candidate = baseCode;
+        int suffix = 2;
+        while (courseCodeExists(candidate, reservedCodes)) {
+            String suffixText = "-" + suffix++;
+            candidate = trimToMaxLength(baseCode, 100 - suffixText.length()) + suffixText;
+        }
+
+        reservedCodes.add(candidate.toUpperCase(Locale.ROOT));
+        if (!candidate.equals(requestedCode)) {
+            warnings.add("Course Code '" + requestedCode + "' already exists and was imported as '" + candidate + "'.");
+        }
+        return candidate;
+    }
+
+    private boolean courseCodeExists(String code, Set<String> reservedCodes) {
+        return reservedCodes.contains(code.toUpperCase(Locale.ROOT))
+                || courseRepository.existsByCodeIgnoreCase(code);
+    }
+
+    private String trimToMaxLength(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+
     private int parseInt(String value, int defaultValue) {
         if (value == null || value.isBlank()) {
             return defaultValue;
@@ -731,7 +778,40 @@ public class CourseImportService {
             return defaultValue;
         }
     }
-
+ 
+    private Integer parseInteger(String value, Integer defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return (int) Double.parseDouble(value.trim());
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
+    }
+ 
+    private Long parseLong(String value, Long defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return (long) Double.parseDouble(value.trim());
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
+    }
+ 
+    private java.math.BigDecimal parseDecimal(String value, java.math.BigDecimal defaultValue) {
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            return new java.math.BigDecimal(value.trim());
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
+    }
+ 
     private record WorkbookData(Map<String, List<Map<String, String>>> rowsBySheet) {
     }
 }

@@ -29,4 +29,11 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgress, 
            "AND lp.isCompleted = true " +
            "AND lp.lesson.deletedAt IS NULL")
     List<Long> findCompletedLessonIdsByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
+
+    @Query("SELECT lp FROM LessonProgress lp " +
+           "WHERE lp.user.id = :userId " +
+           "AND lp.lesson.section.course.id = :courseId " +
+           "AND lp.isCompleted = true " +
+           "AND lp.lesson.deletedAt IS NULL")
+    List<LessonProgress> findCompletedProgressByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
 }

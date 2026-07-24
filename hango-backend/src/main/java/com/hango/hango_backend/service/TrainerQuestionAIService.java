@@ -39,7 +39,7 @@ public class TrainerQuestionAIService {
         long categoryId = req.getCategoryId() != null ? req.getCategoryId() : 1L;
         long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
 
-        String systemPrompt = buildSystemPrompt(mode, quantity);
+        String systemPrompt = buildSystemPrompt(req, mode, quantity);
 
         String raw = geminiClientService.generateChatResponse(
                 systemPrompt,
@@ -65,17 +65,32 @@ public class TrainerQuestionAIService {
     }
 
     private String buildUserInput(CreateTrainerQuestionAIRequestDTO req) {
-        return "TOPIC_SEED:\n" + req.getTopicSeed() +
-                "\n\nSECTION_ID: " + req.getSectionId() +
-                "\nCATEGORY_ID(DEFAULT): " + req.getCategoryId() +
-                "\nDIFFICULTY_ID(DEFAULT): " + req.getDifficultyId();
+        StringBuilder sb = new StringBuilder();
+        sb.append("TOPIC_SEED:\n").append(req.getTopicSeed())
+          .append("\n\nSECTION_ID: ").append(req.getSectionId())
+          .append("\nCATEGORY_ID(DEFAULT): ").append(req.getCategoryId())
+          .append("\nDIFFICULTY_ID(DEFAULT): ").append(req.getDifficultyId());
+          
+        if (req.getSkillType() != null && !req.getSkillType().isBlank()) {
+            sb.append("\nSKILL_TYPE: ").append(req.getSkillType());
+        }
+        if (req.getGroupType() != null && !req.getGroupType().isBlank()) {
+            sb.append("\nGROUP_TYPE: ").append(req.getGroupType());
+        }
+        return sb.toString();
     }
 
-    private String buildSystemPrompt(String mode, int quantity) {
+    private String buildSystemPrompt(CreateTrainerQuestionAIRequestDTO req, String mode, int quantity) {
         // Yêu cầu JSON thuần theo schema mà FE parse
+        Long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
+        Long categoryId = req.getCategoryId() != null ? req.getCategoryId() : 1L;
+
         if ("SINGLE".equals(mode)) {
+            String skillReq = (req.getSkillType() != null && !req.getSkillType().isBlank()) 
+                    ? " The question MUST specifically test the skill: " + req.getSkillType() + "." 
+                    : "";
             return "You are an expert English test question generator for HanGo trainer.\n" +
-                    "Create ONLY SINGLE multiple-choice questions. 4 options per question. Exactly 1 correct option.\n" +
+                    "Create ONLY SINGLE multiple-choice questions. 4 options per question. Exactly 1 correct option." + skillReq + "\n" +
                     "Return PURE JSON only (no markdown).\n" +
                     "Schema:\n" +
                     "{\n" +
@@ -84,8 +99,8 @@ public class TrainerQuestionAIService {
                     "    {\n" +
                     "      \"questionText\": \"...\",\n" +
                     "      \"explanation\": \"...\",\n" +
-                    "      \"categoryId\": 1,\n" +
-                    "      \"difficultyId\": 14,\n" +
+                    "      \"categoryId\": " + categoryId + ",\n" +
+                    "      \"difficultyId\": " + difficultyId + ",\n" +
                     "      \"options\": [\n" +
                     "        {\"optionText\": \"...\", \"isCorrect\": true},\n" +
                     "        {\"optionText\": \"...\", \"isCorrect\": false},\n" +
@@ -99,9 +114,15 @@ public class TrainerQuestionAIService {
         }
 
         // MULTIPLE
+        String skillReqMulti = (req.getSkillType() != null && !req.getSkillType().isBlank()) 
+                ? " The questions MUST specifically test the skill: " + req.getSkillType() + "." 
+                : "";
+        String groupReq = (req.getGroupType() != null && !req.getGroupType().isBlank())
+                ? " The format and passage MUST follow the structure of group type: " + req.getGroupType() + "."
+                : "";
         return "You are an expert English reading comprehension test question generator for HanGo trainer.\n" +
-                "Create a group question. passageText + subQuestions[].\n" +
-                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option.\n" +
+                "Create a group question. passageText + subQuestions[]." + groupReq + "\n" +
+                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti + "\n" +
                 "Return PURE JSON only (no markdown).\n" +
                 "Schema:\n" +
                 "{\n" +
@@ -110,8 +131,8 @@ public class TrainerQuestionAIService {
                 "  \"group\": {\n" +
                 "    \"passageText\": \"...\",\n" +
                 "    \"explanation\": \"...\",\n" +
-                "    \"categoryId\": 1,\n" +
-                "    \"difficultyId\": 14,\n" +
+                "    \"categoryId\": " + categoryId + ",\n" +
+                "    \"difficultyId\": " + difficultyId + ",\n" +
                 "    \"subQuestions\": [\n" +
                 "      {\n" +
                 "        \"questionText\": \"...\",\n" +
@@ -126,7 +147,6 @@ public class TrainerQuestionAIService {
                 "    ]\n" +
                 "  }\n" +
                 "}\n" +
-                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short.";
+                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short. Options should be plausible distractors.";
     }
 }
-

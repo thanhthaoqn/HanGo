@@ -21,4 +21,5 @@ public class ExamAttemptResponseDTO {
     private String date;
     private String status;
     private Map<String, Integer> answers;
+    private Map<String, Boolean> correctness;
 }

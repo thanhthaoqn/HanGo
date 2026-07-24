@@ -6,6 +6,8 @@ class Exam {
     required this.status,
     required this.questions,
     this.thumbnailUrl = '',
+    this.creatorId,
+    this.visibility = 'PRIVATE',
   });
 
   final int id;
@@ -14,6 +16,8 @@ class Exam {
   final String status;
   final List<Question> questions;
   final String thumbnailUrl;
+  final int? creatorId;
+  final String visibility;
 
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
@@ -26,6 +30,8 @@ class Exam {
           .map(Question.fromJson)
           .toList(),
       thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
+      creatorId: (json['creatorId'] as num?)?.toInt(),
+      visibility: json['visibility'] as String? ?? 'PRIVATE',
     );
   }
 }

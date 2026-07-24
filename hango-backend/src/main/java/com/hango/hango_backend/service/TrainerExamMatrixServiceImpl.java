@@ -48,12 +48,12 @@ public class TrainerExamMatrixServiceImpl implements TrainerExamMatrixService {
             List<ExamMatrixDetailDTO> details = examMatrixDetailRepository.findByMatrixId(matrix.getId()).stream().map(detail ->
                 ExamMatrixDetailDTO.builder()
                         .id(detail.getId())
-                        .skillParamId(detail.getSkillParam().getId())
-                        .skillParamName(detail.getSkillParam().getParamValue())
-                        .difficultyParamId(detail.getDifficultyParam().getId())
-                        .difficultyParamName(detail.getDifficultyParam().getParamValue())
-                        .categoryId(detail.getCategory().getId())
-                        .categoryName(detail.getCategory().getName())
+                        .skillParamId(detail.getSkillParam() != null ? detail.getSkillParam().getId() : null)
+                        .skillParamName(detail.getSkillParam() != null ? detail.getSkillParam().getParamValue() : "N/A")
+                        .difficultyParamId(detail.getDifficultyParam() != null ? detail.getDifficultyParam().getId() : null)
+                        .difficultyParamName(detail.getDifficultyParam() != null ? detail.getDifficultyParam().getParamValue() : "N/A")
+                        .categoryId(detail.getCategory() != null ? detail.getCategory().getId() : null)
+                        .categoryName(detail.getCategory() != null ? detail.getCategory().getName() : "Uncategorized")
                         .quantity(detail.getQuantity())
                         .build()
             ).collect(Collectors.toList());
@@ -62,7 +62,7 @@ public class TrainerExamMatrixServiceImpl implements TrainerExamMatrixService {
                     .id(matrix.getId())
                     .title(matrix.getTitle())
                     .description(matrix.getDescription())
-                    .createdBy(matrix.getCreatedBy().getId())
+                    .createdBy(matrix.getCreatedBy() != null ? matrix.getCreatedBy().getId() : null)
                     .createdAt(matrix.getCreatedAt())
                     .details(details)
                     .build();
