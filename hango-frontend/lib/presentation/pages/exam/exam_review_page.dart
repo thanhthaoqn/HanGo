@@ -21,6 +21,8 @@ class ExamReviewPage extends StatefulWidget {
 class _ExamReviewPageState extends State<ExamReviewPage> {
   List<Map<String, dynamic>> _examQuestions = [];
   late Map<int, int> _userAnswers;
+  Map<int, bool> _correctnessMap = {};
+  Map<int, int> _correctAnswersMap = {};
   bool _isLoadingQuestions = true;
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _questionKeys = {};
@@ -31,12 +33,48 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
   void initState() {
     super.initState();
     
-    // Parse answers Map from the attempt
+    // Parse answers Map from the attempt — safely handle null values
     final rawAnswers = widget.attempt['answers'];
     if (rawAnswers is Map) {
-      _userAnswers = rawAnswers.map((key, value) => MapEntry(int.parse(key.toString()) - 1, int.parse(value.toString())));
+      _userAnswers = {};
+      rawAnswers.forEach((key, value) {
+        if (key != null && value != null) {
+          final k = int.tryParse(key.toString());
+          final v = int.tryParse(value.toString());
+          if (k != null && v != null) {
+            _userAnswers[k - 1] = v; // Convert 1-based key to 0-based
+          }
+        }
+      });
     } else {
       _userAnswers = {};
+    }
+
+    // Parse correctness map from the attempt (Backend provides {questionIndex: true/false})
+    final rawCorrectness = widget.attempt['correctness'];
+    if (rawCorrectness is Map) {
+      rawCorrectness.forEach((key, value) {
+        if (key != null && value != null) {
+          final k = int.tryParse(key.toString());
+          if (k != null) {
+            _correctnessMap[k - 1] = value == true;
+          }
+        }
+      });
+    }
+
+    // Parse correct answers map from the attempt (Backend provides {questionIndex: correctOptionIndex})
+    final rawCorrectAnswers = widget.attempt['correctAnswers'];
+    if (rawCorrectAnswers is Map) {
+      rawCorrectAnswers.forEach((key, value) {
+        if (key != null && value != null) {
+          final k = int.tryParse(key.toString());
+          final v = int.tryParse(value.toString());
+          if (k != null && v != null) {
+            _correctAnswersMap[k - 1] = v;
+          }
+        }
+      });
     }
 
     _fetchQuestions();
@@ -61,6 +99,14 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
         _isLoadingQuestions = false;
       });
     }
+  }
+
+  /// Extract option text safely — API returns [{id, optionText}] or plain strings
+  String _getOptionText(dynamic option) {
+    if (option is Map) {
+      return option['optionText']?.toString() ?? option['content']?.toString() ?? '';
+    }
+    return option?.toString() ?? '';
   }
 
   @override
@@ -120,12 +166,13 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
         child: Column(
           children: [
             Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 1440),
-                padding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 24 : 20,
-                  vertical: 32,
-                ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 48.0 : 20.0,
+                    vertical: 32,
+                  ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -189,6 +236,7 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
                 ),
               ),
             ),
+            ),
             SharedFooter(isDesktop: isDesktop),
           ],
         ),
@@ -196,18 +244,21 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
     );
   }
 
-  Widget _buildSummaryHeader(double scoreValue, bool isPassed) {
+  Widget _buildSummaryHeader(double score, bool isPassed) {
     return Container(
-      padding: const EdgeInsets.all(32.0),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        gradient: LinearGradient(
+          colors: isPassed
+              ? [const Color(0xFF28B79B), const Color(0xFF167B66)]
+              : [const Color(0xFFEF4444), const Color(0xFFB91C1C)],
+        ),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: (isPassed ? const Color(0xFF28B79B) : const Color(0xFFEF4444)).withOpacity(0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           )
         ],
       ),
@@ -215,38 +266,23 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
         children: [
           // Score Circle
           Container(
-            width: 90,
-            height: 90,
-            decoration: const BoxDecoration(
-              color: Color(0xFFE8F8F5),
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  scoreValue.toStringAsFixed(1),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF167B66),
-                  ),
-                ),
-                const Text(
-                  '/10.0',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF28B79B),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            child: Text(
+              score.toStringAsFixed(1),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-          const SizedBox(width: 24),
-          
-          // Exam and Attempt details
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,22 +292,22 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Text(
-                      'Attempt: #${widget.attempt['attemptNumber']}',
-                      style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 13),
+                      'Attempt: #${widget.attempt['attemptNumber'] ?? '?'}',
+                      style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const SizedBox(width: 12),
-                    Icon(Icons.calendar_month, size: 14, color: Colors.grey.shade400),
+                    const Icon(Icons.calendar_month, size: 14, color: Colors.white54),
                     const SizedBox(width: 4),
                     Text(
                       widget.attempt['date'] ?? '',
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                      style: const TextStyle(color: Colors.white70, fontSize: 13),
                     ),
                   ],
                 ),
@@ -288,10 +324,15 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(_examQuestions.length, (index) {
         final q = _examQuestions[index];
-        final options = q['options'] as List;
-        final correctIndex = q['correctIndex'] as int;
+        final options = q['options'] as List? ?? [];
         final userSelectedIndex = _userAnswers[index];
-        final isCorrect = userSelectedIndex == correctIndex;
+        // Use correctness map from the attempt data (Backend-verified)
+        final isCorrect = _correctnessMap[index] ?? false;
+
+        final group = q['group'] as Map<String, dynamic>?;
+        final passage = group?['passage'] as String?;
+        final isFirstQuestionInGroup = index == 0 || (group != null && _examQuestions[index - 1]['group']?['id'] != group['id']);
+        final showPassage = passage != null && passage.isNotEmpty && isFirstQuestionInGroup;
 
         return Container(
           key: _questionKeys[index],
@@ -312,6 +353,36 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Render Passage if exists and is first question of the group
+              if (showPassage)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.article_outlined, color: Color(0xFF64748B), size: 20),
+                          const SizedBox(width: 8),
+                          const Text('Reading Passage', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        passage,
+                        style: const TextStyle(height: 1.6, color: Color(0xFF334155), fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Question Number Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -353,9 +424,30 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
               ),
               const SizedBox(height: 16),
 
+              // Skill tag
+              if (q['skill'] != null && q['skill'].toString().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE6F7F4),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      q['skill'].toString(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0B6660),
+                      ),
+                    ),
+                  ),
+                ),
+
               // Question Text
               Text(
-                'Question ${index + 1}: ${q['content']}',
+                'Question ${index + 1}: ${q['content'] ?? ''}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -368,19 +460,24 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
               // Options
               Column(
                 children: List.generate(options.length, (optIdx) {
-                  final optionText = options[optIdx];
+                  final optionText = _getOptionText(options[optIdx]);
                   final isUserSelected = userSelectedIndex == optIdx;
-                  final isOptionCorrect = correctIndex == optIdx;
+                  final isCorrectAnswer = _correctAnswersMap[index] == optIdx;
+                  
+                  final isSelectedCorrectOption = isUserSelected && isCorrect;
+                  final isSelectedWrongOption = isUserSelected && !isCorrect;
 
                   Color optionBg = Colors.white;
                   Color optionBorder = Colors.grey.shade200;
                   Widget? suffixIcon;
 
-                  if (isOptionCorrect) {
+                  if (isSelectedCorrectOption || (isCorrectAnswer && !isCorrect)) {
+                    // This is the correct option (either selected correctly, or highlighting the correct one if user missed)
                     optionBg = const Color(0xFFE8F8F5);
                     optionBorder = const Color(0xFF28B79B);
                     suffixIcon = const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 18);
-                  } else if (isUserSelected) {
+                  } else if (isSelectedWrongOption) {
+                    // This is the wrong option the user selected
                     optionBg = const Color(0xFFFEE2E2);
                     optionBorder = const Color(0xFFEF4444);
                     suffixIcon = const Icon(Icons.cancel, color: Color(0xFFEF4444), size: 18);
@@ -396,27 +493,27 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
                     ),
                     child: Row(
                       children: [
-                        // Radio circle mockup
+                        // Radio circle
                         Container(
                           width: 18,
                           height: 18,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isOptionCorrect
+                              color: isSelectedCorrectOption
                                   ? const Color(0xFF28B79B)
-                                  : (isUserSelected ? const Color(0xFFEF4444) : Colors.grey.shade400),
+                                  : (isSelectedWrongOption ? const Color(0xFFEF4444) : Colors.grey.shade400),
                               width: 2,
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: (isOptionCorrect || isUserSelected)
+                          child: (isSelectedCorrectOption || isCorrectAnswer) || isUserSelected
                               ? Container(
                                   width: 8,
                                   height: 8,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: isOptionCorrect ? const Color(0xFF28B79B) : const Color(0xFFEF4444),
+                                    color: (isSelectedCorrectOption || isCorrectAnswer) ? const Color(0xFF28B79B) : const Color(0xFFEF4444),
                                   ),
                                 )
                               : null,
@@ -428,19 +525,19 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
                           '${String.fromCharCode(65 + optIdx)}. ',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: isOptionCorrect
+                            color: (isSelectedCorrectOption || isCorrectAnswer)
                                 ? const Color(0xFF167B66)
-                                : (isUserSelected ? const Color(0xFFEF4444) : const Color(0xFF4B5563)),
+                                : (isSelectedWrongOption ? const Color(0xFFEF4444) : const Color(0xFF4B5563)),
                           ),
                         ),
                         Expanded(
                           child: Text(
                             optionText,
                             style: TextStyle(
-                              color: isOptionCorrect
+                              color: (isSelectedCorrectOption || isCorrectAnswer)
                                   ? const Color(0xFF167B66)
-                                  : (isUserSelected ? const Color(0xFFEF4444) : const Color(0xFF1F2937)),
-                              fontWeight: (isOptionCorrect || isUserSelected) ? FontWeight.bold : FontWeight.normal,
+                                  : (isSelectedWrongOption ? const Color(0xFFEF4444) : const Color(0xFF1F2937)),
+                              fontWeight: isUserSelected || isCorrectAnswer ? FontWeight.bold : FontWeight.normal,
                             ),
                           ),
                         ),
@@ -525,9 +622,8 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
               crossAxisSpacing: 8,
             ),
             itemBuilder: (context, index) {
-              final correctIndex = _examQuestions[index]['correctIndex'] as int;
-              final userSelectedIndex = _userAnswers[index];
-              final isCorrect = userSelectedIndex == correctIndex;
+              // Use correctness map from the attempt data (Backend-verified)
+              final isCorrect = _correctnessMap[index] ?? false;
 
               return InkWell(
                 onTap: () => _scrollToQuestion(index),
