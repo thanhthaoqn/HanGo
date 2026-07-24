@@ -35,6 +35,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                                   @Param("enrolledUserId") Long enrolledUserId,
                                                   @Param("enrollmentStatus") String enrollmentStatus);
 
+    @Query("SELECT c.id, cat.paramValue FROM Course c JOIN c.categories cat WHERE c.id IN :courseIds")
+    List<Object[]> findCategoriesByCourseIds(@Param("courseIds") List<Long> courseIds);
+
     @Query("SELECT c FROM Course c WHERE c.code = :code AND c.status = 'PUBLISHED' ORDER BY COALESCE(c.publishedAt, c.createdAt) DESC")
     List<Course> findPublishedByCodeOrderByPublishedAtDesc(@Param("code") String code);
 
