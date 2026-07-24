@@ -1168,38 +1168,39 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'dashboard',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE6F7F1),
-                              borderRadius: BorderRadius.circular(8),
+                  if (_userRoles.any((r) => r.toUpperCase().contains('TRAINER') || r.toUpperCase().contains('MANAGER') || r.toUpperCase().contains('ADMIN')))
+                    PopupMenuItem(
+                      value: 'dashboard',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE6F7F1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.dashboard_outlined,
+                                size: 18,
+                                color: Color(0xFF20B486),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.dashboard_outlined,
-                              size: 18,
-                              color: Color(0xFF20B486),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Dashboard',
+                              style: TextStyle(
+                                fontFamily: 'Outfit',
+                                color: Color(0xFF1E293B),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Dashboard',
-                            style: TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Color(0xFF1E293B),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                   if (!widget.hideCommerceActions) ...[
                     PopupMenuItem(
                       value: 'learning',

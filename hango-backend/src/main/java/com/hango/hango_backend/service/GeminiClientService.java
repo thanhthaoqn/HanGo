@@ -113,7 +113,7 @@ public class GeminiClientService {
                         if (text == null || text.isBlank()) {
                                 return buildHealth(false, "Gemini da phan hoi nhung khong co noi dung hop le");
                         }
-                        return buildHealth(true, "Gemini API san sang");
+                        return buildHealth(true, "Online");
                 } catch (Exception e) {
                         log.warn("Gemini health check failed", e);
                         return buildHealth(false, "Khong goi duoc Gemini API: " + e.getClass().getSimpleName());

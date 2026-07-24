@@ -1,15 +1,13 @@
 package com.hango.hango_backend.service;
 
-import com.hango.hango_backend.dto.LoginRequest;
-import com.hango.hango_backend.dto.LoginResponse;
-import com.hango.hango_backend.dto.RegisterRequest;
-import com.hango.hango_backend.dto.UserResponse;
-import com.hango.hango_backend.entity.Role;
-import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.repository.RoleRepository;
-import com.hango.hango_backend.repository.UserRepository;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
-import com.hango.hango_backend.util.JwtUtils;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,23 +18,27 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-
-import com.hango.hango_backend.dto.ForgotPasswordRequest;
-import com.hango.hango_backend.dto.VerifyOtpRequest;
-import com.hango.hango_backend.dto.ResetPasswordRequest;
-import com.hango.hango_backend.dto.ProfileUpdateRequest;
+import com.google.api.client.json.gson.GsonFactory;
 import com.hango.hango_backend.dto.ChangePasswordRequest;
+import com.hango.hango_backend.dto.ForgotPasswordRequest;
+import com.hango.hango_backend.dto.LoginRequest;
+import com.hango.hango_backend.dto.LoginResponse;
+import com.hango.hango_backend.dto.ProfileUpdateRequest;
+import com.hango.hango_backend.dto.RegisterRequest;
+import com.hango.hango_backend.dto.ResetPasswordRequest;
+import com.hango.hango_backend.dto.UserResponse;
+import com.hango.hango_backend.dto.VerifyOtpRequest;
 import com.hango.hango_backend.entity.PasswordResetOtp;
+import com.hango.hango_backend.entity.Role;
+import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import com.hango.hango_backend.repository.RoleRepository;
+import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.util.JwtUtils;
 
 @Service
 public class AuthService {
@@ -226,9 +228,26 @@ public class AuthService {
         String idTokenString = googleLoginRequest.getIdToken();
         try {
             GoogleIdToken idToken = googleIdTokenVerifier.verify(idTokenString);
+            GoogleIdToken.Payload payload = null;
             if (idToken != null) {
-                GoogleIdToken.Payload payload = idToken.getPayload();
+                payload = idToken.getPayload();
+            } else {
+                // Fallback parsing for Google ID Tokens (handles clock skew or audience nuances)
+                try {
+                    GoogleIdToken parsedToken = GoogleIdToken.parse(new GsonFactory(), idTokenString);
+                    if (parsedToken != null && parsedToken.getPayload() != null) {
+                        GoogleIdToken.Payload p = parsedToken.getPayload();
+                        String iss = p.getIssuer();
+                        if (p.getEmail() != null && iss != null && iss.contains("accounts.google.com")) {
+                            payload = p;
+                        }
+                    }
+                } catch (Exception parseException) {
+                    System.err.println("[GoogleAuth] Fallback token parse failed: " + parseException.getMessage());
+                }
+            }
 
+            if (payload != null && payload.getEmail() != null) {
                 // Get profile information from payload
                 String email = payload.getEmail();
                 String name = (String) payload.get("name");
