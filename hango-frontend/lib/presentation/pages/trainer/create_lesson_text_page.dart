@@ -83,7 +83,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       }
 
       final lessonId = lesson['id'];
-      if (lessonId is num && lessonId < 1000000000000) {
+      final isLocallyModified = lesson['isLocallyModified'] == true;
+      if (lessonId is num && lessonId < 1000000000000 && !isLocallyModified) {
         _loadLessonDetailFromApi(lessonId.toInt());
       }
     }
@@ -113,6 +114,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         setState(() {
           _titleController.text = detail.title;
           _questionController.text = detail.content;
+          if (detail.lessonCode != null) _codeController.text = detail.lessonCode!;
+          if (detail.learningObjectives != null) _learningObjectivesController.text = detail.learningObjectives!;
+          if (detail.mediaDurationSeconds != null) _mediaDurationController.text = detail.mediaDurationSeconds.toString();
+          if (detail.mediaSizeBytes != null) _mediaSizeController.text = detail.mediaSizeBytes.toString();
+          if (detail.estimatedTimeMinutes != null) _estimatedTimeController.text = detail.estimatedTimeMinutes.toString();
         });
       }
     } catch (e) {
@@ -270,8 +276,10 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         'learningObjectives': objectives,
         'estimatedTimeMinutes': estimatedTime,
         'version': 'v1.0',
+        'isLocallyModified': true,
 
-        // Keep old keys for backward compatibility (if backend ignores them it's fine)
+        // Keep old keys (compatibility)
+        'itemType': 'text',
         'questionText': question,
         'questionImageUrl': _uploadedImageUrl ?? '',
         'pdfName': _uploadedPdfName ?? '',

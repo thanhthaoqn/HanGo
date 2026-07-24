@@ -115,6 +115,11 @@ public class LessonServiceImpl implements LessonService {
                 .questions(questions)
                 .isCompleted(isCompleted)
                 .estimatedTime(estTime)
+                .lessonCode(lesson.getCode())
+                .mediaDurationSeconds(lesson.getMediaDurationSeconds())
+                .mediaSizeBytes(lesson.getMediaSizeBytes())
+                .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes())
+                .learningObjectives(lesson.getLearningObjectives())
                 .build();
     }
 

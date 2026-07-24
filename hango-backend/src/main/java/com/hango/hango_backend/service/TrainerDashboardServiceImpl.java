@@ -31,6 +31,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final TrainerQuestionService trainerQuestionService;
     private final QuestionRepository questionRepository;
     private final TrainerProfileRepository trainerProfileRepository;
+    private final PaymentRepository paymentRepository;
+    private final CourseRatingRepository courseRatingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -43,20 +45,123 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         long learnersCount = enrollmentRepository.countDistinctStudentsByCourseCreatorId(trainerId);
         long examsCount = examRepository.countByCreatedByIdAndDeletedAtIsNull(trainerId);
 
-        List<TrainerCourseProjection> projections = courseRepository.findTrainerCourses(trainerId);
-        List<TrainerCourseDTO> courses = projections.stream().map(p -> TrainerCourseDTO.builder()
-                .id(p.getId())
-                .title(p.getTitle())
-                .learnersCount(p.getLearnersCount() != null ? p.getLearnersCount() : 0L)
-                .lessonsCount(p.getLessonsCount() != null ? p.getLessonsCount() : 0L)
-                .thumbnailUrl(p.getThumbnailUrl())
-                .build()).collect(Collectors.toList());
+        java.math.BigDecimal totalRevenue = paymentRepository.sumRevenueByTrainerId(trainerId);
+        if (totalRevenue == null) {
+            totalRevenue = java.math.BigDecimal.ZERO;
+        }
+
+        Double averageRating = courseRatingRepository.getAverageRatingByTrainerId(trainerId);
+        if (averageRating == null) {
+            averageRating = 0.0;
+        }
+
+        List<TrainerCourseDetailProjection> baseProjections = courseRepository.findTrainerCoursesDetailBase(trainerId, "ALL", null);
+        Map<Long, List<TrainerCourseDetailProjection>> groupedById = baseProjections.stream()
+                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
+
+        List<TrainerCourseDTO> courses = groupedById.values().stream()
+                .map(group -> {
+                    TrainerCourseDetailProjection latest = group.stream()
+                            .max((p1, p2) -> {
+                                if (p1.getCreatedAt() == null) return -1;
+                                if (p2.getCreatedAt() == null) return 1;
+                                return p1.getCreatedAt().compareTo(p2.getCreatedAt());
+                            })
+                            .orElse(group.get(0));
+                    return TrainerCourseDTO.builder()
+                            .id(latest.getId())
+                            .title(latest.getTitle())
+                            .learnersCount(latest.getLearnersCount() != null ? latest.getLearnersCount() : 0L)
+                            .lessonsCount(latest.getLessonsCount() != null ? latest.getLessonsCount() : 0L)
+                            .thumbnailUrl(latest.getThumbnailUrl())
+                            .versionsCount((long) group.size())
+                            .build();
+                })
+                .sorted((c1, c2) -> c2.getId().compareTo(c1.getId()))
+                .collect(Collectors.toList());
+
+        // Monthly Revenues
+        List<Object[]> rawRevenues = paymentRepository.getRevenueByMonthForCurrentYear(trainerId);
+        List<com.hango.hango_backend.dto.MonthlyRevenueDTO> monthlyRevenues = new ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            monthlyRevenues.add(new com.hango.hango_backend.dto.MonthlyRevenueDTO(i, java.math.BigDecimal.ZERO));
+        }
+        for (Object[] row : rawRevenues) {
+            int month = ((Number) row[0]).intValue();
+            java.math.BigDecimal rev = (java.math.BigDecimal) row[1];
+            if (month >= 1 && month <= 12) {
+                monthlyRevenues.get(month - 1).setRevenue(rev);
+            }
+        }
+
+        // Recent Activities
+        List<com.hango.hango_backend.dto.RecentActivityDTO> recentActivities = new ArrayList<>();
+        
+        List<com.hango.hango_backend.entity.Payment> recentPayments = paymentRepository.findTop5ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(trainerId, "SUCCESS");
+        for (com.hango.hango_backend.entity.Payment p : recentPayments) {
+            recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
+                    .type("PAYMENT")
+                    .action("Sold course")
+                    .target(p.getCourse().getTitle())
+                    .timestamp(p.getCreatedAt())
+                    .build());
+        }
+
+        List<com.hango.hango_backend.entity.Enrollment> recentEnrollments = enrollmentRepository.findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(trainerId);
+        for (com.hango.hango_backend.entity.Enrollment e : recentEnrollments) {
+            recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
+                    .type("ENROLLMENT")
+                    .action("New student enrolled in")
+                    .target(e.getCourse().getTitle())
+                    .timestamp(e.getEnrolledAt())
+                    .build());
+        }
+
+        List<com.hango.hango_backend.entity.CourseRating> recentRatings = courseRatingRepository.findTop5ByCourseCreatorIdOrderByCreatedAtDesc(trainerId);
+        for (com.hango.hango_backend.entity.CourseRating r : recentRatings) {
+            recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
+                    .type("RATING")
+                    .action("New " + r.getRating() + "-star review on")
+                    .target(r.getCourse().getTitle())
+                    .timestamp(r.getCreatedAt())
+                    .build());
+        }
+
+        recentActivities.sort((a1, a2) -> {
+            if (a1.getTimestamp() == null) return 1;
+            if (a2.getTimestamp() == null) return -1;
+            return a2.getTimestamp().compareTo(a1.getTimestamp());
+        });
+
+        if (recentActivities.size() > 5) {
+            recentActivities = recentActivities.subList(0, 5);
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        for (com.hango.hango_backend.dto.RecentActivityDTO act : recentActivities) {
+            if (act.getTimestamp() != null) {
+                long minutes = java.time.Duration.between(act.getTimestamp(), now).toMinutes();
+                if (minutes < 60) {
+                    act.setTime(minutes + " mins ago");
+                } else if (minutes < 1440) {
+                    act.setTime((minutes / 60) + " hours ago");
+                } else {
+                    act.setTime((minutes / 1440) + " days ago");
+                }
+            } else {
+                act.setTime("Unknown");
+            }
+        }
 
         return TrainerDashboardSummaryDTO.builder()
                 .coursesCount(coursesCount)
                 .learnersCount(learnersCount)
                 .examsCount(examsCount)
+                .totalRevenue(totalRevenue)
+                .averageRating(averageRating)
                 .courses(courses)
+                .recentActivities(recentActivities)
+                .monthlyRevenues(monthlyRevenues)
                 .build();
     }
 
@@ -67,63 +172,76 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         Long trainerId = user.getId();
 
-        // 1. Status Counts
-        long allCount = courseRepository.countByCreatorIdAndDeletedAtIsNull(trainerId);
-        long draftCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "DRAFT");
-        long publishedCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "PUBLISHED");
-        long hiddenCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "HIDDEN");
-        long pendingCount = courseRepository.countByCreatorIdAndStatusAndDeletedAtIsNull(trainerId, "PENDING_APPROVAL");
+        // 1. Fetch All courses for the trainer
+        List<TrainerCourseDetailProjection> allProjections = courseRepository.findTrainerCoursesDetailBase(trainerId, "ALL", null);
 
-        // 2. Fetch Base courses
-        String searchParam = (search == null || search.trim().isEmpty()) ? null : search.trim();
-        List<TrainerCourseDetailProjection> projections = courseRepository.findTrainerCoursesDetailBase(trainerId, status, searchParam);
+        // 2. Group by Root ID and get the Latest Version for each course
+        Map<Long, List<TrainerCourseDetailProjection>> groupedById = allProjections.stream()
+                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
 
-        // 3. Time Period Filter in Java
-        if (timePeriod != null && !timePeriod.equalsIgnoreCase("ALL")) {
-            LocalDateTime cutoff = LocalDateTime.now();
-            if (timePeriod.equalsIgnoreCase("THIS_WEEK")) {
-                cutoff = cutoff.minusWeeks(1);
-            } else if (timePeriod.equalsIgnoreCase("THIS_MONTH")) {
-                cutoff = cutoff.minusMonths(1);
-            }
-            final LocalDateTime finalCutoff = cutoff;
-            projections = projections.stream()
-                    .filter(p -> p.getCreatedAt() != null && p.getCreatedAt().isAfter(finalCutoff))
-                    .collect(Collectors.toList());
-        }
+        List<TrainerCourseDetailProjection> latestProjections = groupedById.values().stream()
+                .map(group -> group.stream()
+                        .max((p1, p2) -> {
+                            if (p1.getCreatedAt() == null) return -1;
+                            if (p2.getCreatedAt() == null) return 1;
+                            return p1.getCreatedAt().compareTo(p2.getCreatedAt());
+                        }).orElse(group.get(0)))
+                .collect(Collectors.toList());
 
-        // 4. Sort in Java
-        List<TrainerCourseDetailProjection> mutableProjections = new ArrayList<>(projections);
+        // 3. Status Counts based on the Latest Versions
+        long allCount = latestProjections.size();
+        long draftCount = latestProjections.stream().filter(p -> "DRAFT".equalsIgnoreCase(p.getStatus())).count();
+        long publishedCount = latestProjections.stream().filter(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus())).count();
+        long hiddenCount = latestProjections.stream().filter(p -> "HIDDEN".equalsIgnoreCase(p.getStatus())).count();
+        long pendingCount = latestProjections.stream().filter(p -> "PENDING_APPROVAL".equalsIgnoreCase(p.getStatus())).count();
+
+        // 4. Apply Filters (Status, Search, Time Period)
+        String searchParam = (search == null || search.trim().isEmpty()) ? null : search.trim().toLowerCase();
+        
+        List<TrainerCourseDetailProjection> filteredProjections = latestProjections.stream()
+                .filter(p -> status.equalsIgnoreCase("ALL") || status.equalsIgnoreCase(p.getStatus()))
+                .filter(p -> searchParam == null || (p.getTitle() != null && p.getTitle().toLowerCase().contains(searchParam)))
+                .filter(p -> {
+                    if (timePeriod == null || timePeriod.equalsIgnoreCase("ALL")) return true;
+                    if (p.getCreatedAt() == null) return false;
+                    LocalDateTime cutoff = LocalDateTime.now();
+                    if (timePeriod.equalsIgnoreCase("THIS_WEEK")) cutoff = cutoff.minusWeeks(1);
+                    else if (timePeriod.equalsIgnoreCase("THIS_MONTH")) cutoff = cutoff.minusMonths(1);
+                    return p.getCreatedAt().isAfter(cutoff);
+                })
+                .collect(Collectors.toList());
+
+        // 5. Sort
         if (sortBy != null) {
             if (sortBy.equalsIgnoreCase("OLDEST")) {
-                mutableProjections.sort((p1, p2) -> {
+                filteredProjections.sort((p1, p2) -> {
                     if (p1.getCreatedAt() == null) return 1;
                     if (p2.getCreatedAt() == null) return -1;
                     return p1.getCreatedAt().compareTo(p2.getCreatedAt());
                 });
             } else if (sortBy.equalsIgnoreCase("ALPHABETICAL")) {
-                mutableProjections.sort((p1, p2) -> {
+                filteredProjections.sort((p1, p2) -> {
                     String t1 = p1.getTitle() != null ? p1.getTitle() : "";
                     String t2 = p2.getTitle() != null ? p2.getTitle() : "";
                     return t1.compareToIgnoreCase(t2);
                 });
             } else { // "NEWEST"
-                mutableProjections.sort((p1, p2) -> {
+                filteredProjections.sort((p1, p2) -> {
                     if (p1.getCreatedAt() == null) return 1;
                     if (p2.getCreatedAt() == null) return -1;
                     return p2.getCreatedAt().compareTo(p1.getCreatedAt());
                 });
             }
         } else {
-            mutableProjections.sort((p1, p2) -> {
+            filteredProjections.sort((p1, p2) -> {
                 if (p1.getCreatedAt() == null) return 1;
                 if (p2.getCreatedAt() == null) return -1;
                 return p2.getCreatedAt().compareTo(p1.getCreatedAt());
             });
         }
 
-        // 5. Map to DTOs
-        List<TrainerCourseDetailDTO> courses = mutableProjections.stream().map(p -> {
+        // 6. Map to DTOs
+        List<TrainerCourseDetailDTO> courses = filteredProjections.stream().map(p -> {
             List<String> catKeys = new ArrayList<>();
             List<String> catNames = new ArrayList<>();
             com.hango.hango_backend.entity.Course c = courseRepository.findById(p.getId()).orElse(null);
@@ -287,26 +405,19 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             // Clone V1 → V2: Create a new DRAFT version preserving the original published course (V1).
             // V2 links back to V1 via parentId for version tracking.
             String newVersion = incrementVersion(course.getVersion());
-            String baseCode = course.getCode() != null ? course.getCode().replaceAll("\\s+$", "") : "";
-            
-            // Strip any existing version suffix (e.g. -V2) to prevent COURSE-1-V2-V3
-            if (baseCode.matches(".*-V\\d+")) {
+            String baseCode = course.getCode() != null ? course.getCode() : "COURSE";
+            if (baseCode.matches(".*-V\\d+$")) {
                 baseCode = baseCode.replaceAll("-V\\d+$", "");
             }
+            String newCode = baseCode + "-" + newVersion.toUpperCase();
             
-            String newCode = "";
-            if (!baseCode.isEmpty()) {
-                newCode = baseCode + "-" + newVersion.toUpperCase();
-            }
-            
-            // Resolve unique constraint conflicts if code was used by a soft-deleted course
             int suffix = 1;
             String candidateCode = newCode;
-            while (candidateCode != null && !candidateCode.isEmpty() && courseRepository.existsByCodeIgnoreCase(candidateCode)) {
-                candidateCode = newCode + "_" + suffix;
-                suffix++;
+            while (courseRepository.existsByCodeIgnoreCase(candidateCode)) {
+                candidateCode = newCode + "_" + suffix++;
             }
             newCode = candidateCode;
+            
             com.hango.hango_backend.entity.Course draftCourse = com.hango.hango_backend.entity.Course.builder()
                     .title(request.getTitle())
                     .code(newCode)
@@ -454,6 +565,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         .pdfName(lDto.getPdfName())
                         .questionImageUrl(lDto.getQuestionImageUrl())
                         .estimatedTime(lDto.getEstimatedTime())
+                        .code(lDto.getLessonCode())
+                        .mediaDurationSeconds(lDto.getMediaDurationSeconds())
+                        .mediaSizeBytes(lDto.getMediaSizeBytes())
+                        .estimatedTimeMinutes(lDto.getEstimatedTimeMinutes())
+                        .learningObjectives(lDto.getLearningObjectives())
                         .version(course.getVersion())
                         .skill(category)
                         .difficulty(difficulty)
@@ -782,9 +898,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Override
     @Transactional
     public void approveTrainerCourse(Long id, String email) {
-        // This approves a PENDING_APPROVAL draft (V2) submitted by a trainer.
-        // V2 becomes PUBLISHED, and V1 remains PUBLISHED so existing learners can continue viewing it.
-        // V1.latestVersionId is set to V2.id so existing learners are notified.
         com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 

@@ -93,9 +93,6 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             throw new RuntimeException("Only courses in PENDING_APPROVAL status can be published");
         }
 
-        // Handle versioning: if this is a draft version (V2) with a parentId,
-        // publish V2 and update V1.latestVersionId = V2.id so old learners can see the banner
-        // while V1 remains PUBLISHED so old learners keep viewing V1 until they upgrade
         course.setStatus("PUBLISHED");
         course.setPublishedAt(java.time.LocalDateTime.now());
         course.setLatestVersionId(course.getId());

@@ -2,6 +2,10 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -44,6 +48,11 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
   final TextEditingController _estimatedTimeController =
       TextEditingController();
 
+  String? _currentVideoUrl;
+  YoutubePlayerController? _youtubeController;
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+
   @override
   void initState() {
     super.initState();
@@ -65,10 +74,71 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           lesson['estimatedTimeMinutes']?.toString() ?? '';
 
       final lessonId = lesson['id'];
-      if (lessonId is num && lessonId < 1000000000000) {
+      final isLocallyModified = lesson['isLocallyModified'] == true;
+      if (lessonId is num && lessonId < 1000000000000 && !isLocallyModified) {
         _loadLessonDetailFromApi(lessonId.toInt());
       }
     }
+
+    _videoUrlController.addListener(_onVideoUrlChanged);
+    _onVideoUrlChanged();
+  }
+
+  void _onVideoUrlChanged() {
+    final url = _videoUrlController.text.trim();
+    if (url != _currentVideoUrl) {
+      _currentVideoUrl = url;
+      _initializePlayer(url);
+    }
+  }
+
+  Future<void> _initializePlayer(String url) async {
+    _disposePlayers();
+
+    if (url.isEmpty) {
+      setState(() {});
+      return;
+    }
+
+    final youtubeId = _extractYouTubeVideoId(url);
+    if (youtubeId != null) {
+      _youtubeController = YoutubePlayerController.fromVideoId(
+        videoId: youtubeId,
+        autoPlay: false,
+        params: const YoutubePlayerParams(showFullscreenButton: true),
+      );
+      setState(() {});
+      return;
+    }
+
+    if (_isDirectVideoUrl(url)) {
+      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+      try {
+        await _videoPlayerController!.initialize();
+        _chewieController = ChewieController(
+          videoPlayerController: _videoPlayerController!,
+          autoPlay: false,
+          looping: false,
+        );
+        setState(() {});
+      } catch (e) {
+        debugPrint('Error initializing video player: $e');
+        _disposePlayers();
+        setState(() {});
+      }
+      return;
+    }
+
+    setState(() {});
+  }
+
+  void _disposePlayers() {
+    _youtubeController?.close();
+    _youtubeController = null;
+    _chewieController?.dispose();
+    _chewieController = null;
+    _videoPlayerController?.dispose();
+    _videoPlayerController = null;
   }
 
   void _loadLessonDetailFromApi(int lessonId) async {
@@ -79,8 +149,11 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
         setState(() {
           _titleController.text = detail.title;
           _videoUrlController.text = detail.content;
-          // Avoid referencing non-existing LessonDetail getter.
-          // Keep existing value from local draft/controller.
+          if (detail.lessonCode != null) _codeController.text = detail.lessonCode!;
+          if (detail.learningObjectives != null) _learningObjectivesController.text = detail.learningObjectives!;
+          if (detail.mediaDurationSeconds != null) _mediaDurationController.text = detail.mediaDurationSeconds.toString();
+          if (detail.mediaSizeBytes != null) _mediaSizeController.text = detail.mediaSizeBytes.toString();
+          if (detail.estimatedTimeMinutes != null) _estimatedTimeController.text = detail.estimatedTimeMinutes.toString();
         });
       }
     } catch (e) {
@@ -92,6 +165,8 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
 
   @override
   void dispose() {
+    _videoUrlController.removeListener(_onVideoUrlChanged);
+    _disposePlayers();
     _titleController.dispose();
     _codeController.dispose();
     _learningObjectivesController.dispose();
@@ -162,13 +237,16 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
 
         'learningObjectives': objectives,
         'estimatedTimeMinutes': estimatedTimeMinutes,
+        'estimatedTime': estimatedTimeMinutes,
         'textContentMarkdown': '',
         'textContentHtml': '',
         'version': 'v1.0',
+        'isLocallyModified': true,
 
         // Keep old keys (compatibility)
         'itemType': 'video',
         'videoUrl': videoUrl,
+        'questionText': videoUrl,
       };
 
       if (widget.lessonIndex != null) {
@@ -908,6 +986,8 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
               color: Color(0xFF1E293B),
             ),
           ),
+          // Video Preview section
+          _buildVideoPreview(),
           const SizedBox(height: 24),
           // Estimated Time input
           const Text(
@@ -1075,6 +1155,290 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           ),
 
         ],
+      ),
+    );
+  }
+
+  // ---- Video URL helpers ----
+
+  String? _extractYouTubeVideoId(String url) {
+    // Supports youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID, youtube.com/shorts/ID
+    final patterns = [
+      RegExp(r'(?:youtube\.com\/watch\?.*v=)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtu\.be\/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})'),
+      RegExp(r'(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})'),
+    ];
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(url);
+      if (match != null) return match.group(1);
+    }
+    return null;
+  }
+
+  String? _extractVimeoVideoId(String url) {
+    final match = RegExp(r'vimeo\.com\/(\d+)').firstMatch(url);
+    return match?.group(1);
+  }
+
+  bool _isDirectVideoUrl(String url) {
+    final lowerUrl = url.toLowerCase();
+    return lowerUrl.endsWith('.mp4') ||
+        lowerUrl.endsWith('.webm') ||
+        lowerUrl.endsWith('.mov') ||
+        lowerUrl.endsWith('.avi') ||
+        lowerUrl.endsWith('.mkv') ||
+        lowerUrl.contains('.mp4?') ||
+        lowerUrl.contains('.webm?');
+  }
+
+  Future<void> _openVideoUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('Could not launch URL: $e');
+      }
+    }
+  }
+
+  Widget _buildVideoPreview() {
+    final videoUrl = _videoUrlController.text.trim();
+    if (videoUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final youtubeId = _extractYouTubeVideoId(videoUrl);
+    final vimeoId = _extractVimeoVideoId(videoUrl);
+    final isDirect = _isDirectVideoUrl(videoUrl);
+
+    if (youtubeId != null && _youtubeController != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: YoutubePlayer(
+            controller: _youtubeController!,
+          ),
+        ),
+      );
+    } else if (isDirect && _chewieController != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: AspectRatio(
+          aspectRatio: _videoPlayerController?.value.aspectRatio ?? 16 / 9,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Chewie(
+              controller: _chewieController!,
+            ),
+          ),
+        ),
+      );
+    } else if (youtubeId != null || isDirect) {
+      // Loading state for video players
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Container(
+          width: double.infinity,
+          height: 200,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              color: Color(0xFF20B486),
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      );
+    } else if (vimeoId != null) {
+      return _buildVimeoPreview(vimeoId, videoUrl);
+    } else if (videoUrl.startsWith('http')) {
+      return _buildGenericVideoPreview(videoUrl);
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildVimeoPreview(String vimeoId, String originalUrl) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: GestureDetector(
+        onTap: () => _openVideoUrl(originalUrl),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color.fromRGBO(0, 0, 0, 0.04),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1AB7EA), Color(0xFF00B2FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1AB7EA).withAlpha(20),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'VIMEO',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1AB7EA),
+                          fontFamily: 'Outfit',
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Video ID: $vimeoId',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Click to play in browser',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.open_in_new, color: Color(0xFF94A3B8), size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenericVideoPreview(String videoUrl) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: GestureDetector(
+        onTap: () => _openVideoUrl(videoUrl),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color.fromRGBO(0, 0, 0, 0.04),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF20B486), Color(0xFF059669)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.smart_display_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF20B486).withAlpha(20),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'VIDEO LINK',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF20B486),
+                          fontFamily: 'Outfit',
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      videoUrl,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                        fontFamily: 'Outfit',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Click to play in browser',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF94A3B8),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.open_in_new, color: Color(0xFF94A3B8), size: 18),
+            ],
+          ),
+        ),
       ),
     );
   }

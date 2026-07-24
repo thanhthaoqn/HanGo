@@ -51,6 +51,7 @@ public class CourseServiceImpl implements CourseService {
     private final LessonQuizAttemptRepository lessonQuizAttemptRepository;
     private final CourseRatingRepository courseRatingRepository;
     private final TrainerProfileRepository trainerProfileRepository;
+    private final EmailService emailService;
 
     @Override
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
@@ -103,7 +104,7 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional(readOnly = true)
     public CourseDetailDTO getCourseDetail(Long id, Long currentUserId) {
-        Course course = courseRepository.findById(id)
+        Course course = courseRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 
         if (course.getDeletedAt() != null) {
@@ -126,6 +127,12 @@ public class CourseServiceImpl implements CourseService {
  
         if (currentUserId != null) {
             Optional<Enrollment> enrollmentOpt = enrollmentRepository.findByUserIdAndCourseId(currentUserId, id);
+            if (enrollmentOpt.isEmpty()) {
+                List<Enrollment> familyE = enrollmentRepository.findFamilyEnrollments(currentUserId, id);
+                if (!familyE.isEmpty() && familyE.get(0).getCourse() != null && !familyE.get(0).getCourse().getId().equals(id)) {
+                    return getCourseDetail(familyE.get(0).getCourse().getId(), currentUserId);
+                }
+            }
             isEnrolled = enrollmentOpt.isPresent();
             completedLessonIds.addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
 
@@ -153,9 +160,12 @@ public class CourseServiceImpl implements CourseService {
         }
  
         List<Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(id);
+        List<Lesson> allLessons = lessonRepository.findByCourseIdOrdered(id);
+        java.util.Map<Long, List<Lesson>> lessonsBySectionId = allLessons.stream()
+                .collect(Collectors.groupingBy(l -> l.getSection().getId()));
         
         List<CourseSessionDTO> sessionDTOs = sections.stream().map(section -> {
-            List<Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId());
+            List<Lesson> lessons = lessonsBySectionId.getOrDefault(section.getId(), new ArrayList<>());
             List<CourseLessonDTO> lessonDTOs = lessons.stream().map(lesson -> {
                     Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
                     int qCount = 0;
@@ -190,7 +200,7 @@ public class CourseServiceImpl implements CourseService {
         }).collect(Collectors.toList());
 
         // For Learners Count and Rating
-        int learnersCount = enrollmentRepository.countByCourseId(id);
+        int learnersCount = enrollmentRepository.countByCourseFamily(id);
         
         String creatorName = "Unknown Trainer";
         try {
@@ -233,7 +243,7 @@ public class CourseServiceImpl implements CourseService {
 
         // Calculate average rating dynamically from DB reviews/ratings
         double averageRating = 0.0;
-        List<CourseRating> ratings = courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(id);
+        List<CourseRating> ratings = courseRatingRepository.findByCourseFamilyOrderByCreatedAtDesc(id);
         if (!ratings.isEmpty()) {
             double sum = 0;
             for (CourseRating r : ratings) {
@@ -310,6 +320,16 @@ public class CourseServiceImpl implements CourseService {
                 .build();
 
         enrollmentRepository.save(enrollment);
+
+        // Gửi email xác nhận cho Learner
+        try {
+            String priceText = (courseToEnroll.getPrice() != null && courseToEnroll.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0)
+                    ? String.format("%,.0fđ", courseToEnroll.getPrice())
+                    : "Miễn phí";
+            emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), courseToEnroll.getTitle(), priceText);
+        } catch (Exception e) {
+            System.err.println("[EMAIL WARN] Failed to send enrollment email: " + e.getMessage());
+        }
     }
 
     @Override
@@ -370,8 +390,12 @@ public class CourseServiceImpl implements CourseService {
         int totalLessons = 0;
         int carriedCompletedLessons = 0;
         List<Section> newSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(latestPublishedCourse.getId());
+        List<Lesson> latestAllLessons = lessonRepository.findByCourseIdOrdered(latestPublishedCourse.getId());
+        java.util.Map<Long, List<Lesson>> latestLessonsBySectionId = latestAllLessons.stream()
+                .collect(Collectors.groupingBy(l -> l.getSection().getId()));
+
         for (Section section : newSections) {
-            List<Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId());
+            List<Lesson> lessons = latestLessonsBySectionId.getOrDefault(section.getId(), new ArrayList<>());
             totalLessons += lessons.size();
             for (Lesson lesson : lessons) {
                 boolean shouldCarry = false;

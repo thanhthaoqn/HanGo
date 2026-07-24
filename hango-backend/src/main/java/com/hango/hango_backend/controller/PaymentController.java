@@ -42,7 +42,7 @@ public class PaymentController {
             String ipAddress = getClientIpAddress(httpRequest);
             String origin = httpRequest.getHeader("Origin");
             PaymentResponseDTO response = paymentService.createPayment(
-                    request.getCourseId(),
+                    request,
                     currentUser.getId(),
                     ipAddress,
                     origin);
@@ -67,6 +67,28 @@ public class PaymentController {
         } catch (Exception e) {
             log.error("Error handling PayOS webhook", e);
             return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Lấy danh sách lịch sử giao dịch của Learner (có phân trang & lọc trạng thái)
+     * GET /api/v1/payment/my-history?page=0&size=10&status=ALL
+     */
+    @GetMapping("/my-history")
+    public ResponseEntity<?> getMyPaymentHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "ALL") String status,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        try {
+            if (currentUser == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+            }
+
+            return ResponseEntity.ok(paymentService.getMyPaymentHistory(currentUser.getId(), status, page, size));
+        } catch (Exception e) {
+            log.error("Error fetching payment history for userId={}", currentUser != null ? currentUser.getId() : null, e);
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
 

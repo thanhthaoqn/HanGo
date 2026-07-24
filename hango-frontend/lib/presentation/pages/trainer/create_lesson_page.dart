@@ -1,11 +1,9 @@
-import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
-import '../../../data/services/auth_service.dart';
 import 'create_lesson_text_page.dart';
+import 'create_lesson_video_page.dart';
 import 'create_quiz_page.dart';
 import 'lesson_list_widget.dart';
 import 'select_quiz_questions_page.dart';
@@ -55,44 +53,10 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
     }
   }
 
-  final _authService = AuthService();
-
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
-
-  Future<void> _refreshCourseDetail() async {
-    try {
-      final token = await _authService.getToken();
-      if (token == null) return;
-
-      final uri = Uri.parse(
-        '$apiBaseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}',
-      );
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        debugPrint("REFRESH COURSE DETAIL RESPONSE: $data");
-        setState(() {
-          if (data['sessions'] != null) {
-            _localSections = List.from(data['sessions']);
-            debugPrint("UPDATED LOCAL SECTIONS: $_localSections");
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Error refreshing course details in CreateLessonPage: $e');
-    }
-  }
 
   Future<void> _notifyParent() async {
     await widget.onSectionsChanged(_localSections);
-    await _refreshCourseDetail();
   }
 
   void _showAddLessonDialog(int sectionIndex, String type) {
@@ -315,6 +279,87 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                             SizedBox(height: 4),
                             Text(
                               'Text',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF64748B),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreateLessonVideoPage(
+                          courseId: widget.courseId,
+                          courseTitle: widget.courseTitle,
+                          trainerName: widget.trainerName,
+                          trainerInitials: widget.trainerInitials,
+                          sections: _localSections,
+                          sectionIndex: widget.selectedSectionIndex,
+                          onSectionsChanged: (updatedSections) async {
+                            setState(() {
+                              _localSections = updatedSections;
+                              _showTypeSelection = false;
+                            });
+                            await _notifyParent();
+                          },
+                        ),
+                      ),
+                    );
+                    if (result == 'goToIntroduction' && mounted) {
+                      if (context.mounted) {
+                        Navigator.pop(context, 'goToIntroduction');
+                      }
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.play_circle_outline,
+                            color: Color(0xFF3B82F6),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Video',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E293B),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Lecture',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF64748B),
@@ -1204,6 +1249,28 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                         ),
                       ),
                     );
+                  } else if (lesson['lessonType'] == 'video' ||
+                      lesson['itemType'] == 'video') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreateLessonVideoPage(
+                          courseId: widget.courseId,
+                          courseTitle: widget.courseTitle,
+                          trainerName: widget.trainerName,
+                          trainerInitials: widget.trainerInitials,
+                          sections: _localSections,
+                          sectionIndex: _activeSectionIndex!,
+                          onSectionsChanged: (updatedSections) async {
+                            setState(() {
+                              _localSections = updatedSections;
+                            });
+                            await _notifyParent();
+                          },
+                          lessonIndex: lessonIndex,
+                        ),
+                      ),
+                    );
                   } else {
                     Navigator.push(
                       context,
@@ -1814,7 +1881,95 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          CreateLessonVideoPage(
+                                            courseId: widget.courseId,
+                                            courseTitle: widget.courseTitle,
+                                            trainerName: widget.trainerName,
+                                            trainerInitials:
+                                                widget.trainerInitials,
+                                            sections: _localSections,
+                                            sectionIndex: index,
+                                            onSectionsChanged:
+                                                (updatedSections) async {
+                                                  setState(() {
+                                                    _localSections =
+                                                        updatedSections;
+                                                  });
+                                                  await _notifyParent();
+                                                },
+                                          ),
+                                    ),
+                                  );
+                                  if (result == 'goToIntroduction' &&
+                                      context.mounted) {
+                                    Navigator.pop(context, 'goToIntroduction');
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEFF6FF),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.play_circle_outline,
+                                          color: Color(0xFF3B82F6),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: const [
+                                          Text(
+                                            'Video',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF1E293B),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Lecture',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF64748B),
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: InkWell(
                                 onTap: () =>

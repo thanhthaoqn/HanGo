@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
@@ -396,23 +397,48 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit'),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (degreeUrl != null && degreeUrl.isNotEmpty)
-                        Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: _buildProofImageCard('Proof 1', degreeUrl))),
-                      if (ieltsUrl != null && ieltsUrl.isNotEmpty)
-                        Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: _buildProofImageCard('Proof 2', ieltsUrl))),
-                      if (scoreUrl != null && scoreUrl.isNotEmpty)
-                        Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: _buildProofImageCard('Proof 3', scoreUrl))),
-                      if ((degreeUrl == null || degreeUrl.isEmpty) && 
-                          (ieltsUrl == null || ieltsUrl.isEmpty) && 
-                          (scoreUrl == null || scoreUrl.isEmpty))
-                        const Text(
+                  Builder(
+                    builder: (context) {
+                      List<Map<String, String>> certList = [];
+                      if (app['certificates'] != null && app['certificates'] is List) {
+                        certList = (app['certificates'] as List).map((c) => Map<String, String>.from(c as Map)).toList();
+                      } else {
+                        if (degreeUrl != null && degreeUrl.isNotEmpty) certList.add({'name': 'Degree Proof', 'url': degreeUrl});
+                        if (ieltsUrl != null && ieltsUrl.isNotEmpty) certList.add({'name': 'Language Proof', 'url': ieltsUrl});
+                        if (scoreUrl != null && scoreUrl.isNotEmpty) {
+                          if (scoreUrl.startsWith('[')) {
+                            try {
+                              final List parsed = jsonDecode(scoreUrl);
+                              certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
+                            } catch (_) {
+                              certList.add({'name': 'Other Credential', 'url': scoreUrl});
+                            }
+                          } else {
+                            certList.add({'name': 'Other Credential', 'url': scoreUrl});
+                          }
+                        }
+                      }
+
+                      if (certList.isEmpty) {
+                        return const Text(
                           'No certificates uploaded.',
                           style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
-                        ),
-                    ],
+                        );
+                      }
+
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: certList.map((item) {
+                          final label = item['name'] ?? 'Proof';
+                          final url = item['url'] ?? '';
+                          return SizedBox(
+                            width: 220,
+                            child: _buildProofImageCard(label, url),
+                          );
+                        }).toList(),
+                      );
+                    },
                   ),
                   
                   if (status == 'AWAITING_APPROVAL') ...[
@@ -568,21 +594,36 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             ),
           ),
           
-          // Document link trigger
+          // Proof Document status badge
           Expanded(
             flex: 2,
-            child: InkWell(
-              onTap: () => _showDetailDialog(app),
-              child: const Text(
-                'View Docs',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF28B79B),
-                  decoration: TextDecoration.underline,
-                  fontFamily: 'Outfit',
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.attachment_rounded, size: 14, color: Color(0xFF64748B)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Credentials Attached',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF475569),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           
@@ -603,42 +644,22 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
           Expanded(
             flex: 2,
             child: status == 'AWAITING_APPROVAL'
-                ? Row(
-                    children: [
-                      SizedBox(
-                        height: 32,
-                        child: ElevatedButton(
-                          onPressed: () => _showApproveDialog(userId, type),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF28B79B),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                          ),
-                          child: const Text(
-                            'Approve',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                          ),
-                        ),
+                ? SizedBox(
+                    height: 32,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showDetailDialog(app),
+                      icon: const Icon(Icons.rate_review_outlined, size: 14),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                       ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        height: 32,
-                        child: OutlinedButton(
-                          onPressed: () => _showRejectDialog(userId),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFD97706),
-                            side: const BorderSide(color: Color(0xFFD97706)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                          ),
-                          child: const Text(
-                            'Reject',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                          ),
-                        ),
+                      label: const Text(
+                        'Review Application',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
                       ),
-                    ],
+                    ),
                   )
                 : Row(
                     children: [

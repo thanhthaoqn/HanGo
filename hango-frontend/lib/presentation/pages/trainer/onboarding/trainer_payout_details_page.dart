@@ -26,7 +26,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   final _bankNameController = TextEditingController();
   final _bankAccountController = TextEditingController();
   final _bankAccountNameController = TextEditingController();
-  final _citizenIdController = TextEditingController();
+  final _taxCodeController = TextEditingController();
 
   String _userProfileFullName = '';
   String _trainerName = '';
@@ -36,7 +36,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   bool _bankNameError = false;
   bool _bankAccountError = false;
   bool _bankAccountNameError = false;
-  bool _citizenIdError = false;
+  bool _taxCodeError = false;
 
   final List<String> _bankSuggestions = [
     'Vietcombank (VCB)',
@@ -92,59 +92,23 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     _bankNameController.text = p['bankName'] ?? '';
     _bankAccountController.text = p['bankAccount'] ?? '';
     _bankAccountNameController.text = p['bankAccountName'] ?? '';
-    _citizenIdController.text = p['citizenId'] ?? '';
+    _taxCodeController.text = p['taxCode']?.toString().isNotEmpty == true
+        ? p['taxCode']
+        : (p['citizenId'] ?? '');
   }
 
   void _onBankAccountChanged() {
-    final text = _bankAccountController.text.trim();
-    if (text.length >= 9 && _bankAccountNameController.text.trim().isEmpty && _userProfileFullName.isNotEmpty) {
-      setState(() {
-        _bankAccountNameController.text = _userProfileFullName;
-      });
-    }
+    // Keep empty until user types
   }
 
   Future<void> _loadUserProfileName() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('user_fullname');
-      if (name != null && name.isNotEmpty) {
-        setState(() {
-          _userProfileFullName = _removeVietnameseAccents(name).toUpperCase();
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading full name: $e');
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('user_fullname') ?? '';
+    if (name.isNotEmpty) {
+      setState(() {
+        _userProfileFullName = name;
+      });
     }
-  }
-
-  String _removeVietnameseAccents(String str) {
-    const vietnamese = 'aAeEoOuUiIdDyYoO';
-    const vietnameseRegex = [
-      'áàảãạăắằẳẵặâấầẩẫậ',
-      'ÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬ',
-      'éèẻẽẹêếềểễệ',
-      'ÉÈẺẼẸÊẾỀỂỄỆ',
-      'óòỏõọôốồổỗộơớờởỡợ',
-      'ÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢ',
-      'úùủũụưứừửữự',
-      'ÚÙỦŨỤƯỨỪỬỮỰ',
-      'íìỉĩị',
-      'ÍÌÌỈĨỊ',
-      'đ',
-      'Đ',
-      'ýỳỷỹỵ',
-      'ÝỲỶỸỴ',
-      'óòỏõọôốồổỗộơớờởỡợ',
-      'ÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢ'
-    ];
-
-    var result = str;
-    for (var i = 0; i < vietnameseRegex.length; i++) {
-      final regex = RegExp('[' + vietnameseRegex[i] + ']');
-      result = result.replaceAll(regex, vietnamese[i]);
-    }
-    return result;
   }
 
   bool _validateFields() {
@@ -152,7 +116,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     final bankName = _bankNameController.text.trim();
     final bankAccount = _bankAccountController.text.trim();
     final bankAccountName = _bankAccountNameController.text.trim();
-    final citizenId = _citizenIdController.text.trim();
+    final taxCode = _taxCodeController.text.trim();
 
     final numRegex = RegExp(r'^\d+$');
     final nameRegex = RegExp(r'^[A-Z ]+$');
@@ -161,7 +125,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
       _bankNameError = bankName.isEmpty;
       _bankAccountError = bankAccount.isEmpty || !numRegex.hasMatch(bankAccount);
       _bankAccountNameError = bankAccountName.isEmpty || !nameRegex.hasMatch(bankAccountName);
-      _citizenIdError = citizenId.isEmpty || citizenId.length != 12 || !numRegex.hasMatch(citizenId);
+      _taxCodeError = taxCode.isEmpty || taxCode.length < 10 || !numRegex.hasMatch(taxCode);
     });
 
     if (_bankNameError) {
@@ -186,12 +150,12 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
       );
       return false;
     }
-    if (_citizenIdError) {
+    if (_taxCodeError) {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Số Căn cước công dân (CCCD) phải gồm đúng 12 chữ số.'
-            : 'Invalid citizen identity number (must be exactly 12 digits).',
+            ? 'Mã số thuế không hợp lệ (ít nhất 10 số).'
+            : 'Invalid Tax Identification Number (digits only, at least 10 digits).',
       );
       return false;
     }
@@ -209,8 +173,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     payload['bankName'] = _bankNameController.text.trim();
     payload['bankAccount'] = _bankAccountController.text.trim();
     payload['bankAccountName'] = _bankAccountNameController.text.trim().toUpperCase();
-    payload['taxCode'] = '';
-    payload['citizenId'] = _citizenIdController.text.trim();
+    payload['taxCode'] = _taxCodeController.text.trim();
+    payload['citizenId'] = _taxCodeController.text.trim();
     payload['agreementSigned'] = true;
 
     final result = await _onboardingService.saveProfileDraft(payload);
@@ -243,7 +207,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     _bankNameController.dispose();
     _bankAccountController.dispose();
     _bankAccountNameController.dispose();
-    _citizenIdController.dispose();
+    _taxCodeController.dispose();
     super.dispose();
   }
 
@@ -346,34 +310,39 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Autocomplete<String>(
-                        optionsBuilder: (TextEditingValue textEditingValue) {
-                          if (textEditingValue.text.isEmpty) {
-                            return _bankSuggestions;
-                          }
-                          return _bankSuggestions.where((String option) {
-                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                          });
-                        },
-                        onSelected: (String selection) {
-                          _bankNameController.text = selection;
-                        },
-                        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                          if (controller.text.isEmpty && _bankNameController.text.isNotEmpty) {
-                            controller.text = _bankNameController.text;
-                          }
-                          controller.addListener(() {
-                            _bankNameController.text = controller.text;
-                          });
-                          return TextField(
-                            controller: controller,
-                            focusNode: focusNode,
-                            decoration: InputDecoration(
-                              errorText: _bankNameError ? (isVi ? 'Vui lòng chọn ngân hàng' : 'Bank name required') : null,
-                              hintText: isVi ? 'Ví dụ: Vietcombank (VCB)' : 'Example: Techcombank (TCB)',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
+                      DropdownButtonFormField<String>(
+                        value: _bankSuggestions.contains(_bankNameController.text) ? _bankNameController.text : null,
+                        dropdownColor: Colors.white,
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          fillColor: Colors.white,
+                          filled: true,
+                          errorText: _bankNameError ? (isVi ? 'Vui lòng chọn ngân hàng' : 'Bank name required') : null,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 2),
+                          ),
+                        ),
+                        hint: Text(isVi ? 'Chọn ngân hàng thụ hưởng' : 'Select beneficiary bank'),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+                        items: _bankSuggestions.map((String b) {
+                          return DropdownMenuItem<String>(
+                            value: b,
+                            child: Text(b),
                           );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _bankNameController.text = val;
+                              _bankNameError = false;
+                            });
+                          }
                         },
                       ),
                       const SizedBox(height: 24),
@@ -427,9 +396,9 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Citizen ID (CCCD)
+                      // Tax Identification Number (Tax ID)
                       Text(
-                        isVi ? 'Số Căn cước công dân (CCCD - 12 chữ số) *' : 'Citizen ID / CCCD (12 digits) *',
+                        isVi ? 'Mã số thuế (Tax ID) *' : 'Tax Identification Number (Tax ID) *',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -439,13 +408,15 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                       ),
                       const SizedBox(height: 8),
                       TextField(
-                        controller: _citizenIdController,
+                        controller: _taxCodeController,
                         keyboardType: TextInputType.number,
-                        maxLength: 12,
+                        maxLength: 13,
                         decoration: InputDecoration(
-                          errorText: _citizenIdError ? (isVi ? 'Số CCCD không hợp lệ (12 số)' : 'Invalid citizen ID (12 digits)') : null,
+                          errorText: _taxCodeError ? (isVi ? 'Mã số thuế không hợp lệ' : 'Invalid Tax ID number') : null,
                           counterText: '',
-                          hintText: '012345678901',
+                          hintText: '8019283710',
+                          fillColor: Colors.white,
+                          filled: true,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
