@@ -332,29 +332,75 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6FFFA),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.school,
-                    size: 18,
-                    color: Color(0xFF20B486),
-                  ),
+
+                Image.network(
+
+                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+
+                  height: 36,
+
+                  fit: BoxFit.contain,
+
+                  errorBuilder: (context, error, stackTrace) {
+
+                    return Row(
+
+                      children: [
+
+                        Container(
+
+                          width: 32,
+
+                          height: 32,
+
+                          decoration: const BoxDecoration(
+
+                            color: Color(0xFFE6FFFA),
+
+                            shape: BoxShape.circle,
+
+                          ),
+
+                          child: const Icon(
+
+                            Icons.school,
+
+                            size: 18,
+
+                            color: Color(0xFF20B486),
+
+                          ),
+
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        const Text(
+
+                          'HanGo',
+
+                          style: TextStyle(
+
+                            fontSize: 20,
+
+                            fontWeight: FontWeight.bold,
+
+                            color: Color(0xFF1F2937),
+
+                            fontFamily: 'Outfit',
+
+                          ),
+
+                        ),
+
+                      ],
+
+                    );
+
+                  },
+
                 ),
-                const SizedBox(width: 8),
-                const Text(
-                  'HanGo',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
+
               ],
             ),
           ),
