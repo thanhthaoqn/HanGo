@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
@@ -24,7 +24,6 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
   List<CourseReviewCourse> _courses = [];
   String _statusFilter = 'PENDING';
   bool _isLoading = true;
-  bool _isSidebarVisible = true;
   bool _isMockPreview = false;
 
   @override
@@ -218,7 +217,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'courses')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible)
+          if (isDesktop)
             const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'courses')),
           Expanded(
             child: Column(
@@ -707,15 +706,6 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
                 icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () {
-                setState(() {
-                  _isSidebarVisible = !_isSidebarVisible;
-                });
-              },
             ),
           const SizedBox(width: 8),
           const Expanded(
@@ -725,9 +715,9 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
                 Text(
                   'Course Review',
                   style: TextStyle(
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFF1E293B),
                     fontWeight: FontWeight.bold,
-                    fontSize: 20,
+                    fontSize: 28,
                     fontFamily: 'Outfit',
                   ),
                 ),

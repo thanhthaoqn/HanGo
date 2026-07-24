@@ -4,7 +4,7 @@ import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../widgets/shared_header.dart';
-import 'course_manager_dashboard_page.dart';
+
 
 class CourseManagerSettlementPage extends StatefulWidget {
   const CourseManagerSettlementPage({super.key});
@@ -16,7 +16,6 @@ class CourseManagerSettlementPage extends StatefulWidget {
 class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPage> {
   final _revenueService = RevenueSettlementService();
   bool _isLoading = true;
-  bool _isSidebarVisible = true;
   List<dynamic> _statements = [];
 
   String _periodMonthFilter = '';
@@ -254,7 +253,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'settlement')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible)
+          if (isDesktop)
             const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'settlement')),
           Expanded(
             child: Column(
@@ -293,43 +292,13 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 12),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () {
-                setState(() {
-                  _isSidebarVisible = !_isSidebarVisible;
-                });
-              },
-            ),
-            const SizedBox(width: 12),
           ],
-          InkWell(
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
-              );
-            },
-            child: const Text(
-              'Dashboard',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
-          const SizedBox(width: 4),
           const Text(
             'Revenue Settlement',
             style: TextStyle(
-              color: Color(0xFF20B486),
+              fontSize: 28,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              color: Color(0xFF1E293B),
               fontFamily: 'Outfit',
             ),
           ),
