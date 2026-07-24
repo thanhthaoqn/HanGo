@@ -51,6 +51,7 @@ public class CourseServiceImpl implements CourseService {
     private final LessonQuizAttemptRepository lessonQuizAttemptRepository;
     private final CourseRatingRepository courseRatingRepository;
     private final TrainerProfileRepository trainerProfileRepository;
+    private final EmailService emailService;
 
     @Override
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
@@ -319,6 +320,16 @@ public class CourseServiceImpl implements CourseService {
                 .build();
 
         enrollmentRepository.save(enrollment);
+
+        // Gửi email xác nhận cho Learner
+        try {
+            String priceText = (courseToEnroll.getPrice() != null && courseToEnroll.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0)
+                    ? String.format("%,.0fđ", courseToEnroll.getPrice())
+                    : "Miễn phí";
+            emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), courseToEnroll.getTitle(), priceText);
+        } catch (Exception e) {
+            System.err.println("[EMAIL WARN] Failed to send enrollment email: " + e.getMessage());
+        }
     }
 
     @Override

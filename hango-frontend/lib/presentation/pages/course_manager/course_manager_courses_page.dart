@@ -2,6 +2,7 @@
 
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
+import '../../widgets/course_manager_sidebar.dart';
 import '../../widgets/shared_header.dart';
 import '../trainer/matrix_management_page.dart';
 import 'course_manager_dashboard_page.dart';
@@ -214,24 +215,18 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         hideNavLinks: true,
         hideCommerceActions: true,
       ),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'courses')) : null,
       body: Row(
         children: [
           if (isDesktop && _isSidebarVisible)
-            SizedBox(width: 240, child: _buildSidebar(context)),
+            const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'courses')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildContentHeader(context, isDesktop),
                 Expanded(
-                  child: _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF20B486),
-                          ),
-                        )
-                      : _buildContent(),
+                  child: _buildContent(),
                 ),
               ],
             ),

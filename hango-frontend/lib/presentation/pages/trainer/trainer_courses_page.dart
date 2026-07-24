@@ -16,9 +16,11 @@ import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import 'trainer_profile_page.dart';
+import 'trainer_revenue_page.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
-  const TrainerCoursesPage({super.key});
+  final bool isEmbedded;
+  const TrainerCoursesPage({super.key, this.isEmbedded = false});
 
   @override
   State<TrainerCoursesPage> createState() => _TrainerCoursesPageState();
@@ -446,6 +448,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    if (widget.isEmbedded) {
+      return _buildBodyContent();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Slate 50
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
@@ -458,23 +464,27 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               children: [
                 _buildHeader(context, !isDesktop),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildWelcomeSection(),
-                        const SizedBox(height: 24),
-                        _buildFilterContainer(),
-                        const SizedBox(height: 24),
-                        _buildCoursesSection(),
-                      ],
-                    ),
-                  ),
+                  child: _buildBodyContent(),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBodyContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildWelcomeSection(),
+          const SizedBox(height: 24),
+          _buildFilterContainer(),
+          const SizedBox(height: 24),
+          _buildCoursesSection(),
         ],
       ),
     );
@@ -574,6 +584,18 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const TrainerQuestionBankPage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(
+            Icons.account_balance_wallet_outlined,
+            'Revenue',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerRevenuePage(),
                 ),
               );
             },

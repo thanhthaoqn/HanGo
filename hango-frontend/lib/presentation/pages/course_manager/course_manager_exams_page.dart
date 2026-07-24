@@ -167,15 +167,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
 
                         _buildFilterContainer(),
                         const SizedBox(height: 24),
-                        if (_isLoading)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(40.0),
-                              child: CircularProgressIndicator(color: Color(0xFF20B486)),
-                            ),
-                          )
-                        else
-                          _buildExamsTable(),
+                        _buildExamsTable(),
                       ],
                     ),
                   ),

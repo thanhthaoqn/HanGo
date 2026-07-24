@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
+import '../../../data/repositories/cart_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
@@ -9,6 +10,7 @@ import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'list_courses_page.dart';
 import 'course_detail_page.dart';
+import '../login_page.dart';
 import '../../widgets/payment_qr_dialog.dart';
 
 class CartPage extends StatefulWidget {
@@ -20,6 +22,7 @@ class CartPage extends StatefulWidget {
 
 class _CartPageState extends State<CartPage> {
   final CourseRepository _repository = CourseRepository();
+  final CartRepository _cartRepository = CartRepository();
   List<Course> _cartCourses = [];
   Set<String> _enrolledCourseIds = {};
   bool _isLoading = true;
@@ -27,39 +30,62 @@ class _CartPageState extends State<CartPage> {
   @override
   void initState() {
     super.initState();
+
+    // 1. Instant 0ms memory populate from RAM cache
+    final cached = CartManager.cartCoursesNotifier.value;
+    if (cached.isNotEmpty) {
+      _cartCourses = List<Course>.from(cached);
+      _isLoading = false;
+    }
+
+    CartManager.cartCoursesNotifier.addListener(_onCartNotifierChanged);
     _loadCart();
+  }
+
+  void _onCartNotifierChanged() {
+    if (mounted) {
+      setState(() {
+        _cartCourses = List<Course>.from(CartManager.cartCoursesNotifier.value);
+      });
+    }
   }
 
   @override
   void dispose() {
+    CartManager.cartCoursesNotifier.removeListener(_onCartNotifierChanged);
     super.dispose();
   }
 
   Future<void> _loadCart() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (_cartCourses.isEmpty) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cartIds = prefs.getStringList('cart_course_ids') ?? [];
-      
-      if (cartIds.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _cartCourses = [];
-            _enrolledCourseIds = {};
-            _isLoading = false;
-          });
+      final token = prefs.getString('auth_token');
+
+      List<Course> coursesInCart = [];
+      if (token != null && token.isNotEmpty) {
+        try {
+          coursesInCart = await _cartRepository.getCartItems();
+        } catch (e) {
+          debugPrint('Error loading DB cart: $e');
         }
-        return;
       }
 
-      final allCourses = await _repository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
-      final filtered = allCourses.where((c) => cartIds.contains(c.id.toString())).toList();
+      if (coursesInCart.isEmpty) {
+        final cartIds = await CartManager.getCartIds();
+        if (cartIds.isNotEmpty) {
+          final allCourses = await _repository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
+          coursesInCart = allCourses.where((c) => cartIds.contains(c.id.toString())).toList();
+        }
+      }
 
       final enrolled = <String>{};
-      for (final c in filtered) {
+      for (final c in coursesInCart) {
         final isEnrolled = prefs.getBool('enrolled_course_id_${c.id}') ?? false;
         if (isEnrolled) {
           enrolled.add(c.id.toString());
@@ -68,7 +94,7 @@ class _CartPageState extends State<CartPage> {
 
       if (mounted) {
         setState(() {
-          _cartCourses = filtered;
+          _cartCourses = coursesInCart;
           _enrolledCourseIds = enrolled;
           _isLoading = false;
         });
@@ -83,14 +109,13 @@ class _CartPageState extends State<CartPage> {
   }
 
   Future<void> _removeItem(int courseId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final cartIds = prefs.getStringList('cart_course_ids') ?? [];
-    cartIds.remove(courseId.toString());
-    await prefs.setStringList('cart_course_ids', cartIds);
-    await CartManager.updateCount();
-    
+    // 1. Optimistic removal (0ms lag)
+    setState(() {
+      _cartCourses.removeWhere((c) => c.id == courseId);
+    });
+
     ToastHelper.show(context, LanguageManager.isVi ? 'Đã xóa khóa học khỏi giỏ hàng' : 'Removed from cart');
-    _loadCart();
+    await CartManager.removeFromCart(courseId);
   }
 
   String _getCoursePrice(Course course) {
@@ -125,9 +150,9 @@ class _CartPageState extends State<CartPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('enrolled_course_id_${course.id}', true);
       
-      final cartIds = prefs.getStringList('cart_course_ids') ?? [];
+      final cartIds = await CartManager.getCartIds();
       cartIds.remove(course.id.toString());
-      await prefs.setStringList('cart_course_ids', cartIds);
+      await CartManager.setCartIds(cartIds);
       await CartManager.updateCount();
       
       if (mounted) {
@@ -149,92 +174,80 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
-  void _payPaidCourse(Course course) {
+  void _checkoutCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng nhập để thực hiện thanh toán.' : 'Please log in to check out.');
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginPage()));
+      }
+      return;
+    }
+
+    final unpaidCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price > 0).toList();
+    final freeCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price <= 0).toList();
+
+    if (unpaidCourses.isEmpty && freeCourses.isEmpty) {
+      ToastHelper.show(context, LanguageManager.isVi ? 'Bạn đã sở hữu tất cả khóa học trong giỏ hàng' : 'All courses in cart are already enrolled');
+      return;
+    }
+
+    // Auto enroll free courses if any
+    for (final freeCourse in freeCourses) {
+      try {
+        await _repository.enrollCourse(freeCourse.id);
+        await prefs.setBool('enrolled_course_id_${freeCourse.id}', true);
+      } catch (_) {}
+    }
+
+    if (unpaidCourses.isNotEmpty) {
+      double totalCartPrice = 0;
+      for (final c in unpaidCourses) {
+        totalCartPrice += c.price;
+      }
+      _payPaidCourses(unpaidCourses, totalCartPrice);
+    } else {
+      final cartIds = await CartManager.getCartIds();
+      for (final fc in freeCourses) {
+        cartIds.remove(fc.id.toString());
+      }
+      await CartManager.setCartIds(cartIds);
+      await CartManager.updateCount();
+      ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Đăng ký thành công các khóa học miễn phí!' : 'Free courses enrolled successfully!');
+      _loadCart();
+    }
+  }
+
+  void _payPaidCourses(List<Course> courses, double totalPrice) {
+    final courseIds = courses.map((c) => c.id).toList();
+    final title = courses.length > 1
+        ? (LanguageManager.isVi ? 'Thanh toán ${courses.length} khóa học trong giỏ hàng' : 'Checkout ${courses.length} courses in cart')
+        : courses.first.title;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => PaymentQrDialog(
-        courseId: course.id,
-        courseTitle: course.title,
-        price: course.price,
+        courseIds: courseIds,
+        courseTitle: title,
+        price: totalPrice,
         onPaymentSuccess: () async {
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('enrolled_course_id_${course.id}', true);
-          
-          final cartIds = prefs.getStringList('cart_course_ids') ?? [];
-          cartIds.remove(course.id.toString());
-          await prefs.setStringList('cart_course_ids', cartIds);
+          final cartIds = await CartManager.getCartIds();
+
+          for (final c in courses) {
+            await prefs.setBool('enrolled_course_id_${c.id}', true);
+            cartIds.remove(c.id.toString());
+          }
+          await CartManager.setCartIds(cartIds);
           await CartManager.updateCount();
-          
+
           if (mounted) {
-            ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Thanh toán thành công! Khóa học đã được mở khóa.' : 'Payment successful! Course unlocked.');
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: course.id),
-              ),
-            );
+            ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Thanh toán thành công! Các khóa học đã được mở khóa.' : 'Payment successful! Courses unlocked.');
+            _loadCart();
           }
         },
-      ),
-    );
-  }
-
-  void _checkout() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Color(0xFF28B79B), size: 28),
-            const SizedBox(width: 10),
-            Text(
-              LanguageManager.isVi ? 'Thanh toán thành công' : 'Checkout Successful',
-              style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Text(
-          LanguageManager.isVi
-              ? 'Chúc mừng bạn đã sở hữu các khóa học. Hãy bắt đầu chinh phục tiếng Anh ngay hôm nay!'
-              : 'Congratulations! You now own these courses. Let\'s start conquering English today!',
-          style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF28B79B),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              
-              // Clear cart in local storage
-              final prefs = await SharedPreferences.getInstance();
-              
-              // Also auto-enroll them in these courses locally
-              for (final c in _cartCourses) {
-                await prefs.setBool('enrolled_course_id_${c.id}', true);
-              }
-              
-              await prefs.setStringList('cart_course_ids', []);
-              await CartManager.updateCount();
-              
-              if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ListCoursesPage()),
-                );
-              }
-            },
-            child: Text(
-              LanguageManager.isVi ? 'Vào học ngay' : 'Learn Now',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          )
-        ],
       ),
     );
   }
@@ -510,18 +523,7 @@ class _CartPageState extends State<CartPage> {
                       ),
                     );
                   } else {
-                    return ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF05A22),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      ),
-                      onPressed: () => _payPaidCourse(course),
-                      child: Text(
-                        isVi ? 'Thanh toán' : 'Checkout',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                      ),
-                    );
+                    return const SizedBox.shrink();
                   }
                 },
               ),
@@ -568,25 +570,79 @@ class _CartPageState extends State<CartPage> {
           ),
           const SizedBox(height: 20),
 
-          // Price rows
+          // Detailed Price breakdown
+          _buildSummaryRow(
+            isVi ? 'Số lượng khóa học' : 'Total Items',
+            isVi ? '${_cartCourses.length} khóa học' : '${_cartCourses.length} items',
+          ),
+          const SizedBox(height: 12),
+          _buildSummaryRow(
+            isVi ? 'Tạm tính' : 'Subtotal',
+            _formatPrice(subtotal),
+          ),
+          const SizedBox(height: 12),
+          _buildSummaryRow(
+            isVi ? 'Giảm giá' : 'Discount',
+            '0đ',
+            valueColor: const Color(0xFF10B981),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 16),
           _buildSummaryRow(
             isVi ? 'Tổng tiền' : 'Total',
             _formatPrice(subtotal),
             isBold: true,
-            fontSize: 18,
+            fontSize: 20,
             valueColor: const Color(0xFF28B79B),
           ),
           const SizedBox(height: 20),
-          Text(
-            isVi 
-              ? '* Vui lòng chọn đăng ký học hoặc thanh toán cho từng khóa học ở danh sách bên cạnh.'
-              : '* Please enroll or pay for each course individually in the list.',
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 12,
-              fontFamily: 'Outfit',
-              fontStyle: FontStyle.italic,
-              height: 1.4,
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF05A22),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 2,
+            ),
+            onPressed: _checkoutCart,
+            icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+            label: Text(
+              isVi ? 'Quét mã QR thanh toán' : 'Scan QR Code Checkout',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isVi 
+                      ? 'Nút trên sẽ tự động mở VietQR PayOS để quét mã thanh toán các khóa học.'
+                      : 'Button above will automatically open VietQR PayOS for your checkout.',
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontFamily: 'Outfit',
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

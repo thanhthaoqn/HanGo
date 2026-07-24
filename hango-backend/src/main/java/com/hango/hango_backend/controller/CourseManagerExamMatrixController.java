@@ -23,13 +23,17 @@ public class CourseManagerExamMatrixController {
     private final QuestionRepository questionRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyAuthority('COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
     public ResponseEntity<List<ExamMatrixDTO>> getAllMatrices(
             @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(matrixService.getAllExamMatrices());
+        try {
+            return ResponseEntity.ok(matrixService.getAllExamMatrices());
+        } catch (Exception e) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
     }
 
     @PostMapping

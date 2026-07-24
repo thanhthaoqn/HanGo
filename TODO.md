@@ -261,27 +261,31 @@ This file is the official roadmap and checklist for the HanGo platform developme
 
 ## 🚀 [FE-12] Payment & Revenue (NEW)
 ### 🎨 Phase 1: Frontend UI & Mock Data
-- [ ] Build Course Purchase screen displaying price details.
+- [x] Build Course Purchase screen displaying price details and PayOS QR code modal.
+- [x] Build Learner Purchase History UI tab in Account Profile page (`MyInformationPage`).
 - [ ] Integrate payment checkout redirection.
 - [ ] Build Trainer Revenue Dashboard UI (sales statistics, monthly statement table).
 - [ ] Build Admin Revenue Settlement UI (generate statements, confirm transfer record).
 
 ### ⚙️ Phase 2: Backend Execution & API Design
-- [ ] Set up `orders`, `revenue_records`, `monthly_statements` tables.
-- [x] Write VNPay payment integration (generate payment URL, verify IPN checksum, idempotent success handler).
-- [ ] Write auto revenue splitter logic (Gross -> TrainerShare / PlatformShare based on TrainerType 70/30 or 60/40) upon successful payment.
+- [x] Set up `payments`, `revenue_records`, `monthly_statements` tables.
+- [x] Write PayOS payment integration (generate payment URL, verify webhook checksum, idempotent success handler).
+- [x] Implement API `GET /api/v1/payment/my-history` for Learner to retrieve purchase history.
+- [x] Implement duplicate enrollment guard on payment creation.
+- [x] Write auto revenue splitter logic (Gross -> TrainerShare / PlatformShare based on TrainerType 70/30 or 60/40) upon successful payment.
 - [ ] Implement background scheduler job to automatically generate Monthly Statements.
 - [ ] Create Trainer APIs (`GET /api/v1/trainer/revenue`, `POST /api/v1/trainer/statements/{id}/confirm`).
 - [ ] Create Admin settlement APIs (`GET /api/v1/admin/statements`, `PUT /api/v1/admin/statements/{id}/pay`).
 
 ### 🔌 Phase 3: Integration
-- [ ] Integrate checkout redirection to VNPay sandbox environment.
-- [ ] Connect order tracking and webhook IPN processing.
+- [x] Integrate checkout redirection / QR dialog to PayOS environment.
+- [x] Connect order tracking and webhook IPN processing.
+- [x] Connect Purchase History UI to Backend API.
 - [ ] Connect Revenue Dashboard for Trainers and Settlement views for Admins.
 
 ### 🚨 Phase 4: Quality Assurance
-- [ ] Test double-payment IPN (idempotency checks).
-- [x] Test VNPay signature checks.
+- [x] Test double-payment IPN (idempotency checks).
+- [x] Test PayOS signature checks and duplicate enrollment protection.
 - [ ] Validate manual transfer record flow by Admin.
 
 ---

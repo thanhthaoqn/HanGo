@@ -45,7 +45,7 @@ class _CourseCardState extends State<CourseCard> {
   Future<void> _loadStates() async {
     final prefs = await SharedPreferences.getInstance();
     final wishlist = prefs.getStringList('wishlisted_course_ids') ?? [];
-    final cart = prefs.getStringList('cart_course_ids') ?? [];
+    final cart = await CartManager.getCartIds();
     final enrolledLocal = prefs.getBool('enrolled_course_id_${widget.course.id}') ?? false;
 
     if (mounted) {
@@ -82,24 +82,22 @@ class _CourseCardState extends State<CourseCard> {
   }
 
   Future<void> _toggleCart() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cart = prefs.getStringList('cart_course_ids') ?? [];
-    final courseIdStr = widget.course.id.toString();
+    final isVi = LanguageManager.isVi;
 
-    setState(() {
-      if (_isInCart) {
-        cart.remove(courseIdStr);
+    if (_isInCart) {
+      setState(() {
         _isInCart = false;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã xóa khỏi giỏ hàng' : 'Removed from cart');
-      } else {
-        cart.add(courseIdStr);
+      });
+      ToastHelper.show(context, isVi ? 'Đã xóa khỏi giỏ hàng' : 'Removed from cart');
+      await CartManager.removeFromCart(widget.course.id);
+    } else {
+      setState(() {
         _isInCart = true;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã thêm vào giỏ hàng' : 'Added to cart');
-      }
-    });
+      });
+      ToastHelper.show(context, isVi ? 'Đã thêm vào giỏ hàng' : 'Added to cart');
+      await CartManager.addToCart(widget.course);
+    }
 
-    await prefs.setStringList('cart_course_ids', cart);
-    await CartManager.updateCount();
     if (widget.onStateChanged != null) {
       widget.onStateChanged!();
     }

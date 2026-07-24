@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
+import '../../widgets/course_manager_sidebar.dart';
 import '../../widgets/shared_header.dart';
 import '../login_page.dart';
 import 'course_manager_dashboard_page.dart';
@@ -122,10 +123,10 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
         hideNavLinks: true,
         hideCommerceActions: true,
       ),
-      drawer: !isDesktop ? Drawer(child: _buildCourseManagerSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'profile')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible) SizedBox(width: 240, child: _buildCourseManagerSidebar(context)),
+          if (isDesktop && _isSidebarVisible) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'profile')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

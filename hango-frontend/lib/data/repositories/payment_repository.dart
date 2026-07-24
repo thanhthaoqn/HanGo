@@ -6,12 +6,19 @@ import '../../utils/config.dart';
 class PaymentRepository {
   final String baseUrl = EnvConfig.v1BaseUrl;
 
-  Future<Map<String, dynamic>> createPayment(int courseId) async {
+  Future<Map<String, dynamic>> createPayment({int? courseId, List<int>? courseIds}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
     if (token == null || token.isEmpty) {
       throw Exception('Vui lòng đăng nhập để thanh toán.');
+    }
+
+    final Map<String, dynamic> bodyData = {};
+    if (courseIds != null && courseIds.isNotEmpty) {
+      bodyData['courseIds'] = courseIds;
+    } else if (courseId != null) {
+      bodyData['courseId'] = courseId;
     }
 
     final response = await http.post(
@@ -20,7 +27,7 @@ class PaymentRepository {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({'courseId': courseId}),
+      body: jsonEncode(bodyData),
     );
 
     if (response.statusCode != 200) {
@@ -56,5 +63,29 @@ class PaymentRepository {
     }
 
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  Future<dynamic> getMyPaymentHistory({int page = 0, int size = 10, String status = 'ALL'}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Vui lòng đăng nhập.');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/payment/my-history?page=$page&size=$size&status=$status'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      final body = utf8.decode(response.bodyBytes);
+      throw Exception('Lỗi tải lịch sử thanh toán: $body');
+    }
+
+    return jsonDecode(utf8.decode(response.bodyBytes));
   }
 }
