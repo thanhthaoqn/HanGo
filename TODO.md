@@ -53,15 +53,15 @@ This file is the official roadmap and checklist for the HanGo platform developme
 ### ⚙️ Phase 2: Backend Execution & API Design
 - [x] Create Management API for Admin (`GET /api/v1/users`, pagination, `@PreAuthorize`).
 - [x] Create Lock API (`PUT /api/v1/users/{id}/status`).
-- [ ] Implement AI Usage Logging Aspect (`@AfterReturning`) to record token usage and log into `ai_usage_logs` table.
-- [ ] Implement Audit Logging Aspect to record administrative actions into `audit_logs` table.
+- [x] Implement AI Usage logging to record token usage and log into `ai_usage_logs` table (`GeminiClientService` is the single choke point that writes every call; `GET /api/admin/ai-usage` exposes it). *(checkbox corrected 2026-07-24 — was marked incomplete but already implemented, see `doc/specs/03-rbac.md`.)*
+- [x] Implement Audit Logging to record administrative actions into `audit_logs` table (`AdminController.logAudit()`, `GET /api/admin/audit-log`). *(checkbox corrected 2026-07-24, same reason as above.)*
 
 ### 🔌 Phase 3: Integration
 - [x] Connect Admin User Management APIs and Dashboard Analytics charts.
 - [ ] Integrate AI Usage Monitoring and Audit Logs with real APIs.
 
 ### 🚨 Phase 4: Quality Assurance
-- [ ] Prevent Admin from locking their own account (HTTP 400 Error).
+- [x] Prevent Admin from locking their own account (HTTP 400 Error) — fixed 2026-07-22 alongside the status/role-whitelist bypass fixes in `AdminController`, see `doc/specs/03-rbac.md`.
 
 ---
 
@@ -188,6 +188,9 @@ This file is the official roadmap and checklist for the HanGo platform developme
 
 ### 🚨 Phase 4: Quality Assurance
 - [ ] Test guardrails to ensure AI refuses out-of-scope prompts (e.g. non-educational questions).
+- [x] Fix `getSafeUserId` to accept `UserDetailsImpl` directly instead of resolving id defensively. *(moved from a stray `TODO_backend_ai.txt` scratch file found inside `src/main/java` during the 2026-07-24 audit — folded in here and the stray file removed.)*
+- [ ] Validate the SecurityContext flow for `/ai-assistant/messages` end-to-end.
+- [ ] Call the API with a real `Authorization: Bearer` token to confirm `learnerId` is never null.
 
 ---
 
@@ -316,12 +319,10 @@ This file is the official roadmap and checklist for the HanGo platform developme
 - [ ] Mount WebSocket Client listener to receive realtime pushes.
 
 ### ⚙️ Phase 2: Backend Execution & API Design
-- [ ] Configure Spring Boot **WebSocket** with STOMP message broker.
-- [ ] Set up `notifications` table and `ApplicationEventPublisher` (Spring Events) for async notification dispatching (`@Async`).
-- [ ] Set up triggers for the following events:
-  - Learner: PurchaseSuccess, CourseUpdated, CommentReply.
-  - Trainer: NewEnrollment, CommentReply, ContentApproved, ContentRejected, StatementReady.
-- [ ] Implement JavaMailSender for email notifications (OTP verification, Reset Password, Purchase Success).
+- [ ] Configure Spring Boot **WebSocket** with STOMP message broker — still not implemented; current delivery is REST polling only (`GET /api/v1/notifications`, `/unread-count`), by deliberate simplification (see `doc/specs/14-notification.md`).
+- [x] Set up `notifications` table (`Notification` entity, supports per-user and per-role broadcast targeting) — done. **Not done, and not currently planned:** `ApplicationEventPublisher`/`@Async` dispatching — `NotificationService` is called directly from each producing Service instead (documented, deliberate simplification, checkbox corrected 2026-07-24).
+- [x] Triggers implemented and tested: `ContentApproved`/`ContentRejected` (course & exam review), `CourseUpdated` (new version published), `StatementReady`, `LOW_RATING`/`LOW_AVERAGE_RATING` (course rating). **Not yet confirmed wired:** `PurchaseSuccess`, `NewEnrollment`, `CommentReply` — verify before marking fully done.
+- [x] Implement JavaMailSender for email notifications (`EmailService`: OTP verification, enrollment success, trainer status/statement settlement) — done; falls back to console logging if SMTP is unreachable rather than failing the request.
 
 ### 🔌 Phase 3: Integration
 - [ ] Integrate WebSocket client on frontend to listen to user-specific queues.

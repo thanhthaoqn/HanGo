@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.9 (AI)
 
+> ⚠️ **Ghi chú 2026-07-24:** kiến trúc thật chi tiết hơn tài liệu này mô tả. Nhà cung cấp AI thật là **Gemini** (không phải "OpenAI GPT-4 hoặc Gemini" chung chung) — `GeminiClientService` là điểm chốt duy nhất gọi API. Có 1 tầng guardrail 3 lớp thật đã implement: `ScopeGuardrailService` (so sánh embedding similarity với ngưỡng cấu hình được để chặn câu hỏi ngoài phạm vi), `AIPromptBuilder` (dựng system prompt kèm ngữ cảnh Lesson), `LessonEmbeddingService` (tính & cache embedding nội dung Lesson). Tên class thật là `AIAssistantService` (không phải "AiService" như tài liệu này viết), entity thật là `AIConversation`/`AIMessage` (không phải "ai_conversations" bảng chung chung). Xem [`HanGo_Documentation.md`](../HanGo_Documentation.md) §11 và §15.1 để biết inventory đầy đủ.
+
 ## 1. Business Context
 The AI Learning Assistant feature is the technological highlight of HanGo. It provides an in-app Chat Interface where Learners can ask questions regarding lesson content, request document summaries, or get explanations for difficult concepts. This substitutes the need for continuous 1:1 instructor support.
 

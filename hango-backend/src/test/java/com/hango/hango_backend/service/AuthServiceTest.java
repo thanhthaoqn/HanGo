@@ -895,6 +895,19 @@ class AuthServiceTest {
     }
 
     @Test
+    void updateAvatarShouldRejectEmptyFile() {
+        User user = activeUser("known@example.com", "ACTIVE");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.updateAvatar("known@example.com", file));
+        assertTrue(ex.getMessage().contains("required"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     void updateAvatarShouldUploadToCloudinaryAndSaveReturnedUrl() throws Exception {
         User user = activeUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));

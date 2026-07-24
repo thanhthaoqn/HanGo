@@ -26,10 +26,10 @@ The system manages several core EdTech domains that dictate the architecture:
 - **Constraints:** Must support responsive design across different form factors (Mobile, Tablet, Web). State is managed via localized mechanisms, meaning data fetching and caching must be handled carefully without a heavy global state manager.
 
 **Backend (Spring Boot):**
-- **Core Framework:** Java 21, Spring Boot (4.0.6 parent).
-- **Data Access:** Spring Data JPA, Hibernate, MySQL Connector/J.
-- **Third-Party Integrations:** Google API Client (OAuth2), Cloudinary (Media storage).
-- **Constraints:** Java 21 language features should be utilized. Must provide consistent JSON structures for all API responses.
+- **Core Framework:** Java 17, Spring Boot (4.0.6 parent). *(`pom.xml` pins `java.version=17`; CI/deploy workflows install a JDK 21 toolchain to build with, but the compiled language level is 17 — no Java 21-only syntax is used anywhere in the codebase as of 2026-07-24.)*
+- **Data Access:** Spring Data JPA, Hibernate, MySQL Connector/J. Schema is managed via Hibernate `ddl-auto` (no Flyway/Liquibase yet — see `AUDIT_REPORT.md` HIGH-01).
+- **Third-Party Integrations:** Google API Client (OAuth2), Cloudinary (Media storage), PayOS (payment gateway — supersedes an earlier VNPay design; some field/column names like `Payment.vnpayTxnNo` still carry the old name).
+- **Constraints:** Must provide consistent JSON structures for all API responses (currently inconsistent across controllers — see `AUDIT_REPORT.md` HIGH-05).
 
 **Database:**
 - **System:** MySQL.
@@ -51,9 +51,9 @@ The backend enforces a strict N-Tier pattern where Controllers only talk to Serv
 - **`service/`**: Core business logic and transaction management.
 - **`repository/`**: Database interactions via Spring Data JPA.
 - **`entity/`**: JPA models mapping directly to MySQL tables.
-- **`dto/`**: Data Transfer Objects for API payloads (Entities are never exposed directly to the client).
-- **`exception/`**: Global error handling (`@ControllerAdvice`).
-- **`sercurity/`**: JWT filters and authentication logic.
+- **`dto/`**: Data Transfer Objects for API payloads (Entities are never exposed directly to the client). Mapping is done manually (`@Builder` chains / field copies) — no MapStruct is actually used despite earlier plans.
+- **`exeption/`**: Global error handling (`@ControllerAdvice`) — package name is spelled this way in the real code (not "exception"). Currently only catches a custom `ApiException`; most services throw plain `RuntimeException` instead (see `AUDIT_REPORT.md` HIGH-05).
+- **`sercurity/`**: JWT filters and authentication logic — package name is spelled this way in the real code (not "security").
 
 ## 4. Data Flow & Security Constraints
 

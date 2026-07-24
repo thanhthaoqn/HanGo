@@ -22,6 +22,7 @@ public class CommentServiceImpl implements CommentService {
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
     private final CommentRuleEngineService ruleEngineService;
+    private final NotificationService notificationService;
 
     private CommentDTO convertToDTO(Comment comment, Long currentUserId) {
         return CommentDTO.builder()
@@ -91,6 +92,14 @@ public class CommentServiceImpl implements CommentService {
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
+
+        if (parent != null && parent.getUser() != null && !parent.getUser().getId().equals(userId)) {
+            notificationService.notifyUser(parent.getUser(), NotificationService.TYPE_COMMENT_REPLY,
+                    "New reply to your comment",
+                    user.getFullName() + " replied: \"" + request.getContent() + "\"",
+                    lesson.getSection() != null ? lesson.getSection().getCourse() : null);
+        }
+
         return convertToDTO(savedComment, userId);
     }
 

@@ -10,9 +10,11 @@ import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamRepository;
 import com.hango.hango_backend.repository.LessonRepository;
+import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.service.CourseManagerDashboardService;
+import com.hango.hango_backend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,8 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     private final ExamRepository examRepository;
     private final SectionRepository sectionRepository;
     private final LessonRepository lessonRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -98,12 +102,31 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         course.setLatestVersionId(course.getId());
         courseRepository.save(course);
 
+        notificationService.notifyUser(course.getCreator(), NotificationService.TYPE_CONTENT_APPROVED,
+                "Course published",
+                "Your course \"" + course.getTitle() + "\" has been approved and published.", course);
+
         if (course.getParentId() != null) {
             Course originalCourse = courseRepository.findById(course.getParentId())
                     .orElse(null);
             if (originalCourse != null && "PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
                 originalCourse.setLatestVersionId(course.getId());
                 courseRepository.save(originalCourse);
+            }
+
+            List<Long> priorVersionIds = courseRepository.findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(course.getCode())
+                    .stream()
+                    .map(Course::getId)
+                    .filter(id -> !id.equals(course.getId()))
+                    .collect(Collectors.toList());
+            if (!priorVersionIds.isEmpty()) {
+                enrollmentRepository.findByCourseIdIn(priorVersionIds).stream()
+                        .map(enrollment -> enrollment.getUser())
+                        .distinct()
+                        .forEach(learner -> notificationService.notifyUser(learner, NotificationService.TYPE_COURSE_UPDATED,
+                                "Course updated",
+                                "\"" + course.getTitle() + "\" has a new version (" + course.getVersion() + ") available.",
+                                course));
             }
         }
     }
@@ -122,6 +145,10 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         course.setStatus("DRAFT");
         courseRepository.save(course);
         // V1 remains PUBLISHED untouched - no changes needed
+
+        notificationService.notifyUser(course.getCreator(), NotificationService.TYPE_CONTENT_REJECTED,
+                "Course returned to draft",
+                "Your course \"" + course.getTitle() + "\" was returned to draft by the course manager.", course);
     }
 
     private String normalizeStatus(String status) {
@@ -231,6 +258,10 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         exam.setStatus("PUBLISHED");
         exam.setRejectionReason(null);
         examRepository.save(exam);
+
+        notificationService.notifyUser(exam.getCreatedBy(), NotificationService.TYPE_CONTENT_APPROVED,
+                "Exam published",
+                "Your exam \"" + exam.getTitle() + "\" has been approved and published.", null);
     }
 
     @Override
@@ -247,5 +278,10 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         exam.setStatus("DRAFT");
         exam.setRejectionReason(reason);
         examRepository.save(exam);
+
+        notificationService.notifyUser(exam.getCreatedBy(), NotificationService.TYPE_CONTENT_REJECTED,
+                "Exam returned to draft",
+                "Your exam \"" + exam.getTitle() + "\" was returned to draft" + (reason != null && !reason.isBlank() ? ": " + reason : "."),
+                null);
     }
 }

@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.2 (PROF). Admin-side account list/lock/role management is out of scope here — see [03-rbac.md](03-rbac.md) (FE-03).
 
+> ⚠️ **Ghi chú 2026-07-24:** `ProfileUpdateRequest` hiện **không có** annotation validation nào (`@Valid`/`@NotBlank`/`@Size`) — cập nhật profile không được validate ở tầng server (GAP-PROF-03, chưa sửa — xem `AUDIT_REPORT.md`). Learner "Learning Profile" (FR-PROF-04) và Trainer public/brand page (FR-PROF-05, vốn đã đánh dấu 📌 optional) vẫn chưa xác nhận có implementation đầy đủ tương ứng ở backend — cần đọc lại code trước khi viết test hoặc claim đã "Implemented".
+
 ## 1. Business Context
 Profile Management lets every logged-in user (Learner, Trainer, Course Manager, Admin) view/update their own personal information (full name, avatar, phone number) and change their own password. Learners additionally get a **Learning Profile** view — courses studied, progress, Exam history, and weaknesses (FR-PROF-04). Trainers may additionally get a public "brand page" (bio, course list) — this is marked open/optional for v1 (📌 FR-PROF-05).
 

@@ -90,9 +90,9 @@ class AdminControllerTest {
         when(courseRepository.count()).thenReturn(7L);
         when(enrollmentRepository.count()).thenReturn(15L);
         TopCourseProjection top = mock(TopCourseProjection.class);
-        lenient().when(top.getId()).thenReturn(1L);
-        lenient().when(top.getTitle()).thenReturn("English Grammar Mastery");
-        lenient().when(top.getEnrollmentCount()).thenReturn(10L);
+        when(top.getId()).thenReturn(1L);
+        when(top.getTitle()).thenReturn("English Grammar Mastery");
+        when(top.getEnrollmentCount()).thenReturn(10L);
         when(courseRepository.findTopCoursesByEnrollment(5)).thenReturn(List.of(top));
 
         ResponseEntity<?> response = adminController.getDashboardStats();
@@ -104,6 +104,22 @@ class AdminControllerTest {
         assertEquals(4L, body.get("totalRoles"));
         assertEquals(7L, body.get("totalCourses"));
         assertEquals(15L, body.get("totalEnrollments"));
+        @SuppressWarnings("unchecked")
+        List<java.util.Map<String, Object>> topCourses = (List<java.util.Map<String, Object>>) body.get("topCourses");
+        assertEquals(1, topCourses.size());
+        assertEquals(1L, topCourses.get(0).get("id"));
+        assertEquals("English Grammar Mastery", topCourses.get(0).get("title"));
+        assertEquals(10L, topCourses.get(0).get("enrollmentCount"));
+    }
+
+    @Test
+    void getDashboardStatsShouldReturn400WhenRepositoryThrows() {
+        when(userRepository.count()).thenThrow(new RuntimeException("DB down"));
+
+        ResponseEntity<?> response = adminController.getDashboardStats();
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("Error: DB down", response.getBody());
     }
 
     @Test
@@ -204,6 +220,44 @@ class AdminControllerTest {
         assertEquals(5, content.size());
     }
 
+    @Test
+    void getUsersShouldFilterByAdminRoleType() {
+        User admin = userWithRole(1L, "admin@example.com", "ADMINISTRATOR");
+        User trainer = userWithRole(2L, "trainer@example.com", "TRAINER");
+        when(userRepository.findAll()).thenReturn(List.of(admin, trainer));
+
+        ResponseEntity<?> response = adminController.getUsers("admin", null, 0, 10);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
+        assertEquals(1, body.get("totalElements"));
+    }
+
+    @Test
+    void getUsersShouldReturnEmptyContentWhenPageExceedsTotalElements() {
+        User trainer = userWithRole(1L, "trainer@example.com", "TRAINER");
+        when(userRepository.findAll()).thenReturn(List.of(trainer));
+
+        ResponseEntity<?> response = adminController.getUsers("trainer", null, 5, 10);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
+        assertEquals(1, body.get("totalElements"));
+        @SuppressWarnings("unchecked")
+        List<?> content = (List<?>) body.get("content");
+        assertTrue(content.isEmpty());
+    }
+
+    @Test
+    void getUsersShouldReturn400WhenRepositoryThrows() {
+        when(userRepository.findAll()).thenThrow(new RuntimeException("DB error"));
+
+        ResponseEntity<?> response = adminController.getUsers("staff", null, 0, 10);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("Error: DB error", response.getBody());
+    }
+
     // =================================================================
     // updateUserStatus
     // =================================================================
@@ -254,6 +308,16 @@ class AdminControllerTest {
         assertEquals(2L, captor.getValue().getTargetUserId());
     }
 
+    @Test
+    void updateUserStatusShouldReturn400WhenRepositoryThrowsGenericException() {
+        when(userRepository.findById(2L)).thenThrow(new RuntimeException("DB error"));
+
+        ResponseEntity<?> response = adminController.updateUserStatus(2L, "INACTIVE", mock(UserDetails.class));
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("Error: DB error", response.getBody());
+    }
+
     // =================================================================
     // getUserDetail
     // =================================================================
@@ -276,6 +340,16 @@ class AdminControllerTest {
         ResponseEntity<?> response = adminController.getUserDetail(99L);
 
         assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    void getUserDetailShouldReturn400WhenServiceThrowsGenericException() {
+        when(authService.getUserById(1L)).thenThrow(new RuntimeException("boom"));
+
+        ResponseEntity<?> response = adminController.getUserDetail(1L);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("Error: boom", response.getBody());
     }
 
     // =================================================================
@@ -360,6 +434,26 @@ class AdminControllerTest {
     }
 
     @Test
+    void updateUserByAdminShouldAllowAdminSettingOwnStatusToSameCurrentValue() {
+        // The self-lock guard only fires when the requested status differs from the current
+        // one, so requesting the SAME status (just different casing) bypasses it entirely.
+        User admin = targetUser(1L, "admin@example.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(authService.getUserById(1L)).thenReturn(UserResponse.builder().id(1L).build());
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(admin));
+        AdminUserUpdateRequest request = new AdminUserUpdateRequest();
+        request.setStatus("active");
+
+        ResponseEntity<?> response = adminController.updateUserByAdmin(1L, request, adminPrincipal("admin@example.com"));
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(userRepository).save(admin);
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertTrue(captor.getValue().getDetails().contains("status=ACTIVE"));
+    }
+
+    @Test
     void updateUserByAdminShouldThrowWhenEmailAlreadyInUse() {
         User target = targetUser(2L, "learner@example.com");
         when(userRepository.findById(2L)).thenReturn(Optional.of(target));
@@ -412,6 +506,43 @@ class AdminControllerTest {
         verify(auditLogRepository).save(captor.capture());
         assertEquals("UPDATE_USER", captor.getValue().getActionType());
         assertTrue(captor.getValue().getDetails().contains("status=INACTIVE"));
+    }
+
+    @Test
+    void updateUserByAdminShouldReplaceExistingRolesWithNewSingleRole() {
+        User target = userWithRole(2L, "learner@example.com", "LEARNER");
+        Role trainerRole = Role.builder().id(2L).roleName("TRAINER").build();
+        when(userRepository.findById(2L)).thenReturn(Optional.of(target));
+        when(roleRepository.findByRoleName("TRAINER")).thenReturn(Optional.of(trainerRole));
+        when(authService.getUserById(2L)).thenReturn(UserResponse.builder().id(2L).build());
+
+        AdminUserUpdateRequest request = new AdminUserUpdateRequest();
+        request.setRole("trainer");
+
+        ResponseEntity<?> response = adminController.updateUserByAdmin(2L, request, mock(UserDetails.class));
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, target.getRoles().size());
+        assertTrue(target.getRoles().contains(trainerRole));
+    }
+
+    @Test
+    void updateUserByAdminShouldSaveButNotLogAuditWhenOnlyPhoneNumberChanged() {
+        // Documents a real production gap: phoneNumber/gender/dateOfBirth are applied to the
+        // User and saved, but never appended to the `changes` list, so no audit log entry is
+        // written even though the record was actually mutated. See GAP-RBAC-1 in utc-sheet-rbac.csv.
+        User target = targetUser(2L, "learner@example.com");
+        when(userRepository.findById(2L)).thenReturn(Optional.of(target));
+        when(authService.getUserById(2L)).thenReturn(UserResponse.builder().id(2L).build());
+        AdminUserUpdateRequest request = new AdminUserUpdateRequest();
+        request.setPhoneNumber("0999999999");
+
+        ResponseEntity<?> response = adminController.updateUserByAdmin(2L, request, mock(UserDetails.class));
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("0999999999", target.getPhoneNumber());
+        verify(userRepository).save(target);
+        verify(auditLogRepository, never()).save(any());
     }
 
     @Test

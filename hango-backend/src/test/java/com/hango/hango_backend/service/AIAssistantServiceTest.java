@@ -2,6 +2,7 @@ package com.hango.hango_backend.service;
 
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.LessonDetailDTO;
+import com.hango.hango_backend.dto.QuizQuestionDTO;
 import com.hango.hango_backend.dto.SendMessageRequest;
 import com.hango.hango_backend.dto.SendMessageResponse;
 import com.hango.hango_backend.entity.AIConversation;
@@ -358,6 +359,90 @@ class AIAssistantServiceTest {
 
         assertEquals("Here is the answer.", response.getReply());
         assertTrue(response.getSuggestedQuestions().isEmpty());
+    }
+
+    @Test
+    void sendMessageShouldReturnEmptySuggestedQuestionsWhenGeminiResponseHasNoJsonArray() {
+        Lesson l = lesson(1L);
+        User u = learner(1L);
+        AIConversation existing = newConversation(10L, l, u);
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(l));
+        when(conversationRepository.findByIdAndLearnerIdWithMessages(10L, 1L)).thenReturn(Optional.of(existing));
+        when(conversationRepository.save(any(AIConversation.class))).thenReturn(existing);
+        stubNoLessonDetail(1L, 1L);
+        when(scopeGuardrailService.checkScope(eq(l), anyString(), any())).thenReturn(
+                new ScopeGuardrailService.ScopeCheckResult(true, 0.9));
+        when(promptBuilder.buildSystemPrompt(eq(l), any())).thenReturn("SYSTEM_PROMPT");
+        when(geminiClientService.generateChatResponse(eq("SYSTEM_PROMPT"), any())).thenReturn("Here is the answer.");
+        when(geminiClientService.generateChatResponse(org.mockito.ArgumentMatchers.contains("gợi ý"), any()))
+                .thenReturn("Sorry, I cannot help with that right now.");
+
+        SendMessageResponse response = service.sendMessage(1L, request(10L, 1L, "Explain present perfect."));
+
+        assertEquals("Here is the answer.", response.getReply());
+        assertTrue(response.getSuggestedQuestions().isEmpty());
+    }
+
+    @Test
+    void sendMessageShouldReturnFewerThanThreeSuggestedQuestionsWhenGeminiReturnsFewer() {
+        Lesson l = lesson(1L);
+        User u = learner(1L);
+        AIConversation existing = newConversation(10L, l, u);
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(l));
+        when(conversationRepository.findByIdAndLearnerIdWithMessages(10L, 1L)).thenReturn(Optional.of(existing));
+        when(conversationRepository.save(any(AIConversation.class))).thenReturn(existing);
+        stubNoLessonDetail(1L, 1L);
+        when(scopeGuardrailService.checkScope(eq(l), anyString(), any())).thenReturn(
+                new ScopeGuardrailService.ScopeCheckResult(true, 0.9));
+        when(promptBuilder.buildSystemPrompt(eq(l), any())).thenReturn("SYSTEM_PROMPT");
+        when(geminiClientService.generateChatResponse(eq("SYSTEM_PROMPT"), any())).thenReturn("Here is the answer.");
+        when(geminiClientService.generateChatResponse(org.mockito.ArgumentMatchers.contains("gợi ý"), any()))
+                .thenReturn("{\"suggestedQuestions\":[\"Q1?\"]}");
+
+        SendMessageResponse response = service.sendMessage(1L, request(10L, 1L, "Explain present perfect."));
+
+        assertEquals(List.of("Q1?"), response.getSuggestedQuestions());
+    }
+
+    @Test
+    void sendMessageShouldDefaultToEmptyPracticeQuestionsWhenLessonDetailIsNull() {
+        Lesson l = lesson(1L);
+        User u = learner(1L);
+        AIConversation existing = newConversation(10L, l, u);
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(l));
+        when(conversationRepository.findByIdAndLearnerIdWithMessages(10L, 1L)).thenReturn(Optional.of(existing));
+        when(conversationRepository.save(any(AIConversation.class))).thenReturn(existing);
+        when(lessonService.getLessonDetail(1L, 1L)).thenReturn(null);
+        when(scopeGuardrailService.checkScope(eq(l), anyString(), eq(List.of()))).thenReturn(
+                new ScopeGuardrailService.ScopeCheckResult(true, 0.9));
+        when(promptBuilder.buildSystemPrompt(eq(l), eq(List.of()))).thenReturn("SYSTEM_PROMPT");
+        when(geminiClientService.generateChatResponse(eq("SYSTEM_PROMPT"), any())).thenReturn("Here is the answer.");
+
+        SendMessageResponse response = service.sendMessage(1L, request(10L, 1L, "Explain present perfect."));
+
+        assertEquals("Here is the answer.", response.getReply());
+        verify(scopeGuardrailService).checkScope(eq(l), anyString(), eq(List.of()));
+    }
+
+    @Test
+    void sendMessageShouldForwardNonEmptyPracticeQuestionsFromLessonDetailToScopeCheckAndPromptBuilder() {
+        Lesson l = lesson(1L);
+        User u = learner(1L);
+        AIConversation existing = newConversation(10L, l, u);
+        List<QuizQuestionDTO> questions = List.of(QuizQuestionDTO.builder().questionText("What is present perfect?").build());
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(l));
+        when(conversationRepository.findByIdAndLearnerIdWithMessages(10L, 1L)).thenReturn(Optional.of(existing));
+        when(conversationRepository.save(any(AIConversation.class))).thenReturn(existing);
+        when(lessonService.getLessonDetail(1L, 1L)).thenReturn(LessonDetailDTO.builder().id(1L).questions(questions).build());
+        when(scopeGuardrailService.checkScope(eq(l), anyString(), eq(questions))).thenReturn(
+                new ScopeGuardrailService.ScopeCheckResult(true, 0.9));
+        when(promptBuilder.buildSystemPrompt(eq(l), eq(questions))).thenReturn("SYSTEM_PROMPT");
+        when(geminiClientService.generateChatResponse(eq("SYSTEM_PROMPT"), any())).thenReturn("Here is the answer.");
+
+        service.sendMessage(1L, request(10L, 1L, "Explain present perfect."));
+
+        verify(scopeGuardrailService).checkScope(eq(l), anyString(), eq(questions));
+        verify(promptBuilder).buildSystemPrompt(eq(l), eq(questions));
     }
 
     // =================================================================

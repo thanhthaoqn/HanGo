@@ -9,6 +9,43 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PathwayTimeboxingSchedulerTest {
 
+  // =================================================================
+  // schedule
+  // =================================================================
+
+  @Test
+  void scheduleShouldReturnEmptyListWhenNodeCountIsZero() {
+    List<PathwayTimeboxingScheduler.NodeSchedule> result = PathwayTimeboxingScheduler.schedule(
+        LocalDate.of(2026, 10, 15),
+        10,
+        null,
+        null,
+        0
+    );
+
+    assertTrue(result.isEmpty());
+  }
+
+  @Test
+  void scheduleShouldPinAllNodesToTargetDateWithZeroHoursWhenHoursPerWeekIsZero() {
+    LocalDate target = LocalDate.of(2026, 10, 15);
+
+    List<PathwayTimeboxingScheduler.NodeSchedule> result = PathwayTimeboxingScheduler.schedule(
+        target,
+        0,
+        null,
+        null,
+        3
+    );
+
+    assertEquals(3, result.size());
+    for (PathwayTimeboxingScheduler.NodeSchedule nodeSchedule : result) {
+      assertEquals(target, nodeSchedule.getStartDate());
+      assertEquals(target, nodeSchedule.getDeadline());
+      assertEquals(0, nodeSchedule.getEstimatedHours());
+    }
+  }
+
   @Test
   void schedule_isDeterministic_for_sameInputs() {
     LocalDate target = LocalDate.of(2026, 10, 15); // Thursday

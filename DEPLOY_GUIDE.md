@@ -116,6 +116,8 @@ EOF
 chmod 600 ~/hango/.env
 ```
 
+> ⚠️ **Không bao giờ commit giá trị thật của các biến trên vào Git** (kể cả trong tài liệu). Lấy giá trị thật từ PayOS Merchant Dashboard và dán trực tiếp trên server khi chạy lệnh này, không lưu lại trong bất kỳ file nào được track bởi git. Nếu bạn tìm thấy giá trị thật đã từng bị commit (kể cả trong lịch sử git cũ), hãy coi như đã bị lộ và rotate lại key ngay trên PayOS Dashboard.
+
 ---
 
 ## 🤖 PHẦN 5: Triển Khai Tự Động Với CI/CD GitHub Actions
@@ -152,7 +154,7 @@ Khi bạn đẩy code có chứa thư mục cấu hình `.github/workflows/deplo
    ```
 3. **Sinh chứng chỉ SSL:**
    ```bash
-   sudo certbot certonly --standalone -d hangog92.online -d www.hangog92.online -d api.hangog92.online --email hangog92su26@gmail.com --agree-tos --no-eff-email
+   sudo certbot certonly --standalone -d hangog92.online -d www.hangog92.online -d api.hangog92.online --email YOUR_EMAIL@example.com --agree-tos --no-eff-email
    ```
 4. **Copy chứng chỉ vào thư mục chia sẻ của Docker:**
    ```bash

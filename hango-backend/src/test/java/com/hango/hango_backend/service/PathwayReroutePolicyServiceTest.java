@@ -19,6 +19,67 @@ class PathwayReroutePolicyServiceTest {
         service = new PathwayReroutePolicyService();
     }
 
+    // =================================================================
+    // evaluate
+    // =================================================================
+
+    @Test
+    void evaluateShouldReturnNoChangeWhenNodesSnapshotIsNull() {
+        ProgressSnapshotDTO snapshot = new ProgressSnapshotDTO();
+
+        PathwayReroutePolicyService.PolicyDecision decision = service.evaluate(snapshot);
+
+        assertEquals(PathwayReroutePolicyService.PolicyAction.NO_CHANGE, decision.action);
+        assertNull(decision.targetNode);
+    }
+
+    @Test
+    void evaluateShouldReturnNoChangeWhenNodesSnapshotIsEmpty() {
+        ProgressSnapshotDTO snapshot = new ProgressSnapshotDTO();
+        snapshot.setNodesSnapshot(List.of());
+
+        PathwayReroutePolicyService.PolicyDecision decision = service.evaluate(snapshot);
+
+        assertEquals(PathwayReroutePolicyService.PolicyAction.NO_CHANGE, decision.action);
+        assertNull(decision.targetNode);
+    }
+
+    @Test
+    void evaluateShouldReturnNoChangeWhenPerfectScoreNodeHasNoNextNode() {
+        ProgressSnapshotDTO snapshot = new ProgressSnapshotDTO();
+
+        ProgressSnapshotDTO.NodeSnapshotDTO node1 = new ProgressSnapshotDTO.NodeSnapshotDTO();
+        node1.setStatus("COMPLETED");
+        node1.setLatestScore(100.0);
+
+        snapshot.setNodesSnapshot(List.of(node1));
+
+        PathwayReroutePolicyService.PolicyDecision decision = service.evaluate(snapshot);
+
+        assertEquals(PathwayReroutePolicyService.PolicyAction.NO_CHANGE, decision.action);
+        assertNull(decision.targetNode);
+    }
+
+    @Test
+    void evaluateShouldNotFastTrackWhenNextNodeHasWeakSkillOverlap() {
+        ProgressSnapshotDTO snapshot = new ProgressSnapshotDTO();
+
+        ProgressSnapshotDTO.NodeSnapshotDTO node1 = new ProgressSnapshotDTO.NodeSnapshotDTO();
+        node1.setStatus("COMPLETED");
+        node1.setLatestScore(100.0);
+
+        ProgressSnapshotDTO.NodeSnapshotDTO node2 = new ProgressSnapshotDTO.NodeSnapshotDTO();
+        node2.setStatus("LOCKED");
+        node2.setHasWeakSkillOverlap(true);
+
+        snapshot.setNodesSnapshot(List.of(node1, node2));
+
+        PathwayReroutePolicyService.PolicyDecision decision = service.evaluate(snapshot);
+
+        assertEquals(PathwayReroutePolicyService.PolicyAction.NO_CHANGE, decision.action);
+        assertNull(decision.targetNode);
+    }
+
     @Test
     void fastTrack_onlySuggests_neverAutoSkips() {
         ProgressSnapshotDTO snapshot = new ProgressSnapshotDTO();

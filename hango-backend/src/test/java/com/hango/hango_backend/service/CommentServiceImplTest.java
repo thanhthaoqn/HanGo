@@ -40,6 +40,8 @@ class CommentServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private CommentRuleEngineService ruleEngineService;
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private CommentServiceImpl commentService;
@@ -180,6 +182,35 @@ class CommentServiceImplTest {
         verify(commentRepository).save(captor.capture());
         assertEquals(5L, captor.getValue().getParentComment().getId());
         assertEquals(5L, result.getParentCommentId());
+        verify(notificationService).notifyUser(any(), org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_COMMENT_REPLY), any(), any(), any());
+    }
+
+    @Test
+    void addCommentShouldNotNotifyWhenReplyingToOwnComment() {
+        Comment parent = comment(5L, user(10L, "Alice"), "APPROVED");
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(Lesson.builder().id(1L).build()));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(user(10L, "Alice")));
+        when(commentRepository.findById(5L)).thenReturn(Optional.of(parent));
+        when(ruleEngineService.evaluate(any())).thenReturn(approved());
+        when(commentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        commentService.addComment(1L, 10L, CommentRequestDTO.builder().content("reply to self").parentCommentId(5L).build());
+
+        verify(notificationService, never()).notifyUser(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void addCommentShouldNotNotifyWhenParentCommentHasNoAuthor() {
+        Comment parent = comment(5L, null, "APPROVED");
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(Lesson.builder().id(1L).build()));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(user(10L, "Alice")));
+        when(commentRepository.findById(5L)).thenReturn(Optional.of(parent));
+        when(ruleEngineService.evaluate(any())).thenReturn(approved());
+        when(commentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        commentService.addComment(1L, 10L, CommentRequestDTO.builder().content("reply").parentCommentId(5L).build());
+
+        verify(notificationService, never()).notifyUser(any(), any(), any(), any(), any());
     }
 
     // =================================================================
@@ -254,6 +285,42 @@ class CommentServiceImplTest {
     // =================================================================
 
     @Test
+    void likeCommentShouldThrowWhenCommentNotFound() {
+        when(commentRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> commentService.likeComment(1L, 20L));
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    void likeCommentShouldThrowWhenUserNotFound() {
+        Comment existing = comment(1L, user(10L, "Alice"), "APPROVED");
+        when(commentRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(userRepository.findById(20L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> commentService.likeComment(1L, 20L));
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    void unlikeCommentShouldThrowWhenCommentNotFound() {
+        when(commentRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> commentService.unlikeComment(1L, 20L));
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    void unlikeCommentShouldThrowWhenUserNotFound() {
+        Comment existing = comment(1L, user(10L, "Alice"), "APPROVED");
+        when(commentRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(userRepository.findById(20L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> commentService.unlikeComment(1L, 20L));
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
     void likeCommentShouldAddCurrentUserToLikedUsersAndReflectInDTO() {
         Comment existing = comment(1L, user(10L, "Alice"), "APPROVED");
         User liker = user(20L, "Bob");
@@ -301,5 +368,16 @@ class CommentServiceImplTest {
         CommentDTO replyDto = result.stream().filter(c -> c.getId().equals(2L)).findFirst().orElseThrow();
         assertNull(rootDto.getParentCommentId());
         assertEquals(1L, replyDto.getParentCommentId());
+    }
+
+    @Test
+    void convertToDTOShouldDefaultCreatedAtToNowWhenEntityCreatedAtIsNull() {
+        Comment approved = comment(1L, user(10L, "Alice"), "APPROVED");
+        when(commentRepository.findByLessonIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(approved));
+
+        List<CommentDTO> result = commentService.getCommentsByLesson(1L, null);
+
+        assertEquals(1, result.size());
+        org.junit.jupiter.api.Assertions.assertNotNull(result.get(0).getCreatedAt());
     }
 }

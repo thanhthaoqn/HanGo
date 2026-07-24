@@ -19,9 +19,17 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Spring Security role name this notification is addressed to, e.g. "TRAINER_LEAD" (Course Manager). */
-    @Column(name = "recipient_role", nullable = false, length = 30)
+    /**
+     * Broadcast target: Spring Security role name this notification is addressed to (e.g.
+     * "TRAINER_LEAD"), used when {@link #user} is null. Mutually exclusive with per-user targeting.
+     */
+    @Column(name = "recipient_role", length = 30)
     private String recipientRole;
+
+    /** Per-user target. When set, this notification belongs to exactly this user. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @Column(nullable = false, length = 50)
     private String type;

@@ -191,6 +191,18 @@ class TrainerExamMatrixServiceTest {
     }
 
     @Test
+    void createExamMatrixShouldThrowWhenDifficultyParamNotFound() {
+        User creator = user(1L, "trainer@example.com");
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(creator));
+        when(examMatrixRepository.save(any(ExamMatrix.class))).thenReturn(matrix(1L, "Matrix", creator));
+        when(systemParameterRepository.findById(1L)).thenReturn(Optional.of(param(1L, "Reading")));
+        when(systemParameterRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class,
+                () -> service.createExamMatrix("trainer@example.com", createRequest("Matrix", List.of(detailRequest(1L, 99L, 1L, 5)))));
+    }
+
+    @Test
     void createExamMatrixShouldThrowWhenCategoryNotFound() {
         User creator = user(1L, "trainer@example.com");
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(creator));

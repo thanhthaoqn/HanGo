@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.7 (QB)
 
+> ⚠️ **Ghi chú 2026-07-24:** `TrainerQuestionServiceImpl` thật hiện dùng `JdbcTemplate` (raw SQL có tham số hoá) cho phần CRUD group/sub-question thay vì thuần JPA — vẫn an toàn (không nối chuỗi SQL thủ công) nhưng khác cách triển khai "API CRUD" chung chung mà tài liệu này ngụ ý. `GAP-QB-01` (biến fallback trong `TrainerQuestionAIService.generatePayload` được tính nhưng không bao giờ dùng tới) vẫn còn tồn tại, chưa sửa. Excel Import/Export cho Question Bank: xem lưu ý về Apache POI ở [06-course-content-management.md](06-course-content-management.md) — nhiều khả năng áp dụng tương tự ở đây, chưa xác nhận riêng.
+
 ## 1. Business Context
 The Assessment system requires a flexible and centralized question repository, owned by each Trainer, reused by both Quiz (in Course content) and Exam. v1 supports exactly **one QuestionType: SingleChoice** (4 options A/B/C/D, exactly one correct answer) — no Multiple Choice / Fill-in-blank / True-False. Each Question has exactly **one SkillType** (BR-QB-01) and a Visibility (Public/Private). QuestionGroup lets several questions share a passage (SharedContent), used mainly for Exam. It also provides bulk Import/Export via Excel files, saving time versus manual entry.
 

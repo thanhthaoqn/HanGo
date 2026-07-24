@@ -2,6 +2,8 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.10 (LRN)
 
+> ⚠️ **Ghi chú 2026-07-24:** tài liệu này chưa đề cập tới Course Rating & Review (FR-LRN-08/09/10/11 — rating 1-5 sao, cache `averageRating`/`totalRatings` trên `Course`, notification `LOW_RATING`/`LOW_AVERAGE_RATING` cho Course Manager) đã được implement đầy đủ và có test (`CourseRatingServiceTest`), cũng như tính năng Learning Pathway/AI Mentor (xem [11-recommendation.md](11-recommendation.md)) được xây thêm lên trên module này sau này. Không có `ProgressService` riêng như có thể suy đoán — logic tiến độ nằm trong `CourseServiceImpl`/`LessonServiceImpl`. Tài liệu chưa cập nhật các bổ sung này, không có gì trong đây bị chứng minh sai — chỉ là chưa đầy đủ.
+
 ## 1. Business Context
 The system needs to provide Learners with the ability to track the Learning Progress of each course they are enrolled in, ensuring learners know exactly what percentage they have completed and what part they need to study next. Learning is **strictly sequential by Lesson** — completing Lesson N unlocks Lesson N+1 (Quiz completion is not required to unlock the next Lesson — BR-LRN-02). Course access, once purchased/enrolled, is **lifetime** (BR-LRN-05). Gamification is explicitly out of scope for v1. For the Trainer, this is core data to evaluate course effectiveness.
 

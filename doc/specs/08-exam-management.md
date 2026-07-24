@@ -2,6 +2,12 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.8 (EXM)
 
+> ⚠️ **Cập nhật 2026-07-24** (đã tự đọc code + viết/chạy test trực tiếp trên `ExamService` trong đợt audit này):
+> - **§3 "Backend Scoring Validation" đã đúng với code hiện tại** — `saveExamAttempt` thực sự tính điểm server-side dựa trên `QuestionOption.isCorrect`, không tin điểm client gửi lên (không còn là GAP-EXM-03 như báo cáo QA 2026-07-19 từng ghi nhận).
+> - **GAP-EXM-01 (vẫn còn tồn tại, chưa sửa):** `answersJson` được lưu đúng dạng JSON array khi `saveExamAttempt` chạy, nhưng `mapToAttemptDTO` (dùng chung cho cả response ngay sau khi nộp bài **và** khi xem lại Attempt History) đọc lại bằng `objectMapper.readValue(json, Map.class)` — sai kiểu, exception bị nuốt (catch rỗng) — kết quả: trường `answers`/`correctness` trong `ExamAttemptResponseDTO` **luôn rỗng**, kể cả khi dữ liệu đã lưu đúng trong DB. Ảnh hưởng trực tiếp tới acceptance criteria "Result screen displaying...correct/incorrect per question" và "Attempt history view" ở §2 — cả 2 màn hình này hiện không thể hiển thị đúng "câu nào đúng/sai" từ dữ liệu trả về, dù điểm tổng (`score`) vẫn đúng. Xem test `saveExamAttemptShouldPersistEnrichedAnswersAsJsonArrayButEchoBackEmptyAnswersDueToTypeMismatch` trong `ExamServiceTest.java` — bug được cố tình lock lại bằng test để không bị quên, không phải test đang fail.
+> - **Không có bảng `exam_versions` riêng** như §2 mô tả — `Exam.status` nằm trực tiếp trên bảng `exams` (tương tự Course, xem `05-course-management.md`).
+> - Learner-facing "lấy đề để làm bài" hiện có method `ExamService.getExamQuestions(examId)` — trả về DTO an toàn (không có `isCorrect`) — đã có unit test đầy đủ từ 2026-07-24 (trước đó chưa có test, dù method đã tồn tại).
+
 ## 1. Business Context
 Exam is **independent of Course** — it simulates the latest THPTQG English exam and is created by **Trainer or Course Manager** (Course Manager can self-publish; Trainer's exam needs Course Manager approval — FR-EXM-01/03). Exam Questions are **created specifically for the Exam** — they are *not* pulled from / shared with the reusable Question Bank used by Quiz (BR-G07). Format is **fixed, not configurable**: **40 questions / 50 minutes / scale of 10** (0.25 pt per question), single-choice (BR-EXM-01). There is no pass/fail threshold — only a numeric score. For the Learner, this is an interface featuring a countdown timer, test execution, and automatic scoring immediately upon submission, with **unlimited retakes** (BR-G08).
 
