@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/model/lesson_detail.dart';
+import '../../utils/config.dart';
 
 class LessonRepository {
-  final String baseUrl = 'http://localhost:8080/api/v1';
+  final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<LessonDetail> fetchLessonDetail(int lessonId) async {
     try {

@@ -45,7 +45,7 @@ class _CourseCardState extends State<CourseCard> {
   Future<void> _loadStates() async {
     final prefs = await SharedPreferences.getInstance();
     final wishlist = prefs.getStringList('wishlisted_course_ids') ?? [];
-    final cart = prefs.getStringList('cart_course_ids') ?? [];
+    final cart = await CartManager.getCartIds();
     final enrolledLocal = prefs.getBool('enrolled_course_id_${widget.course.id}') ?? false;
 
     if (mounted) {
@@ -82,24 +82,22 @@ class _CourseCardState extends State<CourseCard> {
   }
 
   Future<void> _toggleCart() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cart = prefs.getStringList('cart_course_ids') ?? [];
-    final courseIdStr = widget.course.id.toString();
+    final isVi = LanguageManager.isVi;
 
-    setState(() {
-      if (_isInCart) {
-        cart.remove(courseIdStr);
+    if (_isInCart) {
+      setState(() {
         _isInCart = false;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã xóa khỏi giỏ hàng' : 'Removed from cart');
-      } else {
-        cart.add(courseIdStr);
+      });
+      ToastHelper.show(context, isVi ? 'Đã xóa khỏi giỏ hàng' : 'Removed from cart');
+      await CartManager.removeFromCart(widget.course.id);
+    } else {
+      setState(() {
         _isInCart = true;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã thêm vào giỏ hàng' : 'Added to cart');
-      }
-    });
+      });
+      ToastHelper.show(context, isVi ? 'Đã thêm vào giỏ hàng' : 'Added to cart');
+      await CartManager.addToCart(widget.course);
+    }
 
-    await prefs.setStringList('cart_course_ids', cart);
-    await CartManager.updateCount();
     if (widget.onStateChanged != null) {
       widget.onStateChanged!();
     }
@@ -137,20 +135,31 @@ class _CourseCardState extends State<CourseCard> {
   }
 
   String _getCoursePrice(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   String _getOriginalPrice(String currentPrice) {
     if (currentPrice == 'Miễn phí') return '';
-    if (currentPrice.contains('699')) return '999.000đ';
-    if (currentPrice.contains('899')) return '1.290.000đ';
-    if (currentPrice.contains('1.290')) return '1.800.000đ';
-    return '2.100.000đ';
+    try {
+      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
+      if (clean.isEmpty) return '';
+      final val = double.parse(clean);
+      final original = val * 1.3;
+      final formatted = original.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]}.',
+      );
+      return '$formattedđ';
+    } catch (_) {
+      return '';
+    }
   }
 
   String _getTeacherSalutation(String name) {
@@ -177,26 +186,33 @@ class _CourseCardState extends State<CourseCard> {
         'tagColor': const Color(0xFFE0F2FE),
         'textColor': const Color(0xFF0369A1),
       };
-    } else if (cat.contains('reading') || cat.contains('đọc hiểu')) {
+    } else if (cat.contains('reading') || cat.contains('đọc')) {
       return {
         'color': const Color(0xFF28B79B),
         'icon': Icons.chrome_reader_mode_rounded,
         'tagColor': const Color(0xFFE6FFFA),
         'textColor': const Color(0xFF137333),
       };
-    } else if (cat.contains('pronunciation') || cat.contains('phát âm') || cat.contains('stress') || cat.contains('trọng âm')) {
+    } else if (cat.contains('pronunciation') || cat.contains('phát âm')) {
       return {
         'color': const Color(0xFF8B5CF6),
         'icon': Icons.volume_up_rounded,
         'tagColor': const Color(0xFFF3E8FF),
         'textColor': const Color(0xFF6D28D9),
       };
-    } else if (cat.contains('vocabulary') || cat.contains('từ vựng')) {
+    } else if (cat.contains('synonym') || cat.contains('antonym') || cat.contains('đồng nghĩa') || cat.contains('trái nghĩa')) {
       return {
         'color': const Color(0xFFF97316),
-        'icon': Icons.translate_rounded,
+        'icon': Icons.compare_arrows_rounded,
         'tagColor': const Color(0xFFFFF7ED),
         'textColor': const Color(0xFFC2410C),
+      };
+    } else if (cat.contains('conversation') || cat.contains('giao tiếp')) {
+      return {
+        'color': const Color(0xFFEC4899),
+        'icon': Icons.chat_bubble_outline_rounded,
+        'tagColor': const Color(0xFFFCE7F3),
+        'textColor': const Color(0xFFBE185D),
       };
     } else {
       return {
@@ -206,6 +222,47 @@ class _CourseCardState extends State<CourseCard> {
         'textColor': const Color(0xFF137333),
       };
     }
+  }
+
+  Widget _buildCategoryTags() {
+    final tags = widget.course.categories.isNotEmpty
+        ? widget.course.categories
+        : (widget.course.category.isNotEmpty ? [widget.course.category] : []);
+
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: tags.take(3).map((tag) {
+          final theme = _getCourseCategoryTheme(tag);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: theme['tagColor'] as Color? ?? const Color(0xFFE6FFFA),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (theme['textColor'] as Color? ?? const Color(0xFF28B79B)).withOpacity(0.3),
+                width: 0.8,
+              ),
+            ),
+            child: Text(
+              tag,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: theme['textColor'] as Color? ?? const Color(0xFF137333),
+                fontFamily: 'Outfit',
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   Widget _buildCardPlaceholder(Map<String, dynamic> theme) {
@@ -356,6 +413,7 @@ class _CourseCardState extends State<CourseCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildCategoryTags(),
                     Text(
                       widget.course.title,
                       maxLines: 2,

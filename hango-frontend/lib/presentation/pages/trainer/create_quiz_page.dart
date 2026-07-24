@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import 'select_quiz_questions_page.dart';
@@ -96,10 +97,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
         return;
       }
       
-      String baseUrl = 'http://localhost:8080/api/v1';
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-        baseUrl = 'http://10.0.2.2:8080/api/v1';
-      }
+      final String baseUrl = EnvConfig.v1BaseUrl;
 
       final uri = Uri.parse('$baseUrl/courses/${widget.courseId}?t=${DateTime.now().millisecondsSinceEpoch}');
       final response = await http.get(

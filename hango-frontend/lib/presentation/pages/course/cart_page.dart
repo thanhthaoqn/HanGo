@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
+import '../../../data/repositories/cart_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
@@ -8,6 +9,9 @@ import '../../../utils/cart_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'list_courses_page.dart';
+import 'course_detail_page.dart';
+import '../login_page.dart';
+import '../../widgets/payment_qr_dialog.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({Key? key}) : super(key: key);
@@ -18,49 +22,80 @@ class CartPage extends StatefulWidget {
 
 class _CartPageState extends State<CartPage> {
   final CourseRepository _repository = CourseRepository();
+  final CartRepository _cartRepository = CartRepository();
   List<Course> _cartCourses = [];
+  Set<String> _enrolledCourseIds = {};
   bool _isLoading = true;
-  final TextEditingController _promoController = TextEditingController();
-  double _discountPercentage = 0.0;
-  bool _isPromoApplied = false;
 
   @override
   void initState() {
     super.initState();
+
+    // 1. Instant 0ms memory populate from RAM cache
+    final cached = CartManager.cartCoursesNotifier.value;
+    if (cached.isNotEmpty) {
+      _cartCourses = List<Course>.from(cached);
+      _isLoading = false;
+    }
+
+    CartManager.cartCoursesNotifier.addListener(_onCartNotifierChanged);
     _loadCart();
+  }
+
+  void _onCartNotifierChanged() {
+    if (mounted) {
+      setState(() {
+        _cartCourses = List<Course>.from(CartManager.cartCoursesNotifier.value);
+      });
+    }
   }
 
   @override
   void dispose() {
-    _promoController.dispose();
+    CartManager.cartCoursesNotifier.removeListener(_onCartNotifierChanged);
     super.dispose();
   }
 
   Future<void> _loadCart() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (_cartCourses.isEmpty) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cartIds = prefs.getStringList('cart_course_ids') ?? [];
-      
-      if (cartIds.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _cartCourses = [];
-            _isLoading = false;
-          });
+      final token = prefs.getString('auth_token');
+
+      List<Course> coursesInCart = [];
+      if (token != null && token.isNotEmpty) {
+        try {
+          coursesInCart = await _cartRepository.getCartItems();
+        } catch (e) {
+          debugPrint('Error loading DB cart: $e');
         }
-        return;
       }
 
-      final allCourses = await _repository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
-      final filtered = allCourses.where((c) => cartIds.contains(c.id.toString())).toList();
+      if (coursesInCart.isEmpty) {
+        final cartIds = await CartManager.getCartIds();
+        if (cartIds.isNotEmpty) {
+          final allCourses = await _repository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
+          coursesInCart = allCourses.where((c) => cartIds.contains(c.id.toString())).toList();
+        }
+      }
+
+      final enrolled = <String>{};
+      for (final c in coursesInCart) {
+        final isEnrolled = prefs.getBool('enrolled_course_id_${c.id}') ?? false;
+        if (isEnrolled) {
+          enrolled.add(c.id.toString());
+        }
+      }
 
       if (mounted) {
         setState(() {
-          _cartCourses = filtered;
+          _cartCourses = coursesInCart;
+          _enrolledCourseIds = enrolled;
           _isLoading = false;
         });
       }
@@ -74,23 +109,24 @@ class _CartPageState extends State<CartPage> {
   }
 
   Future<void> _removeItem(int courseId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final cartIds = prefs.getStringList('cart_course_ids') ?? [];
-    cartIds.remove(courseId.toString());
-    await prefs.setStringList('cart_course_ids', cartIds);
-    await CartManager.updateCount();
-    
+    // 1. Optimistic removal (0ms lag)
+    setState(() {
+      _cartCourses.removeWhere((c) => c.id == courseId);
+    });
+
     ToastHelper.show(context, LanguageManager.isVi ? 'Đã xóa khóa học khỏi giỏ hàng' : 'Removed from cart');
-    _loadCart();
+    await CartManager.removeFromCart(courseId);
   }
 
   String _getCoursePrice(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   int _parsePriceInt(String priceStr) {
@@ -104,74 +140,114 @@ class _CartPageState extends State<CartPage> {
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.') + 'đ';
   }
 
-  void _applyPromo() {
-    final code = _promoController.text.trim().toUpperCase();
-    if (code == 'HANGO20' || code == 'DISCOUNT20') {
-      setState(() {
-        _discountPercentage = 0.20;
-        _isPromoApplied = true;
-      });
-      ToastHelper.show(context, LanguageManager.isVi ? 'Áp dụng mã giảm giá 20% thành công!' : 'Applied 20% discount coupon!');
-    } else {
-      ToastHelper.showError(context, LanguageManager.isVi ? 'Mã giảm giá không hợp lệ' : 'Invalid promo code');
+  void _enrollFreeCourse(Course course) async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      await _repository.enrollCourse(course.id);
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('enrolled_course_id_${course.id}', true);
+      
+      final cartIds = await CartManager.getCartIds();
+      cartIds.remove(course.id.toString());
+      await CartManager.setCartIds(cartIds);
+      await CartManager.updateCount();
+      
+      if (mounted) {
+        ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Đăng ký khóa học thành công!' : 'Enrolled successfully!');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseDetailPage(courseId: course.id),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Failed to enroll: $e');
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  void _checkout() {
+  void _checkoutCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng nhập để thực hiện thanh toán.' : 'Please log in to check out.');
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginPage()));
+      }
+      return;
+    }
+
+    final unpaidCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price > 0).toList();
+    final freeCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price <= 0).toList();
+
+    if (unpaidCourses.isEmpty && freeCourses.isEmpty) {
+      ToastHelper.show(context, LanguageManager.isVi ? 'Bạn đã sở hữu tất cả khóa học trong giỏ hàng' : 'All courses in cart are already enrolled');
+      return;
+    }
+
+    // Auto enroll free courses if any
+    for (final freeCourse in freeCourses) {
+      try {
+        await _repository.enrollCourse(freeCourse.id);
+        await prefs.setBool('enrolled_course_id_${freeCourse.id}', true);
+      } catch (_) {}
+    }
+
+    if (unpaidCourses.isNotEmpty) {
+      double totalCartPrice = 0;
+      for (final c in unpaidCourses) {
+        totalCartPrice += c.price;
+      }
+      _payPaidCourses(unpaidCourses, totalCartPrice);
+    } else {
+      final cartIds = await CartManager.getCartIds();
+      for (final fc in freeCourses) {
+        cartIds.remove(fc.id.toString());
+      }
+      await CartManager.setCartIds(cartIds);
+      await CartManager.updateCount();
+      ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Đăng ký thành công các khóa học miễn phí!' : 'Free courses enrolled successfully!');
+      _loadCart();
+    }
+  }
+
+  void _payPaidCourses(List<Course> courses, double totalPrice) {
+    final courseIds = courses.map((c) => c.id).toList();
+    final title = courses.length > 1
+        ? (LanguageManager.isVi ? 'Thanh toán ${courses.length} khóa học trong giỏ hàng' : 'Checkout ${courses.length} courses in cart')
+        : courses.first.title;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Color(0xFF28B79B), size: 28),
-            const SizedBox(width: 10),
-            Text(
-              LanguageManager.isVi ? 'Thanh toán thành công' : 'Checkout Successful',
-              style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Text(
-          LanguageManager.isVi
-              ? 'Chúc mừng bạn đã sở hữu các khóa học. Hãy bắt đầu chinh phục tiếng Anh ngay hôm nay!'
-              : 'Congratulations! You now own these courses. Let\'s start conquering English today!',
-          style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF28B79B),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              
-              // Clear cart in local storage
-              final prefs = await SharedPreferences.getInstance();
-              
-              // Also auto-enroll them in these courses locally
-              for (final c in _cartCourses) {
-                await prefs.setBool('enrolled_course_id_${c.id}', true);
-              }
-              
-              await prefs.setStringList('cart_course_ids', []);
-              await CartManager.updateCount();
-              
-              if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ListCoursesPage()),
-                );
-              }
-            },
-            child: Text(
-              LanguageManager.isVi ? 'Vào học ngay' : 'Learn Now',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          )
-        ],
+      builder: (context) => PaymentQrDialog(
+        courseIds: courseIds,
+        courseTitle: title,
+        price: totalPrice,
+        onPaymentSuccess: () async {
+          final prefs = await SharedPreferences.getInstance();
+          final cartIds = await CartManager.getCartIds();
+
+          for (final c in courses) {
+            await prefs.setBool('enrolled_course_id_${c.id}', true);
+            cartIds.remove(c.id.toString());
+          }
+          await CartManager.setCartIds(cartIds);
+          await CartManager.updateCount();
+
+          if (mounted) {
+            ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Thanh toán thành công! Các khóa học đã được mở khóa.' : 'Payment successful! Courses unlocked.');
+            _loadCart();
+          }
+        },
       ),
     );
   }
@@ -185,8 +261,6 @@ class _CartPageState extends State<CartPage> {
     for (final c in _cartCourses) {
       subtotal += _parsePriceInt(_getCoursePrice(c));
     }
-    int discount = (subtotal * _discountPercentage).round();
-    int total = subtotal - discount;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -231,7 +305,7 @@ class _CartPageState extends State<CartPage> {
                           )
                         : _cartCourses.isEmpty
                             ? _buildEmptyState(isVi)
-                            : _buildCartContent(isDesktop, isVi, subtotal, discount, total),
+                            : _buildCartContent(isDesktop, isVi, subtotal),
                   ],
                 ),
               ),
@@ -308,7 +382,7 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildCartContent(bool isDesktop, bool isVi, int subtotal, int discount, int total) {
+  Widget _buildCartContent(bool isDesktop, bool isVi, int subtotal) {
     if (isDesktop) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,7 +394,7 @@ class _CartPageState extends State<CartPage> {
           const SizedBox(width: 32),
           Expanded(
             flex: 1,
-            child: _buildSummaryCard(isVi, subtotal, discount, total),
+            child: _buildSummaryCard(isVi, subtotal),
           )
         ],
       );
@@ -329,7 +403,7 @@ class _CartPageState extends State<CartPage> {
         children: [
           _buildItemsList(isVi),
           const SizedBox(height: 28),
-          _buildSummaryCard(isVi, subtotal, discount, total),
+          _buildSummaryCard(isVi, subtotal),
         ],
       );
     }
@@ -393,7 +467,7 @@ class _CartPageState extends State<CartPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${isVi ? 'Giảng viên' : 'Educator'}: ${course.creatorName}',
+                      '${isVi ? 'Giáo viên' : 'Educator'}: ${course.creatorName}',
                       style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                     ),
                     const SizedBox(height: 6),
@@ -410,7 +484,50 @@ class _CartPageState extends State<CartPage> {
                 ),
               ),
               const SizedBox(width: 16),
-
+              Builder(
+                builder: (context) {
+                  final isEnrolled = _enrolledCourseIds.contains(course.id.toString());
+                  final isFree = course.price <= 0;
+                  
+                  if (isEnrolled) {
+                    return ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CourseDetailPage(courseId: course.id),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        isVi ? 'Học ngay' : 'Study Now',
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                      ),
+                    );
+                  } else if (isFree) {
+                    return ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                      onPressed: () => _enrollFreeCourse(course),
+                      child: Text(
+                        isVi ? 'Đăng ký học' : 'Enroll',
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                      ),
+                    );
+                  } else {
+                    return const SizedBox.shrink();
+                  }
+                },
+              ),
+              const SizedBox(width: 8),
               // Delete Button
               IconButton(
                 icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
@@ -424,7 +541,7 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildSummaryCard(bool isVi, int subtotal, int discount, int total) {
+  Widget _buildSummaryCard(bool isVi, int subtotal) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -453,94 +570,81 @@ class _CartPageState extends State<CartPage> {
           ),
           const SizedBox(height: 20),
 
-          // Price rows
-          _buildSummaryRow(isVi ? 'Tạm tính' : 'Subtotal', _formatPrice(subtotal)),
+          // Detailed Price breakdown
+          _buildSummaryRow(
+            isVi ? 'Số lượng khóa học' : 'Total Items',
+            isVi ? '${_cartCourses.length} khóa học' : '${_cartCourses.length} items',
+          ),
+          const SizedBox(height: 12),
+          _buildSummaryRow(
+            isVi ? 'Tạm tính' : 'Subtotal',
+            _formatPrice(subtotal),
+          ),
           const SizedBox(height: 12),
           _buildSummaryRow(
             isVi ? 'Giảm giá' : 'Discount',
-            discount > 0 ? '-${_formatPrice(discount)}' : '0đ',
-            valueColor: const Color(0xFFEF4444),
+            '0đ',
+            valueColor: const Color(0xFF10B981),
           ),
           const SizedBox(height: 16),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 16),
           _buildSummaryRow(
             isVi ? 'Tổng tiền' : 'Total',
-            _formatPrice(total),
+            _formatPrice(subtotal),
             isBold: true,
-            fontSize: 18,
+            fontSize: 20,
             valueColor: const Color(0xFF28B79B),
           ),
-          const SizedBox(height: 24),
-
-          // Promo field
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                  ),
-                  child: TextField(
-                    controller: _promoController,
-                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: isVi ? 'Mã giảm giá' : 'Promo Code',
-                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF05A22),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 2,
+            ),
+            onPressed: _checkoutCart,
+            icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+            label: Text(
+              isVi ? 'Quét mã QR thanh toán' : 'Scan QR Code Checkout',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isVi 
+                      ? 'Nút trên sẽ tự động mở VietQR PayOS để quét mã thanh toán các khóa học.'
+                      : 'Button above will automatically open VietQR PayOS for your checkout.',
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontFamily: 'Outfit',
+                      height: 1.4,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 38,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E293B),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: _applyPromo,
-                  child: Text(
-                    isVi ? 'Áp dụng' : 'Apply',
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              )
-            ],
+              ],
+            ),
           ),
-          if (_isPromoApplied) ...[
-            const SizedBox(height: 10),
-            Text(
-              isVi ? '✓ Đã áp dụng mã giảm giá 20%' : '✓ Applied coupon 20% discount',
-              style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-            ),
-          ],
-          const SizedBox(height: 28),
-
-          // Checkout button
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28B79B),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 2,
-              ),
-              onPressed: _cartCourses.isEmpty ? null : _checkout,
-              child: Text(
-                isVi ? 'Thanh toán ngay' : 'Checkout Now',
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-              ),
-            ),
-          )
         ],
       ),
     );

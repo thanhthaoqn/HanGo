@@ -31,3 +31,8 @@ spring.mail.password=YOUR_APP_PASSWORD
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
 spring.mail.properties.mail.smtp.starttls.required=true
+
+# PayOS Configuration
+payos.client-id=YOUR_PAYOS_CLIENT_ID
+payos.api-key=YOUR_PAYOS_API_KEY
+payos.checksum-key=YOUR_PAYOS_CHECKSUM_KEY

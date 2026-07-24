@@ -11,8 +11,9 @@ import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
+import '../pages/course_manager/course_manager_dashboard_page.dart';
+import '../pages/trainer/trainer_dashboard_page.dart';
 import '../pages/learner/my_learning_page.dart';
-import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
 
 import '../../utils/toast_helper.dart';
@@ -24,6 +25,7 @@ class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final String activeTab;
   final bool hideNavLinks;
   final bool hideCommerceActions;
+  final bool hideLanguageSwitcher;
 
   const SharedHeader({
     Key? key,
@@ -31,6 +33,7 @@ class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
     this.activeTab = 'Courses',
     this.hideNavLinks = false,
     this.hideCommerceActions = false,
+    this.hideLanguageSwitcher = false,
   }) : super(key: key);
 
   @override
@@ -49,9 +52,9 @@ class _SharedHeaderState extends State<SharedHeader> {
   String _userAvatarUrl = '';
   bool _isVietnamese = true;
   int _cartCount = 0;
+  List<String> _userRoles = [];
 
-  List<Course> _allCourses = [];
-  List<String> _cartIds = [];
+  List<Course> _cartCourses = [];
 
   OverlayEntry? _cartOverlayEntry;
   final LayerLink _cartLink = LayerLink();
@@ -61,14 +64,36 @@ class _SharedHeaderState extends State<SharedHeader> {
   @override
   void initState() {
     super.initState();
-    _loadUserInfo();
     _isVietnamese = LanguageManager.isVi;
-    LanguageManager.isVietnamese.addListener(_onLanguageChanged);
-    CartManager.cartCountNotifier.addListener(_onCartChanged);
-    CartManager.updateCount();
 
-    _loadCartIds();
-    _fetchAllCoursesForDropdowns();
+    // Instant synchronous in-memory populate (0ms lag)
+    if (AuthService.cachedIsLoggedIn != null) {
+      _isLoggedIn = AuthService.cachedIsLoggedIn!;
+      _userFullName = AuthService.cachedFullName ?? 'Learner';
+      _userEmail = AuthService.cachedEmail ?? '';
+      _userAvatarUrl = AuthService.cachedAvatarUrl ?? '';
+      _updateInitials(_userFullName);
+    }
+
+    _cartCourses = CartManager.cartCoursesNotifier.value;
+    _cartCount = CartManager.cartCountNotifier.value;
+
+    LanguageManager.isVietnamese.addListener(_onLanguageChanged);
+    AuthService.userChangeNotifier.addListener(_onUserChanged);
+    CartManager.cartCountNotifier.addListener(_onCartChanged);
+    CartManager.cartCoursesNotifier.addListener(_onCartCoursesChanged);
+
+    _loadUserInfo();
+    CartManager.updateCount();
+  }
+
+  void _updateInitials(String name) {
+    if (name.trim().isNotEmpty) {
+      final parts = name.trim().split(' ');
+      if (parts.isNotEmpty) {
+        _userInitials = parts.last[0].toUpperCase();
+      }
+    }
   }
 
   void _onLanguageChanged() {
@@ -79,34 +104,26 @@ class _SharedHeaderState extends State<SharedHeader> {
     }
   }
 
+  void _onUserChanged() {
+    if (mounted) {
+      _loadUserInfo();
+    }
+  }
+
   void _onCartChanged() {
     if (mounted) {
       setState(() {
         _cartCount = CartManager.cartCountNotifier.value;
       });
-      _loadCartIds();
     }
   }
 
-  Future<void> _loadCartIds() async {
-    final prefs = await SharedPreferences.getInstance();
+  void _onCartCoursesChanged() {
     if (mounted) {
       setState(() {
-        _cartIds = prefs.getStringList('cart_course_ids') ?? [];
+        _cartCourses = CartManager.cartCoursesNotifier.value;
+        _cartCount = CartManager.cartCountNotifier.value;
       });
-    }
-  }
-
-  Future<void> _fetchAllCoursesForDropdowns() async {
-    try {
-      final courses = await CourseRepository().fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
-      if (mounted) {
-        setState(() {
-          _allCourses = courses;
-        });
-      }
-    } catch (e) {
-      // ignore
     }
   }
 
@@ -114,17 +131,21 @@ class _SharedHeaderState extends State<SharedHeader> {
   void dispose() {
     _hideCartOverlay();
     LanguageManager.isVietnamese.removeListener(_onLanguageChanged);
+    AuthService.userChangeNotifier.removeListener(_onUserChanged);
     CartManager.cartCountNotifier.removeListener(_onCartChanged);
+    CartManager.cartCoursesNotifier.removeListener(_onCartCoursesChanged);
     super.dispose();
   }
 
   String _getCoursePrice(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
+    if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final prices = ['699.000đ', '899.000đ', '1.290.000đ', '1.500.000đ'];
-    return prices[course.id % prices.length];
+    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return '$formattedđ';
   }
 
   int _parsePriceInt(String priceStr) {
@@ -182,11 +203,9 @@ class _SharedHeaderState extends State<SharedHeader> {
     });
   }
 
-
-
   Widget _buildCartDropdown() {
     final isVi = _isVietnamese;
-    final cartCourses = _allCourses.where((c) => _cartIds.contains(c.id.toString())).toList();
+    final cartCourses = _cartCourses;
 
     int totalVal = 0;
     for (final c in cartCourses) {
@@ -362,15 +381,13 @@ class _SharedHeaderState extends State<SharedHeader> {
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final cartList = prefs.getStringList('cart_course_ids') ?? [];
-    final cartCount = cartList.length;
     final token = prefs.getString('auth_token');
 
     if (token == null) {
+      AuthService.cachedIsLoggedIn = false;
       if (mounted) {
         setState(() {
           _isLoggedIn = false;
-          _cartCount = cartCount;
         });
       }
       return;
@@ -380,6 +397,11 @@ class _SharedHeaderState extends State<SharedHeader> {
     final email = prefs.getString('user_email') ?? '';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
 
+    AuthService.cachedFullName = fullName;
+    AuthService.cachedEmail = email;
+    AuthService.cachedAvatarUrl = avatarUrl;
+    AuthService.cachedIsLoggedIn = true;
+
     String initials = 'L';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -388,6 +410,8 @@ class _SharedHeaderState extends State<SharedHeader> {
       }
     }
 
+    final roles = prefs.getStringList('user_roles') ?? [];
+
     if (mounted) {
       setState(() {
         _isLoggedIn = true;
@@ -395,7 +419,7 @@ class _SharedHeaderState extends State<SharedHeader> {
         _userEmail = email;
         _userInitials = initials;
         _userAvatarUrl = avatarUrl;
-        _cartCount = cartCount;
+        _userRoles = roles;
       });
     }
   }
@@ -481,7 +505,6 @@ class _SharedHeaderState extends State<SharedHeader> {
           GestureDetector(
             onTap: () {
               LanguageManager.setLanguage(true);
-              ToastHelper.show(context, 'Đã chuyển sang Tiếng Việt');
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -504,7 +527,6 @@ class _SharedHeaderState extends State<SharedHeader> {
           GestureDetector(
             onTap: () {
               LanguageManager.setLanguage(false);
-              ToastHelper.show(context, 'Switched to English');
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -593,19 +615,15 @@ class _SharedHeaderState extends State<SharedHeader> {
   @override
   Widget build(BuildContext context) {
     final logoWidget = InkWell(
-      onTap: widget.hideNavLinks
-          ? null
-          : () {
-              if (widget.activeTab != '') {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LearnerHomePage(),
-                  ),
-                  (route) => false,
-                );
-              }
-            },
+      onTap: () {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const LearnerHomePage(),
+          ),
+          (route) => false,
+        );
+      },
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -725,11 +743,9 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 4),
                 if (!widget.hideCommerceActions) ...[
                   _buildCartButton(),
-                  const SizedBox(width: 2),
+                  const SizedBox(width: 8),
                 ],
               ],
               // Notification Bell
@@ -815,7 +831,24 @@ class _SharedHeaderState extends State<SharedHeader> {
               PopupMenuButton<String>(
                 enabled: true,
                 onSelected: (val) {
-                  if (val == 'logout') {
+                  if (val == 'dashboard') {
+                    final isTrainer = _userRoles.any((r) => r.toUpperCase().contains('TRAINER'));
+                    if (isTrainer) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TrainerDashboardPage(),
+                        ),
+                      );
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CourseManagerDashboardPage(),
+                        ),
+                      );
+                    }
+                  } else if (val == 'logout') {
                     _handleLogout();
                   } else if (val == 'my_info' || val == 'profile') {
                     Navigator.push(
@@ -834,9 +867,19 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     );
                   } else if (val == 'cart') {
-                    ToastHelper.show(context, _isVietnamese ? 'Mở giỏ hàng của bạn' : 'Opening your cart');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CartPage(),
+                      ),
+                    );
                   } else if (val == 'purchase_history') {
-                    ToastHelper.show(context, _isVietnamese ? 'Mở lịch sử mua hàng' : 'Opening purchase history');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyInformationPage(initialTab: 2),
+                      ),
+                    );
                   } else if (val == 'notifications') {
                     ToastHelper.show(context, _isVietnamese ? 'Không có thông báo mới' : 'No new notifications');
                   }
@@ -942,6 +985,38 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     ),
                   ),
+                  PopupMenuItem(
+                    value: 'dashboard',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6F7F1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.dashboard_outlined,
+                              size: 18,
+                              color: Color(0xFF20B486),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Dashboard',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   if (!widget.hideCommerceActions) ...[
                     PopupMenuItem(
                       value: 'learning',
@@ -988,21 +1063,6 @@ class _SharedHeaderState extends State<SharedHeader> {
                                 color: Color(0xFF1E293B),
                                 fontWeight: FontWeight.w500,
                                 fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF8B5CF6),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              '5',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -1115,10 +1175,8 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                _buildLanguageSwitcher(),
-                const SizedBox(width: 8),
                 _buildCartButton(),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
               ],
               TextButton(
                 onPressed: () {
@@ -1130,7 +1188,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                   );
                 },
                 child: const Text(
-                  'Đăng nhập',
+                  'Login',
                   style: TextStyle(
                     color: Color(0xFF1E293B),
                     fontWeight: FontWeight.bold,
@@ -1173,7 +1231,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
                   child: const Text(
-                    'Đăng ký',
+                    'Register',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

@@ -3,6 +3,7 @@ import '../../../services/hango_api.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import 'package:flutter/foundation.dart';
+import '../../../utils/config.dart';
 import 'matrix_builder_page.dart';
 
 class MatrixManagementPage extends StatefulWidget {
@@ -19,12 +20,7 @@ class _MatrixManagementPageState extends State<MatrixManagementPage> {
   List<Map<String, dynamic>> _matrices = [];
   bool _isLoading = true;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {

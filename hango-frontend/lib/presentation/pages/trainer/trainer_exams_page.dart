@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
@@ -12,9 +13,12 @@ import 'trainer_edit_exam_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import '../../../utils/toast_helper.dart';
 import 'matrix_management_page.dart';
+import 'trainer_profile_page.dart';
+import 'trainer_revenue_page.dart';
 
 class TrainerExamsPage extends StatefulWidget {
-  const TrainerExamsPage({super.key});
+  final bool isEmbedded;
+  const TrainerExamsPage({super.key, this.isEmbedded = false});
 
   @override
   State<TrainerExamsPage> createState() => _TrainerExamsPageState();
@@ -25,6 +29,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
+  int? _currentUserId;
+  bool _isCourseManager = false;
 
   bool _isLoading = true;
   String _errorMessage = '';
@@ -48,12 +54,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   String _selectedSortBy = 'NEWEST';
   String _selectedTimePeriod = 'ALL';
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {
@@ -133,6 +134,54 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     }
   }
 
+  Future<void> _updateExamVisibility(int examId, String newVisibility) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final uri = Uri.parse('$apiBaseUrl/trainer/exams/$examId/visibility');
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'visibility': newVisibility}),
+      );
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(context, 'Exam visibility updated successfully');
+        _fetchExamsData();
+      } else {
+        ToastHelper.showError(context, 'Failed to update visibility: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error updating exam visibility: $e');
+    }
+  }
+
+  Future<void> _updateExamStatus(int examId, String newStatus) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final uri = Uri.parse('$apiBaseUrl/trainer/exams/$examId/status');
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'status': newStatus}),
+      );
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(context, 'Exam status updated successfully');
+        _fetchExamsData();
+      } else {
+        ToastHelper.showError(context, 'Failed to update status: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error updating exam status: $e');
+    }
+  }
+
   void _loadMockFallback() {
     setState(() {
       _allCount = 1;
@@ -169,6 +218,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
+    final userId = prefs.getInt('user_id');
+    final roles = prefs.getStringList('user_roles') ?? [];
+    
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -180,6 +232,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       _trainerName = fullName;
       _trainerInitials = initials;
       _trainerAvatarUrl = avatarUrl;
+      _currentUserId = userId;
+      _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'TRAINER_LEAD' || r.toUpperCase() == 'ADMIN');
     });
   }
 
@@ -199,6 +253,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    if (widget.isEmbedded) {
+      return _buildBodyContent();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
@@ -211,31 +269,35 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               children: [
                 _buildHeader(context, !isDesktop),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildWelcomeSection(),
-                        const SizedBox(height: 24),
-                        _buildFilterContainer(),
-                        const SizedBox(height: 24),
-                        if (_isLoading)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(40.0),
-                              child: CircularProgressIndicator(color: Color(0xFF20B486)),
-                            ),
-                          )
-                        else
-                          _buildExamsTable(),
-                      ],
-                    ),
-                  ),
+                  child: _buildBodyContent(),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBodyContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildWelcomeSection(),
+          const SizedBox(height: 24),
+          _buildFilterContainer(),
+          const SizedBox(height: 24),
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(40.0),
+                child: CircularProgressIndicator(color: Color(0xFF20B486)),
+              ),
+            )
+          else
+            _buildExamsTable(),
         ],
       ),
     );
@@ -748,7 +810,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             flex: 1,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _buildVisibilityChip(exam['status'], exam['visibility']),
+              child: _buildVisibilityChip(exam),
             ),
           ),
           Expanded(
@@ -756,6 +818,44 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                if (_isCourseManager)
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, color: Color(0xFF64748B), size: 20),
+                    onSelected: (value) {
+                      if (value == 'HIDE') {
+                        _updateExamStatus(exam['id'], 'HIDDEN');
+                      } else if (value == 'PUBLISH') {
+                        _updateExamStatus(exam['id'], 'PUBLISHED');
+                      }
+                    },
+                    itemBuilder: (context) {
+                      final status = exam['status']?.toString().toUpperCase() ?? '';
+                      return [
+                        if (status != 'HIDDEN')
+                          const PopupMenuItem(
+                            value: 'HIDE',
+                            child: Row(
+                              children: [
+                                Icon(Icons.visibility_off, color: Colors.orange, size: 18),
+                                SizedBox(width: 8),
+                                Text('Hide Exam'),
+                              ],
+                            ),
+                          ),
+                        if (status == 'HIDDEN' || status == 'SUBMITTED')
+                          const PopupMenuItem(
+                            value: 'PUBLISH',
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                SizedBox(width: 8),
+                                Text('Publish Exam'),
+                              ],
+                            ),
+                          ),
+                      ];
+                    },
+                  ),
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
                   onPressed: () async {
@@ -781,12 +881,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     );
   }
 
-
   Widget _buildStatusChip(String status) {
     status = status.toUpperCase();
     Color bgColor;
     Color textColor;
-    if (status == 'APPROVED') {
+    if (status == 'APPROVED' || status == 'PUBLISHED') {
       bgColor = const Color(0xFFE6FFFA);
       textColor = const Color(0xFF20B486);
     } else if (status == 'SUBMITTED' || status == 'PENDING') {
@@ -795,6 +894,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     } else if (status == 'REJECTED') {
       bgColor = const Color(0xFFFEE2E2);
       textColor = const Color(0xFFEF4444);
+    } else if (status == 'HIDDEN') {
+      bgColor = const Color(0xFFF1F5F9);
+      textColor = const Color(0xFF94A3B8);
     } else { // DRAFT
       bgColor = const Color(0xFFF1F5F9);
       textColor = const Color(0xFF64748B);
@@ -832,8 +934,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     );
   }
 
-  Widget _buildVisibilityChip(String? status, String? visibility) {
-    if (status == null || status.toUpperCase() != 'APPROVED') {
+  Widget _buildVisibilityChip(Map<String, dynamic> exam) {
+    String? status = exam['status'];
+    String? visibility = exam['visibility'];
+    
+    if (status == null || (status.toUpperCase() != 'PUBLISHED' && status.toUpperCase() != 'APPROVED')) {
       return const Text(
         '-',
         style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold),
@@ -841,31 +946,66 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     }
     
     bool isPublic = visibility?.toUpperCase() == 'PUBLIC';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPublic ? Icons.public : Icons.lock_outline,
-            size: 14,
-            color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+    bool canEdit = _currentUserId != null && exam['creatorId'] == _currentUserId;
+
+    return InkWell(
+      onTap: canEdit ? () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Change Visibility'),
+            content: Text('Do you want to make this exam ${isPublic ? 'PRIVATE' : 'PUBLIC'}?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _updateExamVisibility(exam['id'], isPublic ? 'PRIVATE' : 'PUBLIC');
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38C9A6)),
+                child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          Text(
-            isPublic ? 'Public' : 'Private',
-            style: TextStyle(
+        );
+      } : () {
+        ToastHelper.showError(context, 'You do not have permission to change visibility of this exam');
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: canEdit ? (isPublic ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)) : Colors.transparent),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPublic ? Icons.public : Icons.lock_outline,
+              size: 14,
               color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-              fontFamily: 'Outfit',
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text(
+              isPublic ? 'Public' : 'Private',
+              style: TextStyle(
+                color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontFamily: 'Outfit',
+              ),
+            ),
+            if (canEdit) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_drop_down, size: 14, color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
+            ]
+          ],
+        ),
       ),
     );
   }
@@ -972,25 +1112,32 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             );
           }),
           _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: true),
-          _buildSidebarItem(Icons.grid_on, 'Matrix', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MatrixManagementPage(onBack: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
-                  );
-                }),
-              ),
-            );
-          }),
           _buildSidebarItem(Icons.people_outline, 'Learner'),
           _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
                 builder: (context) => const TrainerQuestionBankPage(),
+              ),
+            );
+          }),
+          _buildSidebarItem(
+            Icons.account_balance_wallet_outlined,
+            'Revenue',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TrainerRevenuePage(),
+                ),
+              );
+            },
+          ),
+          _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainerProfilePage(),
               ),
             );
           }),

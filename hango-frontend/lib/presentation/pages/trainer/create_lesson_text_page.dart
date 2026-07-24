@@ -34,8 +34,13 @@ class CreateLessonTextPage extends StatefulWidget {
 
 class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   late List<dynamic> _localSections;
-  
+
   final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  final TextEditingController _learningObjectivesController = TextEditingController();
+  final TextEditingController _mediaDurationController = TextEditingController();
+  final TextEditingController _mediaSizeController = TextEditingController();
+  final TextEditingController _estimatedTimeController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
   final TextEditingController _questionController = TextEditingController();
 
@@ -52,20 +57,34 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   void initState() {
     super.initState();
     _localSections = List.from(widget.sections);
-    
-    if (widget.lessonIndex != null && widget.lessonIndex! < (_localSections[widget.sectionIndex]['lessons'] ?? []).length) {
-      final lesson = _localSections[widget.sectionIndex]['lessons'][widget.lessonIndex!];
+
+    if (widget.lessonIndex != null &&
+        widget.lessonIndex! <
+            (_localSections[widget.sectionIndex]['lessons'] ?? []).length) {
+      final lesson =
+          _localSections[widget.sectionIndex]['lessons'][widget.lessonIndex!];
       _titleController.text = lesson['title'] ?? '';
+      _codeController.text = lesson['lessonCode'] ?? '';
+      _learningObjectivesController.text = lesson['learningObjectives'] ?? '';
+      _mediaDurationController.text = lesson['mediaDurationSeconds']?.toString() ?? '';
+      _mediaSizeController.text = lesson['mediaSizeBytes']?.toString() ?? '';
+      _estimatedTimeController.text = lesson['estimatedTimeMinutes']?.toString() ?? '';
       _descController.text = lesson['description'] ?? '';
-      _questionController.text = lesson['questionText'] ?? '';
-      _uploadedPdfName = (lesson['pdfName'] as String?)?.isNotEmpty == true ? lesson['pdfName'] : null;
-      _uploadedImageUrl = (lesson['questionImageUrl'] as String?)?.isNotEmpty == true ? lesson['questionImageUrl'] : null;
+      _questionController.text = lesson['questionText'] ?? lesson['content'] ?? '';
+      _uploadedPdfName = (lesson['pdfName'] as String?)?.isNotEmpty == true
+          ? lesson['pdfName']
+          : null;
+      _uploadedImageUrl =
+          (lesson['questionImageUrl'] as String?)?.isNotEmpty == true
+          ? lesson['questionImageUrl']
+          : null;
       if (_uploadedPdfName != null && _uploadedPdfName!.isNotEmpty) {
         _pdfFileSizeStr = 'Attached';
       }
 
       final lessonId = lesson['id'];
-      if (lessonId is num && lessonId < 1000000000000) {
+      final isLocallyModified = lesson['isLocallyModified'] == true;
+      if (lessonId is num && lessonId < 1000000000000 && !isLocallyModified) {
         _loadLessonDetailFromApi(lessonId.toInt());
       }
     }
@@ -73,7 +92,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     if (kIsWeb) {
       registerDragDrop((clientX, clientY, pickedFile) {
         if (_dropZoneKey.currentContext == null) return;
-        final RenderBox renderBox = _dropZoneKey.currentContext!.findRenderObject() as RenderBox;
+        final RenderBox renderBox =
+            _dropZoneKey.currentContext!.findRenderObject() as RenderBox;
         final position = renderBox.localToGlobal(Offset.zero);
         final size = renderBox.size;
         if (clientX >= position.dx &&
@@ -94,10 +114,17 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         setState(() {
           _titleController.text = detail.title;
           _questionController.text = detail.content;
+          if (detail.lessonCode != null) _codeController.text = detail.lessonCode!;
+          if (detail.learningObjectives != null) _learningObjectivesController.text = detail.learningObjectives!;
+          if (detail.mediaDurationSeconds != null) _mediaDurationController.text = detail.mediaDurationSeconds.toString();
+          if (detail.mediaSizeBytes != null) _mediaSizeController.text = detail.mediaSizeBytes.toString();
+          if (detail.estimatedTimeMinutes != null) _estimatedTimeController.text = detail.estimatedTimeMinutes.toString();
         });
       }
     } catch (e) {
-      debugPrint('Error loading lesson detail from API in CreateLessonTextPage: $e');
+      debugPrint(
+        'Error loading lesson detail from API in CreateLessonTextPage: $e',
+      );
     }
   }
 
@@ -107,6 +134,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       unregisterDragDrop();
     }
     _titleController.dispose();
+    _codeController.dispose();
+    _learningObjectivesController.dispose();
+    _mediaDurationController.dispose();
+    _mediaSizeController.dispose();
+    _estimatedTimeController.dispose();
     _descController.dispose();
     _questionController.dispose();
     super.dispose();
@@ -115,7 +147,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   Future<void> _notifyParent() async {
     await widget.onSectionsChanged(_localSections);
   }
-
 
   Future<void> _processPdfFile(PickedFile file) async {
     final double sizeInMb = file.bytes.length / (1024 * 1024);
@@ -175,10 +206,16 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     final selection = _questionController.selection;
     if (selection.start >= 0 && selection.end >= 0) {
       final selectedText = text.substring(selection.start, selection.end);
-      final newText = text.replaceRange(selection.start, selection.end, '$tagOpen$selectedText$tagClose');
+      final newText = text.replaceRange(
+        selection.start,
+        selection.end,
+        '$tagOpen$selectedText$tagClose',
+      );
       _questionController.text = newText;
       // Put cursor inside or after tag
-      _questionController.selection = TextSelection.collapsed(offset: selection.start + tagOpen.length + selectedText.length);
+      _questionController.selection = TextSelection.collapsed(
+        offset: selection.start + tagOpen.length + selectedText.length,
+      );
     } else {
       _questionController.text = '$text$tagOpen$tagClose';
     }
@@ -186,6 +223,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
 
   void _saveLesson() async {
     final title = _titleController.text.trim();
+    final code = _codeController.text.trim();
+    final objectives = _learningObjectivesController.text.trim();
+    final mediaDuration = int.tryParse(_mediaDurationController.text.trim()) ?? 0;
+    final mediaSize = int.tryParse(_mediaSizeController.text.trim()) ?? 0;
+    final estimatedTime = int.tryParse(_estimatedTimeController.text.trim()) ?? 0;
     final desc = _descController.text.trim();
     final question = _questionController.text.trim();
 
@@ -200,16 +242,47 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     }
 
     setState(() {
-      final lessons = List.from(_localSections[widget.sectionIndex]['lessons'] ?? []);
+      final lessons = List.from(
+        _localSections[widget.sectionIndex]['lessons'] ?? [],
+      );
+
+      final int displayOrder = widget.lessonIndex != null
+          ? (lessons[widget.lessonIndex!]['displayOrder'] as num?)?.toInt() ??
+                (lessons.length + 1)
+          : (lessons.length + 1);
+
       final lessonData = {
-        'id': widget.lessonIndex != null ? lessons[widget.lessonIndex!]['id'] : DateTime.now().millisecondsSinceEpoch,
+        'id': widget.lessonIndex != null
+            ? lessons[widget.lessonIndex!]['id']
+            : DateTime.now().millisecondsSinceEpoch,
+        'lessonCode': code,
         'title': title,
         'description': desc,
+
+        // Must match backend/template key
+        'lessonType': 'text',
+        'displayOrder': displayOrder,
+
+        // Backend/template content fields (text lesson)
+        'content': question,
+        'textContentMarkdown': question,
+        'textContentHtml': '',
+
+        // Media fields (optional in template)
+        'mediaFileUrl': _uploadedPdfName ?? '',
+        'mediaType': 'pdf',
+        'mediaDurationSeconds': mediaDuration,
+        'mediaSizeBytes': mediaSize,
+        'learningObjectives': objectives,
+        'estimatedTimeMinutes': estimatedTime,
+        'version': 'v1.0',
+        'isLocallyModified': true,
+
+        // Keep old keys (compatibility)
         'itemType': 'text',
         'questionText': question,
         'questionImageUrl': _uploadedImageUrl ?? '',
         'pdfName': _uploadedPdfName ?? '',
-        'displayOrder': widget.lessonIndex != null ? lessons[widget.lessonIndex!]['displayOrder'] : (lessons.length + 1),
       };
 
       if (widget.lessonIndex != null) {
@@ -223,10 +296,12 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     await _notifyParent();
     if (!mounted) return;
     ToastHelper.showSuccess(
-      context, 
-      widget.lessonIndex != null ? 'Lesson updated successfully' : 'Lesson added successfully'
+      context,
+      widget.lessonIndex != null
+          ? 'Lesson updated successfully'
+          : 'Lesson added successfully',
     );
-    
+
     // Pop back to CreateLessonPage
     Navigator.pop(context);
   }
@@ -362,7 +437,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF4B5563), size: 24),
+            icon: const Icon(
+              Icons.notifications_none_outlined,
+              color: Color(0xFF4B5563),
+              size: 24,
+            ),
             onPressed: () {},
           ),
           const SizedBox(width: 16),
@@ -453,7 +532,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               ),
             ),
           ],
-        )
+        ),
       ],
     );
   }
@@ -495,7 +574,10 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                     border: Border.all(color: const Color(0xFFEFF2F5)),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       Container(
@@ -505,7 +587,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                           color: Color(0xFF20B486),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.check, size: 14, color: Colors.white),
+                        child: const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Column(
@@ -540,7 +626,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               // Step 2: Syllabus
               InkWell(
                 onTap: () {
-                  Navigator.pop(context); // Pops back to CreateLessonPage (Syllabus)
+                  Navigator.pop(
+                    context,
+                  ); // Pops back to CreateLessonPage (Syllabus)
                 },
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
@@ -555,13 +643,13 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                         left: 0,
                         top: 0,
                         bottom: 0,
-                        child: Container(
-                          width: 4,
-                          color: activeColor,
-                        ),
+                        child: Container(width: 4, color: activeColor),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         child: Row(
                           children: [
                             Container(
@@ -664,7 +752,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF20B486).withAlpha(102),
-                  disabledBackgroundColor: const Color(0xFF20B486).withAlpha(102),
+                  disabledBackgroundColor: const Color(
+                    0xFF20B486,
+                  ).withAlpha(102),
                   disabledForegroundColor: Colors.white.withAlpha(200),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -682,7 +772,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                   color: Color(0xFF94A3B8),
                   fontFamily: 'Outfit',
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -762,8 +852,59 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 ),
                 const Icon(Icons.edit, color: Color(0xFFF59E0B), size: 20),
                 const SizedBox(width: 12),
-                const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+                const Icon(
+                  Icons.delete_outline,
+                  color: Color(0xFFEF4444),
+                  size: 20,
+                ),
               ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Lesson Code field
+          const Text(
+            'Lesson Code',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4B5563),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _codeController,
+            decoration: InputDecoration(
+              hintText: 'e.g. L01',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0xFF20B486),
+                  width: 1.5,
+                ),
+              ),
+            ),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 24),
@@ -782,8 +923,15 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             controller: _titleController,
             decoration: InputDecoration(
               hintText: 'Enter lesson title',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -794,10 +942,17 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
+                borderSide: const BorderSide(
+                  color: Color(0xFF20B486),
+                  width: 1.5,
+                ),
               ),
             ),
-            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+            ),
           ),
           const SizedBox(height: 20),
           // Lesson Description field
@@ -816,8 +971,15 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Enter lesson description.....',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -828,10 +990,65 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
+                borderSide: const BorderSide(
+                  color: Color(0xFF20B486),
+                  width: 1.5,
+                ),
               ),
             ),
-            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Learning Objectives field
+          const Text(
+            'Learning Objectives',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4B5563),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _learningObjectivesController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: 'Enter learning objectives (one per line).....',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0xFF20B486),
+                  width: 1.5,
+                ),
+              ),
+            ),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+            ),
           ),
           const SizedBox(height: 20),
           // Content Type field (Pre-filled Text)
@@ -889,7 +1106,10 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 const SizedBox(height: 12),
                 // Rich Editor Toolbar
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF8FAFC),
                     border: Border.symmetric(
@@ -899,35 +1119,55 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.format_bold, size: 18, color: Color(0xFF475569)),
+                        icon: const Icon(
+                          Icons.format_bold,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
                         onPressed: () => _addMarkdownTag('**', '**'),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 16),
                       IconButton(
-                        icon: const Icon(Icons.format_italic, size: 18, color: Color(0xFF475569)),
+                        icon: const Icon(
+                          Icons.format_italic,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
                         onPressed: () => _addMarkdownTag('*', '*'),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 16),
                       IconButton(
-                        icon: const Icon(Icons.format_list_bulleted, size: 18, color: Color(0xFF475569)),
+                        icon: const Icon(
+                          Icons.format_list_bulleted,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
                         onPressed: () => _addMarkdownTag('- ', ''),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 16),
                       IconButton(
-                        icon: const Icon(Icons.link, size: 18, color: Color(0xFF475569)),
+                        icon: const Icon(
+                          Icons.link,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
                         onPressed: () => _addMarkdownTag('[', '](url)'),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 16),
                       IconButton(
-                        icon: const Icon(Icons.format_clear, size: 18, color: Color(0xFF475569)),
+                        icon: const Icon(
+                          Icons.format_clear,
+                          size: 18,
+                          color: Color(0xFF475569),
+                        ),
                         onPressed: () {
                           // Clear formats/remove selected markdown helper
                         },
@@ -945,11 +1185,19 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                     maxLines: 6,
                     decoration: const InputDecoration(
                       hintText: 'Enter your question here...',
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
+                      hintStyle: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 14,
+                        fontFamily: 'Outfit',
+                      ),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B)),
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 14,
+                      color: Color(0xFF1E293B),
+                    ),
                   ),
                 ),
               ],
@@ -967,7 +1215,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             ),
           ),
           const SizedBox(height: 8),
-          if ((_uploadedPdfName == null || _uploadedPdfName!.isEmpty) && !_isUploadingPdf)
+          if ((_uploadedPdfName == null || _uploadedPdfName!.isEmpty) &&
+              !_isUploadingPdf)
             InkWell(
               key: _dropZoneKey,
               onTap: _pickAndUploadPdf,
@@ -979,12 +1228,19 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 ),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 16,
+                  ),
                   alignment: Alignment.center,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      Icon(Icons.description_outlined, color: Color(0xFF64748B), size: 36),
+                      Icon(
+                        Icons.description_outlined,
+                        color: Color(0xFF64748B),
+                        size: 36,
+                      ),
                       SizedBox(height: 8),
                       Text(
                         'Upload PDF Document',
@@ -1099,7 +1355,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                             child: LinearProgressIndicator(
                               value: _pdfUploadProgress,
                               backgroundColor: const Color(0xFFF1F5F9),
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF20B486),
+                              ),
                               minHeight: 4,
                             ),
                           ),
@@ -1132,6 +1390,171 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                 ],
               ),
             ),
+          const SizedBox(height: 24),
+          // Estimated Time input
+          const Text(
+            'Estimated Time (Minutes)',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4B5563),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _estimatedTimeController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: 'e.g. 15',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              prefixIcon: const Icon(
+                Icons.timer_outlined,
+                color: Color(0xFF94A3B8),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0xFF20B486),
+                  width: 1.5,
+                ),
+              ),
+            ),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Media Duration & Size fields
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Duration (Seconds)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4B5563),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _mediaDurationController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 120',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF20B486),
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Size (Bytes)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4B5563),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _mediaSizeController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 102400',
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 14,
+                          fontFamily: 'Outfit',
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF20B486),
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

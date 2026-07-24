@@ -73,6 +73,26 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     final score = widget.initialProfile['scoreReportUrl'];
     final avatarUrl = widget.initialProfile['avatarUrl'] ?? _trainerAvatarUrl;
 
+    List<Map<String, String>> certList = [];
+    if (widget.initialProfile['certificates'] != null && widget.initialProfile['certificates'] is List) {
+      certList = (widget.initialProfile['certificates'] as List).map((c) => Map<String, String>.from(c as Map)).toList();
+    } else {
+      if (degree != null && degree.toString().isNotEmpty) certList.add({'name': isVi ? 'Bằng cấp / Chứng chỉ' : 'Degree / Qualification', 'url': degree.toString()});
+      if (ielts != null && ielts.toString().isNotEmpty) certList.add({'name': isVi ? 'Chứng chỉ Tiếng Anh' : 'Language Proficiency', 'url': ielts.toString()});
+      if (score != null && score.toString().isNotEmpty) {
+        if (score.toString().startsWith('[')) {
+          try {
+            final List parsed = jsonDecode(score.toString());
+            certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
+          } catch (_) {
+            certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': score.toString()});
+          }
+        } else {
+          certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': score.toString()});
+        }
+      }
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -171,14 +191,18 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
-                    children: [
-                      if (degree != null && degree.isNotEmpty)
-                        _buildFileThumbnail(context, isVi ? 'Tài liệu 1' : 'Document 1', degree),
-                      if (ielts != null && ielts.isNotEmpty)
-                        _buildFileThumbnail(context, isVi ? 'Tài liệu 2' : 'Document 2', ielts),
-                      if (score != null && score.isNotEmpty)
-                        _buildFileThumbnail(context, isVi ? 'Tài liệu 3' : 'Document 3', score),
-                    ],
+                    children: certList.isEmpty
+                        ? [
+                            Text(
+                              isVi ? 'Chưa tải lên minh chứng.' : 'No credentials uploaded.',
+                              style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8)),
+                            )
+                          ]
+                        : certList.map((item) {
+                            final label = item['name'] ?? (isVi ? 'Minh chứng' : 'Credential');
+                            final url = item['url'] ?? '';
+                            return _buildFileThumbnail(context, label, url);
+                          }).toList(),
                   ),
                 ],
               ),
@@ -658,7 +682,7 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
           : 'Congratulations! Your application has been approved. Please proceed to sign the agreement and configure your payout details.';
     } else {
       return isVi
-          ? 'Hồ sơ giảng viên của bạn chưa hoàn thiện hoặc đã bị từ chối phê duyệt. Hãy chỉnh sửa và cập nhật lại thông tin để gửi duyệt.'
+          ? 'Hồ sơ giáo viên của bạn chưa hoàn thiện hoặc đã bị từ chối phê duyệt. Hãy chỉnh sửa và cập nhật lại thông tin để gửi duyệt.'
           : 'Your profile is incomplete or has been rejected. Please edit and re-submit for review.';
     }
   }

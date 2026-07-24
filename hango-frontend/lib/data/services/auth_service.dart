@@ -4,17 +4,15 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/file_picker_helper.dart';
 
+import '../../utils/config.dart';
+import '../../utils/cart_manager.dart';
+
 class AuthService {
   // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
   static Function(Map<String, dynamic>)? onLoginSuccess;
 
-  // Use localhost or 10.0.2.2 for Android emulator
-  static String get baseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/auth';
-    }
-    return 'http://localhost:8080/api/auth';
-  }
+  // Use dynamic baseUrl configuration
+  static String get baseUrl => EnvConfig.authBaseUrl;
 
   static const String _tokenKey = 'auth_token';
   static const String _userIdKey = 'user_id';
@@ -50,6 +48,16 @@ class AuthService {
     }
   }
 
+  static String? cachedFullName;
+  static String? cachedEmail;
+  static String? cachedAvatarUrl;
+  static bool? cachedIsLoggedIn;
+  static final ValueNotifier<int> userChangeNotifier = ValueNotifier<int>(0);
+
+  static void notifyUserChanged() {
+    userChangeNotifier.value++;
+  }
+
   // Save session details
   Future<void> saveSession(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
@@ -60,9 +68,30 @@ class AuthService {
     await prefs.setStringList(_userRolesKey, List<String>.from(data['roles']));
     if (data['avatarUrl'] != null) {
       await prefs.setString(_userAvatarUrlKey, data['avatarUrl']);
+      cachedAvatarUrl = data['avatarUrl'];
     } else {
       await prefs.remove(_userAvatarUrlKey);
+      cachedAvatarUrl = null;
     }
+
+    cachedFullName = data['fullName'];
+    cachedEmail = data['email'];
+    cachedIsLoggedIn = true;
+    notifyUserChanged();
+
+    // Merge guest cart items into user's account cart
+    try {
+      final guestItems = prefs.getStringList('guest_cart_course_ids') ?? [];
+      final legacyItems = prefs.getStringList('cart_course_ids') ?? [];
+      final userKey = 'cart_course_ids_user_${data['id']}';
+      final userItems = prefs.getStringList(userKey) ?? [];
+
+      final merged = <String>{...userItems, ...guestItems, ...legacyItems}.toList();
+      await prefs.setStringList(userKey, merged);
+      await prefs.remove('guest_cart_course_ids');
+      await prefs.remove('cart_course_ids');
+      await CartManager.updateCount();
+    } catch (_) {}
   }
 
   // Retrieve token
@@ -73,8 +102,10 @@ class AuthService {
 
   // Check if logged in
   Future<bool> isLoggedIn() async {
+    if (cachedIsLoggedIn != null) return cachedIsLoggedIn!;
     final token = await getToken();
-    return token != null;
+    cachedIsLoggedIn = token != null;
+    return cachedIsLoggedIn!;
   }
 
   // Log out
@@ -86,6 +117,15 @@ class AuthService {
     await prefs.remove(_userFullNameKey);
     await prefs.remove(_userRolesKey);
     await prefs.remove(_userAvatarUrlKey);
+    await prefs.remove('cart_course_ids');
+
+    cachedFullName = null;
+    cachedEmail = null;
+    cachedAvatarUrl = null;
+    cachedIsLoggedIn = false;
+    notifyUserChanged();
+
+    await CartManager.updateCount();
   }
 
   // Perform registration request

@@ -15,6 +15,7 @@ class CourseService {
       thumbnailUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?q=80&w=600',
       status: 'featured',
       progressPercentage: 0.0,
+      price: 0.0,
     ),
     const Course(
       id: 2,
@@ -27,6 +28,7 @@ class CourseService {
       thumbnailUrl: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=600',
       status: 'featured',
       progressPercentage: 0.0,
+      price: 0.0,
     ),
     // In Progress Courses
     const Course(
@@ -40,6 +42,7 @@ class CourseService {
       thumbnailUrl: 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=600',
       status: 'draft',
       progressPercentage: 0.0,
+      price: 0.0,
     ),
   ];
   // Fetch courses by status

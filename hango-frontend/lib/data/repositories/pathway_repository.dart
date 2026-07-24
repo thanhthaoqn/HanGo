@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../domain/entities/learning_pathway.dart';
+import '../../utils/config.dart';
 
 class PathwayRepository {
-  final String baseUrl = 'http://localhost:8080/api/v1';
+  final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<LearningPathway> getMyPathway() async {
     final prefs = await SharedPreferences.getInstance();
@@ -73,20 +74,19 @@ class PathwayRepository {
   }
 
   Future<LearningPathway> suggestReroute({required int pathwayId}) async {
-    return _putRequest('$baseUrl/pathways/$pathwayId/reroute/suggestions');
+    return _postRequestNoBody('$baseUrl/pathways/$pathwayId/reroute/suggestions');
   }
 
   Future<LearningPathway> acceptReroute({required int pathwayId}) async {
-    return _putRequest('$baseUrl/pathways/$pathwayId/reroute/accept');
+    return _postRequestNoBody('$baseUrl/pathways/$pathwayId/reroute/accept');
   }
 
   Future<LearningPathway> declineReroute({required int pathwayId}) async {
-    return _putRequest('$baseUrl/pathways/$pathwayId/reroute/decline');
+    return _postRequestNoBody('$baseUrl/pathways/$pathwayId/reroute/decline');
   }
 
   Future<LearningPathway> reroutePathway({required int pathwayId}) async {
-    // Legacy fallback, mapped to suggestReroute
-    return suggestReroute(pathwayId: pathwayId);
+    return _putRequest('$baseUrl/pathways/$pathwayId/reroute');
   }
 
   Future<LearningPathway> _putRequest(String urlStr) async {
@@ -99,6 +99,32 @@ class PathwayRepository {
     }
 
     final response = await http.put(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      final body = utf8.decode(response.bodyBytes);
+      throw Exception('Request failed: ${response.statusCode}. $body');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    return LearningPathway.fromJson(data);
+  }
+
+  Future<LearningPathway> _postRequestNoBody(String urlStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final uri = Uri.parse(urlStr);
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+    }
+
+    final response = await http.post(
       uri,
       headers: {
         'Content-Type': 'application/json',

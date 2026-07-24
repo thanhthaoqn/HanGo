@@ -36,101 +36,79 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
   AnimationController? _timerAnimationController;
   Animation<double>? _timerScaleAnimation;
 
-  // Real-looking mock English questions
-  final List<Map<String, dynamic>> _baseQuestions = [
-    {
-      "content": "The book _______ you lent me yesterday is very interesting.",
-      "options": ["who", "whom", "which", "whose"],
-      "correctIndex": 2,
-      "skill": "Grammar",
-      "explanation": "'Which' is used as a relative pronoun to refer to things/objects (the book)."
-    },
-    {
-      "content": "If I _______ you, I would study harder for the final exam.",
-      "options": ["am", "was", "were", "would be"],
-      "correctIndex": 2,
-      "skill": "Grammar",
-      "explanation": "In Type 2 conditional sentences, 'were' is used for all subjects in the 'if' clause."
-    },
-    {
-      "content": "She has been working here _______ she graduated from university.",
-      "options": ["for", "since", "in", "during"],
-      "correctIndex": 1,
-      "skill": "Vocabulary",
-      "explanation": "'Since' is used to indicate a starting point in time for Present Perfect tense."
-    },
-    {
-      "content": "The weather was _______ bad that we had to cancel the outdoor picnic.",
-      "options": ["such", "so", "very", "too"],
-      "correctIndex": 1,
-      "skill": "Grammar",
-      "explanation": "The structure is 'so + adjective + that + clause' (so bad that...)."
-    },
-    {
-      "content": "By the time the police arrived, the bank robbers _______.",
-      "options": ["escaped", "have escaped", "had escaped", "escape"],
-      "correctIndex": 2,
-      "skill": "Grammar",
-      "explanation": "The past perfect 'had escaped' represents an action completed before another past action (arrived)."
-    },
-    {
-      "content": "He is very keen _______ learning foreign languages.",
-      "options": ["on", "in", "at", "for"],
-      "correctIndex": 0,
-      "skill": "Vocabulary",
-      "explanation": "The adjective phrase is 'keen on' doing something (interested in)."
-    },
-    {
-      "content": "The project was completed _______ schedule, which pleased the management.",
-      "options": ["ahead of", "in front of", "prior to", "before"],
-      "correctIndex": 0,
-      "skill": "Vocabulary",
-      "explanation": "'Ahead of schedule' is a standard idiom meaning faster or earlier than planned."
-    },
-    {
-      "content": "Could you please _______ me a favor and carry this heavy suitcase?",
-      "options": ["make", "do", "give", "take"],
-      "correctIndex": 1,
-      "skill": "Vocabulary",
-      "explanation": "The standard collocation is 'do someone a favor'."
-    },
-    {
-      "content": "Many species are in danger of extinction _______ habitat loss.",
-      "options": ["because", "despite", "due to", "instead of"],
-      "correctIndex": 2,
-      "skill": "Reading Comprehension",
-      "explanation": "'Due to' is a preposition meaning 'because of', followed by a noun phrase."
-    },
-    {
-      "content": "The novel is widely considered a masterpiece, _______ it was written in only three weeks.",
-      "options": ["although", "because", "since", "despite"],
-      "correctIndex": 0,
-      "skill": "Reading Comprehension",
-      "explanation": "'Although' introduces a concession clause contradicting the first statement."
-    }
-  ];
-
-  late List<Map<String, dynamic>> _examQuestions;
+  late List<Map<String, dynamic>> _examQuestions = [];
+  late List<Map<String, dynamic>> _examGroups = [];
+  bool _isLoading = true;
+  final ExamRepository _examRepository = ExamRepository();
 
   @override
   void initState() {
     super.initState();
-    
-    // Generate questions matching exam's question count (defaulting to base size if invalid)
-    int targetCount = widget.exam.questionCount > 0 ? widget.exam.questionCount : 10;
-    _examQuestions = [];
-    for (int i = 0; i < targetCount; i++) {
-      final base = _baseQuestions[i % _baseQuestions.length];
-      _examQuestions.add({
-        "id": i + 1,
-        "content": "Question ${i + 1}: ${base['content']}",
-        "options": base['options'],
-        "correctIndex": base['correctIndex'],
-        "skill": base['skill'],
-        "explanation": base['explanation'],
-      });
-    }
+    _loadQuestions();
+  }
 
+  Future<void> _loadQuestions() async {
+    try {
+      final questions = await _examRepository.fetchExamQuestions(widget.exam.id);
+      
+      final Map<int, List<Map<String, dynamic>>> groupMap = {};
+      final List<Map<String, dynamic>> flatQuestions = [];
+      
+      int globalQIndex = 0;
+      for (var q in questions) {
+        final processedQ = {
+          "id": q['id'],
+          "globalIndex": globalQIndex,
+          "content": "Question ${globalQIndex + 1}: ${q['content']}",
+          "options": (q['options'] as List).map((o) => o['optionText']).toList(),
+          "skill": q['skill'],
+        };
+        
+        flatQuestions.add(processedQ);
+        
+        final group = q['group'];
+        int groupId = group != null ? group['id'] : -1 - globalQIndex;
+        if (!groupMap.containsKey(groupId)) {
+          groupMap[groupId] = [];
+        }
+        groupMap[groupId]!.add(processedQ);
+        
+        globalQIndex++;
+      }
+      
+      final List<Map<String, dynamic>> groups = [];
+      for (var entry in groupMap.entries) {
+        String? passage;
+        if (entry.key >= 0) {
+          final firstQ = questions.firstWhere((q) => q['group'] != null && q['group']['id'] == entry.key);
+          passage = firstQ['group']['passage'];
+        }
+        groups.add({
+          "passage": passage,
+          "questions": entry.value,
+        });
+      }
+      
+      if (mounted) {
+        setState(() {
+          _examQuestions = flatQuestions;
+          _examGroups = groups;
+          _isLoading = false;
+        });
+        _initializeTimer();
+      }
+    } catch (e) {
+      debugPrint("Error loading questions: $e");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load questions.')));
+      }
+    }
+  }
+
+  void _initializeTimer() {
     // Set duration
     int durationMinutes = widget.exam.durationMinutes > 0 ? widget.exam.durationMinutes : 50;
     _durationInSeconds = durationMinutes * 60;
@@ -247,16 +225,14 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
       _isSubmitted = true;
     });
     
-    int correctCount = 0;
-    for (int i = 0; i < _examQuestions.length; i++) {
-      final q = _examQuestions[i];
-      if (_userAnswers[i] == q['correctIndex']) {
-        correctCount++;
-      }
+    final attemptMap = await _saveAttemptToHistory();
+    double score = 0.0;
+    if (attemptMap != null && attemptMap['score'] != null) {
+      score = (attemptMap['score'] as num).toDouble();
     }
-    double score = (correctCount / _examQuestions.length) * 10;
     
-    final attemptMap = await _saveAttemptToHistory(score);
+    int correctCount = (score * _examQuestions.length / 10).round();
+    
     await _maybeRefreshPathway(attemptMap);
     if (!mounted) return;
 
@@ -267,7 +243,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
           exam: widget.exam,
           score: score,
           correctCount: correctCount,
-          totalQuestions: _examQuestions.length,
+          examQuestions: _examQuestions,
           userAnswers: _userAnswers,
           attempt: attemptMap ?? {
             "attemptNumber": 1,
@@ -359,16 +335,13 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                         });
                         _timer?.cancel();
                         
-                        int correctCount = 0;
-                        for (int i = 0; i < _examQuestions.length; i++) {
-                          final q = _examQuestions[i];
-                          if (_userAnswers[i] == q['correctIndex']) {
-                            correctCount++;
-                          }
+                        final attemptMap = await _saveAttemptToHistory();
+                        double score = 0.0;
+                        if (attemptMap != null && attemptMap['score'] != null) {
+                          score = (attemptMap['score'] as num).toDouble();
                         }
-                        double score = (correctCount / _examQuestions.length) * 10;
+                        int correctCount = (score * _examQuestions.length / 10).round();
                         
-                        final attemptMap = await _saveAttemptToHistory(score);
                         await _maybeRefreshPathway(attemptMap);
                         if (!mounted) return;
 
@@ -379,14 +352,15 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                               exam: widget.exam,
                               score: score,
                               correctCount: correctCount,
-                              totalQuestions: _examQuestions.length,
                               userAnswers: _userAnswers,
+                              examQuestions: _examQuestions,
                               attempt: attemptMap ?? {
                                 "attemptNumber": 1,
                                 "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
                                 "score": score,
                                 "status": score >= 5.0 ? "PASSED" : "FAILED",
                                 "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
+                                "correctness": {},
                               },
                             ),
                           ),
@@ -419,20 +393,14 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     );
   }
 
-  Future<Map<String, dynamic>?> _saveAttemptToHistory(double score) async {
+  Future<Map<String, dynamic>?> _saveAttemptToHistory() async {
     try {
       final repository = ExamRepository();
       Map<String, dynamic> answersForSubmit = {};
       _userAnswers.forEach((key, value) {
-        final question = _examQuestions[key];
-        answersForSubmit[(key + 1).toString()] = {
-          'selectedOption': value,
-          'isCorrect': value == question['correctIndex'],
-          'skill': question['skill'],
-          'topic': question['skill'],
-        };
+        answersForSubmit[(key + 1).toString()] = value;
       });
-      final attempt = await repository.submitExamAttempt(widget.exam.id, score, answersForSubmit);
+      final attempt = await repository.submitExamAttempt(widget.exam.id, 0.0, answersForSubmit);
       return attempt;
     } catch (e) {
       debugPrint("Error saving attempt: $e");
@@ -814,6 +782,17 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
   Widget _buildExamActiveQuestionPane() {
     final currentQuestion = _examQuestions[_currentQuestionIndex];
+    
+    // Find passage if exists
+    String? passageText;
+    for (var group in _examGroups) {
+      final List qs = group['questions'];
+      if (qs.any((q) => q['id'] == currentQuestion['id'])) {
+        passageText = group['passage'];
+        break;
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -853,6 +832,23 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                   ),
                   const SizedBox(height: 24),
                   
+                  // Passage text if available
+                  if (passageText != null && passageText.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Text(
+                        passageText,
+                        style: const TextStyle(fontSize: 16, color: Color(0xFF334155), height: 1.6),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
                   // Question text
                   Text(
                     currentQuestion['content'],
@@ -1084,12 +1080,16 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      appBar: null, // Removed standard AppBar as requested
+      appBar: null,
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildExitExamHeader(),
-            Expanded(
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+              )
+            : Column(
+                children: [
+                  _buildExitExamHeader(),
+                  Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(

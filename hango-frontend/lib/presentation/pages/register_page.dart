@@ -318,17 +318,6 @@ class _RegisterPageState extends State<RegisterPage> {
                               color: Color(0xFF1F2937),
                             ),
                           ),
-                          const SizedBox(height: 20),
-
-                          // Role Selector Toggle
-                          RoleToggleSelector(
-                            selectedRole: _selectedRole,
-                            onRoleChanged: (role) {
-                              setState(() {
-                                _selectedRole = role;
-                              });
-                            },
-                          ),
                           const SizedBox(height: 24),
 
                           // Full Name Field

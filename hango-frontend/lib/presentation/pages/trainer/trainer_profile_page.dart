@@ -11,9 +11,11 @@ import '../login_page.dart';
 import 'trainer_courses_page.dart';
 import 'trainer_dashboard_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
+import 'trainer_revenue_page.dart';
 
 class TrainerProfilePage extends StatefulWidget {
-  const TrainerProfilePage({super.key});
+  final bool isEmbedded;
+  const TrainerProfilePage({super.key, this.isEmbedded = false});
 
   @override
   State<TrainerProfilePage> createState() => _TrainerProfilePageState();
@@ -48,14 +50,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
 
   bool _isUploadingAvatar = false;
 
-  // Degrees & Certificates
-  String? _degreeUrl;
-  String? _ieltsUrl;
-  String? _scoreReportUrl;
-
-  bool _isUploadingDegree = false;
-  bool _isUploadingIelts = false;
-  bool _isUploadingScoreReport = false;
+  // Degrees & Certificates (Dynamic unlimited list)
+  List<Map<String, String>> _certificates = [];
 
   bool _fullNameError = false;
   bool _phoneNumberError = false;
@@ -125,9 +121,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         _phoneNumberController.text = p['phoneNumber'] ?? '';
         _bioController.text = p['bio'] ?? '';
         _workplaceController.text = p['workplace'] ?? '';
-        _degreeUrl = p['degreeUrl'];
-        _ieltsUrl = p['ieltsUrl'];
-        _scoreReportUrl = p['scoreReportUrl'];
         _avatarUrl = p['avatarUrl'] ?? avatarUrl;
         _gender = (p['gender'] == 'MALE' || p['gender'] == 'FEMALE') ? p['gender'] : null;
         _trainerType = p['trainerType'] ?? 'PROFESSIONAL';
@@ -135,6 +128,33 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         _bankAccountController.text = p['bankAccount'] ?? '';
         _bankAccountNameController.text = p['bankAccountName'] ?? '';
         _citizenIdController.text = p['citizenId'] ?? '';
+
+        _certificates.clear();
+        if (p['certificates'] != null && p['certificates'] is List) {
+          _certificates = (p['certificates'] as List)
+              .map((item) => Map<String, String>.from(item as Map))
+              .toList();
+        } else {
+          if (p['degreeUrl'] != null && p['degreeUrl'].toString().isNotEmpty) {
+            _certificates.add({'name': 'Degree / Qualification Certificate', 'url': p['degreeUrl'].toString()});
+          }
+          if (p['ieltsUrl'] != null && p['ieltsUrl'].toString().isNotEmpty) {
+            _certificates.add({'name': 'IELTS / Language Proficiency Certificate', 'url': p['ieltsUrl'].toString()});
+          }
+          if (p['scoreReportUrl'] != null && p['scoreReportUrl'].toString().isNotEmpty) {
+            final raw = p['scoreReportUrl'].toString();
+            if (raw.startsWith('[')) {
+              try {
+                final List parsed = jsonDecode(raw);
+                _certificates = parsed.map((item) => Map<String, String>.from(item as Map)).toList();
+              } catch (_) {
+                _certificates.add({'name': 'Score Report / Other Credential', 'url': raw});
+              }
+            } else {
+              _certificates.add({'name': 'Score Report / Other Credential', 'url': raw});
+            }
+          }
+        }
         _isLoading = false;
       });
     } else {
@@ -258,9 +278,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       return false;
     }
 
-    final hasProof = (_degreeUrl != null && _degreeUrl!.isNotEmpty) ||
-        (_ieltsUrl != null && _ieltsUrl!.isNotEmpty) ||
-        (_scoreReportUrl != null && _scoreReportUrl!.isNotEmpty);
+    final hasProof = _certificates.isNotEmpty;
 
     if (!hasProof) {
       ToastHelper.showError(
@@ -292,9 +310,13 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     payload['bankName'] = _selectedBank ?? '';
     payload['bankAccount'] = _bankAccountController.text.trim();
     payload['bankAccountName'] = _bankAccountNameController.text.trim().toUpperCase();
-    payload['degreeUrl'] = _degreeUrl ?? '';
-    payload['ieltsUrl'] = _ieltsUrl ?? '';
-    payload['scoreReportUrl'] = _scoreReportUrl ?? '';
+    final degree = _certificates.isNotEmpty ? _certificates.first['url'] ?? '' : '';
+    final ielts = _certificates.length > 1 ? _certificates[1]['url'] ?? '' : '';
+    final score = _certificates.length > 2 ? jsonEncode(_certificates) : (_certificates.isNotEmpty ? _certificates.last['url'] ?? '' : '');
+    payload['degreeUrl'] = degree;
+    payload['ieltsUrl'] = ielts;
+    payload['scoreReportUrl'] = score;
+    payload['certificates'] = _certificates;
     payload['citizenId'] = _citizenIdController.text.trim();
 
     debugPrint('[TrainerProfile] Saving draft payload: $payload');
@@ -320,7 +342,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
 
         setState(() {
           _trainerName = _fullNameController.text.trim();
-          _trainerAvatarUrl = _avatarUrl ?? '';
+        _trainerAvatarUrl = _avatarUrl ?? '';
         });
 
         ToastHelper.showSuccess(
@@ -339,6 +361,10 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final isDesktop = size.width > 1024;
     final isVi = LanguageManager.isVi;
 
+    if (widget.isEmbedded) {
+      return _buildBodyContent(isVi);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
@@ -351,63 +377,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
               children: [
                 _buildHeader(context, !isDesktop),
                 Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486)))
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Center(
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 800),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    isVi ? 'Hồ sơ của tôi' : 'My Profile',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0F172A),
-                                      fontFamily: 'Outfit',
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-
-                                  // Avatar Card
-                                  _buildAvatarCard(isVi),
-                                  const SizedBox(height: 24),
-
-                                  // Form Body
-                                  _buildFormFields(isVi),
-                                  const SizedBox(height: 32),
-
-                                  // Save Button
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      ElevatedButton.icon(
-                                        onPressed: _isSaving ? null : _handleSave,
-                                        icon: _isSaving
-                                            ? const SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                              )
-                                            : const Icon(Icons.save_rounded, size: 18),
-                                        label: Text(isVi ? 'Lưu thay đổi' : 'Save Changes'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF20B486),
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+                  child: _buildBodyContent(isVi),
                 ),
               ],
             ),
@@ -415,6 +385,66 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         ],
       ),
     );
+  }
+
+  Widget _buildBodyContent(bool isVi) {
+    return _isLoading
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486)))
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isVi ? 'Hồ sơ của tôi' : 'My Profile',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Avatar Card
+                    _buildAvatarCard(isVi),
+                    const SizedBox(height: 24),
+
+                    // Form Body
+                    _buildFormFields(isVi),
+                    const SizedBox(height: 32),
+
+                    // Save Button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _isSaving ? null : _handleSave,
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Icon(Icons.save_rounded, size: 18),
+                          label: Text(isVi ? 'Lưu thay đổi' : 'Save Changes'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF20B486),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
   }
 
   Widget _buildAvatarCard(bool isVi) {
@@ -527,10 +557,11 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
+            dropdownColor: Colors.white,
             value: _gender,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: Colors.white,
               filled: true,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -589,13 +620,14 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _selectedBank,
+                dropdownColor: Colors.white,
                 isExpanded: true,
                 hint: Text(isVi ? 'Chọn ngân hàng' : 'Select bank'),
                 items: _bankSuggestions.map((String b) {
@@ -628,7 +660,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             },
           ),
           const SizedBox(height: 16),
-          _buildInputField(isVi ? 'Số Căn cước công dân (CCCD - 12 chữ số)' : 'Citizen ID (CCCD)', _citizenIdController, keyboardType: TextInputType.number, maxLength: 12, errorText: _citizenIdError ? (isVi ? 'CCCD gồm đúng 12 số' : '12 digits required') : null),
+          _buildInputField(isVi ? 'Mã số thuế (Tax ID)' : 'Tax Identification Number (Tax ID)', _citizenIdController, keyboardType: TextInputType.number, maxLength: 13, errorText: _citizenIdError ? (isVi ? 'Mã số thuế không hợp lệ' : 'Invalid Tax ID') : null),
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 24),
@@ -764,6 +796,16 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
               MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()),
             );
           }),
+          _buildSidebarItem(
+            Icons.account_balance_wallet_outlined,
+            isVi ? 'Doanh thu' : 'Revenue',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TrainerRevenuePage()),
+              );
+            },
+          ),
           _buildSidebarItem(Icons.person_outline, isVi ? 'Hồ sơ của tôi' : 'My Profile', isActive: true),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
@@ -899,20 +941,182 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     );
   }
 
+  Future<String?> _uploadFileToCloudinary() async {
+    try {
+      final picked = await pickImage();
+      if (picked == null || picked.bytes == null) return null;
+
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'hango_preset'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          picked.bytes!,
+          filename: picked.name,
+        ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(responseBody);
+        return data['secure_url'] ?? data['url'];
+      }
+    } catch (e) {
+      debugPrint('Cloudinary upload error: $e');
+    }
+    return null;
+  }
+
+  void _showAddCertificateModal(bool isVi) {
+    final nameController = TextEditingController();
+    String? tempUrl;
+    bool isUploading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Container(
+                color: Colors.white,
+                constraints: const BoxConstraints(maxWidth: 550),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isVi ? 'Thêm chứng chỉ / Bằng cấp' : 'Add Degree & Certificate',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      isVi ? 'Tên chứng chỉ / Bằng cấp *' : 'Certificate / Degree Name *',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: nameController,
+                      onChanged: (_) => setModalState(() {}),
+                      decoration: InputDecoration(
+                        hintText: isVi ? 'Ví dụ: Bằng Cử nhân Sư phạm Anh, IELTS 8.0' : 'E.g.: Bachelor of English Pedagogy, IELTS 8.0',
+                        fillColor: Colors.white,
+                        filled: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      isVi ? 'Ảnh chứng chỉ / Bằng cấp *' : 'Certificate / Degree Image *',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: isUploading
+                          ? null
+                          : () async {
+                              setModalState(() => isUploading = true);
+                              final uploaded = await _uploadFileToCloudinary();
+                              setModalState(() {
+                                isUploading = false;
+                                if (uploaded != null) tempUrl = uploaded;
+                              });
+                            },
+                      child: Container(
+                        height: 220,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
+                        ),
+                        child: isUploading
+                            ? const Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)))
+                            : (tempUrl != null
+                                ? Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(tempUrl!, width: double.infinity, height: 220, fit: BoxFit.contain),
+                                      ),
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                          child: const Icon(Icons.check, color: Colors.white, size: 16),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.cloud_upload_outlined, color: Color(0xFF28B79B), size: 32),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        isVi ? 'Nhấp để chọn ảnh chứng chỉ' : 'Click to select certificate image',
+                                        style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                    ],
+                                  )),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(isVi ? 'Hủy' : 'Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: (tempUrl != null && nameController.text.trim().isNotEmpty)
+                              ? () {
+                                  setState(() {
+                                    _certificates.add({
+                                      'name': nameController.text.trim(),
+                                      'url': tempUrl!,
+                                    });
+                                  });
+                                  Navigator.pop(context);
+                                  ToastHelper.showSuccess(context, isVi ? 'Đã thêm chứng chỉ!' : 'Certificate added!');
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF28B79B),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: Text(isVi ? 'Thêm chứng chỉ' : 'Add Certificate'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildUnifiedUploadBox(bool isVi) {
-    final list = <Map<String, String>>[];
-    if (_degreeUrl != null && _degreeUrl!.isNotEmpty) {
-      list.add({'type': 'degree', 'url': _degreeUrl!, 'label': isVi ? 'Tài liệu minh chứng 1' : 'Credential 1'});
-    }
-    if (_ieltsUrl != null && _ieltsUrl!.isNotEmpty) {
-      list.add({'type': 'ielts', 'url': _ieltsUrl!, 'label': isVi ? 'Tài liệu minh chứng 2' : 'Credential 2'});
-    }
-    if (_scoreReportUrl != null && _scoreReportUrl!.isNotEmpty) {
-      list.add({'type': 'score', 'url': _scoreReportUrl!, 'label': isVi ? 'Tài liệu minh chứng 3' : 'Credential 3'});
-    }
-
-    final isFull = list.length >= 3;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -924,12 +1128,21 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            isVi ? 'Danh sách tài liệu đã tải lên' : 'Uploaded Documents',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155), fontSize: 13),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isVi ? 'Danh sách tài liệu đã tải lên' : 'Uploaded Documents',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155), fontSize: 13),
+              ),
+              Text(
+                '${_certificates.length} ${isVi ? 'tài liệu' : 'documents'}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
-          if (list.isEmpty)
+          if (_certificates.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
@@ -941,7 +1154,12 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             )
           else
             Column(
-              children: list.map((item) {
+              children: _certificates.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final item = entry.value;
+                final certName = item['name'] ?? (isVi ? 'Chứng chỉ ${idx + 1}' : 'Certificate ${idx + 1}');
+                final url = item['url'] ?? '';
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(12),
@@ -961,13 +1179,13 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                               builder: (context) => Dialog(
                                 child: Container(
                                   constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
-                                  child: Image.network(item['url']!, fit: BoxFit.contain),
+                                  child: Image.network(url, fit: BoxFit.contain),
                                 ),
                               ),
                             );
                           },
                           child: Image.network(
-                            item['url']!,
+                            url,
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
@@ -982,7 +1200,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item['label']!,
+                              certName,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                             ),
                             const SizedBox(height: 4),
@@ -993,7 +1211,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                                   builder: (context) => Dialog(
                                     child: Container(
                                       constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
-                                      child: Image.network(item['url']!, fit: BoxFit.contain),
+                                      child: Image.network(url, fit: BoxFit.contain),
                                     ),
                                   ),
                                 );
@@ -1010,9 +1228,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                         icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
                         onPressed: () {
                           setState(() {
-                            if (item['type'] == 'degree') _degreeUrl = null;
-                            if (item['type'] == 'ielts') _ieltsUrl = null;
-                            if (item['type'] == 'score') _scoreReportUrl = null;
+                            _certificates.removeAt(idx);
                           });
                         },
                       ),
@@ -1021,110 +1237,34 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 );
               }).toList(),
             ),
-          if (!isFull) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: (_isUploadingDegree || _isUploadingIelts || _isUploadingScoreReport)
-                  ? null
-                  : () {
-                      if (_degreeUrl == null || _degreeUrl!.isEmpty) {
-                        _pickAndUpload('degree');
-                      } else if (_ieltsUrl == null || _ieltsUrl!.isEmpty) {
-                        _pickAndUpload('ielts');
-                      } else if (_scoreReportUrl == null || _scoreReportUrl!.isEmpty) {
-                        _pickAndUpload('score');
-                      }
-                    },
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                height: 80,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
-                ),
-                child: Center(
-                  child: (_isUploadingDegree || _isUploadingIelts || _isUploadingScoreReport)
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF20B486)),
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.cloud_upload_outlined, color: Color(0xFF20B486), size: 24),
-                            const SizedBox(width: 12),
-                            Text(
-                              isVi ? 'Nhấp để tải lên tài liệu minh chứng' : 'Click to upload credential',
-                              style: const TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                          ],
-                        ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () => _showAddCertificateModal(isVi),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              height: 70,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
+                color: Colors.white,
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF28B79B), size: 22),
+                    const SizedBox(width: 10),
+                    Text(
+                      isVi ? 'Thêm chứng chỉ, bằng cấp' : 'Add Degree & Certificate',
+                      style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
-  }
-
-  void _pickAndUpload(String targetDoc) async {
-    try {
-      final picked = await pickImage();
-      if (picked == null) return;
-
-      setState(() {
-        if (targetDoc == 'degree') _isUploadingDegree = true;
-        if (targetDoc == 'ielts') _isUploadingIelts = true;
-        if (targetDoc == 'score') _isUploadingScoreReport = true;
-      });
-
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          picked.bytes,
-          filename: picked.name,
-        ));
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
-        final uploadedUrl = data['secure_url'] ?? data['url'];
-
-        setState(() {
-          if (targetDoc == 'degree') {
-            _degreeUrl = uploadedUrl;
-            _isUploadingDegree = false;
-          }
-          if (targetDoc == 'ielts') {
-            _ieltsUrl = uploadedUrl;
-            _isUploadingIelts = false;
-          }
-          if (targetDoc == 'score') {
-            _scoreReportUrl = uploadedUrl;
-            _isUploadingScoreReport = false;
-          }
-        });
-        if (mounted) {
-          ToastHelper.showSuccess(context, 'Tải lên tài liệu thành công!');
-        }
-      } else {
-        throw Exception('Cloudinary error: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        _isUploadingDegree = false;
-        _isUploadingIelts = false;
-        _isUploadingScoreReport = false;
-      });
-      if (mounted) {
-        ToastHelper.showError(context, 'Tải ảnh lên thất bại: $e');
-      }
-    }
   }
 }

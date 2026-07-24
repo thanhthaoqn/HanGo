@@ -26,6 +26,9 @@ public class Enrollment {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
+    @Column(name = "enrolled_version_id")
+    private Long enrolledVersionId;
+
     @Builder.Default
     @Column(length = 20)
     private String status = "ENROLLED";

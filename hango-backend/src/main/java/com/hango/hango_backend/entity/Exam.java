@@ -34,6 +34,9 @@ public class Exam {
 
     private String visibility = "PRIVATE";
 
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
 

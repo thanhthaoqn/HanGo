@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/exam.dart';
+import '../../utils/config.dart';
 
 class ExamRepository {
-  // Use localhost for Web/Desktop. For Android Emulator, change to 10.0.2.2
-  final String baseUrl = 'http://localhost:8080/api/v1';
+  // Use dynamic baseUrl configuration
+  final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<List<Exam>> fetchExams({String status = 'All'}) async {
     try {
@@ -58,6 +59,32 @@ class ExamRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchExamQuestions(String examId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/exams/$examId/questions');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        return data.map((e) => Map<String, dynamic>.from(e)).toList();
+      } else {
+        throw Exception('Failed to load questions: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching questions: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> submitExamAttempt(String examId, double score, Map<String, dynamic> answers) async {
     try {
       final uri = Uri.parse('$baseUrl/exams/$examId/submit');
@@ -84,7 +111,16 @@ class ExamRepository {
         throw Exception('Failed to submit exam: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error submitting exam: $e');
+      throw Exception('Error submitting exam attempt: $e');
+    }
+  }
+
+  Future<bool> hasCompletedEntryExam() async {
+    try {
+      final attempts = await fetchExamAttempts('60');
+      return attempts.isNotEmpty;
+    } catch (e) {
+      return false;
     }
   }
 

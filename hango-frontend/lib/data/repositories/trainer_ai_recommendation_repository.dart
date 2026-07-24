@@ -4,9 +4,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/model/trainer_ai_question_models.dart';
+import '../../utils/config.dart';
 
 class TrainerAiQuestionRepository {
-  final String baseUrl = 'http://localhost:8080/api/v1';
+  final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<TrainerAiGenerateResponse> generate({
     required String mode,
@@ -15,6 +16,8 @@ class TrainerAiQuestionRepository {
     required int quantity,
     int? categoryId,
     int? difficultyId,
+    String? skillType,
+    String? groupType,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -28,6 +31,8 @@ class TrainerAiQuestionRepository {
       'quantity': quantity,
       if (categoryId != null) 'categoryId': categoryId,
       if (difficultyId != null) 'difficultyId': difficultyId,
+      if (skillType != null) 'skillType': skillType,
+      if (groupType != null) 'groupType': groupType,
     };
 
     final response = await http.post(

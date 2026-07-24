@@ -22,6 +22,9 @@ public class Section {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
+    @Column(length = 100)
+    private String code;
+
     @Column(nullable = false)
     private String title;
 
@@ -30,6 +33,9 @@ public class Section {
 
     @Column(name = "display_order")
     private Integer displayOrder;
+
+    @Column(length = 50)
+    private String version;
 
     @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")

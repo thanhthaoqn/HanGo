@@ -158,7 +158,8 @@ public class ExamImportController {
 
                     Long skillParamId = resolveSystemParam(skillStr);
                     Long difficultyId = resolveSystemParam(diffStr);
-                    Long categoryId = resolveCategory(groupTypeStr);
+                    Long groupTypeId = resolveSystemParam(groupTypeStr);
+                    Long categoryId = null; // Excel does not provide category
 
                     if (skillParamId == null)
                         throw new IllegalArgumentException(
@@ -168,7 +169,7 @@ public class ExamImportController {
                                 "Invalid Difficulty '" + diffStr + "' at Exam " + currentExamCode);
 
                     if (isGroup) {
-                        if (categoryId == null)
+                        if (groupTypeId == null)
                             throw new IllegalArgumentException(
                                     "Invalid Group Type '" + groupTypeStr + "' for passage at Exam " + currentExamCode);
 
@@ -176,9 +177,10 @@ public class ExamImportController {
                         GeneratedKeyHolder kh = new GeneratedKeyHolder();
                         jdbcTemplate.update(con -> {
                             var ps = con.prepareStatement(
-                                    "INSERT INTO question_groups (context_text, group_type_param_id) VALUES (?, 17)",
+                                    "INSERT INTO question_groups (context_text, group_type_param_id) VALUES (?, ?)",
                                     java.sql.Statement.RETURN_GENERATED_KEYS);
                             ps.setString(1, passageText);
+                            ps.setLong(2, groupTypeId);
                             return ps;
                         }, kh);
                         Number k = kh.getKey();
@@ -317,9 +319,31 @@ public class ExamImportController {
     private Long resolveSystemParam(String paramValue) {
         if (paramValue == null || paramValue.isBlank())
             return null;
+        
+        String searchVal = paramValue.trim();
+        
+        // Map old Skill Types to new ones
+        if (searchVal.equalsIgnoreCase("Conversation/Short Sentences")) searchVal = "Conversation ordering"; // Or any appropriate new skill
+        else if (searchVal.equalsIgnoreCase("Synonym")) searchVal = "Synonym in context";
+        else if (searchVal.equalsIgnoreCase("Antonym")) searchVal = "Antonym in context";
+        else if (searchVal.equalsIgnoreCase("Pronunciation")) searchVal = "Phonetics";
+        else if (searchVal.equalsIgnoreCase("Grammar")) searchVal = "Vocabulary"; // Fallback
+        else if (searchVal.equalsIgnoreCase("Sentence Meaning")) searchVal = "Contextual meaning";
+        else if (searchVal.equalsIgnoreCase("Sentence Combining")) searchVal = "Word order";
+        else if (searchVal.equalsIgnoreCase("Fill in Blank")) searchVal = "Vocabulary";
+        else if (searchVal.equalsIgnoreCase("Reading Comprehension")) searchVal = "Reading Comprehension - 10 questions";
+        else if (searchVal.equalsIgnoreCase("Arrangement")) searchVal = "Paragraph ordering";
+        
+        // Map old Group Types to new ones
+        if (searchVal.equalsIgnoreCase("Notice Completion")) searchVal = "Read and Fill in a Notice";
+        else if (searchVal.equalsIgnoreCase("Flyer Completion")) searchVal = "Read and Fill in a Leaflet/Advertisement";
+        else if (searchVal.equalsIgnoreCase("Passage Arrangement")) searchVal = "Paragraph/Text Reordering";
+        else if (searchVal.equalsIgnoreCase("Information Gap Filling")) searchVal = "Guided Cloze Test";
+        else if (searchVal.equalsIgnoreCase("Reading Comprehension")) searchVal = "Reading Comprehension - 10 questions";
+
         List<Long> ids = jdbcTemplate.query(
                 "SELECT id FROM system_parameters WHERE LOWER(param_value) = LOWER(?) LIMIT 1",
-                (rs, rn) -> rs.getLong("id"), paramValue.trim());
+                (rs, rn) -> rs.getLong("id"), searchVal);
         return ids.isEmpty() ? null : ids.get(0);
     }
 

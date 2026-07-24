@@ -363,7 +363,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
                     },
                     style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500),
                     decoration: InputDecoration(
-                      hintText: isVi ? 'Tìm kiếm bài học, giảng viên, từ khóa...' : 'Search lessons, educators, keywords...',
+                      hintText: isVi ? 'Tìm kiếm bài học, giáo viên, từ khóa...' : 'Search lessons, educators, keywords...',
                       hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,

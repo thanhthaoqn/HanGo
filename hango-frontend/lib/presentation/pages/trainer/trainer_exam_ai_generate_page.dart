@@ -15,6 +15,8 @@ class _TrainerExamAiGeneratePageState extends State<TrainerExamAiGeneratePage> {
   final _topicController = TextEditingController();
   final _countController = TextEditingController();
   String _selectedDifficulty = 'Medium';
+  String? _selectedSkillType;
+  String? _selectedGroupType;
 
   @override
   void dispose() {
@@ -122,6 +124,123 @@ class _TrainerExamAiGeneratePageState extends State<TrainerExamAiGeneratePage> {
                                         if (val != null) {
                                           setState(() => _selectedDifficulty = val);
                                         }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('SKILL TYPE (Optional)'),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _selectedSkillType,
+                                      hint: const Text(
+                                        'Select Skill Type',
+                                        style: TextStyle(
+                                          color: Color(0xFF94A3B8),
+                                          fontSize: 12,
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                      isExpanded: true,
+                                      items: [
+                                        'Phonetics',
+                                        'Word order',
+                                        'Reduced relative clause',
+                                        'Preposition',
+                                        'Collocation',
+                                        'To-infinitive',
+                                        'Quantifier',
+                                        'Phrasal verb',
+                                        'Prepositional phrase',
+                                        'Vocabulary',
+                                        'Conversation ordering',
+                                        'Letter ordering',
+                                        'Paragraph ordering',
+                                        'Passive voice',
+                                        'Relative clause',
+                                        'Contextual meaning',
+                                        'Factual / Detail question',
+                                        'Synonym in context',
+                                        'Antonym in context',
+                                        'Reference question',
+                                        'Paraphrasing question',
+                                        'Paragraph-specific information question',
+                                        'Main idea / Central theme question',
+                                        'TRUE / NOT TRUE question',
+                                        'Inference question',
+                                      ]
+                                          .map((e) => DropdownMenuItem(
+                                                value: e,
+                                                child: Text(e, style: const TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                              ))
+                                          .toList(),
+                                      onChanged: (val) {
+                                        setState(() => _selectedSkillType = val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLabel('GROUP TYPE (Optional)'),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _selectedGroupType,
+                                      hint: const Text(
+                                        'Select Group Type',
+                                        style: TextStyle(
+                                          color: Color(0xFF94A3B8),
+                                          fontSize: 12,
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                      isExpanded: true,
+                                      items: [
+                                        'Read and Fill in a Notice',
+                                        'Read and Fill in a Leaflet/Advertisement',
+                                        'Paragraph/Text Reordering',
+                                        'Guided Cloze Test',
+                                        'Reading Comprehension - 8 questions',
+                                        'Reading Comprehension - 10 questions'
+                                      ]
+                                          .map((e) => DropdownMenuItem(
+                                                value: e,
+                                                child: Text(e, style: const TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                              ))
+                                          .toList(),
+                                      onChanged: (val) {
+                                        setState(() => _selectedGroupType = val);
                                       },
                                     ),
                                   ),

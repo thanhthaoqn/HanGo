@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
+import '../../../../utils/config.dart';
 import '../../login_page.dart';
 import '../trainer_courses_page.dart';
 import '../trainer_dashboard_page.dart';
@@ -12,13 +13,14 @@ import 'trainer_create_question_page.dart';
 import '../../learner/learner_home_page.dart';
 import '../../../../utils/language_manager.dart';
 import '../trainer_profile_page.dart';
+import '../trainer_revenue_page.dart';
 import 'models/trainer_question.dart';
-import 'widgets/question_filter_pane.dart';
 import 'widgets/question_search_bar.dart';
 import 'widgets/question_table.dart';
 
 class TrainerQuestionBankPage extends StatefulWidget {
-  const TrainerQuestionBankPage({Key? key}) : super(key: key);
+  final bool isEmbedded;
+  const TrainerQuestionBankPage({Key? key, this.isEmbedded = false}) : super(key: key);
 
   @override
   State<TrainerQuestionBankPage> createState() => _TrainerQuestionBankPageState();
@@ -35,8 +37,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _errorMessage = '';
 
   // Filter States
-  String _selectedType = 'ALL';
-  String _selectedGroupType = 'Choose Group Type';
+  String _selectedType = 'PUBLIC';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
   int _currentPage = 1;
@@ -46,12 +47,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   List<TrainerQuestion> _displayedQuestions = [];
   Timer? _debounceTimer;
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
-    }
-    return 'http://localhost:8080';
-  }
+  String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   @override
   void initState() {
@@ -139,14 +135,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     _fetchQuestions();
   }
 
-  void _handleGroupTypeChanged(String groupType) {
-    setState(() {
-      _selectedGroupType = groupType;
-      _currentPage = 1;
-    });
-    _fetchQuestions();
-  }
-
   void _handleSortChanged(String sort) {
     setState(() {
       _sortBy = sort;
@@ -178,6 +166,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         ? []
         : _allQuestions.sublist(startIndex, endIndex);
 
+    if (widget.isEmbedded) {
+      return _buildBodyContent();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
@@ -190,108 +182,94 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
               children: [
                 _buildHeader(context, !isDesktop),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left pane: SELECT TYPE dropdown
-                        QuestionFilterPane(
-                          selectedType: _selectedType,
-                          onTypeChanged: _handleTypeChanged,
-                          selectedGroupType: _selectedGroupType,
-                          onGroupTypeChanged: _handleGroupTypeChanged,
-                        ),
-                        const SizedBox(width: 24),
-                        // Right pane: Search bar and Table
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              QuestionSearchBar(
-                                searchController: _searchController,
-                                onSearchChanged: _handleSearch,
-                                sortBy: _sortBy,
-                                onSortChanged: _handleSortChanged,
-                                onCreatePressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const TrainerCreateQuestionPage()),
-                                  ).then((_) => _fetchQuestions());
-                                },
-                                onImportPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Excel Import flow is under construction')),
-                                  );
-                                },
-                                onRefreshPressed: _fetchQuestions,
-                              ),
-                              const SizedBox(height: 24),
-                              QuestionTable(
-                                questions: _displayedQuestions,
-                                isLoading: _isLoading,
-                                currentPage: _currentPage,
-                                totalRecords: _allQuestions.length,
-                                pageSize: _pageSize,
-                                onPageChanged: (page) {
-                                  setState(() {
-                                    _currentPage = page;
-                                  });
-                                },
-                                onViewPressed: (q) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
-                                      question: q,
-                                      isReadOnly: true,
-                                    )),
-                                  );
-                                },
-                                onEditPressed: (q) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
-                                      question: q,
-                                      isEdit: true,
-                                    )),
-                                  ).then((_) => _fetchQuestions());
-                                },
-                                onStatusToggled: (q, isPublic) async {
-                                  final oldStatus = q.status;
-                                  final newStatus = isPublic ? 'PUBLIC' : 'PRIVATE';
-                                  
-                                  // Optimistic UI Update
-                                  setState(() {
-                                    q.status = newStatus;
-                                  });
+                  child: _buildBodyContent(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                                  try {
-                                    final token = await _authService.getToken();
-                                    if (token != null) {
-                                      final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                                      await api.toggleQuestionStatus(q.id, newStatus, isGroup: q.isGroup);
-                                    } else {
-                                      throw Exception('No token');
-                                    }
-                                  } catch (e) {
-                                    // Revert on failure
-                                    setState(() {
-                                      q.status = oldStatus;
-                                    });
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Failed to update status: $e')),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+  Widget _buildBodyContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                QuestionSearchBar(
+                  searchController: _searchController,
+                  onSearchChanged: _handleSearch,
+                  selectedType: _selectedType,
+                  onTypeChanged: _handleTypeChanged,
+                  sortBy: _sortBy,
+                  onSortChanged: _handleSortChanged,
+                  onCreatePressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const TrainerCreateQuestionPage()),
+                    ).then((_) => _fetchQuestions());
+                  },
+                  onImportPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Excel Import flow is under construction')),
+                    );
+                  },
+                  onRefreshPressed: _fetchQuestions,
+                ),
+                const SizedBox(height: 24),
+                QuestionTable(
+                  questions: _displayedQuestions,
+                  isLoading: _isLoading,
+                  currentPage: _currentPage,
+                  totalRecords: _allQuestions.length,
+                  pageSize: _pageSize,
+                  onPageChanged: (page) {
+                    setState(() {
+                      _currentPage = page;
+                    });
+                  },
+                  onViewPressed: (q) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                        question: q,
+                        isReadOnly: true,
+                      )),
+                    );
+                  },
+                  onEditPressed: (q) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                        question: q,
+                        isEdit: true,
+                      )),
+                    ).then((_) => _fetchQuestions());
+                  },
+                  onStatusToggled: (q, isPublic) async {
+                    final oldStatus = q.status;
+                    final newStatus = isPublic ? 'PUBLIC' : 'PRIVATE';
+                    setState(() {
+                      q.status = newStatus;
+                    });
+                    try {
+                      final token = await _authService.getToken();
+                      if (token != null) {
+                        final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+                        await api.toggleQuestionStatus(q.id, newStatus, isGroup: q.isGroup);
+                      }
+                    } catch (e) {
+                      setState(() {
+                        q.status = oldStatus;
+                      });
+                    }
+                  },
                 ),
               ],
             ),
@@ -376,6 +354,16 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             Icons.question_answer_outlined,
             'Question Bank',
             isActive: true,
+          ),
+          _buildSidebarItem(
+            Icons.account_balance_wallet_outlined,
+            'Revenue',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const TrainerRevenuePage()),
+              );
+            },
           ),
           _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
             Navigator.pushReplacement(

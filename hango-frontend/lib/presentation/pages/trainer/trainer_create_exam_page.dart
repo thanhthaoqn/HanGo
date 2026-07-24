@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -44,12 +45,7 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
   bool _isUploadingImage = false;
   String _uploadStatusText = '';
 
-  String get apiBaseUrl {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
-    }
-    return 'http://localhost:8080/api/v1';
-  }
+  String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {
@@ -298,6 +294,7 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
                 description: 'Use AI to automatically generate a complete exam based on your criteria.',
                 icon: Icons.auto_awesome_outlined,
                 color: const Color(0xFF8B5CF6),
+                isDisabled: true,
                 onTap: () {
                   setState(() => _currentView = 'ai');
                 },
@@ -316,61 +313,65 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    bool isDisabled = false,
   }) {
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: isDisabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 300,
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
+        onTap: isDisabled ? null : onTap,
+        child: Opacity(
+          opacity: isDisabled ? 0.5 : 1.0,
+          child: Container(
+            width: 300,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
-                child: Icon(icon, color: color, size: 32),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                  fontFamily: 'Outfit',
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 32),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF64748B),
-                  fontFamily: 'Outfit',
-                  height: 1.5,
+                const SizedBox(height: 24),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                    fontFamily: 'Outfit',
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Text(
+                  description,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    fontFamily: 'Outfit',
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
