@@ -50,6 +50,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   String _selectedSortBy = 'NEWEST'; // 'NEWEST', 'OLDEST', 'ALPHABETICAL'
   String _selectedTimePeriod = 'ALL'; // 'ALL', 'THIS_WEEK', 'THIS_MONTH'
 
+  // Pagination
+  int _currentPage = 1;
+  final int _itemsPerPage = 10;
+
   // Courses List
   List<dynamic> _coursesList = [];
   bool _isDownloadingTemplate = false;
@@ -92,6 +96,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
+      _currentPage = 1;
     });
 
     try {
@@ -475,18 +480,90 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   }
 
   Widget _buildBodyContent() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildWelcomeSection(),
-          const SizedBox(height: 24),
-          _buildFilterContainer(),
-          const SizedBox(height: 24),
-          _buildCoursesSection(),
-        ],
-      ),
+    final paginatedGroups = _paginatedGroups;
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.only(left: 24, right: 24, top: 24, bottom: 24),
+          sliver: SliverToBoxAdapter(child: _buildWelcomeSection()),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          sliver: SliverToBoxAdapter(child: _buildFilterContainer()),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_errorMessage.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Text(
+                      'Notice: $_errorMessage. Fallback data shown.',
+                      style: const TextStyle(
+                        color: Colors.orangeAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                if (_isLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48.0),
+                      child: CircularProgressIndicator(color: Color(0xFF20B486)),
+                    ),
+                  )
+                else if (_groupedCourses.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 64),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFEFF2F5)),
+                    ),
+                    child: const Column(
+                      children: [
+                        Icon(Icons.folder_open, size: 48, color: Color(0xFF94A3B8)),
+                        SizedBox(height: 16),
+                        Text(
+                          'No courses found matching this criteria',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (!_isLoading && paginatedGroups.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _CourseCardWrapper(
+                  group: paginatedGroups[index],
+                  buildCard: _buildCourseCard,
+                ),
+                childCount: paginatedGroups.length,
+              ),
+            ),
+          ),
+        SliverPadding(
+          padding: const EdgeInsets.all(24),
+          sliver: SliverToBoxAdapter(child: _buildPagination()),
+        ),
+      ],
     );
   }
 
@@ -513,7 +590,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
               child: Image.network(
                 'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                height: 36,
+                height: 42,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Row(
@@ -1259,6 +1336,20 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     return byKey.values.map(_resolveGroup).toList();
   }
 
+  int get _totalPages {
+    final groups = _groupedCourses;
+    if (groups.isEmpty) return 1;
+    return (groups.length / _itemsPerPage).ceil();
+  }
+
+  List<({dynamic published, dynamic draft, dynamic pending, List<dynamic> all})> get _paginatedGroups {
+    final groups = _groupedCourses;
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    if (startIndex >= groups.length) return [];
+    final endIndex = startIndex + _itemsPerPage;
+    return groups.sublist(startIndex, endIndex > groups.length ? groups.length : endIndex);
+  }
+
   /// Returns the lifecycle state string for a group.
   /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'PENDING'
   String _lifecycleState({
@@ -1274,70 +1365,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
 
   // ─── Courses section ──────────────────────────────────────────────────────
 
-  Widget _buildCoursesSection() {
-    final groups = _groupedCourses;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_errorMessage.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: Text(
-              'Notice: $_errorMessage. Fallback data shown.',
-              style: const TextStyle(
-                color: Colors.orangeAccent,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ),
-        if (_isLoading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 48.0),
-              child: CircularProgressIndicator(color: Color(0xFF20B486)),
-            ),
-          )
-        else if (groups.isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 64),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFEFF2F5)),
-            ),
-            child: const Column(
-              children: [
-                Icon(Icons.folder_open, size: 48, color: Color(0xFF94A3B8)),
-                SizedBox(height: 16),
-                Text(
-                  'No courses found matching this criteria',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          Column(children: groups.map(_buildCourseCard).toList()),
-        const SizedBox(height: 24),
-        _buildPagination(),
-      ],
-    );
-  }
-
   // ─── Course Card (lifecycle-aware) ────────────────────────────────────────
 
   Widget _buildCourseCard(
-    ({dynamic published, dynamic draft, dynamic pending, List<dynamic> all})
-    group,
+    ({dynamic published, dynamic draft, dynamic pending, List<dynamic> all}) group,
+    bool isHovered,
   ) {
     final published = group.published;
     final draft = group.draft;
@@ -1378,17 +1410,24 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         ? const Color(0xFFBFDBFE)
         : const Color(0xFFEFF2F5);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 16),
+      transform: Matrix4.translationValues(0, isHovered ? -4 : 0, 0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1.5),
-        boxShadow: const [
+        border: Border.all(
+          color: isHovered ? const Color(0xFF20B486).withAlpha(102) : borderColor, 
+          width: 1.5
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.04),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: isHovered 
+                ? const Color(0xFF20B486).withAlpha(31)
+                : const Color.fromRGBO(0, 0, 0, 0.04),
+            blurRadius: isHovered ? 20 : 10,
+            offset: Offset(0, isHovered ? 8 : 4),
           ),
         ],
       ),
@@ -1397,14 +1436,14 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         children: [
           // ── Body ─────────────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(12),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final useRow = constraints.maxWidth > 600;
 
                 final imageWidget = Container(
-                  width: useRow ? 110 : double.infinity,
-                  height: 82,
+                  width: useRow ? 80 : double.infinity,
+                  height: 60,
                   decoration: BoxDecoration(
                     color: const Color(0xFFEEF2F6),
                     borderRadius: BorderRadius.circular(12),
@@ -1439,7 +1478,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         Text(
                           title,
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1E293B),
                             fontFamily: 'Outfit',
@@ -1544,7 +1583,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                 top: BorderSide(color: borderColor.withAlpha(100)),
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: _buildLifecycleActions(
               state: state,
               course: course,
@@ -1792,7 +1831,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   padding: const EdgeInsets.all(20),
                   shrinkWrap: true,
                   itemCount: sortedVersions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final item = sortedVersions[index];
                     final version = (item['version'] ?? 'v1').toString();
@@ -2044,7 +2083,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(8),
@@ -2052,13 +2091,13 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: color),
+            Icon(icon, size: 14, color: color),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 color: color,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Outfit',
               ),
@@ -2095,59 +2134,87 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   }
 
   Widget _buildPagination() {
+    if (_groupedCourses.isEmpty) return const SizedBox();
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         InkWell(
-          onTap: () {},
+          onTap: _currentPage > 1 ? () {
+            setState(() {
+              _currentPage--;
+            });
+          } : null,
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
+              color: _currentPage > 1 ? Colors.white : const Color(0xFFF1F5F9),
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.chevron_left,
               size: 16,
-              color: Color(0xFF94A3B8),
+              color: _currentPage > 1 ? const Color(0xFF475569) : const Color(0xFF94A3B8),
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        Container(
-          width: 32,
-          height: 32,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: Color(0xFF20B486),
-            shape: BoxShape.circle,
-          ),
-          child: const Text(
-            '1',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Outfit',
-            ),
+        const SizedBox(width: 12),
+        Text(
+          'Page $_currentPage of $_totalPages',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF475569),
+            fontFamily: 'Outfit',
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
         InkWell(
-          onTap: () {},
+          onTap: _currentPage < _totalPages ? () {
+            setState(() {
+              _currentPage++;
+            });
+          } : null,
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
+              color: _currentPage < _totalPages ? Colors.white : const Color(0xFFF1F5F9),
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.chevron_right,
               size: 16,
-              color: Color(0xFF94A3B8),
+              color: _currentPage < _totalPages ? const Color(0xFF475569) : const Color(0xFF94A3B8),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CourseCardWrapper<T> extends StatefulWidget {
+  final T group;
+  final Widget Function(T group, bool isHovered) buildCard;
+
+  const _CourseCardWrapper({required this.group, required this.buildCard});
+
+  @override
+  State<_CourseCardWrapper<T>> createState() => _CourseCardWrapperState<T>();
+}
+
+class _CourseCardWrapperState<T> extends State<_CourseCardWrapper<T>> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: widget.buildCard(widget.group, _isHovered),
     );
   }
 }
