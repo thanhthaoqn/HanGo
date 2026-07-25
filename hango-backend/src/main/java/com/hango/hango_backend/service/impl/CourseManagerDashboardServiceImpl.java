@@ -163,13 +163,11 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     }
 
     private CourseReviewDetailDTO mapCourse(Course course, boolean includeSessions) {
-        List<Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId());
-        int lessonsCount = sections.stream()
-                .mapToInt(section -> lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId()).size())
-                .sum();
+        int sectionsCount = includeSessions ? sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId()).size() : (int) sectionRepository.countByCourseId(course.getId());
+        int lessonsCount = (int) lessonRepository.countByCourseId(course.getId());
 
         List<CourseSessionDTO> sessions = includeSessions
-                ? sections.stream().map(section -> {
+                ? sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId()).stream().map(section -> {
                     List<Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(section.getId());
                     List<CourseLessonDTO> lessonDTOs = lessons.stream()
                             .map(lesson -> CourseLessonDTO.builder()
@@ -207,7 +205,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 .version(course.getVersion())
                 .status(course.getStatus())
                 .thumbnailUrl(course.getThumbnailUrl())
-                .sectionsCount(sections.size())
+                .sectionsCount(sectionsCount)
                 .lessonsCount(lessonsCount)
                 .submittedAt(course.getCreatedAt())
                 .sessions(sessions)

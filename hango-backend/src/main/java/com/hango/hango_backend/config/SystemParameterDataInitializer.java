@@ -9,9 +9,12 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -57,7 +60,16 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
             log.warn("Could not cleanup orphaned references (tables may not exist yet): {}", e.getMessage());
         }
 
-        // --- STEP 1: Ensure 25 Skill Types exist ---
+        // --- STEP 1: Fetch all existing SystemParameters ---
+        Map<String, String> existingParams = systemParameterRepository.findAll().stream()
+                .collect(Collectors.toMap(
+                        p -> p.getParamType() + ":" + p.getParamKey(),
+                        SystemParameter::getParamValue,
+                        (v1, v2) -> v1 // In case of duplicates, keep first
+                ));
+        List<SystemParameter> toCreate = new ArrayList<>();
+
+        // --- STEP 1.1: Ensure 25 Skill Types exist ---
         Map<String, String> skills = new LinkedHashMap<>();
         skills.put("PHONETICS", "Phonetics");
         skills.put("WORD_ORDER", "Word order");
@@ -85,11 +97,11 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         skills.put("TRUE_NOT_TRUE_QUESTION", "TRUE / NOT TRUE question");
         skills.put("INFERENCE_QUESTION", "Inference question");
 
-        // --- STEP 1: Ensure 25 Skill Types exist for SKILL_TYPE and SKILL ---
+        // --- STEP 1.2: Ensure 25 Skill Types exist for SKILL_TYPE and SKILL ---
         String[] skillParamTypes = {"SKILL_TYPE", "SKILL"};
         for (String paramType : skillParamTypes) {
             for (Map.Entry<String, String> entry : skills.entrySet()) {
-                ensureExists(paramType, entry.getKey(), entry.getValue());
+                ensureExistsBulk(toCreate, existingParams, paramType, entry.getKey(), entry.getValue());
             }
         }
 
@@ -103,7 +115,7 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         courseCategories.put("TEST_PREPARATION", "Test Preparation");
         
         for (Map.Entry<String, String> entry : courseCategories.entrySet()) {
-            ensureExists("COURSE_CATEGORY", entry.getKey(), entry.getValue());
+            ensureExistsBulk(toCreate, existingParams, "COURSE_CATEGORY", entry.getKey(), entry.getValue());
         }
 
         // --- STEP 2: Ensure 6 Group Types exist ---
@@ -116,23 +128,28 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         groupTypes.put("READING_COMPREHENSION_10_QUESTIONS", "Reading Comprehension - 10 questions");
 
         for (Map.Entry<String, String> entry : groupTypes.entrySet()) {
-            ensureExists("GROUP_TYPE", entry.getKey(), entry.getValue());
+            ensureExistsBulk(toCreate, existingParams, "GROUP_TYPE", entry.getKey(), entry.getValue());
+        }
+
+        if (!toCreate.isEmpty()) {
+            systemParameterRepository.saveAll(toCreate);
+            log.info("Created {} new SystemParameters.", toCreate.size());
         }
 
         log.info("System parameters initialization complete.");
     }
 
-    private void ensureExists(String paramType, String paramKey, String paramValue) {
-        Optional<SystemParameter> existing = systemParameterRepository.findByParamTypeAndParamKey(paramType, paramKey);
-        if (existing.isEmpty()) {
+    private void ensureExistsBulk(List<SystemParameter> toCreate, Map<String, String> existingParams, String paramType, String paramKey, String paramValue) {
+        String cacheKey = paramType + ":" + paramKey;
+        if (!existingParams.containsKey(cacheKey)) {
             SystemParameter param = SystemParameter.builder()
                     .paramType(paramType)
                     .paramKey(paramKey)
                     .paramValue(paramValue)
                     .isActive(true)
                     .build();
-            systemParameterRepository.save(param);
-            log.info("Created SystemParameter: {} -> {} ({})", paramType, paramKey, paramValue);
+            toCreate.add(param);
+            log.info("Will create SystemParameter: {} -> {} ({})", paramType, paramKey, paramValue);
         }
     }
 }

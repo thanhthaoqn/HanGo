@@ -16,9 +16,12 @@ import com.hango.hango_backend.repository.QuestionOptionRepository;
 import com.hango.hango_backend.repository.QuestionRepository;
 import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.SystemParameterRepository;
+import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.entity.TrainerProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import java.math.BigDecimal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -63,6 +66,7 @@ public class CourseImportService {
     private final QuestionOptionRepository questionOptionRepository;
     private final QuestionCategoryRepository questionCategoryRepository;
     private final SystemParameterRepository systemParameterRepository;
+    private final TrainerProfileRepository trainerProfileRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Transactional
@@ -71,6 +75,7 @@ public class CourseImportService {
 
         User trainer = userRepository.findByEmail(trainerEmail)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + trainerEmail));
+        TrainerProfile trainerProfile = trainerProfileRepository.findById(trainer.getId()).orElse(null);
 
         WorkbookData workbook = readWorkbook(file);
         List<Map<String, String>> courseRows = workbook.rowsBySheet.getOrDefault("COURSE", List.of());
@@ -125,6 +130,16 @@ public class CourseImportService {
 
             String persistedCourseCode = resolveUniqueCourseCode(courseCode, reservedPersistedCourseCodes, warnings);
 
+            int lessonCount = 0;
+            List<Map<String, String>> countSections = sectionsByCourse.getOrDefault(courseCode, List.of());
+            for (Map<String, String> sectionRow : countSections) {
+                String sectionCode = required(sectionRow, "Section Code", "SECTIONS");
+                String lessonKey = buildLessonKey(courseCode, sectionCode);
+                lessonCount += lessonsByCourseAndSection.getOrDefault(lessonKey, List.of()).size();
+            }
+
+            BigDecimal calculatedPrice = calculateCoursePrice(trainerProfile, difficulty, lessonCount);
+
             Course course = Course.builder()
                     .title(required(courseRow, "Title", "COURSE"))
                     .description(valueOrDefault(courseRow, "Description", ""))
@@ -133,7 +148,7 @@ public class CourseImportService {
                     .difficulty(difficulty)
                     .thumbnailUrl(valueOrDefault(courseRow, "Thumbnail URL", ""))
                     .code(persistedCourseCode)
-                    .price(parseDecimal(valueOrDefault(courseRow, "Price", "0"), null))
+                    .price(calculatedPrice)
                     .version(valueOrDefault(courseRow, "Version", ""))
                     .objectives(valueOrDefault(courseRow, "Objectives", ""))
                     .status("DRAFT")
@@ -801,15 +816,31 @@ public class CourseImportService {
         }
     }
  
-    private java.math.BigDecimal parseDecimal(String value, java.math.BigDecimal defaultValue) {
-        if (value == null || value.isBlank()) {
-            return defaultValue;
+    private BigDecimal calculateCoursePrice(TrainerProfile profile, SystemParameter difficulty, int lessonCount) {
+        long price = 0;
+        if (profile != null) {
+            if ("PROFESSIONAL".equalsIgnoreCase(profile.getTrainerType())) {
+                price += 300000;
+            } else if ("PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType())) {
+                price += 150000;
+            }
+            if ((profile.getIeltsUrl() != null && !profile.getIeltsUrl().isBlank())
+                    || (profile.getDegreeUrl() != null && !profile.getDegreeUrl().isBlank())) {
+                price += 150000;
+            }
         }
-        try {
-            return new java.math.BigDecimal(value.trim());
-        } catch (NumberFormatException ignored) {
-            return defaultValue;
+        if (difficulty != null) {
+            String level = difficulty.getParamKey();
+            if ("ADVANCED".equalsIgnoreCase(level)) {
+                price += 200000;
+            } else if ("INTERMEDIATE".equalsIgnoreCase(level)) {
+                price += 100000;
+            } else if ("BASIC".equalsIgnoreCase(level)) {
+                price += 50000;
+            }
         }
+        price += (lessonCount * 10000L);
+        return BigDecimal.valueOf(price);
     }
  
     private record WorkbookData(Map<String, List<Map<String, String>>> rowsBySheet) {

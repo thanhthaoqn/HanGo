@@ -19,7 +19,6 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
   final _api = CourseManagerApi();
   List<Map<String, dynamic>> _matrices = [];
   bool _isLoading = true;
-  bool _isSidebarVisible = true;
 
   @override
   void initState() {
@@ -61,7 +60,7 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'matrix')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible)
+          if (isDesktop)
             const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'matrix')),
           Expanded(
             child: Column(
@@ -101,28 +100,16 @@ class _CourseManagerMatrixManagementPageState extends State<CourseManagerMatrixM
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 12),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () {
-                setState(() {
-                  _isSidebarVisible = !_isSidebarVisible;
-                });
-              },
-            ),
-            const SizedBox(width: 12),
           ],
           const Text(
-            'Exam Matrix',
+            'Matrix Management',
             style: TextStyle(
-              color: Color(0xFF20B486),
+              fontSize: 28,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              color: Color(0xFF1E293B),
               fontFamily: 'Outfit',
             ),
           ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, size: 16, color: Color(0xFF20B486)),
           const Spacer(),
           ElevatedButton.icon(
             onPressed: () {
