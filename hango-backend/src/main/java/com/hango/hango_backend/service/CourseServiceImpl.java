@@ -81,23 +81,32 @@ public class CourseServiceImpl implements CourseService {
         }
 
         List<CourseSummaryDTO> dtos = courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId, enrollmentStatus);
-        for (CourseSummaryDTO dto : dtos) {
-            Course c = courseRepository.findById(dto.getId()).orElse(null);
-            if (c != null) {
-                List<String> catNames = new ArrayList<>();
-                if (c.getCategories() != null && !c.getCategories().isEmpty()) {
-                    for (com.hango.hango_backend.entity.SystemParameter sp : c.getCategories()) {
-                        catNames.add(sp.getParamValue());
-                    }
-                } else if (c.getCategory() != null) {
-                    catNames.add(c.getCategory().getParamValue());
-                }
-                dto.setCategories(catNames);
-                if (dto.getCategoryName() == null || dto.getCategoryName().isEmpty()) {
-                    dto.setCategoryName(catNames.isEmpty() ? "" : String.join(", ", catNames));
-                }
-            }
+        
+        if (dtos.isEmpty()) {
+            return dtos;
         }
+
+        List<Long> courseIds = dtos.stream().map(CourseSummaryDTO::getId).collect(Collectors.toList());
+        List<Object[]> courseCategories = courseRepository.findCategoriesByCourseIds(courseIds);
+        
+        Map<Long, List<String>> categoryMap = new HashMap<>();
+        for (Object[] row : courseCategories) {
+            Long courseId = (Long) row[0];
+            String categoryName = (String) row[1];
+            categoryMap.computeIfAbsent(courseId, k -> new ArrayList<>()).add(categoryName);
+        }
+
+        for (CourseSummaryDTO dto : dtos) {
+            List<String> catNames = categoryMap.getOrDefault(dto.getId(), new ArrayList<>());
+            
+            if (catNames.isEmpty() && dto.getCategoryName() != null && !dto.getCategoryName().isEmpty()) {
+                catNames.add(dto.getCategoryName());
+            }
+            
+            dto.setCategories(catNames);
+            dto.setCategoryName(catNames.isEmpty() ? "" : String.join(", ", catNames));
+        }
+
         return dtos;
     }
 
@@ -257,6 +266,7 @@ public class CourseServiceImpl implements CourseService {
         int estimatedDuration = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 12;
         return CourseDetailDTO.builder()
                 .id(course.getId())
+                .status(course.getStatus())
                 .title(course.getTitle())
                 .code(course.getCode())
                 .creatorName(creatorName)

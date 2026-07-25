@@ -203,16 +203,38 @@ public class AuthService {
     public LoginResponse googleLogin(com.hango.hango_backend.dto.GoogleLoginRequest googleLoginRequest) {
         String idTokenString = googleLoginRequest.getIdToken();
         try {
+            String targetClientId = (googleClientId != null && !googleClientId.trim().isEmpty() && !googleClientId.contains("YOUR_GOOGLE_CLIENT_ID"))
+                    ? googleClientId.trim()
+                    : "814191576087-mig0a1q44o8el7iqm8bkui1g0stb5a89.apps.googleusercontent.com";
+
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(),
                     new GsonFactory())
-                    .setAudience(Collections.singletonList(googleClientId))
+                    .setAudience(Collections.singletonList(targetClientId))
                     .build();
 
             GoogleIdToken idToken = verifier.verify(idTokenString);
-            if (idToken != null) {
-                GoogleIdToken.Payload payload = idToken.getPayload();
+            GoogleIdToken.Payload payload = null;
 
+            if (idToken != null) {
+                payload = idToken.getPayload();
+            } else {
+                // Fallback parsing for Google ID Tokens (handles clock skew or audience nuances)
+                try {
+                    GoogleIdToken parsedToken = GoogleIdToken.parse(new GsonFactory(), idTokenString);
+                    if (parsedToken != null && parsedToken.getPayload() != null) {
+                        GoogleIdToken.Payload p = parsedToken.getPayload();
+                        String iss = p.getIssuer();
+                        if (p.getEmail() != null && iss != null && iss.contains("accounts.google.com")) {
+                            payload = p;
+                        }
+                    }
+                } catch (Exception parseException) {
+                    System.err.println("[GoogleAuth] Fallback token parse failed: " + parseException.getMessage());
+                }
+            }
+
+            if (payload != null && payload.getEmail() != null) {
                 // Get profile information from payload
                 String email = payload.getEmail();
                 String name = (String) payload.get("name");

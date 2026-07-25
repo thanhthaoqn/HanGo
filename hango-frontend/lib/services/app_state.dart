@@ -140,7 +140,7 @@ class AppState extends ChangeNotifier {
         final data = jsonDecode(response.body);
         return AiHealth(
           available: data['available'] ?? true,
-          message: data['message'] ?? 'Gemini AI đang sẵn sàng',
+          message: data['message'] ?? 'Online',
           chatModel: data['chatModel'] ?? 'gemini-3.1-flash-lite',
           embeddingModel: data['embeddingModel'] ?? 'text-embedding-004',
         );

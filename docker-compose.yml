@@ -16,6 +16,7 @@ services:
       - PAYOS_CLIENT_ID=${PAYOS_CLIENT_ID}
       - PAYOS_API_KEY=${PAYOS_API_KEY}
       - PAYOS_CHECKSUM_KEY=${PAYOS_CHECKSUM_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     restart: always
 
   frontend:
