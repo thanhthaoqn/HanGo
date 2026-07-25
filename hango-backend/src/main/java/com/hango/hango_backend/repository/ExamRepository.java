@@ -17,9 +17,12 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     @Query("SELECT COUNT(e) FROM Exam e WHERE e.createdBy.id = :createdById AND e.deletedAt IS NULL")
     long countByCreatedByIdAndDeletedAtIsNull(@Param("createdById") Long createdById);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
     List<Exam> findByDeletedAtIsNullOrderByCreatedAtDesc();
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
     List<Exam> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String status);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
     List<Exam> findByStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(List<String> statuses);
 }

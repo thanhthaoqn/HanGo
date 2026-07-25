@@ -24,7 +24,6 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
 
   final List<Map<String, dynamic>> _rules = [];
   bool _isSaving = false;
-  bool _isSidebarVisible = true;
   bool _isLoadingData = true;
 
   List<Map<String, dynamic>> _skills = [];
@@ -238,7 +237,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'matrix')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible)
+          if (isDesktop)
             const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'matrix')),
           Expanded(
             child: Column(
@@ -290,23 +289,13 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 12),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () {
-                setState(() {
-                  _isSidebarVisible = !_isSidebarVisible;
-                });
-              },
-            ),
-            const SizedBox(width: 12),
           ],
           const Text(
             'Exam Matrix Builder',
             style: TextStyle(
-              color: Color(0xFF20B486),
+              fontSize: 28,
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              color: Color(0xFF1E293B),
               fontFamily: 'Outfit',
             ),
           ),

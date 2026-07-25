@@ -252,24 +252,35 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
               child: Row(
                 children: [
-                  Container(
-                    width: 36,
+                  Image.network(
+                    'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
                     height: 36,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.school, size: 20, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'HanGo',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1E293B),
-                      fontFamily: 'Outfit',
-                    ),
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.school, size: 20, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'HanGo',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E293B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
