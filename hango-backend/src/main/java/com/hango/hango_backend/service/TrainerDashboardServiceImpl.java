@@ -629,8 +629,27 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("Only draft courses can be submitted for review");
         }
  
-        course.setStatus("PENDING_APPROVAL");
-        courseRepository.save(course);
+        boolean isManager = course.getCreator().getRoles().stream()
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+        
+        if (isManager) {
+            course.setStatus("PUBLISHED");
+            course.setPublishedAt(java.time.LocalDateTime.now());
+            course.setLatestVersionId(course.getId());
+            courseRepository.save(course);
+
+            if (course.getParentId() != null) {
+                com.hango.hango_backend.entity.Course originalCourse = courseRepository.findById(course.getParentId())
+                        .orElseThrow(() -> new RuntimeException("Original course (V1) not found"));
+                if ("PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
+                    originalCourse.setLatestVersionId(course.getId());
+                    courseRepository.save(originalCourse);
+                }
+            }
+        } else {
+            course.setStatus("PENDING_APPROVAL");
+            courseRepository.save(course);
+        }
     }
     @Override
     @Transactional(readOnly = true)
@@ -825,7 +844,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("User is not authorized to update this exam");
         }
         
-        exam.setStatus(status);
+        if (isManager && "SUBMITTED".equalsIgnoreCase(status) && exam.getCreatedBy().getId().equals(user.getId())) {
+            exam.setStatus("PUBLISHED");
+        } else {
+            exam.setStatus(status);
+        }
+        
         examRepository.save(exam);
     }
 

@@ -18,7 +18,7 @@ class _CourseManagerDashboardPageState
   final _api = CourseManagerApi();
   CourseManagerDashboardSummary? _summary;
   bool _isLoading = true;
-  bool _isSidebarVisible = true;
+
 
   @override
   void initState() {
@@ -64,7 +64,7 @@ class _CourseManagerDashboardPageState
           : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible)
+          if (isDesktop)
             const SizedBox(
               width: 240,
               child: CourseManagerSidebar(currentRoute: 'dashboard'),
@@ -94,7 +94,7 @@ class _CourseManagerDashboardPageState
 
   Widget _buildContentHeader(BuildContext context, bool isDesktop) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      padding: const EdgeInsets.fromLTRB(32, 24, 32, 8),
       child: Row(
         children: [
           if (!isDesktop) ...[
@@ -103,28 +103,17 @@ class _CourseManagerDashboardPageState
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 12),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () {
-                setState(() {
-                  _isSidebarVisible = !_isSidebarVisible;
-                });
-              },
-            ),
-            const SizedBox(width: 12),
           ],
           const Text(
-            'Dashboard',
+            'Course Manager Dashboard',
             style: TextStyle(
-              color: Color(0xFF20B486),
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
               fontFamily: 'Outfit',
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, size: 16, color: Color(0xFF20B486)),
         ],
       ),
     );

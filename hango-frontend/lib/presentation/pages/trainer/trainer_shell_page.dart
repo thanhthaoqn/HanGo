@@ -154,15 +154,57 @@ class _TrainerShellPageState extends State<TrainerShellPage> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFF28B79B), borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.school, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'HanGo',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+              Image.network(
+                'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                height: 36,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Row(
+                    children: [
+                      Image.network(
+
+                        'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+
+                        height: 36,
+
+                        fit: BoxFit.contain,
+
+                        errorBuilder: (context, error, stackTrace) {
+
+                          return Row(
+
+                            children: [
+
+                              Container(
+
+                                padding: const EdgeInsets.all(8),
+
+                                decoration: BoxDecoration(color: const Color(0xFF28B79B), borderRadius: BorderRadius.circular(10)),
+
+                                child: const Icon(Icons.school, color: Colors.white, size: 24),
+
+                              ),
+
+                              const SizedBox(width: 12),
+
+                              const Text(
+
+                                'HanGo',
+
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+
+                              ),
+
+                            ],
+
+                          );
+
+                        },
+
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

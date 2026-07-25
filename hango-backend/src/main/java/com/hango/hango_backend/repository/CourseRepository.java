@@ -90,7 +90,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
            nativeQuery = true)
     List<TopCourseProjection> findTopCoursesByEnrollment(@Param("limit") int limit);
 
+    @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
     List<Course> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String status);
+
+    @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
+    List<Course> findByDeletedAtIsNullOrderByCreatedAtDesc();
 
     long countByStatusAndDeletedAtIsNull(String status);
 

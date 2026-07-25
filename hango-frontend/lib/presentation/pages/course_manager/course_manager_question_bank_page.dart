@@ -24,7 +24,6 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
   
   bool _isLoading = true;
   String _errorMessage = '';
-  bool _isSidebarVisible = true;
 
   // Filter States
   String _selectedType = 'PUBLIC';
@@ -141,7 +140,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'question_bank')) : null,
       body: Row(
         children: [
-          if (isDesktop && _isSidebarVisible) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'question_bank')),
+          if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'question_bank')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -265,42 +264,15 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 12),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () {
-                setState(() {
-                  _isSidebarVisible = !_isSidebarVisible;
-                });
-              },
-            ),
-            const SizedBox(width: 12),
           ],
-          // Breadcrumb
-          Row(
-            children: [
-              const Text(
-                'Question Bank',
-                style: TextStyle(
-                  color: Color(0xFF4B5563),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
-              const SizedBox(width: 4),
-              Text(
-                _selectedType,
-                style: const TextStyle(
-                  color: Color(0xFF20B486),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
+          const Text(
+            'Question Bank',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+              fontFamily: 'Outfit',
+            ),
           ),
         ],
       ),
