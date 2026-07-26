@@ -68,6 +68,7 @@ public class CourseImportService {
     private final SystemParameterRepository systemParameterRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final YouTubeTranscriptService youtubeTranscriptService;
 
     @Transactional
     public CourseImportResultDTO importWorkbook(String trainerEmail, MultipartFile file) throws Exception {
@@ -191,14 +192,25 @@ public class CourseImportService {
                         throw new IllegalArgumentException("Duplicate Lesson Code in section " + sectionCode + ": " + lessonCode);
                     }
 
+                    String lessonType = normalizeLessonType(valueOrDefault(lessonRow, "Lesson Type", "TEXT"));
+                    String content = resolveLessonContent(lessonRow, lessonType);
+                    String videoTranscript = null;
+                    if ("video".equalsIgnoreCase(lessonType) && content != null && content.toLowerCase().contains("youtu")) {
+                        try {
+                            videoTranscript = youtubeTranscriptService.fetchTranscript(content);
+                        } catch (Exception ignored) {
+                        }
+                    }
+
                     Lesson lesson = Lesson.builder()
                             .section(savedSection)
                             .code(lessonCode)
                             .title(required(lessonRow, "Lesson Title", "LESSONS"))
-                            .lessonType(normalizeLessonType(valueOrDefault(lessonRow, "Lesson Type", "TEXT")))
+                            .lessonType(lessonType)
                             .skill(category)
                             .difficulty(difficulty)
-                            .content(resolveLessonContent(lessonRow))
+                            .content(content)
+                            .videoTranscript(videoTranscript)
                             .displayOrder(parseInt(valueOrDefault(lessonRow, "Order Index", ""), lessonIndex + 1))
                             .description(valueOrDefault(lessonRow, "Learning Objectives", ""))
                             .pdfName(resolvePdfName(lessonRow))
@@ -710,7 +722,13 @@ public class CourseImportService {
         return "text";
     }
 
-    private String resolveLessonContent(Map<String, String> lessonRow) {
+    private String resolveLessonContent(Map<String, String> lessonRow, String lessonType) {
+        if ("video".equals(lessonType) || "pdf".equals(lessonType)) {
+            String mediaUrl = valueOrDefault(lessonRow, "Media File URL or Placeholder", "");
+            if (!mediaUrl.isBlank()) {
+                return mediaUrl;
+            }
+        }
         String markdown = valueOrDefault(lessonRow, "Text Content Markdown", "");
         if (!markdown.isBlank()) {
             return markdown;

@@ -53,7 +53,7 @@ public class LearningPathwayController {
 
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> getPathwayById(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -72,7 +72,7 @@ public class LearningPathwayController {
     }
 
     @PutMapping("/{id}/reroute")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> reroutePathway(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -83,7 +83,7 @@ public class LearningPathwayController {
 
     // Feature B: Smart Time-boxing
     @PutMapping("/{id}/schedule")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> applySchedule(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
@@ -93,7 +93,7 @@ public class LearningPathwayController {
     }
 
     @GetMapping("/{id}/schedule-status")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<String> getScheduleStatus(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -103,7 +103,7 @@ public class LearningPathwayController {
 
     // FE-11 agentic reroute contract (Feature A)
     @GetMapping("/{id}/progress-snapshot")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<ProgressSnapshotDTO> progressSnapshot(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -111,8 +111,8 @@ public class LearningPathwayController {
     }
 
     @PostMapping("/{id}/reroute/suggestions")
-    @PreAuthorize("hasRole('LEARNER')")
-    public ResponseEntity<PathwayRerouteSuggestionDTO> rerouteSuggestions(
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
+    public ResponseEntity<LearningPathwayResponseDTO> rerouteSuggestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         
@@ -120,16 +120,32 @@ public class LearningPathwayController {
         PathwayReroutePolicyService.PolicyDecision decision = reroutePolicyService.evaluate(snapshot);
         
         PathwayRerouteSuggestionDTO dto = new PathwayRerouteSuggestionDTO();
-        dto.setNodeType(decision.action.name());
-        dto.setRerouteReason(decision.reason);
+        dto.setNodeType(mapPolicyActionToNodeType(decision.action));
+        dto.setRerouteReason(decision.reason != null
+                ? decision.reason
+                : "Your current pathway still matches your latest progress. No adjustment is needed right now.");
         dto.setCanSkip(decision.action == PathwayReroutePolicyService.PolicyAction.FAST_TRACK_ELIGIBLE);
         dto.setBlockedReason(decision.action == PathwayReroutePolicyService.PolicyAction.DETOUR_REQUIRED ? decision.reason : null);
-        
-        return ResponseEntity.ok(dto);
+
+        LearningPathwayResponseDTO response = learningPathwayService.getPathwayById(id, userDetails.getId());
+        if (decision.action != PathwayReroutePolicyService.PolicyAction.NO_CHANGE) {
+            response.setPendingRerouteSuggestion(dto);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    private String mapPolicyActionToNodeType(PathwayReroutePolicyService.PolicyAction action) {
+        if (action == PathwayReroutePolicyService.PolicyAction.FAST_TRACK_ELIGIBLE) {
+            return "FAST_TRACK_SKIPPED";
+        }
+        if (action == PathwayReroutePolicyService.PolicyAction.DETOUR_REQUIRED) {
+            return "DETOUR_REMEDIAL";
+        }
+        return "NORMAL";
     }
 
     @PostMapping("/{id}/reroute/accept")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> rerouteAccept(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -155,7 +171,7 @@ public class LearningPathwayController {
     }
 
     @PostMapping("/{id}/reroute/decline")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> rerouteDecline(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -165,7 +181,7 @@ public class LearningPathwayController {
 
     // Feature C: Multi-goal Merging
     @PostMapping("/merge-preview")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<MergePreviewDTO> mergePreview(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
             @RequestBody java.util.List<Long> courseIds) {
@@ -173,7 +189,7 @@ public class LearningPathwayController {
     }
 
     @PostMapping("/{id}/merge-confirm")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> mergeConfirm(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
@@ -185,7 +201,7 @@ public class LearningPathwayController {
 
 
     @PostMapping("/{id}/chat")
-    @PreAuthorize("hasRole('LEARNER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER')")
     public ResponseEntity<String> chatWithMentor(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,

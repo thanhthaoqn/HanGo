@@ -9,6 +9,7 @@ import '../../../domain/entities/exam.dart';
 import 'learning_pathway_page.dart';
 import '../course/course_detail_page.dart';
 import '../course/lesson_detail_page.dart';
+import '../course/course_completion_page.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../utils/language_manager.dart';
 
@@ -519,12 +520,21 @@ class _MyLearningPageState extends State<MyLearningPage> {
           ),
           child: InkWell(
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CourseDetailPage(courseId: course.id),
-                ),
-              );
+              if (isCompleted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CourseCompletionPage(courseId: course.id),
+                  ),
+                );
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CourseDetailPage(courseId: course.id),
+                  ),
+                );
+              }
             },
             borderRadius: BorderRadius.circular(12),
             child: Column(
@@ -582,6 +592,34 @@ class _MyLearningPageState extends State<MyLearningPage> {
                           ),
                         ],
                       ),
+                      if (isCompleted) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CourseCompletionPage(courseId: course.id),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.workspace_premium_rounded, size: 16),
+                            label: Text(
+                              _isVietnamese ? 'Xem Chứng Chỉ' : 'View Certificate',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF20B486),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

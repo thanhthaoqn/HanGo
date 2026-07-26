@@ -10,6 +10,7 @@ import '../learner/learner_home_page.dart';
 import '../login_page.dart';
 import 'review_tab.dart';
 import 'lesson_detail_page.dart';
+import 'course_completion_page.dart';
 import 'cart_page.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
@@ -1072,9 +1073,117 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   Widget _buildMainContent(CourseDetail course) {
+    bool isCompleted = false;
+    if (course.isEnrolled && course.sessions.isNotEmpty) {
+      final totalLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.length);
+      final completedLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+      if (totalLessons > 0 && completedLessons == totalLessons) {
+        isCompleted = true;
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isCompleted) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFECFDF5), Color(0xFFFEF3C7)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF6EE7B7)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0F20B486),
+                  blurRadius: 16,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF20B486),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.emoji_events_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            LanguageManager.isVi ? '🎉 Khóa học đã hoàn thành!' : '🎉 You\'ve Completed This Course!',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            LanguageManager.isVi
+                                ? 'Chúc mừng bạn đã hoàn thành xuất sắc toàn bộ bài học. Hãy xem chứng chỉ và tổng kết học tập nhé!'
+                                : 'Congratulations on mastering all lessons! View your official certificate and summary.',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF475569),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => CourseCompletionPage(
+                          courseId: course.id,
+                          courseDetail: course,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.workspace_premium_rounded, size: 18),
+                  label: Text(
+                    LanguageManager.isVi ? 'Xem Chứng Chỉ' : 'View Certificate',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20B486),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         TabBar(
           controller: _tabController,
           labelColor: const Color(0xFF28B79B),
@@ -1628,6 +1737,15 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   Widget _buildEnrollCard(CourseDetail course) {
+    bool isCompleted = false;
+    if (course.isEnrolled && course.sessions.isNotEmpty) {
+      final totalLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.length);
+      final completedLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+      if (totalLessons > 0 && completedLessons == totalLessons) {
+        isCompleted = true;
+      }
+    }
+
     final priceStr = _getCoursePrice(course);
     final isFree = priceStr == 'Miễn phí';
     final originalPriceStr = _getOriginalPrice(priceStr);
@@ -1797,6 +1915,42 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 ),
               ),
             ),
+            if (isCompleted) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CourseCompletionPage(
+                          courseId: course.id,
+                          courseDetail: course,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.workspace_premium_rounded, size: 18, color: Color(0xFFD97706)),
+                  label: Text(
+                    LanguageManager.isVi ? 'Xem Chứng Chỉ' : 'View Certificate',
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
