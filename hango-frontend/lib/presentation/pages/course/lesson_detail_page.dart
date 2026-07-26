@@ -17,6 +17,7 @@ import '../../../utils/string_utils.dart';
 import '../../widgets/lesson_ai_chatbox.dart';
 import 'package:provider/provider.dart';
 import 'course_detail_page.dart';
+import 'course_completion_page.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
@@ -140,7 +141,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _isLoading = false;
       });
 
-      if (_itemType == 'video') {
+      if (_itemType?.toLowerCase() == 'video') {
         _initializePlayer(lesson.content);
       }
       final prefs = await SharedPreferences.getInstance();
@@ -1187,7 +1188,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   }
 
   Widget _buildHtmlContent(LessonDetail lesson) {
-    if (_itemType == 'video') {
+    if (_itemType?.toLowerCase() == 'video' || _youtubeVideoId != null) {
       return Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -3766,8 +3767,32 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         ToastHelper.showSuccess(context, 'Lesson marked as completed!');
       }
 
-      // Auto-navigate to next lesson if available
-      if (nextLessonId != null) {
+      bool isCourseFullyCompleted = false;
+      if (_courseDetail != null) {
+        final totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
+        final completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+        if (totalLessons > 0 && completedLessons == totalLessons) {
+          isCourseFullyCompleted = true;
+        }
+      } else if (nextLessonId == null) {
+        isCourseFullyCompleted = true;
+      }
+
+      // Auto-navigate to completion screen if course finished / last lesson, else next lesson
+      if (isCourseFullyCompleted || nextLessonId == null) {
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => CourseCompletionPage(
+                  courseId: widget.courseId,
+                  courseDetail: _courseDetail,
+                ),
+              ),
+            );
+          }
+        });
+      } else {
         Future.delayed(const Duration(milliseconds: 1000), () {
           if (mounted) {
             _navigateToLesson(nextLessonId);

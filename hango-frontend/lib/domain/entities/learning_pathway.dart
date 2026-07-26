@@ -57,6 +57,54 @@ class PathwayNode {
     this.mergeReason,
   });
 
+  PathwayNode copyWith({
+    int? step,
+    int? courseId,
+    String? courseTitle,
+    List<String>? tags,
+    NodeStatus? status,
+    String? reasonWhy,
+    int? progressPercent,
+    String? skillType,
+    int? totalLessons,
+    int? completedLessons,
+    NodeType? nodeType,
+    String? rerouteReason,
+    bool? isOptional,
+    DateTime? skippedAt,
+    int? parentNodeId,
+    DateTime? startDate,
+    DateTime? deadline,
+    int? estimatedHours,
+    ScheduleStatus? scheduleStatus,
+    List<String>? sourceGoalLabels,
+    String? mergeReason,
+  }) {
+    return PathwayNode(
+      step: step ?? this.step,
+      courseId: courseId ?? this.courseId,
+      courseTitle: courseTitle ?? this.courseTitle,
+      tags: tags ?? this.tags,
+      status: status ?? this.status,
+      reasonWhy: reasonWhy ?? this.reasonWhy,
+      progressPercent: progressPercent ?? this.progressPercent,
+      skillType: skillType ?? this.skillType,
+      totalLessons: totalLessons ?? this.totalLessons,
+      completedLessons: completedLessons ?? this.completedLessons,
+      nodeType: nodeType ?? this.nodeType,
+      rerouteReason: rerouteReason ?? this.rerouteReason,
+      isOptional: isOptional ?? this.isOptional,
+      skippedAt: skippedAt ?? this.skippedAt,
+      parentNodeId: parentNodeId ?? this.parentNodeId,
+      startDate: startDate ?? this.startDate,
+      deadline: deadline ?? this.deadline,
+      estimatedHours: estimatedHours ?? this.estimatedHours,
+      scheduleStatus: scheduleStatus ?? this.scheduleStatus,
+      sourceGoalLabels: sourceGoalLabels ?? this.sourceGoalLabels,
+      mergeReason: mergeReason ?? this.mergeReason,
+    );
+  }
+
   factory PathwayNode.fromJson(Map<String, dynamic> json) {
     NodeStatus parseStatus(String statusStr) {
       switch (statusStr.trim().toUpperCase()) {
@@ -306,6 +354,37 @@ class LearningPathway {
     this.hoursPerWeek,
     this.scheduleStatus,
   });
+
+  LearningPathway copyWith({
+    PathwayRerouteSuggestion? pendingRerouteSuggestion,
+    int? pathwayId,
+    String? roadmapId,
+    String? mentorSummary,
+    List<PathwayNode>? nodes,
+    List<String>? weakSkills,
+    int? totalSteps,
+    int? completedSteps,
+    String? goalName,
+    String? targetDate,
+    int? hoursPerWeek,
+    ScheduleStatus? scheduleStatus,
+  }) {
+    return LearningPathway(
+      pendingRerouteSuggestion:
+          pendingRerouteSuggestion ?? this.pendingRerouteSuggestion,
+      pathwayId: pathwayId ?? this.pathwayId,
+      roadmapId: roadmapId ?? this.roadmapId,
+      mentorSummary: mentorSummary ?? this.mentorSummary,
+      nodes: nodes ?? this.nodes,
+      weakSkills: weakSkills ?? this.weakSkills,
+      totalSteps: totalSteps ?? this.totalSteps,
+      completedSteps: completedSteps ?? this.completedSteps,
+      goalName: goalName ?? this.goalName,
+      targetDate: targetDate ?? this.targetDate,
+      hoursPerWeek: hoursPerWeek ?? this.hoursPerWeek,
+      scheduleStatus: scheduleStatus ?? this.scheduleStatus,
+    );
+  }
 
   int get overallProgressPercent {
     if (totalSteps == 0) return 0;

@@ -102,6 +102,26 @@ void main() {
       expect(tester.binding.transientCallbackCount, greaterThanOrEqualTo(0));
     },
   );
+
+  testWidgets('InteractiveNodeTree displays schedule range from start date', (
+    tester,
+  ) async {
+    final scheduledNode = node(
+      step: 1,
+      courseId: 10,
+      title: 'Grammar Basics',
+      status: NodeStatus.inProgress,
+      startDate: DateTime(2026, 7, 25),
+      deadline: DateTime(2026, 8, 2),
+      estimatedHours: 6,
+    );
+
+    await tester.pumpWidget(
+      treeHarness(nodes: [scheduledNode], onNodeTap: (_) {}),
+    );
+
+    expect(find.text('On track | 25/07 - 02/08 | 6h'), findsOneWidget);
+  });
 }
 
 Widget treeHarness({
@@ -130,6 +150,9 @@ PathwayNode node({
   required String title,
   required NodeStatus status,
   int progress = 0,
+  DateTime? startDate,
+  DateTime? deadline,
+  int? estimatedHours,
 }) {
   return PathwayNode(
     step: step,
@@ -139,5 +162,8 @@ PathwayNode node({
     status: status,
     reasonWhy: 'Recommended from your exam result.',
     progressPercent: progress,
+    startDate: startDate,
+    deadline: deadline,
+    estimatedHours: estimatedHours,
   );
 }

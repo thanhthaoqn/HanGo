@@ -532,7 +532,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 }
                 lesson.setSection(savedSection);
                 lesson.setTitle(lDto.getTitle());
-                lesson.setLessonType(lDto.getItemType() != null ? lDto.getItemType() : "video");
+                String type = lDto.getItemType();
+                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                    type = "video";
+                }
+                lesson.setLessonType(type != null ? type : "video");
                 lesson.setDisplayOrder(lIdx + 1);
                 lesson.setDescription(lDto.getDescription());
                 lesson.setContent(lDto.getQuestionText());
@@ -582,10 +586,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
             for (int lIdx = 0; lIdx < lessonDTOs.size(); lIdx++) {
                 com.hango.hango_backend.dto.CourseLessonDTO lDto = lessonDTOs.get(lIdx);
+                String type2 = lDto.getItemType();
+                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                    type2 = "video";
+                }
                 com.hango.hango_backend.entity.Lesson lesson = com.hango.hango_backend.entity.Lesson.builder()
                         .section(section)
                         .title(lDto.getTitle())
-                        .lessonType(lDto.getItemType() != null ? lDto.getItemType() : "video")
+                        .lessonType(type2 != null ? type2 : "video")
                         .displayOrder(lIdx + 1)
                         .description(lDto.getDescription())
                         .content(lDto.getQuestionText())

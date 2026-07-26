@@ -51,7 +51,6 @@ class InteractiveNodeTree extends StatelessWidget {
     );
   }
 }
-
 class _NodeRow extends StatelessWidget {
   final PathwayNode node;
   final bool isLast;
@@ -436,8 +435,9 @@ class _ScheduleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final startDate = node.startDate;
     final deadline = node.deadline;
-    if (deadline == null) return const SizedBox.shrink();
+    if (startDate == null && deadline == null) return const SizedBox.shrink();
 
     final status = node.scheduleStatus ?? ScheduleStatus.onTrack;
 
@@ -470,7 +470,10 @@ class _ScheduleChip extends StatelessWidget {
     }
 
     final hours = node.estimatedHours;
-    final hoursText = hours != null ? ' • ${hours}h' : '';
+    final dateText = startDate != null && deadline != null
+        ? '${_formatDate(startDate)} - ${_formatDate(deadline)}'
+        : _formatDate(startDate ?? deadline!);
+    final hoursText = hours != null ? ' | ${hours}h' : '';
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -482,7 +485,7 @@ class _ScheduleChip extends StatelessWidget {
           border: Border.all(color: bg.withOpacity(0.45)),
         ),
         child: Text(
-          '$label • ${_formatDate(deadline)}$hoursText',
+          '$label | $dateText$hoursText',
           style: TextStyle(
             color: fg,
             fontSize: 12,

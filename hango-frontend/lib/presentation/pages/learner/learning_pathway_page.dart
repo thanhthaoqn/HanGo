@@ -36,11 +36,11 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     });
 
     try {
-      final pathway = await _repository.getMyPathway();
+      final pathway = _preparePathwayForDisplay(await _repository.getMyPathway());
       if (!mounted) return;
       setState(() {
         _pathway = pathway;
-        _selectedNode = pathway.nodes.isNotEmpty ? pathway.nodes.first : null;
+        _selectedNode = _initialSelectedNode(pathway.nodes);
       });
     } catch (e) {
       if (!mounted) return;
@@ -60,10 +60,42 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
   }
 
   void _handlePathwayUpdated(LearningPathway updatedPathway) {
+    final displayPathway = _preparePathwayForDisplay(updatedPathway);
     setState(() {
-      _pathway = updatedPathway;
-      _selectedNode = updatedPathway.nodes.isNotEmpty ? updatedPathway.nodes.first : null;
+      _pathway = displayPathway;
+      _selectedNode = _initialSelectedNode(displayPathway.nodes);
     });
+  }
+
+  LearningPathway _preparePathwayForDisplay(LearningPathway pathway) {
+    var allPreviousCompleted = true;
+    final displayNodes = <PathwayNode>[];
+
+    for (final node in pathway.nodes) {
+      var displayNode = node;
+      if (node.status == NodeStatus.locked && allPreviousCompleted) {
+        displayNode = node.copyWith(
+          status: NodeStatus.inProgress,
+          reasonWhy: node.reasonWhy.isEmpty
+              ? 'Unlocked because you completed the previous course.'
+              : node.reasonWhy,
+        );
+      }
+
+      displayNodes.add(displayNode);
+      allPreviousCompleted = allPreviousCompleted &&
+          displayNode.status == NodeStatus.completed;
+    }
+
+    return pathway.copyWith(nodes: displayNodes);
+  }
+
+  PathwayNode? _initialSelectedNode(List<PathwayNode> nodes) {
+    if (nodes.isEmpty) return null;
+    return nodes.firstWhere(
+      (node) => node.status == NodeStatus.inProgress,
+      orElse: () => nodes.first,
+    );
   }
 
   void _showSkillAnalysis() {
