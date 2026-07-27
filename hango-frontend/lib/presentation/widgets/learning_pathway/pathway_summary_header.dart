@@ -59,6 +59,7 @@ class PathwaySummaryHeader extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final showMetrics = constraints.maxWidth >= 560;
+            final showGoalTime = constraints.maxWidth >= 680;
             final showWeakSkill =
                 constraints.maxWidth >= 760 && pathway.weakSkills.isNotEmpty;
 
@@ -112,6 +113,10 @@ class PathwaySummaryHeader extends StatelessWidget {
                   const SizedBox(width: 8),
                   _Metric(value: '$overall%', label: isVi ? 'tiến độ' : 'done'),
                 ],
+                if (showGoalTime) ...[
+                  const SizedBox(width: 8),
+                  Flexible(child: _GoalTimeChip(pathway: pathway)),
+                ],
                 if (showWeakSkill) ...[
                   const SizedBox(width: 8),
                   Flexible(
@@ -154,6 +159,94 @@ class PathwaySummaryHeader extends StatelessWidget {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _GoalTimeChip extends StatelessWidget {
+  final LearningPathway pathway;
+
+  const _GoalTimeChip({required this.pathway});
+
+  DateTime? _goalStart() {
+    if (pathway.nodes.isEmpty) return null;
+    final firstNode = pathway.nodes.first;
+    if (firstNode.startDate != null) return firstNode.startDate;
+
+    return pathway.nodes
+        .map((node) => node.startDate)
+        .whereType<DateTime>()
+        .fold<DateTime?>(
+          null,
+          (earliest, date) =>
+              earliest == null || date.isBefore(earliest) ? date : earliest,
+        );
+  }
+
+  DateTime? _goalEnd() {
+    final target = pathway.targetDate;
+    if (target != null && target.isNotEmpty) {
+      final parsed = DateTime.tryParse(target);
+      if (parsed != null) return parsed;
+    }
+
+    return pathway.nodes
+        .map((node) => node.deadline)
+        .whereType<DateTime>()
+        .fold<DateTime?>(
+          null,
+          (latest, date) =>
+              latest == null || date.isAfter(latest) ? date : latest,
+        );
+  }
+
+  String _format(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final start = _goalStart();
+    final end = _goalEnd();
+    if (start == null && end == null) return const SizedBox.shrink();
+
+    final label = start != null && end != null
+        ? '${_format(start)} - ${_format(end)}'
+        : _format(start ?? end!);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.event_available_rounded,
+            color: Colors.white.withOpacity(0.9),
+            size: 15,
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

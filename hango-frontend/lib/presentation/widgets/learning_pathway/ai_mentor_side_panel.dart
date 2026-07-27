@@ -27,18 +27,25 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   final ScrollController _scrollController = ScrollController();
   final PathwayRepository _repository = PathwayRepository();
   final List<Map<String, String>> _messages = [];
+  final Set<String> _unlockAnnouncements = {};
   bool _isSending = false;
   bool _isRerouting = false;
 
   @override
   void initState() {
     super.initState();
-    _messages.add({'role': 'mentor', 'content': widget.pathway.mentorSummary});
+    if (widget.pathway.mentorSummary.trim().isNotEmpty) {
+      _messages.add({'role': 'mentor', 'content': widget.pathway.mentorSummary});
+    }
+    _syncCourseUnlockMessage();
   }
 
   @override
   void didUpdateWidget(AIMentorSidePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.pathway != oldWidget.pathway) {
+      _syncCourseUnlockMessage();
+    }
     if (widget.selectedNode != null &&
         widget.selectedNode != oldWidget.selectedNode) {
       setState(() {
@@ -69,6 +76,30 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
         );
       }
     });
+  }
+
+  void _syncCourseUnlockMessage() {
+    final nodes = widget.pathway.nodes;
+    for (var i = 0; i < nodes.length - 1; i++) {
+      final completedNode = nodes[i];
+      final nextNode = nodes[i + 1];
+      final isNextUnlocked = nextNode.status == NodeStatus.inProgress;
+
+      if (completedNode.status != NodeStatus.completed || !isNextUnlocked) {
+        continue;
+      }
+
+      final key = '${completedNode.courseId}:${nextNode.courseId}';
+      if (_unlockAnnouncements.contains(key)) continue;
+      _unlockAnnouncements.add(key);
+
+      _messages.add({
+        'role': 'mentor',
+        'content':
+            '**${completedNode.courseTitle}** is completed. I have unlocked **${nextNode.courseTitle}** so you can keep the momentum going.',
+      });
+      _scrollToBottom();
+    }
   }
 
   Future<void> _sendMessage() async {
@@ -140,11 +171,13 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       );
       widget.onPathwayUpdated?.call(updatedPathway);
       if (!mounted) return;
+      final hasSuggestion = updatedPathway.pendingRerouteSuggestion != null;
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content':
-              'I updated the recommendation using your latest exam signal and current lesson progress.',
+          'content': hasSuggestion
+              ? 'I found an adjustment suggestion using your latest exam signal and current lesson progress. Review it below before applying.'
+              : 'I checked your latest exam signal and current lesson progress. Your pathway still looks suitable, so no adjustment is needed right now.',
         });
       });
     } catch (_) {

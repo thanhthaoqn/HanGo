@@ -17,14 +17,12 @@ import java.util.regex.Pattern;
 public class YouTubeTranscriptService {
 
     private final ObjectMapper objectMapper;
-    private final WebClient webClient = WebClient.builder().build();
+    private final WebClient webClient = WebClient.builder()
+            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
+            .build();
 
     private static final Pattern VIDEO_ID_PATTERN = Pattern.compile(
             "(?:v=|/v/|youtu\\.be/|/embed/|/shorts/|^)([a-zA-Z0-9_-]{11})"
-    );
-    
-    private static final Pattern YT_INITIAL_PLAYER_RESPONSE_PATTERN = Pattern.compile(
-            "ytInitialPlayerResponse\\s*=\\s*(\\{.*?\\});"
     );
 
     /**
@@ -64,13 +62,13 @@ public class YouTubeTranscriptService {
             if (html == null) return null;
 
             // 2. Extract ytInitialPlayerResponse JSON
-            Matcher jsonMatcher = YT_INITIAL_PLAYER_RESPONSE_PATTERN.matcher(html);
-            if (!jsonMatcher.find()) {
-                log.warn("ytInitialPlayerResponse not found in HTML for video: {}", videoId);
+            String jsonStr = extractJson(html, "ytInitialPlayerResponse");
+            if (jsonStr == null) {
+                log.warn("ytInitialPlayerResponse not found in HTML for video: {}. Contains 'ytInitialPlayerResponse': {}, Contains 'captionTracks': {}. Snippet: {}", 
+                        videoId, html.contains("ytInitialPlayerResponse"), html.contains("captionTracks"), html.length() > 400 ? html.substring(0, 400) : html);
                 return null;
             }
             
-            String jsonStr = jsonMatcher.group(1);
             JsonNode rootNode = objectMapper.readTree(jsonStr);
             
             // 3. Find the captions base URL
@@ -135,5 +133,42 @@ public class YouTubeTranscriptService {
             log.error("Failed to fetch transcript for video {}: {}", videoId, e.getMessage());
             return null;
         }
+    }
+
+    private String extractJson(String html, String marker) {
+        int idx = html.indexOf(marker);
+        if (idx == -1) return null;
+        int start = html.indexOf('{', idx + marker.length());
+        if (start == -1) return null;
+
+        int braceCount = 0;
+        boolean inString = false;
+        boolean escape = false;
+
+        for (int i = start; i < html.length(); i++) {
+            char c = html.charAt(i);
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (c == '\\' && inString) {
+                escape = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (!inString) {
+                if (c == '{') braceCount++;
+                else if (c == '}') {
+                    braceCount--;
+                    if (braceCount == 0) {
+                        return html.substring(start, i + 1);
+                    }
+                }
+            }
+        }
+        return null;
     }
 }
