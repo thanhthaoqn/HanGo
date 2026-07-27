@@ -18,6 +18,7 @@ import '../../widgets/lesson_ai_chatbox.dart';
 import 'package:provider/provider.dart';
 import 'course_detail_page.dart';
 import 'course_completion_page.dart';
+import '../../../utils/language_manager.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
@@ -3768,36 +3769,25 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
 
       bool isCourseFullyCompleted = false;
+      int totalLessons = 0;
+      int completedLessons = 0;
       if (_courseDetail != null) {
-        final totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
-        final completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+        totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
+        completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
         if (totalLessons > 0 && completedLessons == totalLessons) {
           isCourseFullyCompleted = true;
         }
-      } else if (nextLessonId == null) {
-        isCourseFullyCompleted = true;
       }
 
-      // Auto-navigate to completion screen if course finished / last lesson, else next lesson
-      if (isCourseFullyCompleted || nextLessonId == null) {
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => CourseCompletionPage(
-                  courseId: widget.courseId,
-                  courseDetail: _courseDetail,
-                ),
-              ),
-            );
-          }
-        });
-      } else {
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          if (mounted) {
-            _navigateToLesson(nextLessonId);
-          }
-        });
+      final isVi = LanguageManager.isVi;
+      if (mounted) {
+        _showCourseraLessonCompletedModal(
+          isVi: isVi,
+          isCourseFullyCompleted: isCourseFullyCompleted,
+          nextLessonId: nextLessonId,
+          completedLessons: completedLessons,
+          totalLessons: totalLessons,
+        );
       }
     } catch (e) {
       setState(() {
@@ -3808,7 +3798,312 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
     }
   }
+
+  void _showCourseraLessonCompletedModal({
+    required bool isVi,
+    required bool isCourseFullyCompleted,
+    required int? nextLessonId,
+    required int completedLessons,
+    required int totalLessons,
+  }) {
+    final double progressPercent = totalLessons > 0 ? (completedLessons / totalLessons) : 1.0;
+    final int percentInt = (progressPercent * 100).round();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 10,
+        backgroundColor: Colors.white,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 440),
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. Icon Header Badge
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F7F4),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF28B79B).withValues(alpha: 0.3), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF28B79B).withValues(alpha: 0.15),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.emoji_events_rounded,
+                  color: Color(0xFF28B79B),
+                  size: 38,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 2. Title
+              Text(
+                isVi ? 'Hoàn thành bài học! 🎉' : 'Lesson Completed! 🎉',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F2937),
+                  fontFamily: 'Outfit',
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+
+              // 3. Subtitle / Quote
+              Text(
+                isVi
+                    ? 'Tuyệt vời! Bạn đã tiến thêm một bước vững chắc trên hành trình chinh phục khóa học.'
+                    : 'Great job! You take one step closer to mastering this course.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  height: 1.5,
+                  fontFamily: 'Outfit',
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+
+              // 4. Coursera-style Progress Card
+              if (totalLessons > 0) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isVi ? 'Tiến độ khóa học' : 'Course Progress',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          Text(
+                            '$completedLessons / $totalLessons (${percentInt}%)',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF28B79B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: progressPercent,
+                          minHeight: 8,
+                          backgroundColor: const Color(0xFFE2E8F0),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // 5. Action Buttons
+              if (nextLessonId != null) ...[
+                // Next Lesson Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _navigateToLesson(nextLessonId);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                      label: Text(
+                        isVi ? 'Học bài tiếp theo' : 'Continue to Next Lesson',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Stay Here Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        isVi ? 'Ở lại bài học này' : 'Stay on This Lesson',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else if (isCourseFullyCompleted) ...[
+                // Fully Completed Whole Course -> Certificate Button!
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => CourseCompletionPage(
+                              courseId: widget.courseId,
+                              courseDetail: _courseDetail,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 20),
+                      label: Text(
+                        isVi ? 'Nhận Chứng chỉ Khóa học 🎓' : 'Claim Course Certificate 🎓',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        isVi ? 'Ở lại bài học' : 'Stay Here',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                // Last lesson of section or sequence, but course NOT 100% completed!
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.pop(context); // Go back to course pathway / list
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.list_alt_rounded, color: Colors.white, size: 18),
+                      label: Text(
+                        isVi ? 'Về danh sách bài học' : 'Back to Course Pathway',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        isVi ? 'Ở lại bài học' : 'Stay Here',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
 
 class QuizAttempt {
   final int attemptNumber;
