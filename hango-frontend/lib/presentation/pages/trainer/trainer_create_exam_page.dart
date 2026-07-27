@@ -7,11 +7,7 @@ import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
-import '../login_page.dart';
-import 'trainer_dashboard_page.dart';
-import 'trainer_courses_page.dart';
-import 'trainer_exams_page.dart';
-import 'question_bank/trainer_question_bank_page.dart';
+import '../../widgets/trainer/trainer_sidebar.dart';
 import 'trainer_exam_import_excel_page.dart';
 import 'trainer_exam_ai_generate_page.dart';
 import 'trainer_exam_matrix_page.dart';
@@ -72,17 +68,6 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
       _trainerInitials = initials;
       _trainerAvatarUrl = avatarUrl;
     });
-  }
-
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
   }
 
   @override
@@ -194,10 +179,10 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 2)) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -675,172 +660,6 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF20B486)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-
-                Image.network(
-
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-
-                  height: 36,
-
-                  fit: BoxFit.contain,
-
-                  errorBuilder: (context, error, stackTrace) {
-
-                    return Row(
-
-                      children: [
-
-                        Container(
-
-                          width: 32,
-
-                          height: 32,
-
-                          decoration: const BoxDecoration(
-
-                            color: Color(0xFFE6FFFA),
-
-                            shape: BoxShape.circle,
-
-                          ),
-
-                          child: const Icon(
-
-                            Icons.school,
-
-                            size: 18,
-
-                            color: Color(0xFF20B486),
-
-                          ),
-
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        const Text(
-
-                          'HanGo',
-
-                          style: TextStyle(
-
-                            fontSize: 20,
-
-                            fontWeight: FontWeight.bold,
-
-                            color: Color(0xFF1F2937),
-
-                            fontFamily: 'Outfit',
-
-                          ),
-
-                        ),
-
-                      ],
-
-                    );
-
-                  },
-
-                ),
-
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          _buildSidebarItem(
-            Icons.dashboard_outlined,
-            'Dashboard',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerDashboardPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerCoursesPage(),
-              ),
-            );
-          }),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: true),
-          _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerQuestionBankPage(),
-              ),
-            );
-          }),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF38C9A6);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

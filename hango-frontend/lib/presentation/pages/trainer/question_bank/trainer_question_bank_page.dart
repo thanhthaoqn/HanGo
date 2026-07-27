@@ -1,26 +1,19 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
-import '../../login_page.dart';
-import '../trainer_courses_page.dart';
-import '../trainer_dashboard_page.dart';
-import '../trainer_exams_page.dart';
 import 'trainer_create_question_page.dart';
-import '../../learner/learner_home_page.dart';
-import '../../../../utils/language_manager.dart';
 import '../trainer_profile_page.dart';
-import '../trainer_revenue_page.dart';
 import 'models/trainer_question.dart';
 import 'widgets/question_search_bar.dart';
 import 'widgets/question_table.dart';
+import '../../../widgets/trainer/trainer_sidebar.dart';
 
 class TrainerQuestionBankPage extends StatefulWidget {
   final bool isEmbedded;
-  const TrainerQuestionBankPage({Key? key, this.isEmbedded = false}) : super(key: key);
+  const TrainerQuestionBankPage({super.key, this.isEmbedded = false});
 
   @override
   State<TrainerQuestionBankPage> createState() => _TrainerQuestionBankPageState();
@@ -34,7 +27,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
   bool _isLoading = true;
-  String _errorMessage = '';
 
   // Filter States
   String _selectedType = 'PUBLIC';
@@ -84,7 +76,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   Future<void> _fetchQuestions() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = '';
     });
 
     try {
@@ -109,7 +100,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       setState(() {
         _allQuestions = [];
         _isLoading = false;
-        _errorMessage = 'Failed to load questions. Please try again.';
       });
     }
   }
@@ -143,17 +133,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     _fetchQuestions();
   }
 
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -172,10 +151,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 3)) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 3)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -275,206 +254,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Logo
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-
-                Image.network(
-
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-
-                  height: 36,
-
-                  fit: BoxFit.contain,
-
-                  errorBuilder: (context, error, stackTrace) {
-
-                    return Row(
-
-                      children: [
-
-                        Container(
-
-                          width: 32,
-
-                          height: 32,
-
-                          decoration: const BoxDecoration(
-
-                            color: Color(0xFFE6FFFA),
-
-                            shape: BoxShape.circle,
-
-                          ),
-
-                          child: const Icon(
-
-                            Icons.school,
-
-                            size: 18,
-
-                            color: Color(0xFF20B486),
-
-                          ),
-
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        const Text(
-
-                          'HanGo',
-
-                          style: TextStyle(
-
-                            fontSize: 20,
-
-                            fontWeight: FontWeight.bold,
-
-                            color: Color(0xFF1F2937),
-
-                            fontFamily: 'Outfit',
-
-                          ),
-
-                        ),
-
-                      ],
-
-                    );
-
-                  },
-
-                ),
-
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          // Sidebar menu items
-          _buildSidebarItem(
-            Icons.dashboard_outlined,
-            'Dashboard',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerDashboardPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.book_outlined,
-            'Courses',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerCoursesPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerExamsPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(
-            Icons.question_answer_outlined,
-            'Question Bank',
-            isActive: true,
-          ),
-          _buildSidebarItem(
-            Icons.account_balance_wallet_outlined,
-            'Revenue',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const TrainerRevenuePage()),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.person_outline, 'My Profile', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
-            );
-          }),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-
-          _buildSidebarItem(
-            Icons.logout,
-            'Logout',
-            color: Colors.redAccent,
-            onTap: _handleLogout,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive
-                    ? Colors.white
-                    : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive
-                      ? Colors.white
-                      : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
