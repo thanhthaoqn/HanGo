@@ -265,44 +265,111 @@ class _ChatPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      elevation: 12,
-      shadowColor: Colors.black.withValues(alpha: .18),
-      borderRadius: BorderRadius.circular(8),
+      elevation: 16,
+      shadowColor: Colors.black.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(16),
       color: Colors.white,
       clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        width: width,
-        height: height,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        ),
         child: Column(
           children: [
+            // Top Accent Gradient Line
             Container(
-              padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+              height: 4,
+              width: double.infinity,
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppTheme.line)),
+                gradient: LinearGradient(
+                  colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                ),
+              ),
+            ),
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFCFDFE),
+                border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
               ),
               child: Row(
                 children: [
-                  const CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppTheme.emerald,
-                    child: Icon(
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.emerald.withOpacity(0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
                       Icons.psychology_alt_rounded,
                       color: Colors.white,
                       size: 20,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'HanGo AI Assistant',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: Color(0xFF0F172A),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE6F7F4),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'ACTIVE',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF28B79B),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
                         Text(
                           lessonTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w900),
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
+                        const SizedBox(height: 2),
                         FutureBuilder<AiHealth>(
                           future: health,
                           builder: (context, snapshot) {
@@ -318,25 +385,30 @@ class _ChatPanel extends StatelessWidget {
                                       : available
                                       ? Icons.check_circle_rounded
                                       : Icons.error_outline_rounded,
-                                  size: 14,
+                                  size: 11,
                                   color: waiting
-                                      ? AppTheme.muted
+                                      ? const Color(0xFF94A3B8)
                                       : available
-                                      ? AppTheme.emerald
+                                      ? const Color(0xFF10B981)
                                       : const Color(0xFFE11D48),
                                 ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
                                     waiting
-                                        ? 'Đang kiểm tra AI...'
+                                        ? 'Connecting AI...'
                                         : snapshot.data?.message ??
-                                              'Chưa kiểm tra AI',
+                                              'Ready to answer',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: AppTheme.muted,
-                                      fontSize: 12,
+                                    style: TextStyle(
+                                      color: waiting
+                                          ? const Color(0xFF94A3B8)
+                                          : available
+                                          ? const Color(0xFF10B981)
+                                          : const Color(0xFFE11D48),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
@@ -347,139 +419,207 @@ class _ChatPanel extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Xóa lịch sử chat (chỉ trên thiết bị)',
-                    onPressed: sending
-                        ? null
-                        : () async {
-                            final ok =
-                                await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
-                                      title: const Text('Xác nhận xóa lịch sử'),
-                                      content: const Text(
-                                        'Bạn có chắc muốn xóa lịch sử chat này không?\n\nThao tác này chỉ xóa dữ liệu trên thiết bị.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.of(context).pop(false);
-                                          },
-                                          child: const Text('Hủy'),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: IconButton(
+                      tooltip: 'Clear chat history (local only)',
+                      onPressed: sending
+                          ? null
+                          : () async {
+                              final ok =
+                                  await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) {
+                                      return AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
                                         ),
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.of(context).pop(true);
-                                          },
-                                          child: const Text('Xóa'),
+                                        title: const Row(
+                                          children: [
+                                            Icon(Icons.delete_sweep_rounded, color: Color(0xFFE11D48)),
+                                            SizedBox(width: 8),
+                                            Text('Clear chat history?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                          ],
                                         ),
-                                      ],
-                                    );
-                                  },
-                                ) ??
-                                false;
+                                        content: const Text(
+                                          'All AI conversation history for this lesson on this device will be cleared so you can start fresh.',
+                                          style: TextStyle(color: Color(0xFF475569), height: 1.5),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(context).pop(false),
+                                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFE11D48),
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            onPressed: () => Navigator.of(context).pop(true),
+                                            child: const Text('Clear history'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ) ??
+                                  false;
 
-                            if (ok) {
-                              await onClearHistory();
-                            }
-                          },
-                    icon: const Icon(Icons.delete_outline_rounded),
+                              if (ok) {
+                                await onClearHistory();
+                              }
+                            },
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Color(0xFF94A3B8),
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
+            // Messages Area
             Expanded(
-              child: messages.isEmpty
-                  ? LessonAiChatboxEmptyState(
-                      title: 'Gợi ý câu hỏi để bắt đầu học',
-                      questions: defaultLessonAiSuggestedQuestions(),
-                      onTapQuestion: (q) {
-                        controller.text = q;
-                        controller.selection =
-                            TextSelection.collapsed(offset: q.length);
-                        onSend();
-                      },
-                    )
-                  : ListView.builder(
-                      controller: scroll,
-                      padding: const EdgeInsets.all(14),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        return Column(
-                          crossAxisAlignment: msg.role == 'USER'
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            _ChatBubble(message: msg),
-                            if (msg.role != 'USER' &&
-                                msg.suggestedQuestions.isNotEmpty)
-                              QuickQuestionsRow(
-                                questions: msg.suggestedQuestions,
-                                onTapQuestion: (q) {
-                                  controller.text = q;
-                                  controller.selection =
-                                      TextSelection.collapsed(offset: q.length);
-                                  onSend();
-                                },
-                              ),
-                          ],
-                        );
-                      },
-                    ),
+              child: Container(
+                color: const Color(0xFFFAFCFF),
+                child: messages.isEmpty
+                    ? LessonAiChatboxEmptyState(
+                        title: 'Select a suggested prompt below or ask any question to get detailed answers about this lesson.',
+                        questions: defaultLessonAiSuggestedQuestions(),
+                        onTapQuestion: (q) {
+                          controller.text = q;
+                          controller.selection =
+                              TextSelection.collapsed(offset: q.length);
+                          onSend();
+                        },
+                      )
+                    : ListView.builder(
+                        controller: scroll,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = messages[index];
+                          return Column(
+                            crossAxisAlignment: msg.role == 'USER'
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              _ChatBubble(message: msg),
+                              if (msg.role != 'USER' &&
+                                  msg.suggestedQuestions.isNotEmpty)
+                                QuickQuestionsRow(
+                                  questions: msg.suggestedQuestions,
+                                  onTapQuestion: (q) {
+                                    controller.text = q;
+                                    controller.selection =
+                                        TextSelection.collapsed(offset: q.length);
+                                    onSend();
+                                  },
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+              ),
             ),
 
             if (error != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: _InlineError(message: error!),
               ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            // Bottom Input Bar
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+              ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 3,
-                      maxLength: 500,
-                      onSubmitted: (_) => onSend(),
-                      decoration: const InputDecoration(
-                        hintText: 'Nhập câu hỏi trong bài học...',
-                        counterText: '',
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: TextField(
+                        controller: controller,
+                        minLines: 1,
+                        maxLines: 4,
+                        maxLength: 500,
+                        onSubmitted: (_) => onSend(),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF1E293B),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFFCBD5E1)),
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: Color(0xFF28B79B),
-                            width: 1.5,
+                        decoration: const InputDecoration(
+                          hintText: 'Ask AI about this lesson...',
+                          hintStyle: TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 13,
                           ),
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          counterText: '',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  IconButton.filled(
-                    tooltip: 'Gửi',
-                    onPressed: sending ? null : onSend,
-                    icon: sending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send_rounded),
+                  MouseRegion(
+                    cursor: sending ? SystemMouseCursors.basic : SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: sending ? null : onSend,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: sending
+                              ? const LinearGradient(
+                                  colors: [Color(0xFF94A3B8), Color(0xFF64748B)],
+                                )
+                              : const LinearGradient(
+                                  colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                          shape: BoxShape.circle,
+                          boxShadow: sending
+                              ? []
+                              : [
+                                  BoxShadow(
+                                    color: AppTheme.emerald.withOpacity(0.35),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                        ),
+                        child: Center(
+                          child: sending
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.send_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -499,25 +639,126 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mine = message.role == 'USER';
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 1e9),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: mine ? AppTheme.emerald : const Color(0xFFEAF3EE),
-          borderRadius: BorderRadius.circular(8),
-          border: message.wasOutOfScope
-              ? Border.all(color: const Color(0xFFE11D48))
-              : null,
-        ),
-        child: Text(
-          message.content,
-          style: TextStyle(
-            color: mine ? Colors.white : AppTheme.ink,
-            height: 1.42,
+
+    if (mine) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          margin: const EdgeInsets.only(bottom: 12, left: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(18),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(4),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.emerald.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
+          child: Text(
+            message.content,
+            style: const TextStyle(
+              color: Colors.white,
+              height: 1.45,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 360),
+        margin: const EdgeInsets.only(bottom: 14, right: 24),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(right: 10, top: 2),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6F7F4),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.3)),
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                size: 14,
+                color: Color(0xFF28B79B),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(4),
+                    topRight: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(18),
+                  ),
+                  border: Border.all(
+                    color: message.wasOutOfScope
+                        ? const Color(0xFFE11D48)
+                        : const Color(0xFFE2E8F0),
+                    width: message.wasOutOfScope ? 1.5 : 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (message.wasOutOfScope) ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFE11D48)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Off-topic question',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFE11D48).withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    Text(
+                      message.content,
+                      style: const TextStyle(
+                        color: Color(0xFF1E293B),
+                        height: 1.5,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -532,20 +773,20 @@ class _InlineError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF1F2),
         border: Border.all(color: const Color(0xFFFECACA)),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFBE123C)),
-          const SizedBox(width: 8),
+          const Icon(Icons.error_outline_rounded, color: Color(0xFFBE123C), size: 18),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFF9F1239), fontSize: 12),
+              style: const TextStyle(color: Color(0xFF9F1239), fontSize: 12, height: 1.4),
             ),
           ),
         ],
