@@ -8,6 +8,7 @@ import 'package:hango/domain/model/ai_health.dart';
 import 'package:hango/domain/model/ai_models.dart';
 import 'package:hango/services/app_state.dart';
 import 'package:hango/utils/app_theme.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import 'lesson_ai_chatbox_quick_questions.dart';
 import 'lesson_ai_chatbox_default_questions.dart';
@@ -667,12 +668,34 @@ class _ChatBubble extends StatelessWidget {
               ),
             ],
           ),
-          child: Text(
-            message.content,
-            style: const TextStyle(
-              color: Colors.white,
-              height: 1.45,
-              fontSize: 13.5,
+          child: MarkdownBody(
+            data: message.content,
+            selectable: true,
+            styleSheet: MarkdownStyleSheet.fromTheme(
+              Theme.of(context),
+            ).copyWith(
+              p: const TextStyle(
+                color: Colors.white,
+                height: 1.45,
+                fontSize: 13.5,
+              ),
+              strong: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+              em: const TextStyle(
+                color: Colors.white,
+                fontStyle: FontStyle.italic,
+              ),
+              listBullet: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+              code: const TextStyle(
+                color: Colors.white,
+                backgroundColor: Color(0x33000000),
+                fontSize: 12.5,
+              ),
             ),
           ),
         ),
@@ -746,12 +769,66 @@ class _ChatBubble extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                     ],
-                    Text(
-                      message.content,
-                      style: const TextStyle(
-                        color: Color(0xFF1E293B),
-                        height: 1.5,
-                        fontSize: 13.5,
+                    MarkdownBody(
+                      data: message.content,
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet.fromTheme(
+                        Theme.of(context),
+                      ).copyWith(
+                        p: const TextStyle(
+                          color: Color(0xFF1E293B),
+                          height: 1.5,
+                          fontSize: 13.5,
+                        ),
+                        strong: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.bold,
+                        ),
+                        em: const TextStyle(
+                          color: Color(0xFF1E293B),
+                          fontStyle: FontStyle.italic,
+                        ),
+                        h1: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          height: 1.4,
+                        ),
+                        h2: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          height: 1.4,
+                        ),
+                        h3: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          height: 1.4,
+                        ),
+                        listBullet: const TextStyle(
+                          color: Color(0xFF28B79B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        code: const TextStyle(
+                          color: Color(0xFF0D9488),
+                          backgroundColor: Color(0xFFF1F5F9),
+                          fontSize: 12.5,
+                        ),
+                        codeblockPadding: const EdgeInsets.all(10),
+                        codeblockDecoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        blockquoteDecoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: const Border(
+                            left: BorderSide(color: Color(0xFF28B79B), width: 3),
+                          ),
+                        ),
                       ),
                     ),
                   ],
