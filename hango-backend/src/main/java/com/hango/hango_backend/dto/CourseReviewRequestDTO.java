@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 @Data
@@ -20,6 +19,6 @@ public class CourseReviewRequestDTO {
     @Max(value = 5, message = "Rating cannot exceed 5 stars")
     private Short rating;
 
-    @NotBlank(message = "Review content cannot be blank")
+    /** Optional - a learner may submit a star rating with no written review. */
     private String content;
 }

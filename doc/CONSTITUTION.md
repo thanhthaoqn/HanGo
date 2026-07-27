@@ -1,5 +1,7 @@
 # HanGo Project Constitution
 
+> This is the canonical, detailed source for architecture principles, coding conventions, security rules, and git workflow. [`AGENTS.md`](../AGENTS.md) (protocol/workflow), [`agent_backend.md`](agent_backend.md) and [`agent_frontend.md`](agent_frontend.md) (domain quick-reference) all point back here instead of restating these rules — treat this file as the single place to update them.
+
 This document is the "Constitution" of the HanGo EdTech Platform project. All AI Coding Agents (such as Cursor, GitHub Copilot, Windsurf, etc.) and Developers participating in the project's development must strictly adhere to the rules and principles defined below.
 
 ## 1. Project Context & Vision
@@ -7,7 +9,7 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 - **Description:** An educational technology (EdTech) platform focused on personalizing learning experiences, assessing language proficiency, and applying AI to create optimal learning paths.
 - **Platform:**
   - **Frontend:** Flutter (Web-first approach).
-  - **Backend:** Java 21, Spring Boot.
+  - **Backend:** Java 17, Spring Boot 4.0.6.
   - **Database:** MySQL.
 - **Primary Users:** Learner, Trainer (Instructor/Content Creator), Course Manager, Admin.
 
@@ -17,7 +19,7 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 - **State Management (Frontend):** Completely separate UI and Logic. Do not make direct API calls inside the `build()` function.
 
 ## 3. Frontend Guidelines (Flutter & UI/UX)
-- **Framework & Libraries:** Dart `^3.12.0`, Flutter, Riverpod (state management), `go_router` (routing).
+- **Framework & Libraries:** Dart `^3.12.0`, Flutter. **Current baseline (as actually implemented, audited 2026-07-24):** state management is a single root `ChangeNotifierProvider<AppState>` (package `provider`) plus per-page `StatefulWidget` + `setState()` — new screens should follow this same pattern for consistency rather than introducing Riverpod ad hoc. Routing is imperative `Navigator.push`/`MaterialPageRoute` — there is no centralized route table today. Networking uses `package:http` directly per repository/service (the `dio` dependency is declared in `pubspec.yaml` but currently unused). *Adopting Riverpod/go_router/Dio project-wide remains an open option for a future version — see [`ROADMAP.md`](ROADMAP.md) — but is not the current standard; don't introduce them piecemeal in a single new screen.*
 - **Colors & UI/UX:**
   - **Primary Color:** Teal Green (`#20B486`). 
   - **Background & Text:** Slate 50 (`#F8FAFC`) for background, Slate 800 (`#1E293B`) for text.
@@ -28,10 +30,10 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
   - All screens must be wrapped in `LayoutBuilder` or `MediaQuery` to ensure responsiveness across multiple devices.
 
 ## 4. Backend Guidelines (Spring Boot)
-- **Framework & Libraries:** Java 21, Spring Boot 3.x.
+- **Framework & Libraries:** Java 17, Spring Boot 4.0.6.
 - **Entities & DTOs:** 
-  - ABSOLUTELY DO NOT return `@Entity` directly from the Controller to the client. 
-  - Always use DTOs (Data Transfer Objects) for Request/Response and use `MapStruct` to map between Entities and DTOs.
+  - ABSOLUTELY DO NOT return `@Entity` directly from the Controller to the client — this rule **is** followed consistently in the current code.
+  - Always use DTOs (Data Transfer Objects) for Request/Response. **Current baseline:** mapping is done manually (Lombok `@Builder` chains or field-by-field copies inside services) — MapStruct is **not** actually used anywhere in the codebase today despite earlier plans. Keep using the existing manual-mapping style for consistency unless the team decides to adopt MapStruct project-wide (see [`ROADMAP.md`](ROADMAP.md)); don't introduce it for a single new DTO only.
 - **Lombok:** Optimize boilerplate code using annotations such as `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`.
 - **Validation:** Mandatory application of input validation annotations (e.g., `@Valid`, `@NotBlank`, `@NotNull`) on request DTOs.
 
@@ -71,8 +73,9 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 - **Pull Request (PR):** All generated code should be pushed to a separate branch, not automatically committed directly to the `main` or `dev` branch.
 
 ## 9. Testing Requirements
-- **Frontend:** Write Unit Tests and Widget Tests for important components and features.
-- **Backend:** Mandatory Unit Tests using JUnit 5 and Mockito. Integrate Testcontainers for Integration Tests and database checking.
+- **Frontend:** Write Unit Tests and Widget Tests for important components and features. **Current baseline:** only 2 test files exist today (one model test, one widget test) — this is a known gap, not a target state; see [`AUDIT_REPORT.md`](AUDIT_REPORT.md) HIGH-08 and [`ROADMAP.md`](ROADMAP.md).
+- **Backend:** Mandatory Unit Tests using JUnit 5 and Mockito, **Service layer only** (Controller-layer tests are out of scope except where real business logic lives directly in a Controller with no backing Service — see `agent_qa.md`). Testcontainers/`@SpringBootTest` integration tests are aspirational — none exist in the current suite (517 Service-layer unit tests, 0 integration tests as of 2026-07-24).
+- Full strategy, priorities and test case catalogue: [`TESTING.md`](TESTING.md), [`agent_qa.md`](agent_qa.md), [`specs/unit_test_plan.md`](specs/unit_test_plan.md), [`TEST_AUDIT_REPORT.md`](TEST_AUDIT_REPORT.md).
 
 ## 10. AI Prompting Workflow
 When a Developer assigns a task to AI, Context must be provided in the following standard format:

@@ -38,6 +38,7 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
     private final CourseRepository courseRepository;
     private final SystemParameterRepository systemParameterRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -213,6 +214,12 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
 
             MonthlyStatement savedStatement = statementRepository.save(statement);
             generatedStatements.add(savedStatement);
+
+            notificationService.notifyUser(trainer, NotificationService.TYPE_STATEMENT_READY,
+                    "Monthly statement ready",
+                    "Your revenue statement for " + finalPeriodMonth + " (Net payout: "
+                            + String.format("%,.0f", netPayout) + " VND) is ready to review.",
+                    null);
 
             // Mark payments as IN_STATEMENT and link to statementId
             for (Payment p : trainerPayments) {

@@ -21,4 +21,5 @@ public class CommentDTO {
     private Long parentCommentId;
     private Integer likeCount;
     private Boolean isLiked;
+    private String status;
 }

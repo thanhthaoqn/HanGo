@@ -4,8 +4,10 @@ import com.hango.hango_backend.dto.CourseReviewDTO;
 import com.hango.hango_backend.dto.CourseReviewSummaryDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.CourseRating;
+import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.CourseRepository;
+import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.CourseRatingRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,9 +23,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CourseRatingServiceImpl implements CourseRatingService {
 
+    /** Requirement 5: only fire the "average dropped" notification once, when crossing this line. */
+    private static final double LOW_AVERAGE_THRESHOLD = 4.0;
+    /** Requirement 4: any single rating at or below this fires a per-rating notification. */
+    private static final int LOW_RATING_THRESHOLD = 3;
+
     private final CourseRatingRepository courseRatingRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -107,6 +116,12 @@ public class CourseRatingServiceImpl implements CourseRatingService {
         User student = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(userId, courseId)
+                .orElseThrow(() -> new RuntimeException("You must enroll in this course before rating it"));
+        if (!"COMPLETED".equalsIgnoreCase(enrollment.getStatus())) {
+            throw new RuntimeException("You must complete the course before rating it");
+        }
+
         CourseRating courseRating = courseRatingRepository.findByCourseIdAndStudentId(courseId, userId)
                 .orElse(null);
 
@@ -123,6 +138,46 @@ public class CourseRatingServiceImpl implements CourseRatingService {
         }
 
         courseRatingRepository.save(courseRating);
+
+        double previousAverage = course.getAverageRating() != null ? course.getAverageRating() : 0.0;
+        int previousTotal = course.getTotalRatings() != null ? course.getTotalRatings() : 0;
+
+        recalculateCourseStats(course);
+
+        if (rating != null && rating <= LOW_RATING_THRESHOLD) {
+            String title = "Low Course Rating Detected";
+            String message = "Course: " + course.getTitle() + "\nLearner Rating: " + rating + " Stars\nReason: \""
+                    + (content == null || content.isBlank() ? "(no comment provided)" : content) + "\"";
+            notificationService.notifyCourseManagers(NotificationService.TYPE_LOW_RATING, title, message, course);
+            notificationService.notifyRole(NotificationService.RECIPIENT_ADMIN, NotificationService.TYPE_LOW_RATING, title, message, course);
+        }
+
+        boolean wasAboveThreshold = previousTotal > 0 && previousAverage > LOW_AVERAGE_THRESHOLD;
+        boolean isNowAtOrBelowThreshold = course.getAverageRating() != null && course.getAverageRating() <= LOW_AVERAGE_THRESHOLD;
+        if (wasAboveThreshold && isNowAtOrBelowThreshold) {
+            String title = "Course Quality Warning";
+            String message = "Course: " + course.getTitle() + "\nAverage Rating: " + course.getAverageRating()
+                    + "\nTotal Ratings: " + course.getTotalRatings();
+            notificationService.notifyCourseManagers(NotificationService.TYPE_LOW_AVERAGE_RATING, title, message, course);
+            notificationService.notifyRole(NotificationService.RECIPIENT_ADMIN, NotificationService.TYPE_LOW_AVERAGE_RATING, title, message, course);
+        }
+    }
+
+    /** Recomputes and persists Course.averageRating/totalRatings from all its CourseRating rows. */
+    private void recalculateCourseStats(Course course) {
+        List<CourseRating> ratings = courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(course.getId());
+        int total = ratings.size();
+        double average = 0.0;
+        if (total > 0) {
+            double sum = 0;
+            for (CourseRating r : ratings) {
+                sum += r.getRating() != null ? r.getRating() : 0;
+            }
+            average = Math.round((sum / total) * 10.0) / 10.0;
+        }
+        course.setAverageRating(average);
+        course.setTotalRatings(total);
+        courseRepository.save(course);
     }
 
     @Override
@@ -130,6 +185,8 @@ public class CourseRatingServiceImpl implements CourseRatingService {
     public void deleteCourseReview(Long courseId, Long userId) {
         CourseRating courseRating = courseRatingRepository.findByCourseIdAndStudentId(courseId, userId)
                 .orElseThrow(() -> new RuntimeException("Review not found"));
+        Course course = courseRating.getCourse();
         courseRatingRepository.delete(courseRating);
+        recalculateCourseStats(course);
     }
 }

@@ -344,15 +344,17 @@ class _ReviewTabState extends State<ReviewTab> {
                   );
                 }),
               ),
-              const SizedBox(height: 12),
-              Text(
-                review.content,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: Color(0xFF334155),
+              if (review.content.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  review.content,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: Color(0xFF334155),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

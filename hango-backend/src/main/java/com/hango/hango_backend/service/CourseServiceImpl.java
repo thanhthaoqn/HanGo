@@ -10,8 +10,6 @@ import com.hango.hango_backend.entity.Lesson;
 import com.hango.hango_backend.entity.LessonProgress;
 import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.entity.CourseRating;
-import com.hango.hango_backend.repository.CourseRatingRepository;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
@@ -44,9 +42,9 @@ public class CourseServiceImpl implements CourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final LessonProgressRepository lessonProgressRepository;
-    private final CourseRatingRepository courseRatingRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @Override
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
@@ -250,18 +248,9 @@ public class CourseServiceImpl implements CourseService {
         String categoryKey = categoryKeys.isEmpty() ? "" : categoryKeys.get(0);
         String categoryName = categoryNames.isEmpty() ? "" : String.join(", ", categoryNames);
 
-        // Calculate average rating dynamically from DB reviews/ratings
-        double averageRating = 0.0;
-        List<CourseRating> ratings = courseRatingRepository.findByCourseFamilyOrderByCreatedAtDesc(id);
-        if (!ratings.isEmpty()) {
-            double sum = 0;
-            for (CourseRating r : ratings) {
-                sum += (r.getRating() != null ? r.getRating() : 0);
-            }
-            averageRating = sum / ratings.size();
-            // Round to 1 decimal place
-            averageRating = Math.round(averageRating * 10.0) / 10.0;
-        }
+        // Average rating / total ratings are cached on Course by CourseRatingServiceImpl for quick display.
+        double averageRating = course.getAverageRating() != null ? course.getAverageRating() : 0.0;
+        int totalRatings = course.getTotalRatings() != null ? course.getTotalRatings() : 0;
 
         int estimatedDuration = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 12;
         return CourseDetailDTO.builder()
@@ -278,6 +267,7 @@ public class CourseServiceImpl implements CourseService {
                 .categoryNames(categoryNames)
                 .thumbnailUrl(course.getThumbnailUrl())
                 .rating(averageRating)
+                .totalRatings(totalRatings)
                 .learnersCount(learnersCount)
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
@@ -330,6 +320,11 @@ public class CourseServiceImpl implements CourseService {
                 .build();
 
         enrollmentRepository.save(enrollment);
+
+        notificationService.notifyUser(courseToEnroll.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
+                "New enrollment",
+                user.getFullName() + " enrolled in your course \"" + courseToEnroll.getTitle() + "\".",
+                courseToEnroll);
 
         // Gửi email xác nhận cho Learner
         try {
