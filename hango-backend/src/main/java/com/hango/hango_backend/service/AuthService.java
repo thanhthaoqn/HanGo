@@ -1,15 +1,13 @@
 package com.hango.hango_backend.service;
 
-import com.hango.hango_backend.dto.LoginRequest;
-import com.hango.hango_backend.dto.LoginResponse;
-import com.hango.hango_backend.dto.RegisterRequest;
-import com.hango.hango_backend.dto.UserResponse;
-import com.hango.hango_backend.entity.Role;
-import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.repository.RoleRepository;
-import com.hango.hango_backend.repository.UserRepository;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
-import com.hango.hango_backend.util.JwtUtils;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,25 +18,27 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.beans.factory.annotation.Value;
+
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
-
-import com.hango.hango_backend.dto.ForgotPasswordRequest;
-import com.hango.hango_backend.dto.VerifyOtpRequest;
-import com.hango.hango_backend.dto.ResetPasswordRequest;
-import com.hango.hango_backend.dto.ProfileUpdateRequest;
 import com.hango.hango_backend.dto.ChangePasswordRequest;
+import com.hango.hango_backend.dto.ForgotPasswordRequest;
+import com.hango.hango_backend.dto.LoginRequest;
+import com.hango.hango_backend.dto.LoginResponse;
+import com.hango.hango_backend.dto.ProfileUpdateRequest;
+import com.hango.hango_backend.dto.RegisterRequest;
+import com.hango.hango_backend.dto.ResetPasswordRequest;
+import com.hango.hango_backend.dto.UserResponse;
+import com.hango.hango_backend.dto.VerifyOtpRequest;
 import com.hango.hango_backend.entity.PasswordResetOtp;
+import com.hango.hango_backend.entity.Role;
+import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.hango.hango_backend.repository.RoleRepository;
+import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.util.JwtUtils;
 
 @Service
 public class AuthService {
@@ -67,8 +67,8 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
-    @Value("${google.client-id}")
-    private String googleClientId;
+    @Autowired
+    private GoogleIdTokenVerifier googleIdTokenVerifier;
 
     public LoginResponse authenticateUser(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
@@ -148,6 +148,8 @@ public class AuthService {
         return mapToUserResponse(savedUser);
     }
 
+    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "TRAINER_LEAD", "ADMINISTRATOR");
+
     public UserResponse createUserByAdmin(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
             throw new IllegalArgumentException("Error: Email is already in use!");
@@ -162,6 +164,10 @@ public class AuthService {
             if (targetRole.equals("ADMIN")) {
                 targetRole = "ADMINISTRATOR";
             }
+        }
+
+        if (!ADMIN_CREATABLE_ROLES.contains(targetRole)) {
+            throw new IllegalArgumentException("Error: Invalid role! Must be one of " + ADMIN_CREATABLE_ROLES);
         }
 
         final String roleName = targetRole;
@@ -188,9 +194,14 @@ public class AuthService {
     }
 
 
+    private static final long MAX_AVATAR_SIZE_BYTES = 2L * 1024 * 1024;
+    private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/jpg");
+
     public UserResponse updateAvatar(String email, MultipartFile file) throws IOException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        validateAvatarFile(file);
 
         String imageUrl = cloudinaryService.uploadImage(file);
         user.setAvatarUrl(imageUrl);
@@ -199,23 +210,25 @@ public class AuthService {
         return mapToUserResponse(updatedUser);
     }
 
+    private void validateAvatarFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Error: Avatar file is required.");
+        }
+        if (file.getSize() > MAX_AVATAR_SIZE_BYTES) {
+            throw new IllegalArgumentException("Error: Avatar file must not exceed 2MB.");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_AVATAR_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Error: Avatar must be a .jpg, .jpeg, or .png image.");
+        }
+    }
+
     @org.springframework.transaction.annotation.Transactional
     public LoginResponse googleLogin(com.hango.hango_backend.dto.GoogleLoginRequest googleLoginRequest) {
         String idTokenString = googleLoginRequest.getIdToken();
         try {
-            String targetClientId = (googleClientId != null && !googleClientId.trim().isEmpty() && !googleClientId.contains("YOUR_GOOGLE_CLIENT_ID"))
-                    ? googleClientId.trim()
-                    : "814191576087-mig0a1q44o8el7iqm8bkui1g0stb5a89.apps.googleusercontent.com";
-
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
-                    new NetHttpTransport(),
-                    new GsonFactory())
-                    .setAudience(Collections.singletonList(targetClientId))
-                    .build();
-
-            GoogleIdToken idToken = verifier.verify(idTokenString);
+            GoogleIdToken idToken = googleIdTokenVerifier.verify(idTokenString);
             GoogleIdToken.Payload payload = null;
-
             if (idToken != null) {
                 payload = idToken.getPayload();
             } else {
@@ -418,6 +431,7 @@ public class AuthService {
                 throw new IllegalArgumentException("Error: Email is already in use!");
             }
             user.setEmail(request.getEmail());
+            user.setIsVerified(false);
         }
 
         User updatedUser = userRepository.save(user);

@@ -15,6 +15,8 @@ import '../pages/course_manager/course_manager_dashboard_page.dart';
 import '../pages/trainer/trainer_dashboard_page.dart';
 import '../pages/learner/my_learning_page.dart';
 import '../../../domain/model/course.dart';
+import '../../../domain/model/notification_item.dart';
+import '../../../data/repositories/notification_repository.dart';
 
 import '../../utils/toast_helper.dart';
 import '../../utils/language_manager.dart';
@@ -61,6 +63,11 @@ class _SharedHeaderState extends State<SharedHeader> {
   bool _isHoveringCartIcon = false;
   bool _isHoveringCartPopup = false;
 
+  final _notificationRepository = NotificationRepository();
+  List<NotificationItem> _notifications = [];
+  int _unreadNotificationCount = 0;
+  bool _isLoadingNotifications = false;
+
   @override
   void initState() {
     super.initState();
@@ -85,6 +92,103 @@ class _SharedHeaderState extends State<SharedHeader> {
 
     _loadUserInfo();
     CartManager.updateCount();
+    if (_isLoggedIn) {
+      _loadNotifications();
+    }
+  }
+
+  Future<void> _loadNotifications() async {
+    if (_isLoadingNotifications) return;
+    setState(() => _isLoadingNotifications = true);
+    try {
+      final notifications = await _notificationRepository.getNotifications();
+      final unreadCount = await _notificationRepository.getUnreadCount();
+      if (!mounted) return;
+      setState(() {
+        _notifications = notifications;
+        _unreadNotificationCount = unreadCount;
+        _isLoadingNotifications = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingNotifications = false);
+    }
+  }
+
+  Future<void> _markNotificationAsRead(NotificationItem notification) async {
+    if (notification.read) return;
+    try {
+      await _notificationRepository.markAsRead(notification.id);
+      if (!mounted) return;
+      setState(() {
+        _notifications = _notifications
+            .map((n) => n.id == notification.id
+                ? NotificationItem(
+                    id: n.id,
+                    type: n.type,
+                    title: n.title,
+                    message: n.message,
+                    courseId: n.courseId,
+                    courseTitle: n.courseTitle,
+                    read: true,
+                    createdAt: n.createdAt,
+                  )
+                : n)
+            .toList();
+        _unreadNotificationCount = _unreadNotificationCount > 0 ? _unreadNotificationCount - 1 : 0;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _markAllNotificationsAsRead() async {
+    try {
+      await _notificationRepository.markAllAsRead();
+      if (!mounted) return;
+      setState(() {
+        _notifications = _notifications
+            .map((n) => NotificationItem(
+                  id: n.id,
+                  type: n.type,
+                  title: n.title,
+                  message: n.message,
+                  courseId: n.courseId,
+                  courseTitle: n.courseTitle,
+                  read: true,
+                  createdAt: n.createdAt,
+                ))
+            .toList();
+        _unreadNotificationCount = 0;
+      });
+    } catch (_) {}
+  }
+
+  String _formatNotificationTime(DateTime? createdAt) {
+    if (createdAt == null) return '';
+    final diff = DateTime.now().difference(createdAt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    return '${diff.inDays} days ago';
+  }
+
+  IconData _notificationIcon(String type) {
+    switch (type) {
+      case 'PurchaseSuccess':
+        return Icons.shopping_bag_outlined;
+      case 'NewEnrollment':
+        return Icons.school_outlined;
+      case 'CommentReply':
+        return Icons.chat_bubble_outline;
+      case 'ContentApproved':
+        return Icons.check_circle_outline;
+      case 'ContentRejected':
+        return Icons.cancel_outlined;
+      case 'StatementReady':
+        return Icons.receipt_long_outlined;
+      case 'CourseUpdated':
+        return Icons.upgrade_outlined;
+      default:
+        return Icons.notifications_outlined;
+    }
   }
 
   void _updateInitials(String name) {
@@ -107,6 +211,9 @@ class _SharedHeaderState extends State<SharedHeader> {
   void _onUserChanged() {
     if (mounted) {
       _loadUserInfo();
+      if (AuthService.cachedIsLoggedIn == true) {
+        _loadNotifications();
+      }
     }
   }
 
@@ -749,80 +856,151 @@ class _SharedHeaderState extends State<SharedHeader> {
                 ],
               ],
               // Notification Bell
-              PopupMenuButton<void>(
-                enabled: !widget.hideNavLinks,
-                offset: const Offset(0, 50),
-                color: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                icon: const Icon(
-                  Icons.notifications_none_outlined,
-                  color: Color(0xFF4B5563),
-                  size: 24,
-                ),
-                itemBuilder: (context) => [
-                  PopupMenuItem<void>(
-                    enabled: false,
-                    child: Container(
-                      width: 280,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _isVietnamese ? 'Thông báo' : 'Notifications',
-                              style: const TextStyle(
-                                fontFamily: 'Outfit',
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Color(0xFF0F172A),
-                              ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  PopupMenuButton<void>(
+                    enabled: !widget.hideNavLinks,
+                    offset: const Offset(0, 50),
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    onOpened: _loadNotifications,
+                    icon: const Icon(
+                      Icons.notifications_none_outlined,
+                      color: Color(0xFF4B5563),
+                      size: 24,
+                    ),
+                    itemBuilder: (context) => [
+                      PopupMenuItem<void>(
+                        enabled: false,
+                        child: StatefulBuilder(
+                          builder: (context, setMenuState) => Container(
+                            width: 320,
+                            constraints: const BoxConstraints(maxHeight: 420),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        _isVietnamese ? 'Thông báo' : 'Notifications',
+                                        style: const TextStyle(
+                                          fontFamily: 'Outfit',
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      if (_unreadNotificationCount > 0)
+                                        InkWell(
+                                          onTap: () async {
+                                            await _markAllNotificationsAsRead();
+                                            setMenuState(() {});
+                                          },
+                                          child: Text(
+                                            _isVietnamese ? 'Đánh dấu đã đọc' : 'Mark all as read',
+                                            style: const TextStyle(fontSize: 12, color: Color(0xFF28B79B), fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                                if (_isLoadingNotifications)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 32),
+                                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  )
+                                else if (_notifications.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 24),
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: const BoxDecoration(color: Color(0xFFF8FAFC), shape: BoxShape.circle),
+                                          child: const Icon(Icons.notifications_off_outlined, size: 40, color: Color(0xFF94A3B8)),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          _isVietnamese ? 'Không có thông báo mới' : 'No new notifications',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontFamily: 'Outfit',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  Flexible(
+                                    child: ListView.separated(
+                                      shrinkWrap: true,
+                                      padding: const EdgeInsets.only(top: 12),
+                                      itemCount: _notifications.length,
+                                      separatorBuilder: (_, __) => const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 10),
+                                        child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final n = _notifications[index];
+                                        return InkWell(
+                                          onTap: () async {
+                                            await _markNotificationAsRead(n);
+                                            setMenuState(() {});
+                                          },
+                                          child: Container(
+                                            color: n.read ? Colors.transparent : const Color(0xFFF0FDFA),
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                            child: _buildNotificationItem(
+                                              icon: _notificationIcon(n.type),
+                                              iconColor: const Color(0xFF28B79B),
+                                              bgColor: const Color(0xFFE6FBF7),
+                                              title: n.title,
+                                              description: n.message,
+                                              time: _formatNotificationTime(n.createdAt),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                          const SizedBox(height: 24),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF8FAFC),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.notifications_off_outlined,
-                              size: 40,
-                              color: Color(0xFF94A3B8),
-                            ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_unreadNotificationCount > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _isVietnamese ? 'Không có thông báo mới' : 'No new notifications',
+                          constraints: const BoxConstraints(minWidth: 16),
+                          child: Text(
+                            _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF64748B),
-                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isVietnamese 
-                                ? 'Chúng tôi sẽ thông báo khi có hoạt động mới.' 
-                                : 'We\'ll let you know when something comes up.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF94A3B8),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(width: 8),
@@ -881,7 +1059,12 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     );
                   } else if (val == 'notifications') {
-                    ToastHelper.show(context, _isVietnamese ? 'Không có thông báo mới' : 'No new notifications');
+                    ToastHelper.show(
+                      context,
+                      _unreadNotificationCount > 0
+                          ? (_isVietnamese ? 'Bạn có $_unreadNotificationCount thông báo chưa đọc' : 'You have $_unreadNotificationCount unread notifications')
+                          : (_isVietnamese ? 'Không có thông báo mới' : 'No new notifications'),
+                    );
                   }
                 },
                 offset: const Offset(0, 52),

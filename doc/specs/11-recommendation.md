@@ -1,20 +1,26 @@
-# Feature Specification: FT-07 - Recommendation System
+# Feature Specification: FE-11 — Recommendation
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.11 (REC)
+
+> ⚠️ **Ghi chú 2026-07-24 — module ít được test nhất trong toàn hệ thống:** chỉ nhánh **AI Recommendation** (`ExamCourseRecommendationAIService.recommendCoursesAI`) được xác nhận tồn tại trong code; nhánh **Rule-based Recommendation** thuần (map SkillType yếu → Course, không qua AI) mà tài liệu này mô tả **chưa tìm thấy method tương ứng** — có thể chưa implement hoặc đã gộp vào logic AI, cần xác nhận lại trước khi viết test hoặc claim "Implemented". Trước đợt audit này, `recommendCoursesAI` **hoàn toàn chưa có unit test** — đã bổ sung `ExamCourseRecommendationAIServiceTest.java` (7 test: null-check, not-found, mapping thành công, strip markdown fence, giới hạn tối đa 3 course, và 2 kịch bản AI fail/response không hợp lệ → fallback rỗng). Contract function-calling (`triggerReroute`, `getPathwayById`, `getUserProgressSnapshot`) mô tả ở §2 vẫn thuộc phạm vi "Agentic Upgrade" chưa làm — xem `TODO.md` FE-11 Phase 5.
 
 ## 1. Business Context
-To personalize learning paths, the Recommendation System analyzes exam results or a Learner's learning history to generate recommendations. This includes standard rule-based course recommendations and a dynamic, personalized **Adaptive Learning Pathway** (visual node tree roadmap) monitored by an **AI Mentor** agent.
+To personalize learning paths, the Recommendation System runs a **Weakness Analysis by SkillType** after each Exam attempt, then matches weak SkillTypes to Courses tagged with that SkillType (every Course carries **up to 3 SkillTypes** — BR-REC-01). On top of the rule-based match, an AI Recommendation and an AI Learning Pathway (generated roadmap) personalize the suggestion further. There is no "flashcard" concept and no Course "Basic/Advanced level" tiering in HanGo — matching is purely SkillType-based, not a numeric score threshold mapped to a difficulty tier.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] "Suggested for you" Carousel on the Learner Dashboard.
-- [ ] Adaptative Learning Pathway Page showing an Interactive Node Tree (Duolingo-style node statuses: locked/gray, in-progress/glowing, completed/green).
-- [ ] AI Mentor Side Panel featuring a chat interface (markdown response rendering, typing indicator, free text input).
+- [ ] The Dashboard screen or Exam Result screen features a "Suggested for you" section.
+- [ ] Display a list of recommended Courses as a Card Carousel.
+- [ ] Call the API to get recommendations and handle the Empty State (If the system lacks sufficient data to make suggestions, e.g. no Exam attempt yet).
 
 **Backend (Spring Boot):**
-- [ ] API endpoints `/api/v1/pathways/generate` and `/api/v1/pathways/me` to retrieve/construct node structures.
-- [ ] API `/api/v1/pathways/{id}/chat` to exchange messages with the AI Mentor.
-- [ ] Rule-based Engine Logic: evaluates `exam_attempts` and maps low scoring SkillTypes (< 50%) to beginner courses (max 3 SkillTypes per course mapping).
-- [ ] AI Pathway Generation Service: constructs a structured roadmap JSON outlining learning steps.
+- [ ] API `GET /api/v1/recommendations` returns a list of Courses matched by weak SkillType.
+- [ ] Rule-based Engine Logic:
+  - Analyze the latest `exam_attempts` result to compute per-SkillType error rate (Weakness Analysis, FR-REC-01).
+  - For each weak SkillType, suggest Courses that carry that SkillType among their (≤3) tagged SkillTypes (FR-REC-02 / BR-REC-01) — no score-threshold "Basic/Advanced" tiering.
+- [ ] AI Recommendation + AI Learning Pathway endpoints build on top of the same Weakness Analysis (FR-REC-03/04).
+- [ ] Map the response via a standard DTO.
 
 ## 3. Technical Constraints
 - **Agentic Upgrade (Function Calling):** The AI Mentor must use Gemini Function Calling to execute backend tools dynamically, specifically:

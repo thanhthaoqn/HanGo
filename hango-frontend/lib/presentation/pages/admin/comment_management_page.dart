@@ -160,6 +160,204 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
     }
   }
 
+  Future<void> _deleteComment(int id) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/comments/$id');
+      final response = await http.delete(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _comments.removeWhere((c) => c['id'] == id);
+        });
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Comment deleted successfully');
+        }
+      } else if (mounted) {
+        ToastHelper.showError(context, 'Failed to delete comment: ${response.body}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Error deleting comment: $e');
+      }
+    }
+  }
+
+  void _confirmDelete(int id) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Delete Comment', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+          content: const Text(
+            'Are you sure you want to delete this comment? This action cannot be undone.',
+            style: TextStyle(fontFamily: 'Outfit'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(fontFamily: 'Outfit')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteComment(id);
+              },
+              child: const Text('Delete', style: TextStyle(fontFamily: 'Outfit', color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showCommentDetailDialog(Map<String, dynamic> summary) async {
+    final int id = summary['id'];
+    Map<String, dynamic> detail = summary;
+
+    try {
+      final token = await _authService.getToken();
+      if (token != null) {
+        final response = await http.get(
+          Uri.parse('$apiBaseUrl/admin/comments/$id'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (response.statusCode == 200) {
+          detail = jsonDecode(response.body) as Map<String, dynamic>;
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load comment detail: $e');
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        final String status = (detail['status'] ?? summary['status'] ?? 'Pending').toString();
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 640),
+            padding: const EdgeInsets.all(28),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Comment Detail #$id',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                        ),
+                      ),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${detail['commenter'] ?? ''} • ${detail['email'] ?? ''}',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Course: ${detail['course'] ?? 'N/A'}  •  Lesson/Quiz: ${detail['quizOrLesson'] ?? 'N/A'}  •  ${detail['createdAt'] ?? ''}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(color: Color(0xFFE2E8F0)),
+                  const SizedBox(height: 16),
+                  _buildDetailField('Original Comment', detail['originalContent'] ?? detail['comment'] ?? ''),
+                  const SizedBox(height: 16),
+                  _buildDetailField('Normalized Comment', detail['normalizedContent'] ?? '(no rule triggered)'),
+                  const SizedBox(height: 16),
+                  _buildDetailField('Detection Reason', detail['detectionReason'] ?? 'No violation detected'),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Text('Current Status: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit')),
+                      _buildStatusDropdownChip(id, status),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  const Divider(color: Color(0xFFE2E8F0)),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _confirmDelete(id);
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                        label: const Text('Delete'),
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          _updateCommentStatus(id, 'Rejected');
+                          Navigator.pop(context);
+                        },
+                        icon: const Icon(Icons.cancel_outlined, size: 16),
+                        label: const Text('Reject'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _updateCommentStatus(id, 'Approved');
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF14B8A6)),
+                        icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.white),
+                        label: const Text('Approve', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailField(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit')),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+          ),
+          child: Text(value, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit', height: 1.4)),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Filtered data count for badges
@@ -377,6 +575,16 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
                       flex: 4,
                       child: Text('COMMENT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF047857), fontFamily: 'Outfit')),
                     ),
+                    // Course
+                    const Expanded(
+                      flex: 2,
+                      child: Text('COURSE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF047857), fontFamily: 'Outfit')),
+                    ),
+                    // Lesson/Quiz
+                    const Expanded(
+                      flex: 2,
+                      child: Text('LESSON/QUIZ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF047857), fontFamily: 'Outfit')),
+                    ),
                     // Status
                     Expanded(
                       flex: 2,
@@ -388,14 +596,14 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
                         ],
                       ),
                     ),
-                    // Quiz/Lesson
+                    // Created Time
                     const Expanded(
                       flex: 2,
-                      child: Text('QUIZ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF047857), fontFamily: 'Outfit')),
+                      child: Text('CREATED', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF047857), fontFamily: 'Outfit')),
                     ),
                     // Actions
                     const Expanded(
-                      flex: 1,
+                      flex: 2,
                       child: Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF047857), fontFamily: 'Outfit')),
                     ),
                   ],
@@ -429,8 +637,9 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
                     final String commenter = c['commenter'];
                     final String comment = c['comment'];
                     final String status = c['status'];
-                    final String quiz = c['createdAt']; // The dates from screenshot are displayed in this column
-                    final bool isApproved = status == 'Approved';
+                    final String course = c['course'] ?? 'N/A';
+                    final String quizOrLesson = c['quizOrLesson'] ?? 'N/A';
+                    final String createdAt = c['createdAt'] ?? '';
 
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -470,6 +679,22 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
                               ),
                             ),
                           ),
+                          // COURSE
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              course,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563), fontFamily: 'Outfit'),
+                            ),
+                          ),
+                          // LESSON/QUIZ
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              quizOrLesson,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563), fontFamily: 'Outfit'),
+                            ),
+                          ),
                           // STATUS
                           Expanded(
                             flex: 2,
@@ -478,34 +703,30 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
                               child: _buildStatusDropdownChip(id, status),
                             ),
                           ),
-                          // QUIZ (Date string)
+                          // CREATED
                           Expanded(
                             flex: 2,
                             child: Text(
-                              quiz,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF4B5563),
-                                fontFamily: 'Outfit',
-                              ),
+                              createdAt,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563), fontFamily: 'Outfit'),
                             ),
                           ),
-                          // ACTIONS (Switch)
+                          // ACTIONS
                           Expanded(
-                            flex: 1,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Transform.scale(
-                                scale: 0.8,
-                                alignment: Alignment.centerLeft,
-                                child: Switch(
-                                  value: isApproved,
-                                  activeThumbColor: const Color(0xFF14B8A6), // Premium teal
-                                  onChanged: (newVal) {
-                                    _updateCommentStatus(id, newVal ? 'Approved' : 'Rejected');
-                                  },
+                            flex: 2,
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF4B5563)),
+                                  tooltip: 'View Detail',
+                                  onPressed: () => _showCommentDetailDialog(c),
                                 ),
-                              ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                                  tooltip: 'Delete',
+                                  onPressed: () => _confirmDelete(id),
+                                ),
+                              ],
                             ),
                           ),
                         ],

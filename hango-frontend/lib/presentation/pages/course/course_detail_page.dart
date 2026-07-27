@@ -377,7 +377,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Review Content',
+                          'Review Content (Optional)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -471,13 +471,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           onPressed: isSubmitting
                               ? null
                               : () async {
-                                  if (contentController.text.trim().isEmpty) {
-                                    _showNotification(
-                                      'Please write some content for your review',
-                                      isError: true,
-                                    );
-                                    return;
-                                  }
                                   setDialogState(() {
                                     isSubmitting = true;
                                   });

@@ -1,6 +1,18 @@
 # HanGo Testing Strategy
 
+> **Xem thêm:** Chi tiết test cases từng module → [`specs/unit_test_plan.md`](specs/unit_test_plan.md)
+> **QA Agent rules:** [`agent_qa.md`](agent_qa.md)
+
 This document outlines the testing methodologies and expectations for both the Frontend (Flutter) and Backend (Spring Boot) of the HanGo platform.
+
+## 0. Code-First Principle
+
+Dự án thay đổi liên tục trong quá trình phát triển — method có thể bị đổi tên, tách/gộp class, hoặc chưa được implement dù spec đã mô tả. Vì vậy:
+
+- **Nguồn chân lý cho việc viết test là code thực tế** (`hango-backend/src/main/java/...`, `hango-frontend/lib/...`), không phải mô tả trong markdown. Markdown (`HanGo_Documentation.md`, `doc/specs/*.md`) cho biết **ý định nghiệp vụ**; code cho biết **hành vi thật**. Khi hai bên lệch nhau, test phải phản ánh code hiện tại và ghi chú lại phần lệch (xem mẫu phản hồi ở [`AGENTS.md`](../AGENTS.md) §13) thay vì viết test theo doc rồi để nó fail.
+- Trước khi viết test cho một method, **đọc lại source hiện tại** để xác nhận: tên method/class còn đúng không, signature (tham số/kiểu trả về) là gì, method đã tồn tại hay còn `[PLANNED]`.
+- [`specs/unit_test_plan.md`](specs/unit_test_plan.md) là **kế hoạch sống** (living plan): Method List (§1) phải được đối chiếu lại với code mỗi khi có đợt cập nhật lớn, không viết một lần rồi coi là cố định. Cột trạng thái *Implemented / Planned* trong đó phản ánh tình trạng code tại thời điểm cập nhật gần nhất — không phải mục tiêu thiết kế lý tưởng.
+- Không tự ý đánh dấu test case là "Passed" khi chưa thực sự chạy — trạng thái mặc định của một kế hoạch (plan) là **Untested**; chỉ cập nhật Passed/Failed sau khi test thật sự được viết và chạy.
 
 ## 1. Frontend Testing (Flutter)
 

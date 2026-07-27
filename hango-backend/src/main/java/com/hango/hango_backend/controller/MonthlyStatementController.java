@@ -52,7 +52,7 @@ public class MonthlyStatementController {
     // --- Course Manager / Admin Endpoints ---
 
     @GetMapping("/course-manager/statements")
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
     public ResponseEntity<List<MonthlyStatementDTO>> getCourseManagerStatements(
             @RequestParam(name = "periodMonth", required = false) String periodMonth,
             @RequestParam(name = "status", required = false) String status) {
@@ -61,7 +61,7 @@ public class MonthlyStatementController {
     }
 
     @PostMapping("/course-manager/statements/generate")
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
     public ResponseEntity<List<MonthlyStatementDTO>> generateMonthlyCutoff(
             @RequestParam(name = "periodMonth", required = false) String periodMonth) {
         List<MonthlyStatementDTO> generated = statementService.generateMonthlyCutoff(periodMonth);
@@ -69,7 +69,7 @@ public class MonthlyStatementController {
     }
 
     @PostMapping("/course-manager/statements/{id}/settle")
-    @PreAuthorize("permitAll()")
+    @PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
     public ResponseEntity<MonthlyStatementDTO> settleStatement(
             @PathVariable("id") Long id,
             @RequestBody SettleRequestDTO request) {

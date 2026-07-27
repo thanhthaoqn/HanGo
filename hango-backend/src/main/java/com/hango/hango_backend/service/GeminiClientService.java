@@ -5,7 +5,9 @@ import com.hango.hango_backend.dto.AiHealthResponse;
 import com.hango.hango_backend.dto.GeminiEmbeddingDto;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.GeminiGenerateResponse;
+import com.hango.hango_backend.entity.AiUsageLog;
 import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.repository.AiUsageLogRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -28,10 +30,26 @@ public class GeminiClientService {
 
         private WebClient webClient;
         private final GeminiProperties geminiProperties;
+        private final AiUsageLogRepository aiUsageLogRepository;
 
         // Sử dụng Constructor injection thủ công thay cho @RequiredArgsConstructor
-        public GeminiClientService(GeminiProperties geminiProperties) {
+        public GeminiClientService(GeminiProperties geminiProperties, AiUsageLogRepository aiUsageLogRepository) {
                 this.geminiProperties = geminiProperties;
+                this.aiUsageLogRepository = aiUsageLogRepository;
+        }
+
+        /** Records usage for FR-RBAC-07 (AI Usage Monitoring) — used by both real Gemini call sites below. */
+        private void recordUsage(String callType, boolean success, long durationMs, String errorMessage) {
+                try {
+                        aiUsageLogRepository.save(AiUsageLog.builder()
+                                        .callType(callType)
+                                        .success(success)
+                                        .durationMs(durationMs)
+                                        .errorMessage(errorMessage)
+                                        .build());
+                } catch (Exception e) {
+                        log.warn("Failed to record AI usage log (non-fatal)", e);
+                }
         }
 
         /**
@@ -129,6 +147,7 @@ public class GeminiClientService {
 
                 // ✅ ĐÃ SỬA: Loại bỏ hoàn toàn tham số `?key=` gây lỗi 403 trên URL
                 String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
+                long startedAt = System.currentTimeMillis();
 
                 try {
                         GeminiGenerateResponse response = webClient.post()
@@ -147,14 +166,17 @@ public class GeminiClientService {
                         String text = response != null ? response.extractText() : null;
 
                         if (text == null || text.isBlank()) {
+                                recordUsage("CHAT", false, System.currentTimeMillis() - startedAt, "Empty response");
                                 throw new ApiException("AI không trả về nội dung hợp lệ", HttpStatus.BAD_GATEWAY);
                         }
+                        recordUsage("CHAT", true, System.currentTimeMillis() - startedAt, null);
                         return text;
 
                 } catch (ApiException e) {
                         throw e;
                 } catch (Exception e) {
                         log.error("Lỗi khi gọi Gemini chat API", e);
+                        recordUsage("CHAT", false, System.currentTimeMillis() - startedAt, e.getClass().getSimpleName());
                         throw new ApiException("Không thể kết nối tới AI Assistant lúc này, vui lòng thử lại sau",
                                         HttpStatus.SERVICE_UNAVAILABLE);
                 }
@@ -174,6 +196,7 @@ public class GeminiClientService {
 
                 // ✅ ĐÃ SỬA: Loại bỏ hoàn toàn tham số `?key=` gây lỗi 403 trên URL
                 String path = String.format("v1beta/models/%s:embedContent", geminiProperties.getEmbeddingModel());
+                long startedAt = System.currentTimeMillis();
 
                 try {
                         GeminiEmbeddingDto.Response response = webClient.post()
@@ -190,15 +213,18 @@ public class GeminiClientService {
                                         .block();
 
                         if (response == null || response.getEmbedding() == null) {
+                                recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt, "Empty response");
                                 throw new ApiException("Không thể tạo embedding cho nội dung này",
                                                 HttpStatus.BAD_GATEWAY);
                         }
+                        recordUsage("EMBEDDING", true, System.currentTimeMillis() - startedAt, null);
                         return response.getEmbedding().getValues();
 
                 } catch (ApiException e) {
                         throw e;
                 } catch (Exception e) {
                         log.error("Lỗi khi gọi Gemini embedding API", e);
+                        recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt, e.getClass().getSimpleName());
                         throw new ApiException("Không thể xử lý nội dung lúc này, vui lòng thử lại sau",
                                         HttpStatus.SERVICE_UNAVAILABLE);
                 }
