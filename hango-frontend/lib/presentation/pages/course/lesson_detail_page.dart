@@ -10,7 +10,7 @@ import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../domain/model/lesson_detail.dart';
 import '../../widgets/shared_header.dart';
-import '../../widgets/ai_assistant_drawer.dart';
+import '../../../utils/app_theme.dart';
 import '../../../utils/fullscreen_helper.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/string_utils.dart';
@@ -66,7 +66,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   final TextEditingController _replyCommentController = TextEditingController();
   bool _isPostingReply = false;
 
-  bool _isAIAssistantOpen = false;
+  bool _isAIAssistantOpen = true;
   final TextEditingController _commentController = TextEditingController();
   bool _isPostingComment = false;
 
@@ -644,6 +644,45 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               activeTab: 'Courses',
               hideNavLinks: showHideNavLinks,
             ),
+      drawer: (!isDesktop && _courseDetail != null && !_isDoingQuiz)
+          ? Drawer(
+              backgroundColor: Colors.white,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.menu_book_rounded, color: Color(0xFF28B79B)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _courseDetail!.title,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(child: _buildSidebar(_courseDetail!)),
+                  ],
+                ),
+              ),
+            )
+          : null,
+      floatingActionButton: (!_isDoingQuiz && _lessonDetail != null && (!isDesktop || !_isAIAssistantOpen))
+          ? _buildFloatingAIBubble(isDesktop)
+          : null,
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
@@ -680,6 +719,104 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             )
           : _buildPageContent(isDesktop, showHideNavLinks),
+    );
+  }
+
+  Widget _buildFloatingAIBubble(bool isDesktop) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          if (isDesktop) {
+            _toggleAIAssistant();
+          } else {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFAFCFF),
+                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded, color: Color(0xFF28B79B), size: 20),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'HanGo AI Assistant',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: LessonAiChatbox(
+                        key: ValueKey<int>(_currentLessonId),
+                        lessonId: _currentLessonId,
+                        lessonTitle: _lessonDetail!.title,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF28B79B).withOpacity(0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Ask AI',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -739,12 +876,42 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                   horizontal: 24,
                   vertical: 16,
                 ),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
+                    if (!isDesktop) ...[
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: InkWell(
+                          onTap: () => Scaffold.of(context).openDrawer(),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6F7F4),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.3)),
+                            ),
+                            child: const Icon(
+                              Icons.menu_open_rounded,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                     InkWell(
                       onTap: () async {
                         _clearLastVisitedSession();
@@ -761,16 +928,32 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                           );
                         }
                       },
+                      borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          size: 16,
-                          color: Color(0xFF475569),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.arrow_back_rounded,
+                              size: 14,
+                              color: Color(0xFF475569),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Course',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF334155),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -803,6 +986,46 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         ],
                       ),
                     ),
+                    if (isDesktop && !_isDoingQuiz) ...[
+                      const SizedBox(width: 16),
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: InkWell(
+                          onTap: _toggleAIAssistant,
+                          borderRadius: BorderRadius.circular(20),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _isAIAssistantOpen ? const Color(0xFFE6F7F4) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _isAIAssistantOpen ? AppTheme.emerald : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 16,
+                                  color: _isAIAssistantOpen ? AppTheme.emerald : const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isAIAssistantOpen ? 'Hide AI Assistant' : 'AI Assistant',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: _isAIAssistantOpen ? AppTheme.emerald : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -829,8 +1052,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                       ),
                     ),
 
-                    // Right column: resizable AI chat (no scrolling with lesson)
-                    if (!_isDoingQuiz) ...[
+                    // Right column: resizable AI chat (desktop only when toggled ON)
+                    if (isDesktop && !_isDoingQuiz && _isAIAssistantOpen) ...[
                       const SizedBox(width: 12),
 
                       // Divider draggable between lesson and chat
@@ -881,13 +1104,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
                       // Chat width driven by _leftPaneWidth
                       SizedBox(
-                        width: isDesktop
-                            ? (MediaQuery.of(context).size.width -
-                                      320 -
-                                      _leftPaneWidth -
-                                      12)
-                                  .clamp(_minRightPaneWidth, 800)
-                            : 320,
+                        width: (MediaQuery.of(context).size.width -
+                                  320 -
+                                  _leftPaneWidth -
+                                  12)
+                              .clamp(_minRightPaneWidth, 800),
                         child: LessonAiChatbox(
                           key: ValueKey<int>(_currentLessonId),
                           lessonId: _currentLessonId,
@@ -960,56 +1181,67 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     horizontal: 12,
                     vertical: 4,
                   ),
-                  child: Material(
-                    color: isCurrent
-                        ? const Color(0xFFE6F7F4)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      leading: Icon(
-                        _getLessonIcon(l.itemType),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      decoration: BoxDecoration(
                         color: isCurrent
-                            ? const Color(0xFF28B79B)
-                            : const Color(0xFF94A3B8),
-                        size: 20,
-                      ),
-                      title: Text(
-                        l.title,
-                        style: TextStyle(
-                          fontSize: 13,
+                            ? const Color(0xFFE6F7F4)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
                           color: isCurrent
-                              ? const Color(0xFF28B79B)
-                              : const Color(0xFF475569),
-                          fontWeight: isCurrent
-                              ? FontWeight.bold
-                              : FontWeight.w500,
+                              ? AppTheme.emerald.withOpacity(0.4)
+                              : Colors.transparent,
                         ),
                       ),
-                      subtitle: l.estimatedTime != null
-                          ? Text(
-                              '${l.estimatedTime} mins',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isCurrent
-                                    ? const Color(0xFF28B79B).withOpacity(0.8)
-                                    : const Color(0xFF94A3B8),
-                                fontFamily: 'Outfit',
-                              ),
-                            )
-                          : null,
-                      trailing: l.isCompleted
-                          ? const Icon(
-                              Icons.check_circle_rounded,
-                              color: Color(0xFF28B79B),
-                              size: 16,
-                            )
-                          : null,
-                      onTap: () {
-                        _navigateToLesson(l.id);
-                      },
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        leading: Icon(
+                          _getLessonIcon(l.itemType),
+                          color: isCurrent
+                              ? const Color(0xFF28B79B)
+                              : const Color(0xFF94A3B8),
+                          size: 20,
+                        ),
+                        title: Text(
+                          l.title,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isCurrent
+                                ? const Color(0xFF28B79B)
+                                : const Color(0xFF475569),
+                            fontWeight: isCurrent
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: l.estimatedTime != null
+                            ? Text(
+                                '${l.estimatedTime} mins',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isCurrent
+                                      ? const Color(0xFF28B79B).withOpacity(0.8)
+                                      : const Color(0xFF94A3B8),
+                                  fontFamily: 'Outfit',
+                                ),
+                              )
+                            : null,
+                        trailing: l.isCompleted
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                color: Color(0xFF28B79B),
+                                size: 16,
+                              )
+                            : null,
+                        onTap: () {
+                          _navigateToLesson(l.id);
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -2654,63 +2886,92 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
     }
 
-    return InkWell(
-      onTap: () {
-        _navigateToLesson(nextLessonId);
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE6F7F4), Color(0xFFF0FAF8)],
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: () {
+          _navigateToLesson(nextLessonId);
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE6F7F4), Color(0xFFFAFEFD)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.emerald.withOpacity(0.3), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.emerald.withOpacity(0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'NEXT LESSON',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF28B79B),
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, size: 14, color: AppTheme.emerald),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'NEXT LESSON',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF28B79B),
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    nextLessonTitle,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                    const SizedBox(height: 8),
+                    Text(
+                      nextLessonTitle,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.emerald.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: Color(0xFF28B79B),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_forward,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3644,26 +3905,33 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     if (isCompleted) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
           color: const Color(0xFFE6F7F4),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.emerald.withOpacity(0.4), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.emerald.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Row(
+        child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(
               Icons.check_circle_rounded,
               color: Color(0xFF28B79B),
-              size: 20,
+              size: 22,
             ),
             SizedBox(width: 8),
             Text(
-              'Completed',
+              'Lesson Completed',
               style: TextStyle(
                 color: Color(0xFF28B79B),
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
                 fontSize: 16,
               ),
             ),
@@ -3672,34 +3940,60 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       );
     }
 
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 52,
+      height: 54,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.emerald.withOpacity(0.3),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ElevatedButton.icon(
         onPressed: _isMarkingCompleted
             ? null
             : () => _markLessonAsCompleted(lesson.id, nextLessonId, course),
         icon: _isMarkingCompleted
             ? const SizedBox(
-                width: 18,
-                height: 18,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
-            : const Icon(Icons.check_rounded, size: 20),
+            : const Icon(Icons.check_circle_outline_rounded, size: 22),
         label: const Text(
           'Mark as Completed',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF28B79B),
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
           foregroundColor: Colors.white,
           elevation: 0,
+          padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
+        ).copyWith(
+          backgroundBuilder: (context, states, child) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(child: child),
+            );
+          },
         ),
       ),
     );
