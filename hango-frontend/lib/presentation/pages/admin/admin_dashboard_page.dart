@@ -8,6 +8,8 @@ import '../login_page.dart';
 import 'comment_management_page.dart';
 import 'admin_trainer_reviews_page.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../domain/model/notification_item.dart';
+import '../../../data/repositories/notification_repository.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -24,6 +26,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _adminAvatarUrl = '';
   int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Comment, 5: Profile, 6: Approvals, 7: Audit Log
   String _currentCommentTab = 'Lesson';
+
+  // Notification bell state
+  final _notificationRepository = NotificationRepository();
+  List<NotificationItem> _notifications = [];
+  int _unreadNotificationCount = 0;
+  bool _isLoadingNotifications = false;
 
   // Profile tab state variables
   bool _isLoadingProfile = false;
@@ -110,6 +118,105 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _fetchAccounts();
     _fetchAiUsageStats();
     _fetchAuditLog();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    if (_isLoadingNotifications) return;
+    setState(() => _isLoadingNotifications = true);
+    try {
+      final notifications = await _notificationRepository.getNotifications();
+      final unreadCount = await _notificationRepository.getUnreadCount();
+      if (!mounted) return;
+      setState(() {
+        _notifications = notifications;
+        _unreadNotificationCount = unreadCount;
+        _isLoadingNotifications = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingNotifications = false);
+    }
+  }
+
+  Future<void> _markNotificationAsRead(NotificationItem notification) async {
+    if (notification.read) return;
+    try {
+      await _notificationRepository.markAsRead(notification.id);
+      if (!mounted) return;
+      setState(() {
+        _notifications = _notifications
+            .map((n) => n.id == notification.id
+                ? NotificationItem(
+                    id: n.id,
+                    type: n.type,
+                    title: n.title,
+                    message: n.message,
+                    courseId: n.courseId,
+                    courseTitle: n.courseTitle,
+                    read: true,
+                    createdAt: n.createdAt,
+                  )
+                : n)
+            .toList();
+        _unreadNotificationCount = _unreadNotificationCount > 0 ? _unreadNotificationCount - 1 : 0;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _markAllNotificationsAsRead() async {
+    try {
+      await _notificationRepository.markAllAsRead();
+      if (!mounted) return;
+      setState(() {
+        _notifications = _notifications
+            .map((n) => NotificationItem(
+                  id: n.id,
+                  type: n.type,
+                  title: n.title,
+                  message: n.message,
+                  courseId: n.courseId,
+                  courseTitle: n.courseTitle,
+                  read: true,
+                  createdAt: n.createdAt,
+                ))
+            .toList();
+        _unreadNotificationCount = 0;
+      });
+    } catch (_) {}
+  }
+
+  String _formatNotificationTime(DateTime? createdAt) {
+    if (createdAt == null) return '';
+    final diff = DateTime.now().difference(createdAt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    return '${diff.inDays} days ago';
+  }
+
+  IconData _notificationIcon(String type) {
+    switch (type) {
+      case 'TrainerApplicationSubmitted':
+        return Icons.person_add_alt_1_outlined;
+      case 'TrainerApplicationReviewed':
+        return Icons.fact_check_outlined;
+      case 'PurchaseSuccess':
+        return Icons.shopping_bag_outlined;
+      case 'NewEnrollment':
+        return Icons.school_outlined;
+      case 'CommentReply':
+        return Icons.chat_bubble_outline;
+      case 'ContentApproved':
+        return Icons.check_circle_outline;
+      case 'ContentRejected':
+        return Icons.cancel_outlined;
+      case 'StatementReady':
+        return Icons.receipt_long_outlined;
+      case 'CourseUpdated':
+        return Icons.upgrade_outlined;
+      default:
+        return Icons.notifications_outlined;
+    }
   }
 
   @override
@@ -984,30 +1091,182 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             children: [
               // Notification Bell with Badge
               Stack(
+                clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
-                  IconButton(
+                  PopupMenuButton<void>(
+                    offset: const Offset(0, 50),
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    onOpened: _loadNotifications,
                     icon: const Icon(
                       Icons.notifications_none_outlined,
                       color: Color(0xFF4B5563),
                       size: 26,
                     ),
-                    onPressed: () {
-                      ToastHelper.show(context, 'No new notifications');
-                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem<void>(
+                        enabled: false,
+                        child: StatefulBuilder(
+                          builder: (context, setMenuState) => Container(
+                            width: 320,
+                            constraints: const BoxConstraints(maxHeight: 420),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Thông báo',
+                                        style: TextStyle(
+                                          fontFamily: 'Outfit',
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      if (_unreadNotificationCount > 0)
+                                        InkWell(
+                                          onTap: () async {
+                                            await _markAllNotificationsAsRead();
+                                            setMenuState(() {});
+                                          },
+                                          child: const Text(
+                                            'Đánh dấu đã đọc',
+                                            style: TextStyle(fontSize: 12, color: Color(0xFF28B79B), fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                                if (_isLoadingNotifications)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 32),
+                                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  )
+                                else if (_notifications.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 24),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.notifications_off_outlined, size: 40, color: Color(0xFF94A3B8)),
+                                        SizedBox(height: 12),
+                                        Text(
+                                          'Không có thông báo mới',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontFamily: 'Outfit',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  Flexible(
+                                    child: ListView.separated(
+                                      shrinkWrap: true,
+                                      padding: const EdgeInsets.only(top: 12),
+                                      itemCount: _notifications.length,
+                                      separatorBuilder: (_, __) => const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 10),
+                                        child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final n = _notifications[index];
+                                        return InkWell(
+                                          onTap: () async {
+                                            await _markNotificationAsRead(n);
+                                            setMenuState(() {});
+                                            if (n.type == 'TrainerApplicationSubmitted' && mounted) {
+                                              Navigator.of(context).pop();
+                                              setState(() => _selectedMenuIndex = 6);
+                                            }
+                                          },
+                                          child: Container(
+                                            color: n.read ? Colors.transparent : const Color(0xFFF0FDFA),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: const BoxDecoration(
+                                                    color: Color(0xFFE6FBF7),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: Icon(_notificationIcon(n.type), size: 16, color: const Color(0xFF28B79B)),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        n.title,
+                                                        style: const TextStyle(
+                                                          fontFamily: 'Outfit',
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 13,
+                                                          color: Color(0xFF1E293B),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        n.message,
+                                                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        _formatNotificationTime(n.createdAt),
+                                                        style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444), // Red
-                        shape: BoxShape.circle,
+                  if (_unreadNotificationCount > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16),
+                          child: Text(
+                            _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(width: 16),
