@@ -10,6 +10,7 @@ import com.hango.hango_backend.entity.Lesson;
 import com.hango.hango_backend.entity.LessonProgress;
 import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.repository.CourseRatingRepository;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
@@ -42,6 +43,7 @@ public class CourseServiceImpl implements CourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final LessonProgressRepository lessonProgressRepository;
+    private final CourseRatingRepository courseRatingRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
