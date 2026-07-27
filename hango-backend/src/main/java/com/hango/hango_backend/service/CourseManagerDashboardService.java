@@ -11,6 +11,8 @@ public interface CourseManagerDashboardService {
     CourseReviewDetailDTO getCourseReviewDetail(Long courseId);
     void publishCourse(Long courseId);
     void returnCourseToDraft(Long courseId);
+    void hideCourse(Long courseId);
+    void unhideCourse(Long courseId);
 
     List<ExamResponseDTO> getExamsForReview(String status);
     void publishExam(Long examId);

@@ -24,7 +24,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
            "LEFT JOIN c.category cat " +
            "LEFT JOIN c.difficulty diff " +
            "LEFT JOIN c.creator u " +
-           "WHERE c.status = 'PUBLISHED' AND c.deletedAt IS NULL " +
+           "WHERE (c.status = 'PUBLISHED' OR (:enrolledUserId IS NOT NULL AND c.status IN ('HIDDEN', 'ARCHIVED'))) AND c.deletedAt IS NULL " +
            "AND (:search IS NULL OR LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:difficulty IS NULL OR diff.paramKey = :difficulty) " +
            "AND (:enrolledUserId IS NULL OR EXISTS (SELECT 1 FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId AND (:enrollmentStatus IS NULL OR e2.status = :enrollmentStatus))) " +

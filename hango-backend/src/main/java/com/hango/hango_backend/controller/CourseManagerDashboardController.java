@@ -84,6 +84,30 @@ public class CourseManagerDashboardController {
         }
     }
 
+    @PostMapping("/courses/{id}/hide")
+    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    public ResponseEntity<?> hideCourse(@PathVariable Long id) {
+        try {
+            courseManagerDashboardService.hideCourse(id);
+            return ResponseEntity.ok("{\"message\": \"Course hidden successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/courses/{id}/unhide")
+    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    public ResponseEntity<?> unhideCourse(@PathVariable Long id) {
+        try {
+            courseManagerDashboardService.unhideCourse(id);
+            return ResponseEntity.ok("{\"message\": \"Course unhidden successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @GetMapping("/exams/review")
     @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> getExamsForReview(@RequestParam(defaultValue = "PENDING_APPROVAL") String status) {

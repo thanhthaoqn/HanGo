@@ -4,9 +4,6 @@ import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../widgets/shared_header.dart';
-import '../trainer/matrix_management_page.dart';
-import 'course_manager_dashboard_page.dart';
-import 'course_manager_exams_page.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
@@ -15,7 +12,6 @@ import '../../../utils/config.dart';
 import '../../../utils/download_helper.dart';
 import '../trainer/create_course_page.dart';
 import '../trainer/edit_course_page.dart';
-import 'course_manager_question_bank_page.dart';
 
 class CourseManagerCoursesPage extends StatefulWidget {
   const CourseManagerCoursesPage({super.key});
@@ -139,6 +135,50 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     }
   }
 
+  Future<void> _hideCourse(CourseReviewCourse course) async {
+    final confirmed = await _confirmAction(
+      title: 'Hide course?',
+      message:
+          'This will hide "${course.title}" from the public marketplace.\n\nNote: Learners who have already enrolled in and purchased this course will still be able to access and study it from their "My Courses" section.',
+      confirmLabel: 'Hide Course',
+      confirmColor: const Color(0xFFD97706),
+    );
+    if (!confirmed) return;
+
+    try {
+      await _api.hideCourse(course.id);
+      if (!mounted) return;
+      ToastHelper.showSuccess(context, 'Course hidden successfully.');
+      await _loadCourses();
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Could not hide course: $e');
+      }
+    }
+  }
+
+  Future<void> _unhideCourse(CourseReviewCourse course) async {
+    final confirmed = await _confirmAction(
+      title: 'Unhide course?',
+      message:
+          'This will move "${course.title}" back to PUBLISHED and make it visible to all new learners on the marketplace again.',
+      confirmLabel: 'Unhide & Publish',
+      confirmColor: const Color(0xFF20B486),
+    );
+    if (!confirmed) return;
+
+    try {
+      await _api.unhideCourse(course.id);
+      if (!mounted) return;
+      ToastHelper.showSuccess(context, 'Course unhidden and published successfully.');
+      await _loadCourses();
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Could not unhide course: $e');
+      }
+    }
+  }
+
   Future<void> _showCourseDetail(CourseReviewCourse course) async {
     CourseReviewCourse detail = course;
     try {
@@ -161,6 +201,14 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         onPublish: () {
           Navigator.pop(context);
           _publishCourse(detail);
+        },
+        onHide: () {
+          Navigator.pop(context);
+          _hideCourse(detail);
+        },
+        onUnhide: () {
+          Navigator.pop(context);
+          _unhideCourse(detail);
         },
       ),
     );
@@ -389,6 +437,9 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
   }
 
   Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF20B486)));
+    }
     final courses = _displayedCourses;
 
     return LayoutBuilder(
@@ -451,6 +502,8 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         _buildStatusFilter('All', 'ALL'),
         _buildStatusFilter('Pending', 'PENDING'),
         _buildStatusFilter('Published', 'PUBLISHED'),
+        _buildStatusFilter('Rejected', 'REJECTED'),
+        _buildStatusFilter('Hidden', 'HIDDEN'),
         _buildStatusFilter('Draft', 'DRAFT'),
       ],
     );
@@ -589,12 +642,13 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
 
   Widget _buildTableHeaderRow() {
     const style = TextStyle(
-      color: Color(0xFF475569),
-      fontWeight: FontWeight.bold,
       fontFamily: 'Outfit',
-      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      fontSize: 11,
+      color: Color(0xFF64748B),
       letterSpacing: 0.5,
     );
+
     return Row(
       children: [
         const Expanded(flex: 28, child: Text('COURSE', style: style)),
@@ -603,7 +657,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         const Expanded(flex: 13, child: Text('CONTENT', style: style)),
         const Expanded(flex: 10, child: Text('PRICE', style: style)),
         const Expanded(flex: 11, child: Text('STATUS', style: style)),
-        const SizedBox(width: 88, child: Text('ACTION', style: style)),
+        const SizedBox(width: 170, child: Text('ACTION', style: style)),
       ],
     );
   }
@@ -677,27 +731,60 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         ),
         Expanded(flex: 11, child: _StatusPill(status: course.status)),
         SizedBox(
-          width: 88,
-          child: TextButton.icon(
-            onPressed: () => _showCourseDetail(course),
-            icon: const Icon(Icons.search_rounded, size: 15),
-            label: const Text('Review'),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF20B486),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              textStyle: const TextStyle(
-                fontFamily: 'Outfit',
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+          width: 170,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton.icon(
+                onPressed: () => _showCourseDetail(course),
+                icon: const Icon(Icons.search_rounded, size: 15),
+                label: const Text('Review'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF20B486),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  textStyle: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
               ),
-            ),
+              if (course.status.toUpperCase() == 'PUBLISHED')
+                TextButton.icon(
+                  onPressed: () => _hideCourse(course),
+                  icon: const Icon(Icons.visibility_off_outlined, size: 15),
+                  label: const Text('Hide'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFD97706),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    textStyle: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              if (course.status.toUpperCase() == 'HIDDEN')
+                TextButton.icon(
+                  onPressed: () => _unhideCourse(course),
+                  icon: const Icon(Icons.visibility_outlined, size: 15),
+                  label: const Text('Unhide'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF20B486),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    textStyle: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ],
     );
   }
-
-
 
   Widget _buildEmptyState() {
     return Container(
@@ -733,119 +820,6 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     );
   }
 
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSidebarItem(
-            Icons.dashboard,
-            'Dashboard',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CourseManagerDashboardPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true),
-          _buildSidebarItem(
-            Icons.assignment_outlined,
-            'Exam',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CourseManagerExamsPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.grid_on,
-            'Exam Matrix',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MatrixManagementPage(
-                    onBack: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const CourseManagerDashboardPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.question_answer_outlined,
-            'Question Bank',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CourseManagerQuestionBankPage(),
-                ),
-              );
-            },
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : const Color(0xFF64748B),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : const Color(0xFF1F2937),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildContentHeader(BuildContext context, bool isDesktop) {
     return Container(
@@ -1043,11 +1017,15 @@ class _CourseReviewDialog extends StatefulWidget {
   final CourseReviewCourse course;
   final ValueChanged<String> onReject;
   final VoidCallback onPublish;
+  final VoidCallback? onHide;
+  final VoidCallback? onUnhide;
 
   const _CourseReviewDialog({
     required this.course,
     required this.onReject,
     required this.onPublish,
+    this.onHide,
+    this.onUnhide,
   });
 
   @override
@@ -1317,39 +1295,63 @@ class _CourseReviewDialogState extends State<_CourseReviewDialog> {
                     child: const Text('Close'),
                   ),
                   const Spacer(),
-                  OutlinedButton.icon(
-                    onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
-                        ? () {
-                            setState(() {
-                              _showReasonInput = !_showReasonInput;
-                            });
-                          }
-                        : null,
-                    icon: const Icon(Icons.undo_outlined),
-                    label: const Text('Return to Draft'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFEF4444)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  if (widget.course.status.toUpperCase() == 'PUBLISHED')
+                    ElevatedButton.icon(
+                      onPressed: widget.onHide,
+                      icon: const Icon(Icons.visibility_off_outlined),
+                      label: const Text('Hide Course'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD97706),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    )
+                  else if (widget.course.status.toUpperCase() == 'HIDDEN')
+                    ElevatedButton.icon(
+                      onPressed: widget.onUnhide,
+                      icon: const Icon(Icons.visibility_outlined),
+                      label: const Text('Unhide Course'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20B486),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    )
+                  else ...[
+                    OutlinedButton.icon(
+                      onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
+                          ? () {
+                              setState(() {
+                                _showReasonInput = !_showReasonInput;
+                              });
+                            }
+                          : null,
+                      icon: const Icon(Icons.undo_outlined),
+                      label: const Text('Return to Draft'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEF4444),
+                        side: const BorderSide(color: Color(0xFFEF4444)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
-                        ? widget.onPublish
-                        : null,
-                    icon: const Icon(Icons.check),
-                    label: const Text('Publish'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF20B486),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: (_isPendingStatus(widget.course.status) && _hasViewedAll)
+                          ? widget.onPublish
+                          : null,
+                      icon: const Icon(Icons.check),
+                      label: const Text('Publish'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20B486),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -2024,6 +2026,8 @@ class _StatusPill extends StatelessWidget {
     final color = switch (normalized) {
       'PUBLISHED' => const Color(0xFF20B486),
       'PENDING' || 'PENDING_APPROVAL' => const Color(0xFFF59E0B),
+      'REJECTED' => const Color(0xFFEF4444),
+      'HIDDEN' => const Color(0xFFD97706),
       'DRAFT' => const Color(0xFF64748B),
       _ => const Color(0xFF64748B),
     };
