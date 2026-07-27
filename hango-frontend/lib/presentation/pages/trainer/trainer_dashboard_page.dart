@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,7 +30,6 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   bool _isLoading = true;
   String _errorMessage = '';
 
-  // Stats
   int _coursesCount = 0;
   int _examsCount = 0;
   int _learnersCount = 0;
@@ -40,6 +38,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   List<dynamic> _coursesList = [];
   List<dynamic> _recentActivities = [];
   List<dynamic> _monthlyRevenues = [];
+  String _selectedChartPeriod = '1Y';
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
@@ -122,20 +121,8 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
       _totalRevenue = 15000000.0;
       _averageRating = 4.8;
       _coursesList = [
-        {
-          'id': 1,
-          'title': 'IELTS Intensive 7.0+',
-          'learnersCount': 120,
-          'lessonsCount': 24,
-          'thumbnailUrl': null,
-        },
-        {
-          'id': 2,
-          'title': 'Business English Advanced',
-          'learnersCount': 85,
-          'lessonsCount': 16,
-          'thumbnailUrl': null,
-        },
+        {'id': 1, 'title': 'IELTS Intensive 7.0+', 'learnersCount': 120, 'lessonsCount': 24, 'thumbnailUrl': null},
+        {'id': 2, 'title': 'Business English Advanced', 'learnersCount': 85, 'lessonsCount': 16, 'thumbnailUrl': null},
       ];
       _recentActivities = [
         {'type': 'ENROLLMENT', 'action': 'New student enrolled in', 'target': 'IELTS Intensive 7.0+', 'time': '2 hours ago'},
@@ -186,9 +173,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildHeader(context, !isDesktop),
-                Expanded(
-                  child: _buildBodyContent(context, isDesktop, size),
-                ),
+                Expanded(child: _buildBodyContent(context, isDesktop, size)),
               ],
             ),
           ),
@@ -213,20 +198,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 2,
-                child: _buildChartSection(),
-              ),
+              Expanded(flex: 2, child: _buildChartSection()),
               if (isDesktop) const SizedBox(width: 24),
-              if (isDesktop)
-                Expanded(
-                  flex: 1,
-                  child: _buildRecentActivitySection(),
-                ),
+              if (isDesktop) Expanded(flex: 1, child: _buildRecentActivitySection()),
             ],
           ),
-          if (!isDesktop) const SizedBox(height: 32),
-          if (!isDesktop) _buildRecentActivitySection(),
+          if (!isDesktop) ...[const SizedBox(height: 32), _buildRecentActivitySection()],
           const SizedBox(height: 32),
           _buildCoursesSection(),
         ],
@@ -242,11 +219,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-              (route) => false,
-            ),
+            onTap: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LearnerHomePage()), (route) => false),
             borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
@@ -256,31 +229,21 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                     'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
                     height: 36,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.school, size: 20, color: Colors.white),
+                    errorBuilder: (context, error, stackTrace) => Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'HanGo',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF1E293B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                          child: const Icon(Icons.school, size: 20, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text('HanGo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -288,31 +251,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           ),
           const SizedBox(height: 40),
           _buildSidebarItem(Icons.dashboard_rounded, 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.library_books_rounded, 'Courses', onTap: () {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()));
-          }),
-          _buildSidebarItem(Icons.assignment_rounded, 'Exams', onTap: () {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerExamsPage()));
-          }),
+          _buildSidebarItem(Icons.library_books_rounded, 'Courses', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()))),
+          _buildSidebarItem(Icons.assignment_rounded, 'Exams', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerExamsPage()))),
           _buildSidebarItem(Icons.people_alt_rounded, 'Learners'),
-          _buildSidebarItem(Icons.quiz_rounded, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()));
-          }),
-          _buildSidebarItem(
-            Icons.account_balance_wallet_rounded,
-            'Revenue',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerRevenuePage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.person_rounded, 'Profile', onTap: () {
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerProfilePage()));
-          }),
+          _buildSidebarItem(Icons.quiz_rounded, 'Question Bank', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()))),
+          _buildSidebarItem(Icons.account_balance_wallet_rounded, 'Revenue', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerRevenuePage()))),
+          _buildSidebarItem(Icons.person_rounded, 'Profile', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerProfilePage()))),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
@@ -332,26 +276,14 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: isActive ? activeColor.withOpacity(0.1) : Colors.transparent,
+            color: isActive ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
-              Icon(
-                icon,
-                color: isActive ? activeColor : (color ?? const Color(0xFF64748B)),
-                size: 22,
-              ),
+              Icon(icon, color: isActive ? activeColor : (color ?? const Color(0xFF64748B)), size: 22),
               const SizedBox(width: 16),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? activeColor : (color ?? const Color(0xFF334155)),
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 15,
-                  fontFamily: 'Outfit',
-                ),
-              ),
+              Text(title, style: TextStyle(color: isActive ? activeColor : (color ?? const Color(0xFF334155)), fontWeight: isActive ? FontWeight.w700 : FontWeight.w500, fontSize: 15, fontFamily: 'Outfit')),
             ],
           ),
         ),
@@ -363,48 +295,20 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     return Container(
       height: 72,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: const Color(0xFFE2E8F0))),
-      ),
+      decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
       child: Row(
         children: [
           if (showMenuButton) ...[
-            IconButton(
-              icon: const Icon(Icons.menu_rounded, color: Color(0xFF4B5563)),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
+            IconButton(icon: const Icon(Icons.menu_rounded, color: Color(0xFF4B5563)), onPressed: () => Scaffold.of(context).openDrawer()),
             const SizedBox(width: 12),
           ],
-          const Text(
-            'Trainer Dashboard',
-            style: TextStyle(
-              color: Color(0xFF1E293B),
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              fontFamily: 'Outfit',
-            ),
-          ),
+          const Text('Trainer Dashboard', style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w700, fontSize: 18, fontFamily: 'Outfit')),
           const Spacer(),
           Stack(
             alignment: Alignment.center,
             children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: Color(0xFF64748B), size: 24),
-                onPressed: () => ToastHelper.show(context, 'No new notifications'),
-              ),
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEF4444),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
+              IconButton(icon: const Icon(Icons.notifications_outlined, color: Color(0xFF64748B), size: 24), onPressed: () => ToastHelper.show(context, 'No new notifications')),
+              Positioned(top: 14, right: 14, child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle))),
             ],
           ),
           const SizedBox(width: 16),
@@ -426,34 +330,13 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
       offset: const Offset(0, 48),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 'profile',
-          child: Row(
-            children: const [
-              Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
-              SizedBox(width: 12),
-              Text('My Profile', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
-            ],
-          ),
-        ),
+        const PopupMenuItem(value: 'profile', child: Row(children: [Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)), SizedBox(width: 12), Text('My Profile', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500))])),
         const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'logout',
-          child: Row(
-            children: const [
-              Icon(Icons.logout, size: 18, color: Color(0xFFEF4444)),
-              SizedBox(width: 12),
-              Text('Logout', style: TextStyle(fontFamily: 'Outfit', color: Color(0xFFEF4444), fontWeight: FontWeight.w500)),
-            ],
-          ),
-        ),
+        const PopupMenuItem(value: 'logout', child: Row(children: [Icon(Icons.logout, size: 18, color: Color(0xFFEF4444)), SizedBox(width: 12), Text('Logout', style: TextStyle(fontFamily: 'Outfit', color: Color(0xFFEF4444), fontWeight: FontWeight.w500))])),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          borderRadius: BorderRadius.circular(24),
-        ),
+        decoration: BoxDecoration(border: Border.all(color: const Color(0xFFE2E8F0)), borderRadius: BorderRadius.circular(24)),
         child: Row(
           children: [
             Container(
@@ -463,27 +346,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               alignment: Alignment.center,
               child: _trainerAvatarUrl.isNotEmpty
                   ? ClipOval(
-                      child: Image.network(
-                        _trainerAvatarUrl,
-                        width: 32,
-                        height: 32,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Text(
-                          _trainerInitials,
-                          style: const TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                      ),
+                      child: Image.network(_trainerAvatarUrl, width: 32, height: 32, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Text(_trainerInitials, style: const TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold, fontSize: 14))),
                     )
-                  : Text(
-                      _trainerInitials,
-                      style: const TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
+                  : Text(_trainerInitials, style: const TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold, fontSize: 14)),
             ),
             const SizedBox(width: 8),
-            Text(
-              _trainerName,
-              style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E293B), fontSize: 14, fontFamily: 'Outfit'),
-            ),
+            Text(_trainerName, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E293B), fontSize: 14, fontFamily: 'Outfit')),
             const SizedBox(width: 4),
             const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
           ],
@@ -493,420 +361,298 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   }
 
   Widget _buildWelcomeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (_errorMessage.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFFCA5A5)),
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFF0F172A), Color(0xFF1E293B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.15), blurRadius: 24, offset: const Offset(0, 10))],
+        border: Border.all(color: const Color(0xFF334155).withValues(alpha: 0.5), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_errorMessage.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFCA5A5))),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('$_errorMessage. Showing offline/mock data.', style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontFamily: 'Outfit', fontWeight: FontWeight.w500))),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '$_errorMessage. Showing offline/mock data.',
-                    style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 13, fontFamily: 'Outfit'),
-                  ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0xFF20B486).withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF20B486).withValues(alpha: 0.4))),
+                      child: const Text('COMMAND CENTER • LIVE', style: TextStyle(color: Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2, fontFamily: 'Outfit')),
+                    ),
+                    const SizedBox(height: 12),
+                    Text('Welcome back, $_trainerName!', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Outfit', letterSpacing: -0.5)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _buildWelcomeStatBadge('Courses', '$_coursesCount', const Color(0xFF34D399)),
+                        const SizedBox(width: 8),
+                        _buildWelcomeStatBadge('Exams', '$_examsCount', const Color(0xFF60A5FA)),
+                        const SizedBox(width: 8),
+                        _buildWelcomeStatBadge('Learners', '$_learnersCount', const Color(0xFFA78BFA)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text('Here is your training ecosystem performance and learner engagement overview.', style: TextStyle(fontSize: 15, color: Color(0xFF94A3B8), fontFamily: 'Outfit')),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 16),
+              InkWell(
+                onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage())),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [BoxShadow(color: const Color(0xFF20B486).withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6))],
+                  ),
+                  child: const Text('Manage Courses', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14, fontFamily: 'Outfit')),
+                ),
+              ),
+            ],
           ),
-        Text(
-          'Welcome back, $_trainerName! 👋',
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
-            fontFamily: 'Outfit',
-            letterSpacing: -0.5,
-          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeStatBadge(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.3))),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', color: Color(0xFFE2E8F0)),
+          children: [TextSpan(text: '$value ', style: TextStyle(fontWeight: FontWeight.w800, color: color)), TextSpan(text: label)],
         ),
-        const SizedBox(height: 6),
-        const Text(
-          'Here is what\'s happening with your courses today.',
-          style: TextStyle(
-            fontSize: 15,
-            color: Color(0xFF64748B),
-            fontFamily: 'Outfit',
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _buildMetricCards(double width) {
     int crossAxisCount = width > 1200 ? 4 : (width > 800 ? 2 : 1);
-    
     return GridView.count(
       crossAxisCount: crossAxisCount,
       crossAxisSpacing: 20,
       mainAxisSpacing: 20,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.8, // Reduced from 2.2 to prevent bottom overflow
+      childAspectRatio: 1.85,
       children: [
-        _buildPremiumCard(
-          title: 'Total Revenue',
-          value: _formatCurrency(_totalRevenue),
-          trend: '+12.5%',
-          icon: Icons.account_balance_wallet_rounded,
-          gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
-        ),
-        _buildPremiumCard(
-          title: 'Total Learners',
-          value: '$_learnersCount',
-          trend: '+5.2%',
-          icon: Icons.group_rounded,
-          gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF2563EB)]),
-        ),
-        _buildPremiumCard(
-          title: 'Active Courses',
-          value: '$_coursesCount',
-          trend: '0.0%',
-          icon: Icons.menu_book_rounded,
-          gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)]),
-        ),
-        _buildPremiumCard(
-          title: 'Avg Rating',
-          value: _averageRating.toStringAsFixed(1),
-          trend: '+0.1',
-          icon: Icons.star_rounded,
-          gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
-        ),
+        _buildPremiumCard(title: 'Total Revenue', value: _formatCurrency(_totalRevenue), trend: '+12.5%', accentColor: const Color(0xFF20B486), subtitle: 'vs last month'),
+        _buildPremiumCard(title: 'Total Learners', value: '$_learnersCount', trend: '+5.2%', accentColor: const Color(0xFF3B82F6), subtitle: 'active students'),
+        _buildPremiumCard(title: 'Active Courses', value: '$_coursesCount', trend: '0.0%', accentColor: const Color(0xFF8B5CF6), subtitle: 'published modules'),
+        _buildPremiumCard(title: 'Avg Rating', value: _averageRating.toStringAsFixed(1), trend: '+0.1', accentColor: const Color(0xFFF59E0B), subtitle: 'out of 5.0 stars'),
       ],
     );
   }
 
-  Widget _buildPremiumCard({
-    required String title,
-    required String value,
-    required String trend,
-    required IconData icon,
-    required Gradient gradient,
-  }) {
+  Widget _buildPremiumCard({required String title, required String value, required String trend, required Color accentColor, required String subtitle}) {
     bool isPositive = trend.startsWith('+');
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-        border: Border.all(color: Colors.white, width: 2),
-      ),
-      child: Stack(
+    return _HoverCard(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: gradient,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: Colors.white, size: 20),
+                    width: 8, height: 8,
+                    decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle, boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.5), blurRadius: 6)]),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF64748B),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
+                  const SizedBox(width: 10),
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontFamily: 'Outfit')),
                 ],
               ),
-              const Spacer(),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  fontFamily: 'Outfit',
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isPositive ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isPositive ? Icons.trending_up_rounded : Icons.trending_flat_rounded,
-                          size: 14,
-                          color: isPositive ? const Color(0xFF16A34A) : const Color(0xFF6B7280),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          trend,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isPositive ? const Color(0xFF16A34A) : const Color(0xFF6B7280),
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'vs last month',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: isPositive ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
+                child: Text(trend, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isPositive ? const Color(0xFF15803D) : const Color(0xFF475569), fontFamily: 'Outfit')),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(value, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit', letterSpacing: -1.0)),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500, fontFamily: 'Outfit')),
         ],
       ),
     );
   }
 
   Widget _buildChartSection() {
-    return Container(
-      height: 380,
+    return _HoverCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Revenue Overview',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        height: 380,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Revenue Analytics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')), SizedBox(height: 4), Text('Monthly earning progression', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'))]),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: ['1M', '3M', '6M', '1Y'].map((period) {
+                      final isSelected = _selectedChartPeriod == period;
+                      return InkWell(
+                        onTap: () => setState(() => _selectedChartPeriod = period),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))] : null,
+                          ),
+                          child: Text(period, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B), fontFamily: 'Outfit')),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
-                child: Row(
-                  children: const [
-                    Text('This Year', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569), fontFamily: 'Outfit')),
-                    SizedBox(width: 4),
-                    Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+              ],
+            ),
+            const SizedBox(height: 32),
+            Expanded(
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1, getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1)),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          const style = TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit');
+                          String text = switch (value.toInt()) { 0 => 'Jan', 2 => 'Mar', 4 => 'May', 6 => 'Jul', 8 => 'Sep', 10 => 'Nov', _ => '' };
+                          return SideTitleWidget(meta: meta, child: Text(text, style: style));
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, interval: 1, reservedSize: 42, getTitlesWidget: (value, meta) => Text('${value.toInt()}M', style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit')))),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  minX: 0, maxX: 11, minY: 0,
+                  maxY: _monthlyRevenues.isEmpty ? 6 : (_monthlyRevenues.map((e) => ((e['revenue'] as num) / 1000000).toDouble()).reduce((a, b) => a > b ? a : b) + 2),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: _monthlyRevenues.isEmpty ? const [FlSpot(0, 1), FlSpot(1, 1.5), FlSpot(2, 1.4), FlSpot(3, 3.4), FlSpot(4, 2), FlSpot(5, 2.2), FlSpot(6, 1.8), FlSpot(7, 4), FlSpot(8, 3.8), FlSpot(9, 4.5), FlSpot(10, 4.2), FlSpot(11, 5.5)] : _monthlyRevenues.map((e) => FlSpot((e['month'] as num).toDouble() - 1, ((e['revenue'] as num) / 1000000).toDouble())).toList(),
+                      isCurved: true,
+                      curveSmoothness: 0.35,
+                      gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF10B981)]),
+                      barWidth: 3.5,
+                      isStrokeCapRound: true,
+                      dotData: FlDotData(show: false),
+                      belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [const Color(0xFF20B486).withValues(alpha: 0.25), const Color(0xFF20B486).withValues(alpha: 0.0)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          Expanded(
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: 1,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: const Color(0xFFF1F5F9),
-                      strokeWidth: 1,
-                    );
-                  },
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        const style = TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500, fontSize: 12, fontFamily: 'Outfit');
-                        String text = '';
-                        switch (value.toInt()) {
-                          case 0: text = 'Jan'; break;
-                          case 2: text = 'Mar'; break;
-                          case 4: text = 'May'; break;
-                          case 6: text = 'Jul'; break;
-                          case 8: text = 'Sep'; break;
-                          case 10: text = 'Nov'; break;
-                        }
-                        return SideTitleWidget(meta: meta, child: Text(text, style: style));
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 1,
-                      reservedSize: 42,
-                      getTitlesWidget: (value, meta) {
-                        return Text('${value.toInt()}M', style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500, fontSize: 12, fontFamily: 'Outfit'));
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                minX: 0,
-                maxX: 11,
-                minY: 0,
-                maxY: _monthlyRevenues.isEmpty 
-                    ? 6 
-                    : (_monthlyRevenues.map((e) => ((e['revenue'] as num) / 1000000).toDouble()).reduce((a, b) => a > b ? a : b) + 2),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: _monthlyRevenues.isEmpty
-                        ? const [
-                            FlSpot(0, 1), FlSpot(1, 1.5), FlSpot(2, 1.4), FlSpot(3, 3.4),
-                            FlSpot(4, 2), FlSpot(5, 2.2), FlSpot(6, 1.8), FlSpot(7, 4),
-                            FlSpot(8, 3.8), FlSpot(9, 4.5), FlSpot(10, 4.2), FlSpot(11, 5.5),
-                          ]
-                        : _monthlyRevenues.map((e) {
-                            return FlSpot((e['month'] as num).toDouble() - 1, ((e['revenue'] as num) / 1000000).toDouble());
-                          }).toList(),
-                    isCurved: true,
-                    gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF3B82F6)]),
-                    barWidth: 4,
-                    isStrokeCapRound: true,
-                    dotData: FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF20B486).withOpacity(0.2),
-                          const Color(0xFF3B82F6).withOpacity(0.0),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRecentActivitySection() {
-    return Container(
-      height: 380,
+    return _HoverCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Recent Activity',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: _recentActivities.isEmpty
-                ? const Center(
-                    child: Text('No recent activity', style: TextStyle(color: Color(0xFF94A3B8), fontFamily: 'Outfit')),
-                  )
-                : ListView.builder(
-                    itemCount: _recentActivities.length,
-                    itemBuilder: (context, index) {
-                      final act = _recentActivities[index];
-                      IconData icon = Icons.info_outline;
-                      Color color = const Color(0xFF64748B);
-                      if (act['type'] == 'PAYMENT') {
-                        icon = Icons.attach_money_rounded;
-                        color = const Color(0xFF20B486);
-                      } else if (act['type'] == 'ENROLLMENT') {
-                        icon = Icons.person_add_alt_1_rounded;
-                        color = const Color(0xFF3B82F6);
-                      } else if (act['type'] == 'RATING') {
-                        icon = Icons.star_rounded;
-                        color = const Color(0xFFF59E0B);
-                      }
-                      return _buildActivityItem(act['action'] ?? '', act['target'] ?? '', act['time'] ?? '', icon, color);
-                    },
-                  ),
-          ),
-        ],
+      child: SizedBox(
+        height: 380,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Recent Activity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+            const SizedBox(height: 6),
+            const Text('Real-time student actions', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+            const SizedBox(height: 24),
+            Expanded(
+              child: _recentActivities.isEmpty
+                  ? const Center(child: Text('No recent activity', style: TextStyle(color: Color(0xFF94A3B8), fontFamily: 'Outfit')))
+                  : ListView.builder(
+                      itemCount: _recentActivities.length,
+                      itemBuilder: (context, index) {
+                        final act = _recentActivities[index];
+                        final isLast = index == _recentActivities.length - 1;
+                        final type = act['type'];
+                        final tag = type == 'PAYMENT' ? 'PAYMENT' : (type == 'ENROLLMENT' ? 'ENROLL' : (type == 'RATING' ? 'REVIEW' : 'INFO'));
+                        final color = type == 'PAYMENT' ? const Color(0xFF0D9488) : (type == 'ENROLLMENT' ? const Color(0xFF2563EB) : (type == 'RATING' ? const Color(0xFFD97706) : const Color(0xFF64748B)));
+                        return _buildTimelineItem(act['action'] ?? '', act['target'] ?? '', act['time'] ?? '', tag, color, isLast);
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildActivityItem(String action, String target, String time, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20.0),
+  Widget _buildTimelineItem(String action, String target, String time, String tag, Color color, bool isLast) {
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 18, color: color),
+          Column(
+            children: [
+              Container(width: 10, height: 10, margin: const EdgeInsets.only(top: 4), decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2), boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4)])),
+              if (!isLast) Expanded(child: Container(width: 2, color: const Color(0xFFF1F5F9))),
+            ],
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                RichText(
-                  text: TextSpan(
-                    style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontFamily: 'Outfit'),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      TextSpan(text: '$action '),
-                      TextSpan(text: target, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)), child: Text(tag, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color, fontFamily: 'Outfit', letterSpacing: 0.5))),
+                      const Spacer(),
+                      Text(time, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
                     ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(time, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontFamily: 'Outfit')),
-              ],
+                  const SizedBox(height: 6),
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit', height: 1.4),
+                      children: [TextSpan(text: '$action '), TextSpan(text: target, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A)))],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -921,171 +667,121 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Your Top Courses',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A),
-                fontFamily: 'Outfit',
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage())),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF20B486),
-                textStyle: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Outfit'),
-              ),
-              child: Row(
-                children: const [
-                  Text('View all'),
-                  SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded, size: 16),
-                ],
-              ),
+            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Your Top Courses', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')), SizedBox(height: 4), Text('Highest enrollment and learner activity', style: TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'))]),
+            InkWell(
+              onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage())),
+              borderRadius: BorderRadius.circular(12),
+              child: const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: Text('View all courses →', style: TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.w700, fontSize: 14, fontFamily: 'Outfit'))),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        if (_coursesList.isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 48),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              children: const [
-                Icon(Icons.folder_open_rounded, size: 48, color: Color(0xFF94A3B8)),
-                SizedBox(height: 16),
-                Text(
-                  'No courses created yet',
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 15, fontWeight: FontWeight.w500, fontFamily: 'Outfit'),
-                ),
-              ],
-            ),
-          )
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _coursesList.length > 5 ? 5 : _coursesList.length,
-            itemBuilder: (context, index) => _buildCourseItem(_coursesList[index]),
-          ),
+        _coursesList.isEmpty
+            ? Container(
+                padding: const EdgeInsets.symmetric(vertical: 48),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Column(children: [Text('No courses created yet', style: TextStyle(color: Color(0xFF64748B), fontSize: 15, fontWeight: FontWeight.w600, fontFamily: 'Outfit')), SizedBox(height: 4), Text('Start building your first curriculum to see analytics here.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontFamily: 'Outfit'))]),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _coursesList.length > 5 ? 5 : _coursesList.length,
+                itemBuilder: (context, index) => _buildCourseItem(_coursesList[index]),
+              ),
       ],
     );
   }
 
   Widget _buildCourseItem(dynamic course) {
     final title = course['title'] ?? 'Untitled Course';
-    final learners = course['learnersCount'] ?? 0;
+    final int learners = (course['learnersCount'] ?? 0) as int;
+    final int versions = (course['versionsCount'] ?? 1) as int;
     final thumbnail = course['thumbnailUrl'] ?? '';
+    final double maxReference = _learnersCount > 0 ? _learnersCount.toDouble() : 150.0;
+    final double popularityRatio = (learners / maxReference).clamp(0.05, 1.0);
 
-    return Container(
+    return _HoverCard(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.all(20),
+      onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage())),
       child: Row(
         children: [
           Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
-            ),
+            width: 80, height: 80,
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(16)),
+            alignment: Alignment.center,
             child: thumbnail.toString().isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      thumbnail,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: Color(0xFF94A3B8), size: 32),
-                    ),
-                  )
-                : const Icon(Icons.menu_book_rounded, color: Color(0xFF94A3B8), size: 32),
+                ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.network(thumbnail, width: 80, height: 80, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Text(title.isNotEmpty ? title[0].toUpperCase() : 'C', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF64748B), fontFamily: 'Outfit'))))
+                : Text(title.isNotEmpty ? title[0].toUpperCase() : 'C', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Color(0xFF64748B), fontFamily: 'Outfit')),
           ),
           const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E293B),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                const SizedBox(height: 8),
+                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.people_alt_rounded, size: 14, color: Color(0xFF3B82F6)),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$learners Students',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2563EB), fontFamily: 'Outfit'),
-                          ),
-                        ],
-                      ),
-                    ),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(20)), child: Text('$learners Students', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF2563EB), fontFamily: 'Outfit'))),
+                    const SizedBox(width: 8),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)), child: Text('$versions Versions', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569), fontFamily: 'Outfit'))),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: popularityRatio, backgroundColor: const Color(0xFFF1F5F9), valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF20B486)), minHeight: 6))),
                     const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.layers_rounded, size: 14, color: Color(0xFF6B7280)),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${course['versionsCount'] ?? 1} Versions',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4B5563), fontFamily: 'Outfit'),
-                          ),
-                        ],
-                      ),
-                    ),
+                    Text('Engagement ${(popularityRatio * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontFamily: 'Outfit')),
                   ],
                 ),
               ],
             ),
           ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF64748B), size: 16),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _HoverCard extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
+
+  const _HoverCard({required this.child, this.onTap, this.padding, this.margin});
+
+  @override
+  State<_HoverCard> createState() => _HoverCardState();
+}
+
+class _HoverCardState extends State<_HoverCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: widget.onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          margin: widget.margin,
+          padding: widget.padding ?? const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _isHovered ? const Color(0xFF20B486).withValues(alpha: 0.5) : const Color(0xFFF1F5F9), width: 1.5),
+            boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: _isHovered ? 0.07 : 0.02), blurRadius: _isHovered ? 24 : 16, offset: const Offset(0, 8))],
+          ),
+          child: widget.child,
+        ),
       ),
     );
   }
