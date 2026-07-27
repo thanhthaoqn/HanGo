@@ -3,7 +3,7 @@
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.14 (NTF)
 
 ## 1. Business Context
-The Notification system helps retain users by reminding them of important events. **v1 is REST/polling-based, not realtime** — the frontend fetches the list and unread count on demand (bell click, page load), there is no WebSocket/STOMP push yet (that remains a documented future enhancement, see §3). Triggers implemented for **Learner**: PurchaseSuccess, CommentReply, CourseUpdated. Triggers implemented for **Trainer**: NewEnrollment, CommentReply, ContentApproved, ContentRejected, StatementReady (FR-NTF-02/03). There is no "Task"/"Lead" concept in HanGo. A separate role-broadcast mechanism (not per-user) still covers Course Manager low-rating alerts (`LOW_RATING` / `LOW_AVERAGE_RATING`), unchanged from the original design.
+The Notification system helps retain users by reminding them of important events. **v1 is REST/polling-based, not realtime** — the frontend fetches the list and unread count on demand (bell click, page load), there is no WebSocket/STOMP push yet (that remains a documented future enhancement, see §3). Triggers implemented for **Learner**: PurchaseSuccess, CommentReply, CourseUpdated. Triggers implemented for **Trainer**: NewEnrollment, CommentReply, ContentApproved, ContentRejected, StatementReady, TrainerApplicationReviewed (FR-NTF-02/03). There is no "Task"/"Lead" concept in HanGo. A separate role-broadcast mechanism (not per-user) still covers Course Manager low-rating alerts (`LOW_RATING` / `LOW_AVERAGE_RATING`) and Admin trainer-application alerts (`TrainerApplicationSubmitted`, broadcast to `ADMINISTRATOR`), unchanged from the original design except for the new admin trigger.
 
 ## 2. Acceptance Criteria
 
@@ -14,7 +14,7 @@ The Notification system helps retain users by reminding them of important events
 - [x] Clicking a notification marks it as "Read" (no cross-page navigation yet — Edge Case below covers why this is deferred).
 
 **Backend (Spring Boot):**
-- [x] `notifications` table containing: `id`, `user_id` (nullable — per-user target), `recipient_role` (nullable — role-broadcast target, mutually exclusive with `user_id`), `title`, `message`, `type` (free-form `String`, not yet a DB enum: `PurchaseSuccess` · `CourseUpdated` · `CommentReply` · `NewEnrollment` · `ContentApproved` · `ContentRejected` · `StatementReady` · `LOW_RATING` · `LOW_AVERAGE_RATING`), `is_read`, `created_at`, `course_id` (optional FK for deep-linking).
+- [x] `notifications` table containing: `id`, `user_id` (nullable — per-user target), `recipient_role` (nullable — role-broadcast target, mutually exclusive with `user_id`), `title`, `message`, `type` (free-form `String`, not yet a DB enum: `PurchaseSuccess` · `CourseUpdated` · `CommentReply` · `NewEnrollment` · `ContentApproved` · `ContentRejected` · `StatementReady` · `LOW_RATING` · `LOW_AVERAGE_RATING` · `TrainerApplicationSubmitted` · `TrainerApplicationReviewed`), `is_read`, `created_at`, `course_id` (optional FK for deep-linking, null for trainer-application notifications).
 - [ ] Spring Boot WebSocket (STOMP) endpoint — not implemented (Planned).
 - [x] API `GET /api/v1/notifications` (paginated list of notifications visible to the current user — targeted-at-them OR broadcast to one of their roles).
 - [x] API `GET /api/v1/notifications/unread-count`.
@@ -34,6 +34,8 @@ The Notification system helps retain users by reminding them of important events
 | `CourseUpdated` | `CourseManagerDashboardServiceImpl.publishCourse` (when publishing a new version) | Every learner enrolled in a prior version |
 | `StatementReady` | `MonthlyStatementServiceImpl.generateMonthlyCutoff` | Trainer the statement was generated for |
 | `LOW_RATING` / `LOW_AVERAGE_RATING` | `CourseRatingServiceImpl` | Role-broadcast to `TRAINER_LEAD` (unchanged legacy behavior) |
+| `TrainerApplicationSubmitted` | `TrainerOnboardingServiceImpl.submitProfileForReview` | Role-broadcast to `ADMINISTRATOR` |
+| `TrainerApplicationReviewed` | `TrainerOnboardingServiceImpl.reviewTrainerProfile` | Trainer whose profile was approved/rejected |
 
 ## 3. Technical Constraints
 - **Backend Design:** The original design called for decoupling notification generation via **Spring ApplicationEventPublisher** (Observer Pattern), published asynchronously (`@Async`). The current implementation calls `NotificationService` directly from each business-logic service instead — simpler, but couples notification code into the business methods. Revisiting this with an event-publisher refactor is a known follow-up, not required for v1 correctness.

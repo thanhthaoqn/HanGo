@@ -23,6 +23,7 @@ import java.util.Collection;
 public class NotificationService {
 
     public static final String RECIPIENT_COURSE_MANAGER = "TRAINER_LEAD";
+    public static final String RECIPIENT_ADMIN = "ADMINISTRATOR";
 
     public static final String TYPE_LOW_RATING = "LOW_RATING";
     public static final String TYPE_LOW_AVERAGE_RATING = "LOW_AVERAGE_RATING";
@@ -33,12 +34,18 @@ public class NotificationService {
     public static final String TYPE_CONTENT_REJECTED = "ContentRejected";
     public static final String TYPE_STATEMENT_READY = "StatementReady";
     public static final String TYPE_COURSE_UPDATED = "CourseUpdated";
+    public static final String TYPE_TRAINER_APPLICATION_SUBMITTED = "TrainerApplicationSubmitted";
+    public static final String TYPE_TRAINER_APPLICATION_REVIEWED = "TrainerApplicationReviewed";
 
     private final NotificationRepository notificationRepository;
 
     public void notifyCourseManagers(String type, String title, String message, Course course) {
+        notifyRole(RECIPIENT_COURSE_MANAGER, type, title, message, course);
+    }
+
+    public void notifyRole(String role, String type, String title, String message, Course course) {
         Notification notification = Notification.builder()
-                .recipientRole(RECIPIENT_COURSE_MANAGER)
+                .recipientRole(role)
                 .type(type)
                 .title(title)
                 .message(message)

@@ -32,6 +32,7 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -212,6 +213,15 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
 
         TrainerProfile saved = trainerProfileRepository.save(profile);
         log.info("Trainer profile submitted for review: {}", email);
+
+        String trainerName = user.getFullName() != null ? user.getFullName() : email;
+        notificationService.notifyRole(
+                NotificationService.RECIPIENT_ADMIN,
+                NotificationService.TYPE_TRAINER_APPLICATION_SUBMITTED,
+                "Đơn đăng ký giảng viên mới",
+                trainerName + " vừa nộp hồ sơ giảng viên chờ xét duyệt.",
+                null);
+
         return mapToDTO(saved);
     }
 
@@ -279,6 +289,19 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         TrainerProfile saved = trainerProfileRepository.save(profile);
         if (saved.getUser() != null && saved.getUser().getEmail() != null) {
             emailService.sendTrainerStatusNotificationEmail(saved.getUser().getEmail(), newStatus, request.getAdminNotes());
+        }
+        if (saved.getUser() != null) {
+            boolean approved = "VERIFIED".equalsIgnoreCase(newStatus);
+            notificationService.notifyUser(
+                    saved.getUser(),
+                    NotificationService.TYPE_TRAINER_APPLICATION_REVIEWED,
+                    approved ? "Hồ sơ giảng viên đã được duyệt" : "Hồ sơ giảng viên bị từ chối",
+                    approved
+                            ? "Chúc mừng! Hồ sơ đăng ký giảng viên của bạn đã được phê duyệt."
+                            : "Hồ sơ đăng ký giảng viên của bạn đã bị từ chối." +
+                                (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()
+                                        ? " Lý do: " + request.getAdminNotes() : ""),
+                    null);
         }
         return mapToDTO(saved);
     }

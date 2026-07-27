@@ -1,4 +1,6 @@
 Module	Class	Method	UTCID	Test Case (test method name)	Precondition	Input	Expected Result	Exception	Case Type (N/A/B)	Status	Exec Date	Defect ID	Created By	Executed By
+
+
 Recommendation	ExamCourseRecommendationAIService	recommendCoursesAI	UTC01	recommendCoursesAIShouldThrowBadRequestWhenExamAttemptIdIsNull	—	examAttemptId=null	Error	ApiException: HttpStatus.BAD_REQUEST	A	Passed	2026-07-24		Claude (audit)	Claude (audit)
 Recommendation	ExamCourseRecommendationAIService	recommendCoursesAI	UTC02	recommendCoursesAIShouldThrowNotFoundWhenExamAttemptDoesNotExist	no ExamAttempt row	examAttemptId=99	Error	ApiException: HttpStatus.NOT_FOUND	A	Passed	2026-07-24		Claude (audit)	Claude (audit)
 Recommendation	ExamCourseRecommendationAIService	recommendCoursesAI	UTC03	recommendCoursesAIShouldReturnAiRecommendationsMappedToExistingCourses	1 Course(id=10, title='Grammar Basics'); Gemini returns valid JSON recommending courseId=10	examAttemptId=1	weaknessSummary + 1 RecommendedCourseDTO with title/courseId/reasonWhy populated from the matched Course	None	N	Passed	2026-07-24		Claude (audit)	Claude (audit)

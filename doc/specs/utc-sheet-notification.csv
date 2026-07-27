@@ -1,25 +1,51 @@
 Module	Class	Method	UTCID	Test Case (test method name)	Precondition	Input	Expected Result	Exception	Case Type (N/A/B)	Status	Exec Date	Defect ID	Created By	Executed By
+
+
 Notification	NotificationService	notifyCourseManagers	UTC01	notifyCourseManagersShouldSaveNotificationAddressedToTheCourseManagerRole	—	type='LOW_RATING', title='Low Course Rating Detected', message, course	notifications row saved: recipientRole='TRAINER_LEAD' (Course Manager), type='LOW_RATING', read=false	None	N	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	NotificationService	notifyUser	UTC01	notifyUserShouldSaveNotificationTargetedAtTheGivenUser	recipient User exists	recipient, type='PurchaseSuccess', title, message, course	notifications row saved: user=recipient, type='PurchaseSuccess', course set	None	N	Passed	2026-07-24		DucPM	DucPM
 Notification	NotificationService	notifyUser	UTC02	notifyUserShouldDoNothingWhenUserIsNull	—	user=null, type='NewEnrollment'	no repository save called	None	B	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	NotificationService	getNotificationsForUser	UTC01	getNotificationsForUserShouldMapEntitiesToDTOs	1 Notification row (user-targeted, unread) with course	userId=5, roles=['LEARNER'], page=0, size=20	Page<NotificationDTO> with 1 item mapped: id/title/courseId/courseTitle/read fields correct	None	N	Passed	2026-07-24		DucPM	DucPM
 Notification	NotificationService	getNotificationsForUser	UTC02	getNotificationsForUserShouldMapCourseFieldsToNullWhenNotificationHasNoCourse	1 Notification row (user-targeted, read=true) with course=null	userId=5, roles=['LEARNER'], page=0, size=20	Page<NotificationDTO> with 1 item mapped: courseId=null, courseTitle=null, read=true	None	B	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	NotificationService	getUnreadCount	UTC01	getUnreadCountShouldDelegateToRepository	repository returns 3	userId=5, roles=['LEARNER']	returns 3	None	N	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	NotificationService	markAsRead	UTC01	markAsReadShouldThrowWhenNotificationNotFound	no Notification row	notificationId=99, userId=5, roles=['LEARNER']	Error	RuntimeException: 'Notification not found'	A	Passed	2026-07-24		DucPM	DucPM
 Notification	NotificationService	markAsRead	UTC02	markAsReadShouldSetReadTrueWhenOwnedByTargetUser	Notification.user.id=5, read=false	notificationId=1, userId=5, roles=['LEARNER']	notification.read=true, saved	None	N	Passed	2026-07-24		DucPM	DucPM
 Notification	NotificationService	markAsRead	UTC03	markAsReadShouldSetReadTrueWhenBroadcastToOneOfCallersRoles	Notification.recipientRole='TRAINER_LEAD', user=null, read=false	notificationId=1, userId=7, roles=['TRAINER_LEAD']	notification.read=true, saved	None	B	Passed	2026-07-24		DucPM	DucPM
 Notification	NotificationService	markAsRead	UTC04	markAsReadShouldThrowWhenCallerDoesNotOwnTheNotification	Notification.user.id=5	notificationId=1, userId=999, roles=['LEARNER']	Error, no save	RuntimeException: 'You are not allowed to modify this notification'	A	Passed	2026-07-24		DucPM	DucPM
 Notification	NotificationService	markAsRead	UTC05	markAsReadShouldThrowWhenBroadcastRoleDoesNotMatchCallersRoles	Notification.recipientRole='TRAINER_LEAD', user=null	notificationId=1, userId=7, roles=['LEARNER']	Error, no save	RuntimeException: 'You are not allowed to modify this notification'	B	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	NotificationService	markAllAsRead	UTC01	markAllAsReadShouldDelegateToRepositoryAndReturnUpdatedCount	repository returns 4 rows updated	userId=5, roles=['LEARNER']	returns 4	None	N	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	CourseManagerDashboardServiceImpl	publishCourse (trigger: ContentApproved)	UTC01	publishCourseShouldNotifyCreatorWhenPublished	Course status='PENDING_APPROVAL'	courseId=1	course.status='PUBLISHED'; notificationService.notifyUser called with type='ContentApproved', recipient=creator	None	N	Passed	2026-07-24		DucPM	DucPM
 Notification	CourseManagerDashboardServiceImpl	publishCourse (trigger: CourseUpdated)	UTC02	publishCourseShouldNotifyPriorVersionEnrolleesOfCourseUpdateWhenNewVersion	v2 course has parentId=v1.id, same code; a learner is enrolled in v1	courseId=v2.id	notificationService.notifyUser called with type='CourseUpdated', recipient=learner enrolled in v1	None	B	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	CourseManagerDashboardServiceImpl	returnCourseToDraft (trigger: ContentRejected)	UTC01	returnCourseToDraftShouldNotifyCreator	Course status='PENDING_APPROVAL'	courseId=1	course.status='DRAFT'; notificationService.notifyUser called with type='ContentRejected', recipient=creator	None	N	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	CourseManagerDashboardServiceImpl	publishExam (trigger: ContentApproved)	UTC01	publishExamShouldNotifyCreator	Exam status='PENDING_APPROVAL'	examId=1	exam.status='PUBLISHED'; notificationService.notifyUser called with type='ContentApproved', recipient=exam creator	None	N	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	CourseManagerDashboardServiceImpl	returnExamToDraft (trigger: ContentRejected)	UTC01	returnExamToDraftShouldNotifyCreatorWithReason	Exam status='PENDING_APPROVAL'	examId=1, reason='Missing answer key'	exam.status='DRAFT', rejectionReason set; notification message contains the reason	None	B	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	CommentServiceImpl	addComment (trigger: CommentReply)	UTC06	addCommentShouldLinkParentCommentWhenReplying	parent Comment.user.id=20 (Bob), replier userId=10 (Alice)	content='reply', parentCommentId=5	notificationService.notifyUser called with type='CommentReply', recipient=parent author (Bob)	None	N	Passed	2026-07-24		DucPM	DucPM
 Notification	CommentServiceImpl	addComment (trigger: CommentReply)	UTC07	addCommentShouldNotNotifyWhenReplyingToOwnComment	parent Comment.user.id=10, replier userId=10 (same user)	content='reply to self', parentCommentId=5	notificationService.notifyUser never called — no self-notification	None	B	Passed	2026-07-24		DucPM	DucPM
 Notification	CommentServiceImpl	addComment (trigger: CommentReply)	UTC08	addCommentShouldNotNotifyWhenParentCommentHasNoAuthor	parent Comment row exists, id=5, parent.user=null	content='reply', parentCommentId=5	notificationService.notifyUser never called — defensive null-check on parent author	None	B	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	PaymentServiceImpl	handlePayOSWebhook (trigger: PurchaseSuccess/NewEnrollment)	UTC01	handlePayOSWebhookShouldMarkSuccessSplitRevenueEnrollAndNotifyForProfessionalTrainer	valid webhook signature, Payment PENDING	code='00', valid data	notificationService.notifyUser called with type='PurchaseSuccess' (buyer) and type='NewEnrollment' (course creator)	None	N	Passed	2026-07-24		DucPM	DucPM
+
+
 Notification	MonthlyStatementServiceImpl	generateMonthlyCutoff (trigger: StatementReady)	UTC01	generateMonthlyCutoffShouldGroupPendingPaymentsByTrainerComputeTaxAndNotify	pending SUCCESS payments exist for a trainer	periodMonth='2026-07'	notificationService.notifyUser called with type='StatementReady', recipient=trainer	None	N	Passed	2026-07-24		DucPM	DucPM
 
 Note: NotificationService was expanded 2026-07-24 from a single-method, role-broadcast-only stub (2026-07-22 baseline, row 1 above) into a full per-user notification inbox: `Notification.user` (nullable per-user target) added alongside the pre-existing `recipientRole` (nullable role-broadcast target); new repository queries (`findVisibleToUser`, `countUnreadVisibleToUser`, `markAllAsReadForUser`) match either targeting mode. A generic `NotificationController` (`/api/v1/notifications`) now serves LEARNER/TRAINER/TRAINER_LEAD/ADMINISTRATOR alike; the pre-existing TRAINER_LEAD-only endpoints on `CourseManagerDashboardController` are unchanged and still work independently. Frontend bell (`shared_header.dart`) is now wired to the real API with an unread-count badge and mark-as-read on click, replacing the previous static "No new notifications" mock.

@@ -145,23 +145,21 @@ public class CourseRatingServiceImpl implements CourseRatingService {
         recalculateCourseStats(course);
 
         if (rating != null && rating <= LOW_RATING_THRESHOLD) {
-            notificationService.notifyCourseManagers(
-                    NotificationService.TYPE_LOW_RATING,
-                    "Low Course Rating Detected",
-                    "Course: " + course.getTitle() + "\nLearner Rating: " + rating + " Stars\nReason: \""
-                            + (content == null || content.isBlank() ? "(no comment provided)" : content) + "\"",
-                    course);
+            String title = "Low Course Rating Detected";
+            String message = "Course: " + course.getTitle() + "\nLearner Rating: " + rating + " Stars\nReason: \""
+                    + (content == null || content.isBlank() ? "(no comment provided)" : content) + "\"";
+            notificationService.notifyCourseManagers(NotificationService.TYPE_LOW_RATING, title, message, course);
+            notificationService.notifyRole(NotificationService.RECIPIENT_ADMIN, NotificationService.TYPE_LOW_RATING, title, message, course);
         }
 
         boolean wasAboveThreshold = previousTotal > 0 && previousAverage > LOW_AVERAGE_THRESHOLD;
         boolean isNowAtOrBelowThreshold = course.getAverageRating() != null && course.getAverageRating() <= LOW_AVERAGE_THRESHOLD;
         if (wasAboveThreshold && isNowAtOrBelowThreshold) {
-            notificationService.notifyCourseManagers(
-                    NotificationService.TYPE_LOW_AVERAGE_RATING,
-                    "Course Quality Warning",
-                    "Course: " + course.getTitle() + "\nAverage Rating: " + course.getAverageRating()
-                            + "\nTotal Ratings: " + course.getTotalRatings(),
-                    course);
+            String title = "Course Quality Warning";
+            String message = "Course: " + course.getTitle() + "\nAverage Rating: " + course.getAverageRating()
+                    + "\nTotal Ratings: " + course.getTotalRatings();
+            notificationService.notifyCourseManagers(NotificationService.TYPE_LOW_AVERAGE_RATING, title, message, course);
+            notificationService.notifyRole(NotificationService.RECIPIENT_ADMIN, NotificationService.TYPE_LOW_AVERAGE_RATING, title, message, course);
         }
     }
 
