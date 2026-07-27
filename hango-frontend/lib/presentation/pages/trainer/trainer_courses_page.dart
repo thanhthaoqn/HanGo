@@ -1124,9 +1124,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     for (final c in group) {
       final s = (c['status'] ?? '').toString().toUpperCase();
       final id = (c['id'] ?? 0) as int;
-      if (s == 'PUBLISHED') {
+      if (s == 'PUBLISHED' || s == 'HIDDEN' || s == 'ARCHIVED') {
         if (published == null || id > (published['id'] as int)) published = c;
-      } else if (s == 'PENDING_APPROVAL' || s == 'PENDING') {
+      } else if (s == 'PENDING_APPROVAL' || s == 'PENDING' || s == 'SUBMITTED') {
         if (pending == null || id > (pending['id'] as int)) pending = c;
       } else {
         if (draft == null || id > (draft['id'] as int)) draft = c;
@@ -1164,7 +1164,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   }
 
   /// Returns the lifecycle state string for a group.
-  /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'PENDING'
+  /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'DRAFT_ONLY' | 'PENDING'
   String _lifecycleState({
     required dynamic published,
     required dynamic draft,
@@ -1173,6 +1173,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   }) {
     if (pending != null) return 'PENDING';
     if (draft != null && published != null) return 'HAS_DRAFT';
+    if (draft != null && published == null) return 'DRAFT_ONLY';
     return 'LIVE_ONLY';
   }
 
@@ -1459,13 +1460,6 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               onTap: () =>
                   _showVersionHistoryModal(context, title, allVersions),
             ),
-            const SizedBox(width: 8),
-            _iconBtn(
-              icon: Icons.delete_outline,
-              tooltip: 'Delete course',
-              color: const Color(0xFFEF4444),
-              onTap: () => _deleteCourse(course),
-            ),
           ],
         );
 
@@ -1496,19 +1490,52 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               onTap: () =>
                   _showVersionHistoryModal(context, title, allVersions),
             ),
-            const SizedBox(width: 8),
+            const Spacer(),
             _actionChip(
               icon: Icons.cancel_outlined,
               label: 'Cancel Draft',
-              color: const Color(0xFF64748B),
+              color: const Color(0xFFEF4444),
+              bg: const Color(0xFFFEE2E2),
               onTap: () => _deleteCourse(draft),
+            ),
+          ],
+        );
+
+      // ── State 4: Draft Only (or Rejected) ─────────────────────────────
+      case 'DRAFT_ONLY':
+        final s = (course['status'] ?? '').toString().toUpperCase();
+        final isRejected = s == 'REJECTED';
+        return Row(
+          children: [
+            _actionChip(
+              icon: Icons.edit_outlined,
+              label: isRejected ? 'Edit Rejected Course' : 'Edit Draft',
+              color: isRejected ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+              bg: isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditCoursePage(courseId: extractId(course)),
+                  ),
+                ).then((_) => _fetchCoursesData());
+              },
+            ),
+            const SizedBox(width: 8),
+            _actionChip(
+              icon: Icons.history,
+              label: 'Version History',
+              color: const Color(0xFF475569),
+              bg: const Color(0xFFF1F5F9),
+              onTap: () =>
+                  _showVersionHistoryModal(context, title, allVersions),
             ),
             const Spacer(),
             _iconBtn(
               icon: Icons.delete_outline,
               tooltip: 'Delete course',
               color: const Color(0xFFEF4444),
-              onTap: () => _deleteCourse(published ?? draft),
+              onTap: () => _deleteCourse(course),
             ),
           ],
         );

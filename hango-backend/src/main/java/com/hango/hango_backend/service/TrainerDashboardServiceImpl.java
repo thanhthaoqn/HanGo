@@ -909,6 +909,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("You are not authorized to delete this course");
         }
         
+        String status = course.getStatus() != null ? course.getStatus().toUpperCase() : "";
+        if (!"DRAFT".equals(status) && !"REJECTED".equals(status)) {
+            throw new RuntimeException("Chỉ có thể xoá khóa học ở trạng thái Nháp (Draft) hoặc Bị từ chối (Rejected).");
+        }
+        
         course.setDeletedAt(java.time.LocalDateTime.now());
         courseRepository.save(course);
     }

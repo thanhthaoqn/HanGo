@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/course_manager_dashboard_summary.dart';
@@ -114,7 +114,7 @@ class CourseManagerApi {
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       final list = data is List ? data : (data['courses'] as List?) ?? const [];
-      return (list as List)
+      return list
           .map(
             (item) => CourseReviewCourse.fromJson(
               Map<String, dynamic>.from(item as Map),
@@ -160,6 +160,24 @@ class CourseManagerApi {
     if (response.statusCode != 200) {
       throw Exception(
         'Failed to reject course: ${response.statusCode} ${response.body}',
+      );
+    }
+  }
+
+  Future<void> hideCourse(int courseId) async {
+    final response = await _post('/courses/$courseId/hide');
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to hide course: ${response.statusCode} ${response.body}',
+      );
+    }
+  }
+
+  Future<void> unhideCourse(int courseId) async {
+    final response = await _post('/courses/$courseId/unhide');
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to unhide course: ${response.statusCode} ${response.body}',
       );
     }
   }
