@@ -103,6 +103,7 @@ class _RegisterPageState extends State<RegisterPage> {
         
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('is_new_registration_$email', true);
+        if (!mounted) return;
 
         ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
         Navigator.pop(context);
@@ -128,6 +129,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('is_new_registration_$email', true);
+        if (!mounted) return;
 
         ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
         Navigator.pop(context);
@@ -546,54 +548,64 @@ class _RegisterPageState extends State<RegisterPage> {
                           const SizedBox(height: 20),
 
                           // Terms of Service agreement
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: Checkbox(
-                                  value: _agreeToTerms,
-                                  activeColor: const Color(0xFF28B79B),
-                                  onChanged: (val) {
-                                    setState(() {
-                                      _agreeToTerms = val ?? false;
-                                    });
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: RichText(
-                                  text: const TextSpan(
-                                    text: 'By creating an account, you agree to HanGo\'s ',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF6B7280),
-                                      height: 1.3,
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _agreeToTerms = !_agreeToTerms;
+                                });
+                              },
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: Checkbox(
+                                      value: _agreeToTerms,
+                                      activeColor: const Color(0xFF28B79B),
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _agreeToTerms = val ?? false;
+                                        });
+                                      },
                                     ),
-                                    children: [
-                                      TextSpan(
-                                        text: 'Terms of Service',
-                                        style: TextStyle(
-                                          color: Color(0xFF28B79B),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      TextSpan(text: ' and '),
-                                      TextSpan(
-                                        text: 'Privacy Policy',
-                                        style: TextStyle(
-                                          color: Color(0xFF28B79B),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      TextSpan(text: '.'),
-                                    ],
                                   ),
-                                ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: RichText(
+                                      text: const TextSpan(
+                                        text: 'By creating an account, you agree to HanGo\'s ',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF6B7280),
+                                          height: 1.3,
+                                        ),
+                                        children: [
+                                          TextSpan(
+                                            text: 'Terms of Service',
+                                            style: TextStyle(
+                                              color: Color(0xFF28B79B),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          TextSpan(text: ' and '),
+                                          TextSpan(
+                                            text: 'Privacy Policy',
+                                            style: TextStyle(
+                                              color: Color(0xFF28B79B),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          TextSpan(text: '.'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                           const SizedBox(height: 28),
 
@@ -651,15 +663,18 @@ class _RegisterPageState extends State<RegisterPage> {
                                   WidgetSpan(
                                     alignment: PlaceholderAlignment.baseline,
                                     baseline: TextBaseline.alphabetic,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                      },
-                                      child: const Text(
-                                        'Sign In',
-                                        style: TextStyle(
-                                          color: Color(0xFF28B79B),
-                                          fontWeight: FontWeight.bold,
+                                    child: MouseRegion(
+                                      cursor: SystemMouseCursors.click,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                        },
+                                        child: const Text(
+                                          'Sign In',
+                                          style: TextStyle(
+                                            color: Color(0xFF28B79B),
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -918,68 +933,74 @@ class RoleToggleSelector extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: GestureDetector(
-              onTap: () => onRoleChanged('LEARNER'),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: selectedRole == 'LEARNER'
-                      ? const Color(0xFF20B486)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: selectedRole == 'LEARNER'
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          )
-                        ]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'Learner',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => onRoleChanged('LEARNER'),
+                child: Container(
+                  decoration: BoxDecoration(
                     color: selectedRole == 'LEARNER'
-                        ? Colors.white
-                        : const Color(0xFF64748B),
+                        ? const Color(0xFF20B486)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: selectedRole == 'LEARNER'
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            )
+                          ]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Learner',
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: selectedRole == 'LEARNER'
+                          ? Colors.white
+                          : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
           Expanded(
-            child: GestureDetector(
-              onTap: () => onRoleChanged('TRAINER'),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: selectedRole == 'TRAINER'
-                      ? const Color(0xFF20B486)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: selectedRole == 'TRAINER'
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          )
-                        ]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'Trainer',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => onRoleChanged('TRAINER'),
+                child: Container(
+                  decoration: BoxDecoration(
                     color: selectedRole == 'TRAINER'
-                        ? Colors.white
-                        : const Color(0xFF64748B),
+                        ? const Color(0xFF20B486)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: selectedRole == 'TRAINER'
+                        ? [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            )
+                          ]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Trainer',
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: selectedRole == 'TRAINER'
+                          ? Colors.white
+                          : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ),

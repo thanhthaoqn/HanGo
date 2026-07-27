@@ -272,12 +272,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
                         // New Password Field Label
                         const Text(
-                          'NEW PASSWORD',
+                          'New Password',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
-                            color: Color(0xFF4B5563),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF374151),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -331,12 +330,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
                         // Confirm Password Field Label
                         const Text(
-                          'CONFIRM NEW PASSWORD',
+                          'Confirm New Password',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
-                            color: Color(0xFF4B5563),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF374151),
                           ),
                         ),
                         const SizedBox(height: 8),

@@ -1,10 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
-import 'package:google_sign_in_web/google_sign_in_web.dart' as web;
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'register_page.dart';
@@ -321,10 +318,6 @@ class _LoginPageState extends State<LoginPage> {
         if (result['success']) {
           final String name = googleUser.displayName ?? 'Google User';
           final roles = List<String>.from(result['data']['roles'] ?? []);
-          final isAdmin = roles.any((r) => r.contains('ADMIN'));
-          final isTrainerLead = roles.any((r) => r.contains('TRAINER_LEAD'));
-          final isTrainer =
-              roles.any((r) => r.contains('TRAINER')) && !isTrainerLead;
           ToastHelper.showSuccess(
             context,
             'Sign in successful: Welcome, $name!',
@@ -351,67 +344,51 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildGoogleSignInButton() {
-    if (kIsWeb) {
-      try {
-        final plugin = GoogleSignInPlatform.instance as web.GoogleSignInPlugin;
-        return Center(
-          child: plugin.renderButton(
-            configuration: web.GSIButtonConfiguration(
-              type: web.GSIButtonType.standard,
-              theme: web.GSIButtonTheme.outline,
-              size: web.GSIButtonSize.large,
-              text: web.GSIButtonText.signinWith,
-              shape: web.GSIButtonShape.rectangular,
-              locale: 'en',
-            ),
-          ),
-        );
-      } catch (e) {
-        debugPrint('Error rendering GIS button: $e');
-      }
-    }
-
-    // Fallback for non-web or if platform rendering fails
     return SizedBox(
       width: double.infinity,
       height: 48,
-      child: OutlinedButton(
-        onPressed: _isLoading
-            ? null
-            : () async {
-                try {
-                  final GoogleSignInAccount? account = await _googleSignIn
-                      .signIn();
-                  if (account != null) {
-                    _handleGoogleSignInSuccess(account);
+      child: MouseRegion(
+        cursor: _isLoading ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        child: OutlinedButton(
+          onPressed: _isLoading
+              ? null
+              : () async {
+                  try {
+                    final GoogleSignInAccount? account = await _googleSignIn
+                        .signIn();
+                    if (account != null) {
+                      _handleGoogleSignInSuccess(account);
+                    }
+                  } catch (e) {
+                    debugPrint('Google Sign In Error: $e');
                   }
-                } catch (e) {
-                  debugPrint('Google Sign In Error: $e');
-                }
-              },
-        style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          side: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.network(
-              'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
-              width: 20,
-              height: 20,
-              errorBuilder: (context, error, stackTrace) => const Text('G'),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Sign in with Google',
-              style: TextStyle(
-                color: Color(0xFF374151),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+                },
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            side: const BorderSide(color: Color(0xFFD1D5DB)),
+            elevation: 0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.network(
+                'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
+                width: 20,
+                height: 20,
+                errorBuilder: (context, error, stackTrace) => const Text('G', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              const Text(
+                'Sign in with Google',
+                style: TextStyle(
+                  color: Color(0xFF374151),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -728,47 +705,60 @@ class _LoginPageState extends State<LoginPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: const Color(0xFF28B79B),
-                                    onChanged: (val) {
-                                      setState(() {
-                                        _rememberMe = val ?? false;
-                                      });
-                                    },
-                                  ),
+                            MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _rememberMe = !_rememberMe;
+                                  });
+                                },
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: Checkbox(
+                                        value: _rememberMe,
+                                        activeColor: const Color(0xFF28B79B),
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _rememberMe = val ?? false;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Remember me',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF4B5563),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Remember me',
+                              ),
+                            ),
+                            MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ForgotPasswordPage(),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  'Forgot password?',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Color(0xFF4B5563),
+                                    color: Color(0xFF28B79B),
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ),
-                              ],
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ForgotPasswordPage(),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                'Forgot password?',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF28B79B),
-                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -857,21 +847,24 @@ class _LoginPageState extends State<LoginPage> {
                                 WidgetSpan(
                                   alignment: PlaceholderAlignment.baseline,
                                   baseline: TextBaseline.alphabetic,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const RegisterPage(),
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.click,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const RegisterPage(),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Sign up',
+                                        style: TextStyle(
+                                          color: Color(0xFF28B79B),
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                      );
-                                    },
-                                    child: const Text(
-                                      'Sign up',
-                                      style: TextStyle(
-                                        color: Color(0xFF28B79B),
-                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
