@@ -259,6 +259,15 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                       const SizedBox(height: 36),
 
                       // 6 Digit OTP fields
+                      const Text(
+                        'OTP Code',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: List.generate(6, (index) {
