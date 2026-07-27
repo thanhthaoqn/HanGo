@@ -1,0 +1,209 @@
+import 'package:flutter/material.dart';
+import '../../pages/learner/learner_home_page.dart';
+import '../../pages/login_page.dart';
+import '../../pages/trainer/trainer_shell_page.dart';
+import '../../../data/services/auth_service.dart';
+
+class TrainerSidebar extends StatelessWidget {
+  final int activeIndex;
+  final bool isEnabled;
+  final List<int> disabledIndices;
+  final void Function(int index)? onTabSelect;
+
+  const TrainerSidebar({
+    super.key,
+    required this.activeIndex,
+    this.isEnabled = true,
+    this.disabledIndices = const [],
+    this.onTabSelect,
+  });
+
+  void _handleSelectTab(BuildContext context, int index) {
+    if (!isEnabled || disabledIndices.contains(index)) return;
+
+    if (onTabSelect != null) {
+      onTabSelect!(index);
+      if (Scaffold.maybeOf(context)?.isDrawerOpen == true) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    final shellState = TrainerShellPage.of(context);
+    if (shellState != null) {
+      shellState.selectTab(index);
+      if (Scaffold.maybeOf(context)?.isDrawerOpen == true) {
+        Navigator.of(context).pop();
+      }
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => TrainerShellPage(initialIndex: index)),
+        (route) => false,
+      );
+    }
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    final authService = AuthService();
+    await authService.logout();
+    if (context.mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Logo Row -> Clicking navigates to LearnerHomePage()
+          InkWell(
+            onTap: () => Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+              (route) => false,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Image.network(
+                    'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                    height: 36,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.school, size: 20, color: Colors.white),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'HanGo',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          _buildItem(context, 0, Icons.dashboard_outlined, 'Dashboard'),
+          _buildItem(context, 1, Icons.book_outlined, 'Courses'),
+          _buildItem(context, 2, Icons.assignment_outlined, 'Exam'),
+          _buildItem(context, 3, Icons.question_answer_outlined, 'Question Bank'),
+          _buildItem(context, 4, Icons.account_balance_wallet_outlined, 'Revenue'),
+          _buildItem(context, 5, Icons.person_outline, 'My Profile'),
+          const Spacer(),
+          const Divider(color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 12),
+          _buildLogoutItem(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItem(BuildContext context, int index, IconData icon, String title) {
+    final isActive = (activeIndex == index);
+    final itemEnabled = isEnabled && !disabledIndices.contains(index);
+    final activeColor = const Color(0xFF20B486);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: InkWell(
+        onTap: itemEnabled ? () => _handleSelectTab(context, index) : null,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: itemEnabled ? activeColor.withValues(alpha: 0.08) : Colors.transparent,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? activeColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: !itemEnabled
+                    ? const Color(0xFF94A3B8)
+                    : (isActive ? Colors.white : const Color(0xFF475569)),
+                size: 20,
+              ),
+              const SizedBox(width: 14),
+              Text(
+                title,
+                style: TextStyle(
+                  color: !itemEnabled
+                      ? const Color(0xFF94A3B8)
+                      : (isActive ? Colors.white : const Color(0xFF334155)),
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 14,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoutItem(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: InkWell(
+        onTap: () => _handleLogout(context),
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: const Color(0xFFEF4444).withValues(alpha: 0.08),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.logout, color: Color(0xFFEF4444), size: 20),
+              const SizedBox(width: 14),
+              const Text(
+                'Logout',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

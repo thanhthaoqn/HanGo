@@ -1,29 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../data/services/auth_service.dart';
-import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
 import 'trainer_exams_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import 'trainer_revenue_page.dart';
 import 'trainer_profile_page.dart';
+import '../../widgets/trainer/trainer_sidebar.dart';
 
 class TrainerShellPage extends StatefulWidget {
   final int initialIndex;
   const TrainerShellPage({super.key, this.initialIndex = 0});
 
-  static _TrainerShellPageState? of(BuildContext context) {
-    return context.findAncestorStateOfType<_TrainerShellPageState>();
+  static TrainerShellPageState? of(BuildContext context) {
+    return context.findAncestorStateOfType<TrainerShellPageState>();
   }
 
   @override
-  State<TrainerShellPage> createState() => _TrainerShellPageState();
+  State<TrainerShellPage> createState() => TrainerShellPageState();
 }
 
-class _TrainerShellPageState extends State<TrainerShellPage> {
+class TrainerShellPageState extends State<TrainerShellPage> {
   late int _currentIndex;
-  final _authService = AuthService();
 
   String _trainerName = 'Trainer';
   String _trainerInitials = 'T';
@@ -64,17 +62,6 @@ class _TrainerShellPageState extends State<TrainerShellPage> {
     }
   }
 
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -82,10 +69,10 @@ class _TrainerShellPageState extends State<TrainerShellPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? Drawer(child: TrainerSidebar(activeIndex: _currentIndex, onTabSelect: (idx) => selectTab(idx))) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 250, child: _buildSidebar(context)),
+          if (isDesktop) SizedBox(width: 250, child: TrainerSidebar(activeIndex: _currentIndex, onTabSelect: (idx) => selectTab(idx))),
           Expanded(
             child: Column(
               children: [
@@ -141,124 +128,6 @@ class _TrainerShellPageState extends State<TrainerShellPage> {
                 : null,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Image.network(
-                'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                height: 36,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Row(
-                    children: [
-                      Image.network(
-
-                        'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-
-                        height: 36,
-
-                        fit: BoxFit.contain,
-
-                        errorBuilder: (context, error, stackTrace) {
-
-                          return Row(
-
-                            children: [
-
-                              Container(
-
-                                padding: const EdgeInsets.all(8),
-
-                                decoration: BoxDecoration(color: const Color(0xFF28B79B), borderRadius: BorderRadius.circular(10)),
-
-                                child: const Icon(Icons.school, color: Colors.white, size: 24),
-
-                              ),
-
-                              const SizedBox(width: 12),
-
-                              const Text(
-
-                                'HanGo',
-
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
-
-                              ),
-
-                            ],
-
-                          );
-
-                        },
-
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-          _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', isActive: _currentIndex == 0, onTap: () => selectTab(0)),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: _currentIndex == 1, onTap: () => selectTab(1)),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', isActive: _currentIndex == 2, onTap: () => selectTab(2)),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', isActive: _currentIndex == 3, onTap: () => selectTab(3)),
-          _buildSidebarItem(Icons.account_balance_wallet_outlined, 'Revenue', isActive: _currentIndex == 4, onTap: () => selectTab(4)),
-          _buildSidebarItem(Icons.person_outline, 'My Profile', isActive: _currentIndex == 5, onTap: () => selectTab(5)),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, 'Logout', color: Colors.redAccent, onTap: _handleLogout),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF28B79B);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)), size: 20),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

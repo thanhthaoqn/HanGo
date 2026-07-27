@@ -5,14 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
-import '../login_page.dart';
-import '../learner/learner_home_page.dart';
-import 'trainer_courses_page.dart';
-import 'trainer_exams_page.dart';
 import '../../../utils/toast_helper.dart';
-import 'question_bank/trainer_question_bank_page.dart';
+import '../../widgets/trainer/trainer_sidebar.dart';
+import '../login_page.dart';
+import 'trainer_courses_page.dart';
 import 'trainer_profile_page.dart';
-import 'trainer_revenue_page.dart';
 
 class TrainerDashboardPage extends StatefulWidget {
   final bool isEmbedded;
@@ -133,6 +130,15 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     });
   }
 
+  String _formatCurrency(double amount) {
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M đ';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(0)}K đ';
+    }
+    return '${amount.toStringAsFixed(0)} đ';
+  }
+
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
@@ -142,15 +148,6 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         (route) => false,
       );
     }
-  }
-
-  String _formatCurrency(double amount) {
-    if (amount >= 1000000) {
-      return '${(amount / 1000000).toStringAsFixed(1)}M đ';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(0)}K đ';
-    }
-    return '${amount.toStringAsFixed(0)} đ';
   }
 
   @override
@@ -164,10 +161,10 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 0)) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 260, child: _buildSidebar(context)),
+          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 0)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -207,86 +204,6 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           const SizedBox(height: 32),
           _buildCoursesSection(),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LearnerHomePage()), (route) => false),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-              child: Row(
-                children: [
-                  Image.network(
-                    'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                    height: 36,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.school, size: 20, color: Colors.white),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text('HanGo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 40),
-          _buildSidebarItem(Icons.dashboard_rounded, 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.library_books_rounded, 'Courses', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()))),
-          _buildSidebarItem(Icons.assignment_rounded, 'Exams', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerExamsPage()))),
-          _buildSidebarItem(Icons.people_alt_rounded, 'Learners'),
-          _buildSidebarItem(Icons.quiz_rounded, 'Question Bank', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerQuestionBankPage()))),
-          _buildSidebarItem(Icons.account_balance_wallet_rounded, 'Revenue', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerRevenuePage()))),
-          _buildSidebarItem(Icons.person_rounded, 'Profile', onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerProfilePage()))),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout_rounded, 'Logout', color: const Color(0xFFEF4444), onTap: _handleLogout),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: isActive ? activeColor : (color ?? const Color(0xFF64748B)), size: 22),
-              const SizedBox(width: 16),
-              Text(title, style: TextStyle(color: isActive ? activeColor : (color ?? const Color(0xFF334155)), fontWeight: isActive ? FontWeight.w700 : FontWeight.w500, fontSize: 15, fontFamily: 'Outfit')),
-            ],
-          ),
-        ),
       ),
     );
   }
