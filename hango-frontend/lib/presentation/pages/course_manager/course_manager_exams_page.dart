@@ -243,7 +243,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF38C9A6)),
+                    borderSide: const BorderSide(color: Color(0xFF20B486)),
                   ),
                 ),
               );
@@ -342,7 +342,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           color: isActive ? const Color(0xFFE6FFFA) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive ? const Color(0xFF38C9A6) : Colors.transparent,
+            color: isActive ? const Color(0xFF20B486) : Colors.transparent,
           ),
         ),
         child: Row(
@@ -352,7 +352,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               label,
               style: TextStyle(
                 color: isActive
-                    ? const Color(0xFF38C9A6)
+                    ? const Color(0xFF20B486)
                     : const Color(0xFF4B5563),
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                 fontSize: 14,
@@ -364,7 +364,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: isActive
-                    ? const Color(0xFF38C9A6)
+                    ? const Color(0xFF20B486)
                     : const Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -683,7 +683,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                       // View button for all others
                       if (!isCreator || status != 'DRAFT')
                         IconButton(
-                          icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF38C9A6), size: 20),
+                          icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF20B486), size: 20),
                           onPressed: () async {
                             await Navigator.push(
                               context,
@@ -816,7 +816,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                   Navigator.pop(context);
                   _updateExamVisibility(exam['id'], isPublic ? 'PRIVATE' : 'PUBLIC');
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38C9A6)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20B486)),
                 child: const Text('Confirm', style: TextStyle(color: Colors.white)),
               ),
             ],
@@ -937,7 +937,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF38C9A6),
+              backgroundColor: const Color(0xFF20B486),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
