@@ -154,7 +154,7 @@ Khi bạn đẩy code có chứa thư mục cấu hình `.github/workflows/deplo
    ```
 3. **Sinh chứng chỉ SSL:**
    ```bash
-   sudo certbot certonly --standalone -d hangog92.online -d www.hangog92.online -d api.hangog92.online --email YOUR_EMAIL@example.com --agree-tos --no-eff-email
+   sudo certbot certonly --standalone -d hangog92.online -d www.hangog92.online -d api.hangog92.online --email hangog92su26@gmail.com --agree-tos --no-eff-email
    ```
 4. **Copy chứng chỉ vào thư mục chia sẻ của Docker:**
    ```bash
