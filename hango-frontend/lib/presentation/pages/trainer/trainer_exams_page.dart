@@ -123,7 +123,30 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       _loadMockFallback();
     }
   }
-
+  Future<void> _updateExamVisibility(int examId, String newVisibility) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final uri = Uri.parse('$apiBaseUrl/trainer/exams/$examId/visibility');
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'visibility': newVisibility}),
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(context, 'Exam visibility updated successfully');
+        _fetchExamsData();
+      } else {
+        ToastHelper.showError(context, 'Failed to update visibility: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error updating exam visibility: $e');
+    }
+  }
 
   Future<void> _updateExamStatus(int examId, String newStatus) async {
     try {

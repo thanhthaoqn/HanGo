@@ -3,7 +3,7 @@ package com.hango.hango_backend.service;
 import com.hango.hango_backend.dto.SendMessageRequest;
 import com.hango.hango_backend.dto.SendMessageResponse;
 import com.hango.hango_backend.entity.*;
-import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.AIConversationRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;

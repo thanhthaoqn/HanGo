@@ -6,7 +6,7 @@ import com.hango.hango_backend.dto.GeminiEmbeddingDto;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.GeminiGenerateResponse;
 import com.hango.hango_backend.entity.AiUsageLog;
-import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.AiUsageLogRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;

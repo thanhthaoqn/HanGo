@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import java.util.List;
 
 @RestController
@@ -18,8 +20,8 @@ public class CommentController {
 
     private Long getCurrentUserId() {
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
-            return ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+        if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.security.UserDetailsImpl) {
+            return ((com.hango.hango_backend.security.UserDetailsImpl) auth.getPrincipal()).getId();
         }
         return null;
     }
@@ -32,34 +34,34 @@ public class CommentController {
 
     @PostMapping("/lesson/{lessonId}")
     public ResponseEntity<CommentDTO> addComment(@PathVariable Long lessonId, 
-                                                 @RequestParam Long userId, // Replace with UserPrincipal from SecurityContext later
+                                                 @AuthenticationPrincipal UserDetailsImpl currentUser,
                                                  @RequestBody CommentRequestDTO request) {
-        return ResponseEntity.ok(commentService.addComment(lessonId, userId, request));
+        return ResponseEntity.ok(commentService.addComment(lessonId, currentUser.getId(), request));
     }
 
     @PutMapping("/{commentId}")
     public ResponseEntity<CommentDTO> updateComment(@PathVariable Long commentId,
-                                                    @RequestParam Long userId,
+                                                    @AuthenticationPrincipal UserDetailsImpl currentUser,
                                                     @RequestBody CommentRequestDTO request) {
-        return ResponseEntity.ok(commentService.updateComment(commentId, userId, request));
+        return ResponseEntity.ok(commentService.updateComment(commentId, currentUser.getId(), request));
     }
 
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> deleteComment(@PathVariable Long commentId,
-                                              @RequestParam Long userId) {
-        commentService.deleteComment(commentId, userId);
+                                              @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        commentService.deleteComment(commentId, currentUser.getId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{commentId}/like")
     public ResponseEntity<CommentDTO> likeComment(@PathVariable Long commentId,
-                                                  @RequestParam Long userId) {
-        return ResponseEntity.ok(commentService.likeComment(commentId, userId));
+                                                  @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        return ResponseEntity.ok(commentService.likeComment(commentId, currentUser.getId()));
     }
 
     @PostMapping("/{commentId}/unlike")
     public ResponseEntity<CommentDTO> unlikeComment(@PathVariable Long commentId,
-                                                    @RequestParam Long userId) {
-        return ResponseEntity.ok(commentService.unlikeComment(commentId, userId));
+                                                    @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        return ResponseEntity.ok(commentService.unlikeComment(commentId, currentUser.getId()));
     }
 }

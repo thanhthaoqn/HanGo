@@ -1,4 +1,4 @@
-package com.hango.hango_backend.sercurity;
+package com.hango.hango_backend.security;
 
 import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.extern.slf4j.Slf4j;

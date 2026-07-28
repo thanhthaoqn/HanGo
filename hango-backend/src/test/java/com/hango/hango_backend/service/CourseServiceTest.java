@@ -41,7 +41,7 @@ import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.repository.UserRepository;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 
 @ExtendWith(MockitoExtension.class)
 class CourseServiceTest {

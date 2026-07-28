@@ -1,4 +1,4 @@
-package com.hango.hango_backend.exeption;
+package com.hango.hango_backend.exception;
 
 import org.springframework.http.HttpStatus;
 

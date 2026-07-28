@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.entity.User;
 
 @RestController

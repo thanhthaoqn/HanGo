@@ -11,7 +11,7 @@ import com.hango.hango_backend.entity.LearningPathway;
 import com.hango.hango_backend.entity.PathwayNode;
 import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
 import com.hango.hango_backend.repository.LearningPathwayRepository;
