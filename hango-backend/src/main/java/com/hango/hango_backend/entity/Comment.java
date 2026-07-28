@@ -47,6 +47,12 @@ public class Comment {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "normalized_content", columnDefinition = "TEXT")
+    private String normalizedContent;
+
+    @Column(name = "detection_reason", length = 255)
+    private String detectionReason;
+
     private String status;
 
     @Column(name = "created_at", insertable = false, updatable = false)

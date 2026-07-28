@@ -365,7 +365,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
 
     try {
-      await _lessonRepository.postComment(
+      final posted = await _lessonRepository.postComment(
         _currentLessonId,
         _currentUserId,
         _commentController.text.trim(),
@@ -377,12 +377,27 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         _lessonDetail = updatedLesson;
       });
+      if (mounted) _showModerationFeedback(posted.status);
     } catch (e) {
       ToastHelper.showError(context, 'Failed to post comment: $e');
     } finally {
       setState(() {
         _isPostingComment = false;
       });
+    }
+  }
+
+  void _showModerationFeedback(String status) {
+    if (status == 'REJECTED') {
+      ToastHelper.showError(
+        context,
+        'Your comment violates community guidelines.',
+      );
+    } else if (status == 'PENDING') {
+      ToastHelper.show(
+        context,
+        'Your comment is awaiting moderation and is only visible to you for now.',
+      );
     }
   }
 
@@ -447,7 +462,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
 
     try {
-      await _lessonRepository.postComment(
+      final posted = await _lessonRepository.postComment(
         _currentLessonId,
         _currentUserId,
         _replyCommentController.text.trim(),
@@ -463,6 +478,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         _lessonDetail = updatedLesson;
       });
+      if (mounted) _showModerationFeedback(posted.status);
     } catch (e) {
       ToastHelper.showError(context, 'Failed to post reply: $e');
     } finally {

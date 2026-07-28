@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,8 @@ public class UserController {
             }
             UserResponse response = authService.getUserProfile(userDetails.getUsername());
             return ResponseEntity.ok(response);
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("Error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -44,6 +47,8 @@ public class UserController {
             }
             UserResponse response = authService.updateProfile(userDetails.getUsername(), profileUpdateRequest);
             return ResponseEntity.ok(response);
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("Error: " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -59,6 +64,8 @@ public class UserController {
             }
             authService.changePassword(userDetails.getUsername(), changePasswordRequest);
             return ResponseEntity.ok("{\"message\": \"Password changed successfully!\"}");
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }

@@ -78,6 +78,15 @@ public class Course {
     @Column(length = 30)
     private String status = "DRAFT";
 
+    /** Cached from CourseRating rows for quick display; recalculated by CourseRatingServiceImpl on every add/update/delete. */
+    @Builder.Default
+    @Column(name = "average_rating")
+    private Double averageRating = 0.0;
+
+    @Builder.Default
+    @Column(name = "total_ratings")
+    private Integer totalRatings = 0;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

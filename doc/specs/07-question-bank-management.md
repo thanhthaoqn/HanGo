@@ -1,23 +1,27 @@
-# Feature Specification: FT-05 - Question Bank Management
+# Feature Specification: FE-07 — Question Bank Management
+
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.7 (QB)
+
+> ⚠️ **Ghi chú 2026-07-24:** `TrainerQuestionServiceImpl` thật hiện dùng `JdbcTemplate` (raw SQL có tham số hoá) cho phần CRUD group/sub-question thay vì thuần JPA — vẫn an toàn (không nối chuỗi SQL thủ công) nhưng khác cách triển khai "API CRUD" chung chung mà tài liệu này ngụ ý. `GAP-QB-01` (biến fallback trong `TrainerQuestionAIService.generatePayload` được tính nhưng không bao giờ dùng tới) vẫn còn tồn tại, chưa sửa. Excel Import/Export cho Question Bank: xem lưu ý về Apache POI ở [06-course-content-management.md](06-course-content-management.md) — nhiều khả năng áp dụng tương tự ở đây, chưa xác nhận riêng.
 
 ## 1. Business Context
-The Assessment system requires a flexible and centralized question repository. The Question Bank Management feature allows Trainers to create, edit, and categorize questions (Multiple Choice Single Choice) by Category/Skill (SkillType). It provides support for QuestionGroups (reading comprehension passages) and bulk Excel imports, as well as AI-powered draft generation for questions and explanations.
+The Assessment system requires a flexible and centralized question repository, owned by each Trainer, reused by both Quiz (in Course content) and Exam. v1 supports exactly **one QuestionType: SingleChoice** (4 options A/B/C/D, exactly one correct answer) — no Multiple Choice / Fill-in-blank / True-False. Each Question has exactly **one SkillType** (BR-QB-01) and a Visibility (Public/Private). QuestionGroup lets several questions share a passage (SharedContent), used mainly for Exam. It also provides bulk Import/Export via Excel files, saving time versus manual entry.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Question list UI with filters by Course, SkillType, and Difficulty Level.
-- [ ] Question editor form supporting option input fields (A/B/C/D) and correct answer selection.
-- [ ] QuestionGroup editor interface allowing Trainers to write comprehension passage contexts (context text) and add nested sub-questions.
-- [ ] Integration with AI helpers: "AI Generate Question" and "AI Generate Explanation" draft buttons.
-- [ ] "Import from Excel" button opening a File Picker for `.xlsx` template uploads.
+- [ ] Question list UI with filters by **SkillType, Difficulty, and Visibility**.
+- [ ] Question creation form: Content, Explanation, exactly 4 options (A/B/C/D) with single correct-answer selection, SkillType, Difficulty, Visibility.
+- [ ] QuestionGroup editor for shared-passage questions.
+- [ ] AI-assisted "Generate Question & Explanation" draft button (Trainer must review/edit before saving — BR-AI-01).
+- [ ] "Import from Excel" button opening a File Picker, selecting `.xlsx` files, and sending them via API.
+- [ ] Display notifications for the total number of successfully imported questions or formatting errors.
 
 **Backend (Spring Boot):**
-- [ ] API `POST /api/v1/trainer/questions` to create single questions.
-- [ ] API `POST /api/v1/trainer/questions/group` to create passage-based QuestionGroups.
-- [ ] API `/api/v1/trainer/questions/select` to retrieve or randomise section questions for quizzes.
-- [ ] AI prompt integrations to draft question bodies and explanations based on category and SkillType.
-- [ ] API `POST /api/v1/questions/import` to parse bulk upload Excel files (.xlsx) using Apache POI.
+- [ ] API `POST /api/v1/questions` to create a single question along with its 4 `answers` (options).
+- [ ] API `POST /api/v1/questions/import` to handle `MultipartFile`. Read Excel files using Apache POI.
+- [ ] Validate Excel data: exactly one correct answer per question, exactly one SkillType, invalid data types.
+- [ ] Manage Transactions when saving lists of `Question` and `Answer` to prevent relational data loss.
 
 ## 3. Technical Constraints
 - **Database Schema:** Questions are mapped to the `questions` table and options/choices are stored in the `question_options` table (fields: `id`, `question_id`, `option_text`, `is_correct`), using Foreign Keys with `ON DELETE CASCADE`.

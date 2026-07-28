@@ -8,6 +8,7 @@ class LessonComment {
   final int? parentCommentId;
   final int likeCount;
   final bool isLiked;
+  final String status;
 
   LessonComment({
     required this.id,
@@ -19,6 +20,7 @@ class LessonComment {
     this.parentCommentId,
     this.likeCount = 0,
     this.isLiked = false,
+    this.status = 'APPROVED',
   });
 
   factory LessonComment.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class LessonComment {
       parentCommentId: json['parentCommentId'],
       likeCount: json['likeCount'] ?? 0,
       isLiked: json['isLiked'] as bool? ?? false,
+      status: json['status'] ?? 'APPROVED',
     );
   }
 }

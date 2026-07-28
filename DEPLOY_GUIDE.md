@@ -107,14 +107,16 @@ mkdir -p ~/hango/hango-frontend/build
 
 ```bash
 cat << 'EOF' > ~/hango/.env
-PAYOS_CLIENT_ID=df291f8a-a43e-4eb4-8051-403e585bbbe3
-PAYOS_API_KEY=21cbf681-9a31-491d-bf58-b6cc7243da24
-PAYOS_CHECKSUM_KEY=c92c1bac9971bef4723d3ba1190b95cd0fc3f822bc903d1156778433b9b810c3
+PAYOS_CLIENT_ID=YOUR_PAYOS_CLIENT_ID
+PAYOS_API_KEY=YOUR_PAYOS_API_KEY
+PAYOS_CHECKSUM_KEY=YOUR_PAYOS_CHECKSUM_KEY
 EOF
 
 # Khóa quyền truy cập file .env chỉ cho riêng user ubuntu
 chmod 600 ~/hango/.env
 ```
+
+> ⚠️ **Không bao giờ commit giá trị thật của các biến trên vào Git** (kể cả trong tài liệu). Lấy giá trị thật từ PayOS Merchant Dashboard và dán trực tiếp trên server khi chạy lệnh này, không lưu lại trong bất kỳ file nào được track bởi git. Nếu bạn tìm thấy giá trị thật đã từng bị commit (kể cả trong lịch sử git cũ), hãy coi như đã bị lộ và rotate lại key ngay trên PayOS Dashboard.
 
 ---
 
@@ -152,7 +154,7 @@ Khi bạn đẩy code có chứa thư mục cấu hình `.github/workflows/deplo
    ```
 3. **Sinh chứng chỉ SSL:**
    ```bash
-   sudo certbot certonly --standalone -d hangog92.online -d www.hangog92.online -d api.hangog92.online --email thanhthao2004qn@gmail.com --agree-tos --no-eff-email
+   sudo certbot certonly --standalone -d hangog92.online -d www.hangog92.online -d api.hangog92.online --email YOUR_EMAIL@example.com --agree-tos --no-eff-email
    ```
 4. **Copy chứng chỉ vào thư mục chia sẻ của Docker:**
    ```bash
