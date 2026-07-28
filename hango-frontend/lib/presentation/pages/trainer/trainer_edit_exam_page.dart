@@ -7,11 +7,7 @@ import '../../../utils/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
-import '../login_page.dart';
-import 'trainer_courses_page.dart';
-import 'trainer_dashboard_page.dart';
-import 'trainer_exams_page.dart';
-import 'question_bank/trainer_question_bank_page.dart';
+import '../../widgets/trainer/trainer_sidebar.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/course_manager_api.dart';
 
@@ -604,18 +600,6 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       }
     }
   }
-
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -623,10 +607,10 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 2)) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1679,198 +1663,6 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
   }
 
   // --- Sidebar & Header ---
-
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-
-                Image.network(
-
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-
-                  height: 36,
-
-                  fit: BoxFit.contain,
-
-                  errorBuilder: (context, error, stackTrace) {
-
-                    return Row(
-
-                      children: [
-
-                        Container(
-
-                          width: 32,
-
-                          height: 32,
-
-                          decoration: const BoxDecoration(
-
-                            color: Color(0xFFE6FFFA),
-
-                            shape: BoxShape.circle,
-
-                          ),
-
-                          child: const Icon(
-
-                            Icons.school,
-
-                            size: 18,
-
-                            color: Color(0xFF20B486),
-
-                          ),
-
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        const Text(
-
-                          'HanGo',
-
-                          style: TextStyle(
-
-                            fontSize: 20,
-
-                            fontWeight: FontWeight.bold,
-
-                            color: Color(0xFF1F2937),
-
-                            fontFamily: 'Outfit',
-
-                          ),
-
-                        ),
-
-                      ],
-
-                    );
-
-                  },
-
-                ),
-
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          _buildSidebarItem(
-            Icons.dashboard_outlined,
-            'Dashboard',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerDashboardPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.book_outlined,
-            'Courses',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerCoursesPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.assignment_outlined,
-            'Exam',
-            isSelected: true,
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerExamsPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.folder_open_outlined,
-            'Question Bank',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerQuestionBankPage(),
-                ),
-              );
-            },
-          ),
-          const Spacer(),
-          _buildSidebarItem(
-            Icons.logout,
-            'Log out',
-            isLogout: true,
-            onTap: _handleLogout,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isSelected = false,
-    bool isLogout = false,
-    VoidCallback? onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFF1F5F9) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isLogout
-                  ? const Color(0xFFEF4444)
-                  : (isSelected
-                        ? const Color(0xFF38C9A6)
-                        : const Color(0xFF64748B)),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isLogout
-                    ? const Color(0xFFEF4444)
-                    : (isSelected
-                          ? const Color(0xFF0F172A)
-                          : const Color(0xFF64748B)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildHeader(BuildContext context, bool showMenuButton) {
     return Container(

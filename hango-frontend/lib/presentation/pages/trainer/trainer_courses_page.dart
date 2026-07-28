@@ -6,17 +6,14 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
-import '../learner/learner_home_page.dart';
 import 'trainer_dashboard_page.dart';
-import 'trainer_exams_page.dart';
 
 import 'create_course_page.dart';
 import 'edit_course_page.dart';
 import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
-import 'question_bank/trainer_question_bank_page.dart';
 import 'trainer_profile_page.dart';
-import 'trainer_revenue_page.dart';
+import '../../widgets/trainer/trainer_sidebar.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
   final bool isEmbedded;
@@ -459,10 +456,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Slate 50
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
+      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 1)) : null,
       body: Row(
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
+          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 1)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -564,236 +561,6 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           sliver: SliverToBoxAdapter(child: _buildPagination()),
         ),
       ],
-    );
-  }
-
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Logo
-          InkWell(
-            onTap: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LearnerHomePage(),
-                ),
-                (route) => false,
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-              child: Image.network(
-                'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                height: 42,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-
-                      Image.network(
-
-                        'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-
-                        height: 36,
-
-                        fit: BoxFit.contain,
-
-                        errorBuilder: (context, error, stackTrace) {
-
-                          return Row(
-
-                            children: [
-
-                              Container(
-
-                                width: 32,
-
-                                height: 32,
-
-                                decoration: const BoxDecoration(
-
-                                  color: Color(0xFFE6FFFA),
-
-                                  shape: BoxShape.circle,
-
-                                ),
-
-                                child: const Icon(
-
-                                  Icons.school,
-
-                                  size: 18,
-
-                                  color: Color(0xFF20B486),
-
-                                ),
-
-                              ),
-
-                              const SizedBox(width: 8),
-
-                              const Text(
-
-                                'HanGo',
-
-                                style: TextStyle(
-
-                                  fontSize: 20,
-
-                                  fontWeight: FontWeight.bold,
-
-                                  color: Color(0xFF1F2937),
-
-                                  fontFamily: 'Outfit',
-
-                                ),
-
-                              ),
-
-                            ],
-
-                          );
-
-                        },
-
-                      ),
-
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 40),
-          // Sidebar menu items
-          _buildSidebarItem(
-            Icons.dashboard_outlined,
-            'Dashboard',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerDashboardPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', isActive: true),
-          _buildSidebarItem(
-            Icons.assignment_outlined,
-            'Exam',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerExamsPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(Icons.people_outline, 'Learner'),
-          _buildSidebarItem(
-            Icons.question_answer_outlined,
-            'Question Bank',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerQuestionBankPage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.account_balance_wallet_outlined,
-            'Revenue',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerRevenuePage(),
-                ),
-              );
-            },
-          ),
-          _buildSidebarItem(
-            Icons.person_outline,
-            'My Profile',
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerProfilePage(),
-                ),
-              );
-            },
-          ),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-
-          _buildSidebarItem(
-            Icons.logout,
-            'Logout',
-            color: Colors.redAccent,
-            onTap: _handleLogout,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive
-                    ? Colors.white
-                    : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive
-                      ? Colors.white
-                      : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -1357,9 +1124,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     for (final c in group) {
       final s = (c['status'] ?? '').toString().toUpperCase();
       final id = (c['id'] ?? 0) as int;
-      if (s == 'PUBLISHED') {
+      if (s == 'PUBLISHED' || s == 'HIDDEN' || s == 'ARCHIVED') {
         if (published == null || id > (published['id'] as int)) published = c;
-      } else if (s == 'PENDING_APPROVAL' || s == 'PENDING') {
+      } else if (s == 'PENDING_APPROVAL' || s == 'PENDING' || s == 'SUBMITTED') {
         if (pending == null || id > (pending['id'] as int)) pending = c;
       } else {
         if (draft == null || id > (draft['id'] as int)) draft = c;
@@ -1397,7 +1164,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   }
 
   /// Returns the lifecycle state string for a group.
-  /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'PENDING'
+  /// One of: 'LIVE_ONLY' | 'HAS_DRAFT' | 'DRAFT_ONLY' | 'PENDING'
   String _lifecycleState({
     required dynamic published,
     required dynamic draft,
@@ -1406,6 +1173,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   }) {
     if (pending != null) return 'PENDING';
     if (draft != null && published != null) return 'HAS_DRAFT';
+    if (draft != null && published == null) return 'DRAFT_ONLY';
     return 'LIVE_ONLY';
   }
 
@@ -1692,13 +1460,6 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               onTap: () =>
                   _showVersionHistoryModal(context, title, allVersions),
             ),
-            const SizedBox(width: 8),
-            _iconBtn(
-              icon: Icons.delete_outline,
-              tooltip: 'Delete course',
-              color: const Color(0xFFEF4444),
-              onTap: () => _deleteCourse(course),
-            ),
           ],
         );
 
@@ -1729,19 +1490,52 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               onTap: () =>
                   _showVersionHistoryModal(context, title, allVersions),
             ),
-            const SizedBox(width: 8),
+            const Spacer(),
             _actionChip(
               icon: Icons.cancel_outlined,
               label: 'Cancel Draft',
-              color: const Color(0xFF64748B),
+              color: const Color(0xFFEF4444),
+              bg: const Color(0xFFFEE2E2),
               onTap: () => _deleteCourse(draft),
+            ),
+          ],
+        );
+
+      // ── State 4: Draft Only (or Rejected) ─────────────────────────────
+      case 'DRAFT_ONLY':
+        final s = (course['status'] ?? '').toString().toUpperCase();
+        final isRejected = s == 'REJECTED';
+        return Row(
+          children: [
+            _actionChip(
+              icon: Icons.edit_outlined,
+              label: isRejected ? 'Edit Rejected Course' : 'Edit Draft',
+              color: isRejected ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+              bg: isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditCoursePage(courseId: extractId(course)),
+                  ),
+                ).then((_) => _fetchCoursesData());
+              },
+            ),
+            const SizedBox(width: 8),
+            _actionChip(
+              icon: Icons.history,
+              label: 'Version History',
+              color: const Color(0xFF475569),
+              bg: const Color(0xFFF1F5F9),
+              onTap: () =>
+                  _showVersionHistoryModal(context, title, allVersions),
             ),
             const Spacer(),
             _iconBtn(
               icon: Icons.delete_outline,
               tooltip: 'Delete course',
               color: const Color(0xFFEF4444),
-              onTap: () => _deleteCourse(published ?? draft),
+              onTap: () => _deleteCourse(course),
             ),
           ],
         );

@@ -8,7 +8,6 @@ import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.Lesson;
 import com.hango.hango_backend.entity.LessonProgress;
-import com.hango.hango_backend.entity.LessonQuizAttempt;
 import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.CourseRating;
@@ -16,7 +15,6 @@ import com.hango.hango_backend.repository.CourseRatingRepository;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
-import com.hango.hango_backend.repository.LessonQuizAttemptRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.UserRepository;
@@ -24,10 +22,8 @@ import com.hango.hango_backend.repository.TrainerProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,7 +44,6 @@ public class CourseServiceImpl implements CourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final LessonProgressRepository lessonProgressRepository;
-    private final LessonQuizAttemptRepository lessonQuizAttemptRepository;
     private final CourseRatingRepository courseRatingRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final EmailService emailService;
@@ -122,9 +117,22 @@ public class CourseServiceImpl implements CourseService {
 
 
         boolean isEnrolled = false;
+        Optional<Enrollment> enrollmentOpt = Optional.empty();
+        if (currentUserId != null) {
+            enrollmentOpt = enrollmentRepository.findByUserIdAndCourseId(currentUserId, id);
+            if (enrollmentOpt.isEmpty()) {
+                List<Enrollment> familyE = enrollmentRepository.findFamilyEnrollments(currentUserId, id);
+                if (!familyE.isEmpty() && familyE.get(0).getCourse() != null && !familyE.get(0).getCourse().getId().equals(id)) {
+                    return getCourseDetail(familyE.get(0).getCourse().getId(), currentUserId);
+                }
+            }
+            isEnrolled = enrollmentOpt.isPresent();
+        }
 
         if (!"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
-            if (currentUserId == null || course.getCreator() == null || !course.getCreator().getId().equals(currentUserId)) {
+            boolean isCreator = (currentUserId != null && course.getCreator() != null && course.getCreator().getId().equals(currentUserId));
+            boolean isHiddenOrArchivedAndEnrolled = ("HIDDEN".equalsIgnoreCase(course.getStatus()) || "ARCHIVED".equalsIgnoreCase(course.getStatus())) && isEnrolled;
+            if (!isCreator && !isHiddenOrArchivedAndEnrolled) {
                 throw new RuntimeException("Course not found");
             }
         }
@@ -135,14 +143,6 @@ public class CourseServiceImpl implements CourseService {
         String latestPublishedVersion = null;
  
         if (currentUserId != null) {
-            Optional<Enrollment> enrollmentOpt = enrollmentRepository.findByUserIdAndCourseId(currentUserId, id);
-            if (enrollmentOpt.isEmpty()) {
-                List<Enrollment> familyE = enrollmentRepository.findFamilyEnrollments(currentUserId, id);
-                if (!familyE.isEmpty() && familyE.get(0).getCourse() != null && !familyE.get(0).getCourse().getId().equals(id)) {
-                    return getCourseDetail(familyE.get(0).getCourse().getId(), currentUserId);
-                }
-            }
-            isEnrolled = enrollmentOpt.isPresent();
             completedLessonIds.addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
 
             if (isEnrolled) {

@@ -6,7 +6,6 @@ import com.hango.hango_backend.dto.CourseLessonDTO;
 import com.hango.hango_backend.dto.CourseSessionDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Lesson;
-import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamRepository;
 import com.hango.hango_backend.repository.LessonRepository;
@@ -38,6 +37,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         long activeCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("PUBLISHED");
         long inactiveCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("DRAFT")
                 + courseRepository.countByStatusAndDeletedAtIsNull("ARCHIVED")
+                + courseRepository.countByStatusAndDeletedAtIsNull("HIDDEN")
                 + courseRepository.countByStatusAndDeletedAtIsNull("PENDING");
         long examsCount = examRepository.count();
 
@@ -122,6 +122,36 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         course.setStatus("DRAFT");
         courseRepository.save(course);
         // V1 remains PUBLISHED untouched - no changes needed
+    }
+
+    @Override
+    @Transactional
+    public void hideCourse(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .filter(c -> c.getDeletedAt() == null)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
+
+        if (!"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
+            throw new RuntimeException("Only courses in PUBLISHED status can be hidden");
+        }
+
+        course.setStatus("HIDDEN");
+        courseRepository.save(course);
+    }
+
+    @Override
+    @Transactional
+    public void unhideCourse(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .filter(c -> c.getDeletedAt() == null)
+                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
+
+        if (!"HIDDEN".equalsIgnoreCase(course.getStatus()) && !"ARCHIVED".equalsIgnoreCase(course.getStatus())) {
+            throw new RuntimeException("Only hidden or archived courses can be unhidden");
+        }
+
+        course.setStatus("PUBLISHED");
+        courseRepository.save(course);
     }
 
     private String normalizeStatus(String status) {

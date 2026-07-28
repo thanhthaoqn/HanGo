@@ -32,7 +32,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
   CourseDetail? _courseDetail;
   bool _isLoading = true;
   String _userName = 'Learner';
-  String _verificationCode = '';
+  String _achievementId = '';
 
   // Review section state
   double _selectedRating = 5.0;
@@ -44,7 +44,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
   void initState() {
     super.initState();
     _courseDetail = widget.courseDetail;
-    _generateVerificationCode();
+    _generateAchievementId();
     _loadUserAndCourse();
 
     // Initialize 60fps continuous celebration animation
@@ -56,10 +56,10 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
     _particles = _generateParticles(80);
   }
 
-  void _generateVerificationCode() {
+  void _generateAchievementId() {
     final now = DateTime.now();
     final uniqueNum = (now.millisecondsSinceEpoch % 90000) + 10000;
-    _verificationCode = 'CERT-HG-${widget.courseId}-${now.year}-$uniqueNum';
+    _achievementId = 'ACHIEVE-HG-${widget.courseId}-${now.year}-$uniqueNum';
   }
 
   Future<void> _loadUserAndCourse() async {
@@ -104,7 +104,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
       const Color(0xFF14B8A6), // Light Teal
       const Color(0xFFF43F5E), // Rose / Coral
       const Color(0xFF8B5CF6), // Purple
-      const Color(0xFF34D399), // Mint Green
+      const Color(0xFF3B82F6), // Blue
     ];
 
     return List.generate(count, (index) {
@@ -165,26 +165,17 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
     }
   }
 
-  void _downloadCertificate() {
-    ToastHelper.showSuccess(
-      context,
-      LanguageManager.isVi
-          ? '🎉 Đã lưu chứng chỉ! Bạn có thể xem trong thư mục tải xuống.'
-          : '🎉 Certificate saved! Ready for printing or sharing.',
-    );
-  }
-
   void _shareAchievement() {
     final title = _courseDetail?.title ?? 'a course';
     final shareText = LanguageManager.isVi
-        ? 'Tôi vừa hoàn thành xuất sắc khóa học "$title" trên nền tảng HanGo EdTech! Mã xác thực: $_verificationCode'
-        : 'I just completed "$title" on HanGo EdTech! Verification ID: $_verificationCode';
+        ? 'Tôi vừa hoàn thành xuất sắc khóa học "$title" trên nền tảng HanGo EdTech! 🚀'
+        : 'I just completed "$title" on HanGo EdTech! 🚀';
 
     Clipboard.setData(ClipboardData(text: shareText));
     ToastHelper.showSuccess(
       context,
       LanguageManager.isVi
-          ? 'Đã sao chép nội dung chia sẻ vào clipboard!'
+          ? 'Đã sao chép thông tin thành tích vào clipboard!'
           : 'Achievement details copied to clipboard!',
     );
   }
@@ -206,18 +197,21 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Color(0xFF1E293B)),
-          tooltip: isVi ? 'Đóng' : 'Close',
-          onPressed: () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const MyLearningPage()),
-              (route) => route.isFirst,
-            );
-          },
+        leading: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: IconButton(
+            icon: const Icon(Icons.close_rounded, color: Color(0xFF1E293B)),
+            tooltip: isVi ? 'Đóng' : 'Close',
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const MyLearningPage()),
+                (route) => route.isFirst,
+              );
+            },
+          ),
         ),
         title: Text(
-          isVi ? 'Tổng kết Khóa học' : 'Course Completion',
+          isVi ? 'Chúc Mừng Hoàn Thành' : 'Course Completed',
           style: const TextStyle(
             color: Color(0xFF0F172A),
             fontWeight: FontWeight.bold,
@@ -227,21 +221,24 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         ),
         centerTitle: true,
         actions: [
-          TextButton.icon(
-            onPressed: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => CourseDetailPage(courseId: widget.courseId),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => CourseDetailPage(courseId: widget.courseId),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.menu_book_rounded, size: 18, color: Color(0xFF20B486)),
+              label: Text(
+                isVi ? 'Xem lại bài học' : 'Review Course',
+                style: const TextStyle(
+                  color: Color(0xFF20B486),
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Outfit',
                 ),
-              );
-            },
-            icon: const Icon(Icons.menu_book_rounded, size: 18, color: Color(0xFF20B486)),
-            label: Text(
-              isVi ? 'Xem lại bài học' : 'Review Course',
-              style: const TextStyle(
-                color: Color(0xFF20B486),
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Outfit',
               ),
             ),
           ),
@@ -287,13 +284,13 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
       padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
       child: Center(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 1300),
+          constraints: const BoxConstraints(maxWidth: 1200),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left Column: Celebration, Stats & Next Steps
+              // Left Column: Hero Celebration & Mastery Stats
               Expanded(
-                flex: 5,
+                flex: 6,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -301,22 +298,20 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
                     const SizedBox(height: 28),
                     _buildMasteryStatsGrid(isVi),
                     const SizedBox(height: 28),
-                    _buildReviewSection(isVi),
-                    const SizedBox(height: 28),
                     _buildNextStepsCard(isVi),
                     const SizedBox(height: 32),
                   ],
                 ),
               ),
-              const SizedBox(width: 48),
-              // Right Column: Certificate Card
+              const SizedBox(width: 40),
+              // Right Column: Gamified Feedback & Takeaways Card
               Expanded(
-                flex: 6,
+                flex: 5,
                 child: Column(
                   children: [
-                    _buildCertificateCard(isVi),
-                    const SizedBox(height: 20),
-                    _buildCertificateActions(isVi),
+                    _buildReviewSection(isVi),
+                    const SizedBox(height: 24),
+                    _buildTakeawaysCard(isVi),
                   ],
                 ),
               ),
@@ -335,15 +330,13 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         children: [
           _buildCelebrationHeader(isVi),
           const SizedBox(height: 24),
-          _buildCertificateCard(isVi),
-          const SizedBox(height: 16),
-          _buildCertificateActions(isVi),
-          const SizedBox(height: 28),
           _buildMasteryStatsGrid(isVi),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _buildReviewSection(isVi),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _buildNextStepsCard(isVi),
+          const SizedBox(height: 24),
+          _buildTakeawaysCard(isVi),
           const SizedBox(height: 32),
         ],
       ),
@@ -352,20 +345,19 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
 
   Widget _buildCelebrationHeader(bool isVi) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFECFDF5), Color(0xFFF0FDF4)],
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFA7F3D0)),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0820B486),
-            blurRadius: 16,
-            offset: Offset(0, 4),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -373,58 +365,89 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF20B486),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x3320B486),
-                      blurRadius: 12,
-                      offset: Offset(0, 4),
+                  color: const Color(0xFF20B486).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF20B486)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, color: Color(0xFF34D399), size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      isVi ? '✨ HOÀN THÀNH XUẤT SẮC' : '✨ COURSE CONQUERED',
+                      style: const TextStyle(
+                        color: Color(0xFF34D399),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 0.8,
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.emoji_events_rounded,
-                  color: Colors.white,
-                  size: 32,
+              ),
+              Text(
+                'ID: $_achievementId',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  fontSize: 11,
+                  fontFamily: 'monospace',
                 ),
               ),
-              const SizedBox(width: 16),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 38),
+              ),
+              const SizedBox(width: 20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: Text(
-                        isVi ? '🏆 HOÀN THÀNH XUẤT SẮC' : '🏆 ACHIEVEMENT UNLOCKED',
-                        style: const TextStyle(
-                          color: Color(0xFFD97706),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          letterSpacing: 0.8,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     Text(
                       isVi ? 'Chúc Mừng, $_userName!' : 'Congratulations, $_userName!',
                       style: const TextStyle(
-                        fontSize: 26,
+                        fontSize: 28,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
+                        color: Colors.white,
                         fontFamily: 'Outfit',
                         letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _courseDetail?.title ?? (isVi ? 'Khóa học kiến thức chuyên sâu' : 'Mastery Learning Course'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF34D399),
+                        fontFamily: 'Outfit',
                       ),
                     ),
                   ],
@@ -432,17 +455,40 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
             isVi
-                ? 'Bạn đã hoàn thành xuất sắc toàn bộ lộ trình bài học trong khóa học này. Sự kiên trì và nỗ lực của bạn đã mang lại kết quả tuyệt vời!'
-                : 'You have successfully mastered the complete curriculum for this course. Your dedication and consistent effort have paid off outstandingly!',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF475569),
-              height: 1.5,
+                ? 'Sự kiên trì và nỗ lực của bạn đã đơm hoa kết trái. Bạn đã nắm vững toàn bộ kiến thức và kỹ năng từ khóa học này. Hãy tự hào về thành quả tuyệt vời của bản thân!'
+                : 'Your dedication and consistent effort have paid off. You have mastered the comprehensive curriculum of this course. Take a moment to celebrate your personal growth!',
+            style: TextStyle(
+              fontSize: 14.5,
+              color: Colors.white.withValues(alpha: 0.8),
+              height: 1.6,
               fontFamily: 'Outfit',
             ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: ElevatedButton.icon(
+                  onPressed: _shareAchievement,
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: Text(
+                    isVi ? 'Chia sẻ thành tích 🚀' : 'Share Achievement 🚀',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Outfit', fontSize: 14),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20B486),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -477,18 +523,18 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
       {
         'title': isVi ? 'Cấu trúc chương học' : 'Course Modules',
         'value': totalSessions > 0 ? '$totalSessions ${isVi ? 'Chương' : 'Sessions'}' : (isVi ? 'Trọn gói' : 'Complete'),
-        'sub': isVi ? 'Đã nắm vững kiến thức' : 'Structured Sections',
+        'sub': isVi ? 'Đã nắm vững' : 'Structured Sections',
         'icon': Icons.layers_rounded,
         'color': const Color(0xFF8B5CF6),
         'bg': const Color(0xFFF3E8FF),
       },
       {
-        'title': isVi ? 'Đánh giá học thuật' : 'Academic Rating',
-        'value': isVi ? 'Xuất sắc' : 'Excellent',
-        'sub': isVi ? 'Tiêu chuẩn HanGo' : 'HanGo Certified',
-        'icon': Icons.workspace_premium_rounded,
-        'color': const Color(0xFFF43F5E),
-        'bg': const Color(0xFFFFE4E6),
+        'title': isVi ? 'Đánh giá kỹ năng' : 'Skill Proficiency',
+        'value': isVi ? 'Thành thạo' : 'Proficient',
+        'sub': isVi ? 'Khả năng ứng dụng cao' : 'High Application Readiness',
+        'icon': Icons.psychology_alt_rounded,
+        'color': const Color(0xFF3B82F6),
+        'bg': const Color(0xFFEFF6FF),
       },
     ];
 
@@ -497,7 +543,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 1.6,
+        childAspectRatio: 1.65,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
@@ -508,16 +554,16 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         final bg = item['bg'] as Color;
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x04000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
+                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -540,7 +586,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
                     child: Text(
                       item['title'] as String,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 12.5,
                         color: Color(0xFF64748B),
                         fontWeight: FontWeight.w600,
                         fontFamily: 'Outfit',
@@ -555,7 +601,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
               Text(
                 item['value'] as String,
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.w800,
                   color: color,
                   fontFamily: 'Outfit',
@@ -565,7 +611,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
               Text(
                 item['sub'] as String,
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 11.5,
                   color: Color(0xFF94A3B8),
                   fontFamily: 'Outfit',
                 ),
@@ -579,327 +625,42 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
     );
   }
 
-  Widget _buildCertificateCard(bool isVi) {
-    final title = _courseDetail?.title ?? (isVi ? 'Khóa học Tiếng Anh THPT' : 'English Mastery Course');
-    final creator = _courseDetail?.creatorName ?? (isVi ? 'Ban Chuyên Môn HanGo' : 'HanGo Faculty');
-    final now = DateTime.now();
-    final dateStr = "${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}";
-
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFF59E0B), Color(0xFF20B486), Color(0xFFF59E0B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F20B486),
-            blurRadius: 32,
-            offset: Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFBEB),
-          borderRadius: BorderRadius.circular(20),
-          image: const DecorationImage(
-            image: AssetImage('assets/images/parchment_pattern.png'), // Will safely fallback if absent
-            fit: BoxFit.cover,
-            opacity: 0.05,
-          ),
-        ),
-        child: Column(
-          children: [
-            // Header Seal
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF20B486),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'HanGo EdTech',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.5,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFF59E0B)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.verified_rounded, color: Color(0xFFD97706), size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        isVi ? 'CHỨNG CHỈ CHÍNH THỨC' : 'OFFICIAL CERTIFICATE',
-                        style: const TextStyle(
-                          color: Color(0xFFD97706),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          letterSpacing: 0.5,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 36),
-            Text(
-              isVi ? 'CHỨNG NHẬN HOÀN THÀNH KHÓA HỌC' : 'CERTIFICATE OF COMPLETION',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFFB45309), // Dark Gold
-                letterSpacing: 2.0,
-                fontFamily: 'Outfit',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              isVi ? 'Chứng nhận học viên' : 'This is to proudly certify that',
-              style: const TextStyle(
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFF64748B),
-                fontFamily: 'Outfit',
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _userName,
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A),
-                fontFamily: 'Outfit',
-                decoration: TextDecoration.underline,
-                decorationColor: Color(0xFF20B486),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              isVi
-                  ? 'Đã kiên trì học tập và hoàn thành xuất sắc toàn bộ chương trình của khóa học:'
-                  : 'Has successfully completed all requirements and demonstrated mastery of the course:',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF475569),
-                height: 1.5,
-                fontFamily: 'Outfit',
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-              ),
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF20B486),
-                  fontFamily: 'Outfit',
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 40),
-            const Divider(color: Color(0xFFFDE68A), thickness: 1.5),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isVi ? 'CẤP NGÀY' : 'ISSUE DATE',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF94A3B8),
-                        letterSpacing: 1.0,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      dateStr,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.workspace_premium_rounded, color: Color(0xFFF59E0B), size: 36),
-                    const SizedBox(height: 2),
-                    Text(
-                      isVi ? 'ĐẠT CHUẨN HANGO' : 'HANGO CERTIFIED',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFD97706),
-                        letterSpacing: 0.5,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      isVi ? 'GIẢNG VIÊN HƯỚNG DẪN' : 'INSTRUCTOR',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF94A3B8),
-                        letterSpacing: 1.0,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      creator,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'ID: $_verificationCode',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCertificateActions(bool isVi) {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _downloadCertificate,
-            icon: const Icon(Icons.download_rounded, size: 20),
-            label: Text(
-              isVi ? 'Tải về Chứng chỉ' : 'Download Certificate',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20B486),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _shareAchievement,
-            icon: const Icon(Icons.share_rounded, size: 18),
-            label: Text(
-              isVi ? 'Chia sẻ thành tích' : 'Share Achievement',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF0F172A),
-              side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildReviewSection(bool isVi) {
     if (_hasSubmittedReview) {
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: const Color(0xFFECFDF5),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFF6EE7B7)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            const Icon(Icons.star_rounded, color: Color(0xFF10B981), size: 32),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF10B981),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_rounded, color: Colors.white, size: 28),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isVi ? 'Cảm ơn bạn đã gửi đánh giá!' : 'Thank You For Your Review!',
+                    isVi ? 'Cảm ơn bạn đã đánh giá!' : 'Thank You For Your Feedback!',
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                       color: Color(0xFF065F46),
                       fontFamily: 'Outfit',
                     ),
@@ -907,11 +668,12 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
                   const SizedBox(height: 4),
                   Text(
                     isVi
-                        ? 'Đánh giá của bạn đã được ghi nhận và sẽ giúp cộng đồng học viên HanGo lựa chọn tốt hơn.'
-                        : 'Your valuable feedback helps instructors improve and guides fellow learners.',
+                        ? 'Ý kiến đóng góp quý báu của bạn đã được ghi nhận, giúp nâng cao chất lượng bài giảng và hỗ trợ cộng đồng học viên HanGo.'
+                        : 'Your valuable review helps instructors enhance the course material and guides fellow learners.',
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 13.5,
                       color: Color(0xFF047857),
+                      height: 1.4,
                       fontFamily: 'Outfit',
                     ),
                   ),
@@ -924,16 +686,16 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
     }
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -942,34 +704,41 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         children: [
           Row(
             children: [
-              const Icon(Icons.rate_review_rounded, color: Color(0xFFF59E0B), size: 24),
-              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.rate_review_rounded, color: Color(0xFFF59E0B), size: 24),
+              ),
+              const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  isVi ? 'Bạn cảm thấy khóa học thế nào?' : 'How was your learning experience?',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                    fontFamily: 'Outfit',
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isVi ? 'Cảm nhận của bạn về khóa học?' : 'How was your learning experience?',
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isVi ? 'Chia sẻ đánh giá để giúp cộng đồng phát triển' : 'Leave a rating to guide future learners',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            isVi
-                ? 'Hãy để lại số sao và lời chia sẻ cho giảng viên cùng các học viên khác nhé!'
-                : 'Leave a rating and review to support your instructor and fellow learners!',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF64748B),
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(5, (index) {
               final starValue = index + 1.0;
               final isSelected = starValue <= _selectedRating;
@@ -982,69 +751,85 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
                     });
                   },
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.only(right: 8.0),
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 6.0),
                     child: Icon(
                       isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
-                      color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
-                      size: 38,
+                      color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
+                      size: 42,
                     ),
                   ),
                 ),
               );
             }),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              _selectedRating == 5.0
+                  ? (isVi ? '⭐⭐⭐⭐⭐ Tuyệt vời!' : '⭐⭐⭐⭐⭐ Excellent!')
+                  : _selectedRating >= 4.0
+                      ? (isVi ? '⭐⭐⭐⭐ Rất tốt' : '⭐⭐⭐⭐ Very Good')
+                      : _selectedRating >= 3.0
+                          ? (isVi ? '⭐⭐⭐ Khá ổn' : '⭐⭐⭐ Good')
+                          : (isVi ? 'Cần cải thiện thêm' : 'Needs Improvement'),
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706), fontFamily: 'Outfit'),
+            ),
+          ),
+          const SizedBox(height: 20),
           TextField(
             controller: _reviewController,
-            maxLines: 3,
-            maxLength: 300,
+            maxLines: 4,
+            maxLength: 350,
             style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
             decoration: InputDecoration(
               hintText: isVi
-                  ? 'Chia sẻ cảm nhận của bạn về khóa học (giảng viên, nội dung, bài tập)...'
-                  : 'Share your thoughts on the course content, instructor, and exercises...',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  ? 'Viết cảm nhận của bạn về chất lượng giảng dạy, nội dung bài giảng, mức độ dễ hiểu và tính ứng dụng của khóa học...'
+                  : 'Share your thoughts on the course structure, instructor explanations, and real-world usefulness...',
+              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
               filled: true,
               fillColor: const Color(0xFFF8FAFC),
               counterText: '',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Color(0xFF20B486), width: 1.5),
               ),
-              contentPadding: const EdgeInsets.all(16),
+              contentPadding: const EdgeInsets.all(18),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Align(
             alignment: Alignment.centerRight,
-            child: ElevatedButton.icon(
-              onPressed: _isSubmittingReview ? null : _submitReview,
-              icon: _isSubmittingReview
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.send_rounded, size: 18),
-              label: Text(
-                isVi ? 'Gửi đánh giá' : 'Submit Review',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: ElevatedButton.icon(
+                onPressed: _isSubmittingReview ? null : _submitReview,
+                icon: _isSubmittingReview
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.send_rounded, size: 18),
+                label: Text(
+                  isVi ? 'Gửi đánh giá ngay' : 'Submit Feedback',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Outfit', fontSize: 14.5),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
               ),
             ),
           ),
@@ -1055,90 +840,179 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
 
   Widget _buildNextStepsCard(bool isVi) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            isVi ? 'Bước tiếp theo trên hành trình của bạn?' : 'What\'s Next on Your Journey?',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A),
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            isVi
-                ? 'Tiếp tục rèn luyện kỹ năng với Lộ trình học AI cá nhân hóa được tối ưu cho riêng bạn.'
-                : 'Continue advancing your skills with HanGo\'s AI Adaptive Learning Pathway tailored just for you.',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF64748B),
-              fontFamily: 'Outfit',
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.explore_rounded, color: Color(0xFF3B82F6), size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isVi ? 'Bước tiếp theo trên hành trình?' : 'What\'s Next on Your Journey?',
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isVi ? 'Duy trì nhịp độ học tập để bứt phá kỹ năng' : 'Keep up your momentum and unlock new skills',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
+          Text(
+            isVi
+                ? 'Hệ thống AI Adaptive Learning của HanGo đã chuẩn bị sẵn Lộ trình học tiếp theo phù hợp nhất với trình độ hiện tại của bạn. Khám phá ngay để không gián đoạn quá trình rèn luyện!'
+                : 'HanGo\'s AI Adaptive Learning has curated your optimal next learning steps based on your current progress. Continue now to maintain your learning streak!',
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF475569),
+              height: 1.5,
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const LearningPathwayPage()),
-                    );
-                  },
-                  icon: const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFFF59E0B)),
-                  label: Text(
-                    isVi ? 'Khám phá Lộ trình AI' : 'Explore AI Pathway',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const LearningPathwayPage()),
+                      );
+                    },
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFFF59E0B)),
+                    label: Text(
+                      isVi ? 'Khám phá Lộ trình AI ➔' : 'Explore AI Pathway ➔',
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, fontFamily: 'Outfit'),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const MyLearningPage()),
-                      (route) => route.isFirst,
-                    );
-                  },
-                  icon: const Icon(Icons.dashboard_rounded, size: 18),
-                  label: Text(
-                    isVi ? 'Về Bảng điều khiển' : 'My Learning Dashboard',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF475569),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const MyLearningPage()),
+                        (route) => route.isFirst,
+                      );
+                    },
+                    icon: const Icon(Icons.dashboard_rounded, size: 18),
+                    label: Text(
+                      isVi ? 'Về Bảng điều khiển' : 'My Learning Dashboard',
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, fontFamily: 'Outfit'),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF475569),
+                      side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
                   ),
                 ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTakeawaysCard(bool isVi) {
+    final takeaways = [
+      isVi ? 'Nắm vững kiến thức cốt lõi và tư duy hệ thống từ bài giảng' : 'Mastered core concepts and systematic thinking',
+      isVi ? 'Hoàn thành 100% các bài trắc nghiệm và thực hành kỹ năng' : 'Completed 100% of quizzes and skill exercises',
+      isVi ? 'Sẵn sàng áp dụng kiến thức vào thực tế và các khóa nâng cao' : 'Ready to apply knowledge to real-world scenarios',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lightbulb_rounded, color: Color(0xFF20B486), size: 22),
+              const SizedBox(width: 10),
+              Text(
+                isVi ? 'Giá trị bạn đã nhận được' : 'Key Takeaways Achieved',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...takeaways.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.check_circle_outline_rounded, color: Color(0xFF20B486), size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569), height: 1.4, fontFamily: 'Outfit'),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
         ],
       ),
     );
@@ -1182,7 +1056,7 @@ class ConfettiPainter extends CustomPainter {
     for (final particle in particles) {
       final currentY = ((particle.y + animationValue * particle.speed) % 1.4 - 0.2) * size.height;
       final currentX = (particle.x + math.sin((animationValue * math.pi * 2) * particle.horizontalSpeed) * 0.05) * size.width;
-      final currentAngle = particle.angle + animationValue * math.pi * 4 * particle.spinSpeed;
+      final currentAngle = particle.angle + math.pi * 4 * particle.spinSpeed;
 
       canvas.save();
       canvas.translate(currentX, currentY);

@@ -10,14 +10,14 @@ import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../domain/model/lesson_detail.dart';
 import '../../widgets/shared_header.dart';
-import '../../widgets/ai_assistant_drawer.dart';
+import '../../../utils/app_theme.dart';
 import '../../../utils/fullscreen_helper.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/string_utils.dart';
 import '../../widgets/lesson_ai_chatbox.dart';
-import 'package:provider/provider.dart';
 import 'course_detail_page.dart';
 import 'course_completion_page.dart';
+import '../../../utils/language_manager.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
@@ -65,7 +65,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   final TextEditingController _replyCommentController = TextEditingController();
   bool _isPostingReply = false;
 
-  bool _isAIAssistantOpen = false;
+  bool _isAIAssistantOpen = true;
   final TextEditingController _commentController = TextEditingController();
   bool _isPostingComment = false;
 
@@ -235,11 +235,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         // Cho phần bài học bên trái chiếm 65% không gian khả dụng, chatbox chiếm 35% còn lại
         _leftPaneWidth = availableWidth * 0.65;
-        _hasInitializedSplit = true;
       });
     });
 
-    _loadCurrentUserId();
     _loadData();
     _saveLastVisitedSession(widget.lessonId, widget.startQuizImmediately);
     if (widget.startQuizImmediately) {
@@ -601,6 +599,14 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
+  bool get _isCourseFullyCompleted {
+    if (_courseDetail == null) return false;
+    final totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
+    if (totalLessons == 0) return false;
+    final completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+    return completedLessons == totalLessons;
+  }
+
   int? _getNextLessonId(CourseDetail course, int currentLessonId) {
     for (int i = 0; i < course.sessions.length; i++) {
       final session = course.sessions[i];
@@ -625,7 +631,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   // Resizable split between lesson and AI chat
   double _leftPaneWidth = 0; // computed on first layout
-  bool _hasInitializedSplit = false;
   static const double _minLeftPaneWidth = 520;
   static const double _minRightPaneWidth = 320;
 
@@ -643,6 +648,45 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               activeTab: 'Courses',
               hideNavLinks: showHideNavLinks,
             ),
+      drawer: (!isDesktop && _courseDetail != null && !_isDoingQuiz)
+          ? Drawer(
+              backgroundColor: Colors.white,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.menu_book_rounded, color: Color(0xFF28B79B)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _courseDetail!.title,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(child: _buildSidebar(_courseDetail!)),
+                  ],
+                ),
+              ),
+            )
+          : null,
+      floatingActionButton: (!_isDoingQuiz && _lessonDetail != null && (!isDesktop || !_isAIAssistantOpen))
+          ? _buildFloatingAIBubble(isDesktop)
+          : null,
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
@@ -679,6 +723,104 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             )
           : _buildPageContent(isDesktop, showHideNavLinks),
+    );
+  }
+
+  Widget _buildFloatingAIBubble(bool isDesktop) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          if (isDesktop) {
+            _toggleAIAssistant();
+          } else {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFAFCFF),
+                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded, color: Color(0xFF28B79B), size: 20),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'HanGo AI Assistant',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: LessonAiChatbox(
+                        key: ValueKey<int>(_currentLessonId),
+                        lessonId: _currentLessonId,
+                        lessonTitle: _lessonDetail!.title,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF28B79B).withOpacity(0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Ask AI',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -738,12 +880,42 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                   horizontal: 24,
                   vertical: 16,
                 ),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
+                    if (!isDesktop) ...[
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: InkWell(
+                          onTap: () => Scaffold.of(context).openDrawer(),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6F7F4),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.3)),
+                            ),
+                            child: const Icon(
+                              Icons.menu_open_rounded,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                     InkWell(
                       onTap: () async {
                         _clearLastVisitedSession();
@@ -760,16 +932,32 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                           );
                         }
                       },
+                      borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          size: 16,
-                          color: Color(0xFF475569),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.arrow_back_rounded,
+                              size: 14,
+                              color: Color(0xFF475569),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Course',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF334155),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -802,6 +990,46 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         ],
                       ),
                     ),
+                    if (isDesktop && !_isDoingQuiz) ...[
+                      const SizedBox(width: 16),
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: InkWell(
+                          onTap: _toggleAIAssistant,
+                          borderRadius: BorderRadius.circular(20),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _isAIAssistantOpen ? const Color(0xFFE6F7F4) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _isAIAssistantOpen ? AppTheme.emerald : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 16,
+                                  color: _isAIAssistantOpen ? AppTheme.emerald : const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isAIAssistantOpen ? 'Hide AI Assistant' : 'AI Assistant',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: _isAIAssistantOpen ? AppTheme.emerald : const Color(0xFF334155),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -828,8 +1056,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                       ),
                     ),
 
-                    // Right column: resizable AI chat (no scrolling with lesson)
-                    if (!_isDoingQuiz) ...[
+                    // Right column: resizable AI chat (desktop only when toggled ON)
+                    if (isDesktop && !_isDoingQuiz && _isAIAssistantOpen) ...[
                       const SizedBox(width: 12),
 
                       // Divider draggable between lesson and chat
@@ -853,7 +1081,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                                 _minLeftPaneWidth,
                                 availableWidth - _minRightPaneWidth,
                               );
-                              _hasInitializedSplit = true;
                             });
                           },
                           child: Container(
@@ -880,13 +1107,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
                       // Chat width driven by _leftPaneWidth
                       SizedBox(
-                        width: isDesktop
-                            ? (MediaQuery.of(context).size.width -
-                                      320 -
-                                      _leftPaneWidth -
-                                      12)
-                                  .clamp(_minRightPaneWidth, 800)
-                            : 320,
+                        width: (MediaQuery.of(context).size.width -
+                                  320 -
+                                  _leftPaneWidth -
+                                  12)
+                              .clamp(_minRightPaneWidth, 800),
                         child: LessonAiChatbox(
                           key: ValueKey<int>(_currentLessonId),
                           lessonId: _currentLessonId,
@@ -959,56 +1184,67 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     horizontal: 12,
                     vertical: 4,
                   ),
-                  child: Material(
-                    color: isCurrent
-                        ? const Color(0xFFE6F7F4)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      leading: Icon(
-                        _getLessonIcon(l.itemType),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      decoration: BoxDecoration(
                         color: isCurrent
-                            ? const Color(0xFF28B79B)
-                            : const Color(0xFF94A3B8),
-                        size: 20,
-                      ),
-                      title: Text(
-                        l.title,
-                        style: TextStyle(
-                          fontSize: 13,
+                            ? const Color(0xFFE6F7F4)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
                           color: isCurrent
-                              ? const Color(0xFF28B79B)
-                              : const Color(0xFF475569),
-                          fontWeight: isCurrent
-                              ? FontWeight.bold
-                              : FontWeight.w500,
+                              ? AppTheme.emerald.withOpacity(0.4)
+                              : Colors.transparent,
                         ),
                       ),
-                      subtitle: l.estimatedTime != null
-                          ? Text(
-                              '${l.estimatedTime} mins',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isCurrent
-                                    ? const Color(0xFF28B79B).withOpacity(0.8)
-                                    : const Color(0xFF94A3B8),
-                                fontFamily: 'Outfit',
-                              ),
-                            )
-                          : null,
-                      trailing: l.isCompleted
-                          ? const Icon(
-                              Icons.check_circle_rounded,
-                              color: Color(0xFF28B79B),
-                              size: 16,
-                            )
-                          : null,
-                      onTap: () {
-                        _navigateToLesson(l.id);
-                      },
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        leading: Icon(
+                          _getLessonIcon(l.itemType),
+                          color: isCurrent
+                              ? const Color(0xFF28B79B)
+                              : const Color(0xFF94A3B8),
+                          size: 20,
+                        ),
+                        title: Text(
+                          l.title,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isCurrent
+                                ? const Color(0xFF28B79B)
+                                : const Color(0xFF475569),
+                            fontWeight: isCurrent
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: l.estimatedTime != null
+                            ? Text(
+                                '${l.estimatedTime} mins',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isCurrent
+                                      ? const Color(0xFF28B79B).withOpacity(0.8)
+                                      : const Color(0xFF94A3B8),
+                                  fontFamily: 'Outfit',
+                                ),
+                              )
+                            : null,
+                        trailing: l.isCompleted
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                color: Color(0xFF28B79B),
+                                size: 16,
+                              )
+                            : null,
+                        onTap: () {
+                          _navigateToLesson(l.id);
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -1132,6 +1368,12 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     _reviewAttemptIndex == null) ...[
                   const SizedBox(height: 32),
                   _buildNextLessonButton(nextLessonId, course),
+                ] else if (nextLessonId == null &&
+                    _isCourseFullyCompleted &&
+                    !_isDoingQuiz &&
+                    _reviewAttemptIndex == null) ...[
+                  const SizedBox(height: 32),
+                  _buildClaimCertificateButton(),
                 ],
               ],
             ),
@@ -1300,13 +1542,42 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${activeQuestions.length} question',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF28B79B),
-                ),
+              Row(
+                children: [
+                  Text(
+                    '${activeQuestions.length} ${activeQuestions.length == 1 ? "question" : "questions"}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF28B79B),
+                    ),
+                  ),
+                  if (_lessonDetail?.isCompleted == true) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6F7F4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF28B79B).withValues(alpha: 0.4)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: Color(0xFF28B79B), size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'Completed',
+                            style: TextStyle(
+                              color: Color(0xFF28B79B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
               ElevatedButton(
                 onPressed: () {
@@ -1330,9 +1601,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     borderRadius: BorderRadius.circular(24),
                   ),
                 ),
-                child: const Text(
-                  'Start',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Text(
+                  _lessonDetail?.isCompleted == true ? 'Retake Quiz' : 'Start',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -1889,13 +2160,13 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     try {
       await _lessonRepository.postQuizAttempt(
-        widget.lessonId,
+        _currentLessonId,
         _currentUserId,
         score,
         submittedAnswers,
       );
 
-      final List<dynamic> attemptsData = await _lessonRepository.fetchQuizAttempts(widget.lessonId, _currentUserId);
+      final List<dynamic> attemptsData = await _lessonRepository.fetchQuizAttempts(_currentLessonId, _currentUserId);
       final List<QuizAttempt> parsedAttempts = [];
       final List<Map<int, int>> parsedAnswers = [];
       
@@ -1937,16 +2208,76 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         final pathwayRepository = PathwayRepository();
         final pathway = await pathwayRepository.getMyPathway();
         await pathwayRepository.reroutePathway(pathwayId: pathway.pathwayId);
+      } else {
+        // Passed quiz! Update local completed state
+        setState(() {
+          if (_lessonDetail != null) {
+            _lessonDetail = LessonDetail(
+              id: _lessonDetail!.id,
+              title: _lessonDetail!.title,
+              content: _lessonDetail!.content,
+              sectionId: _lessonDetail!.sectionId,
+              courseId: _lessonDetail!.courseId,
+              comments: _lessonDetail!.comments,
+              questions: _lessonDetail!.questions,
+              isCompleted: true,
+            );
+          }
+          if (_courseDetail != null) {
+            final updatedSessions = _courseDetail!.sessions.map((session) {
+              final updatedLessons = session.lessons.map((l) {
+                if (l.id == _currentLessonId) {
+                  return CourseLesson(
+                    id: l.id,
+                    title: l.title,
+                    orderIndex: l.orderIndex,
+                    itemType: l.itemType,
+                    examId: l.examId,
+                    questionCount: l.questionCount,
+                    isCompleted: true,
+                  );
+                }
+                return l;
+              }).toList();
+              return CourseSession(
+                id: session.id,
+                title: session.title,
+                orderIndex: session.orderIndex,
+                lessons: updatedLessons,
+              );
+            }).toList();
+            _courseDetail = _courseDetail!.copyWith(sessions: updatedSessions);
+          }
+        });
       }
     } catch (e) {
       debugPrint('Error syncing quiz attempt or rerouting pathway: $e');
     }
 
     if (!mounted) return;
+    final quizScorePercent = (score * 10).round();
+    final isPassed = quizScorePercent >= 60;
     ToastHelper.showSuccess(
       context,
-      'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0',
+      'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0${isPassed ? " (Passed 🎉)" : ""}',
     );
+
+    if (isPassed && _courseDetail != null) {
+      final totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
+      final completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+      final isCourseFullyCompleted = totalLessons > 0 && completedLessons == totalLessons;
+      int? nextLessonId;
+      if (_lessonDetail != null) {
+        nextLessonId = _getNextLessonId(_courseDetail!, _lessonDetail!.id);
+      }
+      _showCourseraLessonCompletedModal(
+        isVi: LanguageManager.isVi,
+        isCourseFullyCompleted: isCourseFullyCompleted,
+        nextLessonId: nextLessonId,
+        completedLessons: completedLessons,
+        totalLessons: totalLessons,
+      );
+    }
   }
 
   Widget _buildQuizRightSidebarPane(List<QuizQuestion> activeQuestions) {
@@ -2433,26 +2764,88 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                 ),
               ],
             ),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _reviewAttemptIndex = null;
-                });
-              },
-              icon: const Icon(Icons.arrow_back, size: 16),
-              label: const Text('Back to Dashboard'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF475569),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _reviewAttemptIndex = null;
+                    });
+                  },
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: const Text('Back to Dashboard'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF475569),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+                if (_lessonDetail?.isCompleted == true && _courseDetail != null) ...[
+                  if (_getNextLessonId(_courseDetail!, _currentLessonId) != null)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _reviewAttemptIndex = null;
+                        });
+                        _navigateToLesson(_getNextLessonId(_courseDetail!, _currentLessonId)!);
+                      },
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                      label: const Text('Next Lesson'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    )
+                  else if (_isCourseFullyCompleted)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _reviewAttemptIndex = null;
+                        });
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => CourseCompletionPage(
+                              courseId: widget.courseId,
+                              courseDetail: _courseDetail,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.workspace_premium_rounded, size: 16),
+                      label: const Text('Claim Certificate 🎓'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF59E0B),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                ],
+              ],
             ),
           ],
         ),
@@ -2642,6 +3035,105 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
+  Widget _buildClaimCertificateButton() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => CourseCompletionPage(
+                courseId: widget.courseId,
+                courseDetail: _courseDetail,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.emoji_events_rounded, size: 16, color: Color(0xFFD97706)),
+                        const SizedBox(width: 6),
+                        const Text(
+                          '100% COURSE COMPLETED 🎉',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFD97706),
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Claim Your Course Certificate',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.workspace_premium_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildNextLessonButton(int nextLessonId, CourseDetail course) {
     String nextLessonTitle = 'Next Lesson';
     for (final s in course.sessions) {
@@ -2653,63 +3145,92 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
     }
 
-    return InkWell(
-      onTap: () {
-        _navigateToLesson(nextLessonId);
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE6F7F4), Color(0xFFF0FAF8)],
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: () {
+          _navigateToLesson(nextLessonId);
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE6F7F4), Color(0xFFFAFEFD)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.emerald.withOpacity(0.3), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.emerald.withOpacity(0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'NEXT LESSON',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF28B79B),
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, size: 14, color: AppTheme.emerald),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'NEXT LESSON',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF28B79B),
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    nextLessonTitle,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                    const SizedBox(height: 8),
+                    Text(
+                      nextLessonTitle,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.emerald.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: Color(0xFF28B79B),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_forward,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3643,26 +4164,33 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     if (isCompleted) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
           color: const Color(0xFFE6F7F4),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.emerald.withOpacity(0.4), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.emerald.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Row(
+        child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(
               Icons.check_circle_rounded,
               color: Color(0xFF28B79B),
-              size: 20,
+              size: 22,
             ),
             SizedBox(width: 8),
             Text(
-              'Completed',
+              'Lesson Completed',
               style: TextStyle(
                 color: Color(0xFF28B79B),
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
                 fontSize: 16,
               ),
             ),
@@ -3671,34 +4199,60 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       );
     }
 
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 52,
+      height: 54,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.emerald.withOpacity(0.3),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ElevatedButton.icon(
         onPressed: _isMarkingCompleted
             ? null
             : () => _markLessonAsCompleted(lesson.id, nextLessonId, course),
         icon: _isMarkingCompleted
             ? const SizedBox(
-                width: 18,
-                height: 18,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
-            : const Icon(Icons.check_rounded, size: 20),
+            : const Icon(Icons.check_circle_outline_rounded, size: 22),
         label: const Text(
           'Mark as Completed',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF28B79B),
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
           foregroundColor: Colors.white,
           elevation: 0,
+          padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
+        ).copyWith(
+          backgroundBuilder: (context, states, child) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(child: child),
+            );
+          },
         ),
       ),
     );
@@ -3768,36 +4322,25 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
 
       bool isCourseFullyCompleted = false;
+      int totalLessons = 0;
+      int completedLessons = 0;
       if (_courseDetail != null) {
-        final totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
-        final completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+        totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
+        completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
         if (totalLessons > 0 && completedLessons == totalLessons) {
           isCourseFullyCompleted = true;
         }
-      } else if (nextLessonId == null) {
-        isCourseFullyCompleted = true;
       }
 
-      // Auto-navigate to completion screen if course finished / last lesson, else next lesson
-      if (isCourseFullyCompleted || nextLessonId == null) {
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => CourseCompletionPage(
-                  courseId: widget.courseId,
-                  courseDetail: _courseDetail,
-                ),
-              ),
-            );
-          }
-        });
-      } else {
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          if (mounted) {
-            _navigateToLesson(nextLessonId);
-          }
-        });
+      final isVi = LanguageManager.isVi;
+      if (mounted) {
+        _showCourseraLessonCompletedModal(
+          isVi: isVi,
+          isCourseFullyCompleted: isCourseFullyCompleted,
+          nextLessonId: nextLessonId,
+          completedLessons: completedLessons,
+          totalLessons: totalLessons,
+        );
       }
     } catch (e) {
       setState(() {
@@ -3808,7 +4351,317 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
     }
   }
+
+  void _showCourseraLessonCompletedModal({
+    required bool isVi,
+    required bool isCourseFullyCompleted,
+    required int? nextLessonId,
+    required int completedLessons,
+    required int totalLessons,
+  }) {
+    final double progressPercent = totalLessons > 0 ? (completedLessons / totalLessons) : 1.0;
+    final int percentInt = (progressPercent * 100).round();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 10,
+        backgroundColor: Colors.white,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 440),
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. Icon Header Badge
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F7F4),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF28B79B).withValues(alpha: 0.3), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF28B79B).withValues(alpha: 0.15),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.emoji_events_rounded,
+                  color: Color(0xFF28B79B),
+                  size: 38,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 2. Title
+              Text(
+                isVi ? 'Hoàn thành bài học! 🎉' : 'Lesson Completed! 🎉',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F2937),
+                  fontFamily: 'Outfit',
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+
+              // 3. Subtitle / Quote
+              Text(
+                isVi
+                    ? 'Tuyệt vời! Bạn đã tiến thêm một bước vững chắc trên hành trình chinh phục khóa học.'
+                    : 'Great job! You take one step closer to mastering this course.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  height: 1.5,
+                  fontFamily: 'Outfit',
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+
+              // 4. Coursera-style Progress Card
+              if (totalLessons > 0) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isVi ? 'Tiến độ khóa học' : 'Course Progress',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          Text(
+                            '$completedLessons / $totalLessons (${percentInt}%)',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF28B79B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: progressPercent,
+                          minHeight: 8,
+                          backgroundColor: const Color(0xFFE2E8F0),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // 5. Action Buttons
+              if (isCourseFullyCompleted) ...[
+                // Fully Completed Whole Course -> Certificate Button!
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (context) => CourseCompletionPage(
+                              courseId: widget.courseId,
+                              courseDetail: _courseDetail,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 20),
+                      label: Text(
+                        isVi ? 'Nhận Chứng chỉ Khóa học 🎓' : 'Claim Course Certificate 🎓',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        isVi ? 'Ở lại đây' : 'Stay Here',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else if (nextLessonId != null) ...[
+                // Next Lesson Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _navigateToLesson(nextLessonId);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                      label: Text(
+                        isVi ? 'Học bài tiếp theo' : 'Continue to Next Lesson',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Stay Here Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: TextButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        isVi ? 'Ở lại bài học này' : 'Stay on This Lesson',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                // Last lesson of section or sequence, but course NOT 100% completed!
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.pop(context); // Go back to course pathway / list
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.list_alt_rounded, color: Colors.white, size: 18),
+                      label: Text(
+                        isVi ? 'Về danh sách bài học' : 'Back to Course Pathway',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        isVi ? 'Ở lại bài học' : 'Stay Here',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
 
 class QuizAttempt {
   final int attemptNumber;
