@@ -38,7 +38,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
     private final SystemParameterRepository systemParameterRepository;
 
     @Override
-    public List<QuestionDTO> getTrainerQuestions(String email, String type, String search, String sortBy) {
+    public List<QuestionDTO> getTrainerQuestions(String email, String type, String search, String sortBy, Long skillId, Long categoryId, Long difficultyId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
@@ -48,6 +48,10 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         // If type is ALL or old values QUIZ/EXAM, show all statuses
         String statusConditionGroup = (statusFilter != null) ? "AND q.status = ? " : "";
         String statusConditionSingle = (statusFilter != null) ? "AND q.status = ? " : "";
+        
+        String skillCondition = (skillId != null) ? "AND q.skill_param_id = ? " : "";
+        String categoryCondition = (categoryId != null) ? "AND q.category_id = ? " : "";
+        String difficultyCondition = (difficultyId != null) ? "AND q.difficulty_param_id = ? " : "";
 
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
@@ -79,6 +83,9 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
            .append("WHERE q.created_by = ? ")
            .append(statusConditionGroup)
            .append(searchConditionGroup)
+           .append(skillCondition)
+           .append(categoryCondition)
+           .append(difficultyCondition)
            .append("GROUP BY qg.id, qg.context_text ");
         
         params.add(user.getId());
@@ -88,6 +95,9 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(searchPattern);
             params.add(searchPattern);
         }
+        if (skillId != null) params.add(skillId);
+        if (categoryId != null) params.add(categoryId);
+        if (difficultyId != null) params.add(difficultyId);
 
         sql.append(" UNION ALL ");
 
@@ -108,7 +118,10 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
            .append("JOIN users u ON q.created_by = u.id ")
            .append("WHERE q.created_by = ? AND q.group_id IS NULL ")
            .append(statusConditionSingle)
-           .append(searchConditionSingle);
+           .append(searchConditionSingle)
+           .append(skillCondition)
+           .append(categoryCondition)
+           .append(difficultyCondition);
            
         params.add(user.getId());
         if (statusFilter != null) params.add(statusFilter);
@@ -117,6 +130,9 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(searchPattern);
             params.add(searchPattern);
         }
+        if (skillId != null) params.add(skillId);
+        if (categoryId != null) params.add(categoryId);
+        if (difficultyId != null) params.add(difficultyId);
 
         sql.append(") AS combined_results ");
 
