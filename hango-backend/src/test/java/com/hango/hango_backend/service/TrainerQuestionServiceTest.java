@@ -93,7 +93,7 @@ class TrainerQuestionServiceTest {
     void getTrainerQuestionsShouldThrowWhenUserNotFound() {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> service.getTrainerQuestions("unknown@example.com", "ALL", null, null));
+        assertThrows(RuntimeException.class, () -> service.getTrainerQuestions("unknown@example.com", "ALL", null, null, null, null, null));
     }
 
     @Test
@@ -103,7 +103,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<RowMapper<QuestionDTO>> mapperCaptor = ArgumentCaptor.forClass(RowMapper.class);
         when(jdbcTemplate.query(anyString(), mapperCaptor.capture(), any(Object[].class))).thenReturn(List.of());
 
-        service.getTrainerQuestions("trainer@example.com", "ALL", null, null);
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, null, null, null);
 
         ResultSet rs = mock(ResultSet.class);
         when(rs.getLong("item_id")).thenReturn(42L);
@@ -131,7 +131,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
 
-        service.getTrainerQuestions("trainer@example.com", "ALL", null, null);
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, null, null, null);
 
         assertTrue(!sqlCaptor.getValue().contains("AND q.status = ?"));
     }
@@ -142,7 +142,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
 
-        service.getTrainerQuestions("trainer@example.com", "PUBLIC", null, null);
+        service.getTrainerQuestions("trainer@example.com", "PUBLIC", null, null, null, null, null);
 
         assertTrue(sqlCaptor.getValue().contains("AND q.status = ?"));
     }
@@ -153,7 +153,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
 
-        service.getTrainerQuestions("trainer@example.com", "ALL", null, "OLDEST");
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, "OLDEST", null, null, null);
 
         assertTrue(sqlCaptor.getValue().endsWith("ORDER BY updated_at ASC"));
     }
@@ -164,7 +164,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
 
-        service.getTrainerQuestions("trainer@example.com", "ALL", null, null);
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, null, null, null);
 
         assertTrue(sqlCaptor.getValue().endsWith("ORDER BY updated_at DESC"));
     }
@@ -175,7 +175,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
 
-        service.getTrainerQuestions("trainer@example.com", "ALL", "grammar", null);
+        service.getTrainerQuestions("trainer@example.com", "ALL", "grammar", null, null, null, null);
 
         assertTrue(sqlCaptor.getValue().contains("q.question_text LIKE ?"));
     }

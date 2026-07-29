@@ -34,6 +34,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final PaymentRepository paymentRepository;
     private final CourseRatingRepository courseRatingRepository;
     private final YouTubeTranscriptService youtubeTranscriptService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -657,6 +658,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         } else {
             course.setStatus("PENDING_APPROVAL");
             courseRepository.save(course);
+            notificationService.notifyCourseManagers(NotificationService.TYPE_COURSE_SUBMITTED, "Course Submitted", "Course '" + course.getTitle() + "' has been submitted for review by " + email, course);
         }
     }
     @Override
@@ -984,6 +986,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         draftCourse.setLatestVersionId(draftCourse.getId());
         courseRepository.save(draftCourse);
 
+        notificationService.notifyUser(draftCourse.getCreator(), NotificationService.TYPE_CONTENT_APPROVED, "Course Approved", "Your course '" + draftCourse.getTitle() + "' has been approved and published.", draftCourse);
+
         // Update original published version (V1) to point latestVersionId to V2 (keep V1 PUBLISHED)
         com.hango.hango_backend.entity.Course originalCourse = courseRepository.findById(draftCourse.getParentId())
                 .orElseThrow(() -> new RuntimeException("Original course (V1) not found"));
@@ -1007,6 +1011,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         draftCourse.setStatus("REJECTED");
         courseRepository.save(draftCourse);
+
+        notificationService.notifyUser(draftCourse.getCreator(), NotificationService.TYPE_CONTENT_REJECTED, "Course Rejected", "Your draft course '" + draftCourse.getTitle() + "' has been rejected.", draftCourse);
         // V1 remains PUBLISHED - no changes needed
     }
 }

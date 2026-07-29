@@ -27,6 +27,8 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
 
   List<CourseReviewCourse> _courses = [];
   String _statusFilter = 'PENDING';
+  String _selectedSortBy = 'NEWEST';
+  String _selectedTimePeriod = 'ALL';
   bool _isLoading = true;
   bool _isMockPreview = false;
   bool _isDownloadingTemplate = false;
@@ -48,7 +50,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
 
   List<CourseReviewCourse> get _displayedCourses {
     final keyword = _searchController.text.trim().toLowerCase();
-    return _courses.where((course) {
+    final filtered = _courses.where((course) {
       final matchesSearch =
           keyword.isEmpty ||
           course.title.toLowerCase().contains(keyword) ||
@@ -62,6 +64,17 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
           (_statusFilter == 'PENDING' && courseStatus == 'PENDING_APPROVAL');
       return matchesSearch && matchesStatus;
     }).toList();
+
+    // Apply sort
+    if (_selectedSortBy == 'NEWEST') {
+      filtered.sort((a, b) => (b.submittedAt ?? DateTime(2000)).compareTo(a.submittedAt ?? DateTime(2000)));
+    } else if (_selectedSortBy == 'OLDEST') {
+      filtered.sort((a, b) => (a.submittedAt ?? DateTime(2000)).compareTo(b.submittedAt ?? DateTime(2000)));
+    } else if (_selectedSortBy == 'ALPHABETICAL') {
+      filtered.sort((a, b) => a.title.compareTo(b.title));
+    }
+
+    return filtered;
   }
 
   Future<void> _loadCourses() async {
@@ -469,93 +482,204 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
   Widget _buildToolbar(double width) {
     final compact = width < 760;
 
-    final search = SizedBox(
-      width: compact ? double.infinity : 360,
-      child: TextField(
-        controller: _searchController,
-        onChanged: (_) => setState(() {}),
-        decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
-          hintText: 'Search by course, trainer, or code',
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF20B486)),
-          ),
+    final searchField = TextField(
+      controller: _searchController,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        hintText: 'Search for courses...',
+        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+        prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8), size: 20),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF20B486)),
         ),
       ),
     );
 
-    final filters = Wrap(
-      spacing: 8,
-      children: [
-        _buildStatusFilter('All', 'ALL'),
-        _buildStatusFilter('Pending', 'PENDING'),
-        _buildStatusFilter('Published', 'PUBLISHED'),
-        _buildStatusFilter('Rejected', 'REJECTED'),
-        _buildStatusFilter('Hidden', 'HIDDEN'),
-        _buildStatusFilter('Draft', 'DRAFT'),
+    final sortByDropdown = _buildDropdown(
+      value: _selectedSortBy,
+      items: const [
+        DropdownMenuItem(value: 'NEWEST', child: Text('Sort by: Newest')),
+        DropdownMenuItem(value: 'OLDEST', child: Text('Sort by: Oldest')),
+        DropdownMenuItem(value: 'ALPHABETICAL', child: Text('Sort by: Alphabetical')),
       ],
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedSortBy = val);
+        }
+      },
     );
 
-    if (compact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [search, const SizedBox(height: 12), filters],
-      );
-    }
-
-    return Row(
-      children: [
-        Expanded(child: filters),
-        search,
-        const SizedBox(width: 12),
-        IconButton.filledTonal(
-          tooltip: 'Refresh queue',
-          onPressed: _loadCourses,
-          icon: const Icon(Icons.refresh),
-          style: IconButton.styleFrom(
-            foregroundColor: const Color(0xFF20B486),
-            backgroundColor: const Color(0xFFE6F7F1),
-          ),
-        ),
+    final timePeriodDropdown = _buildDropdown(
+      value: _selectedTimePeriod,
+      items: const [
+        DropdownMenuItem(value: 'ALL', child: Text('Time Period: All')),
+        DropdownMenuItem(value: 'THIS_WEEK', child: Text('Time Period: This Week')),
+        DropdownMenuItem(value: 'THIS_MONTH', child: Text('Time Period: This Month')),
       ],
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _selectedTimePeriod = val);
+        }
+      },
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEFF2F5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Tabs row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildStatusFilter('All', 'ALL'),
+                const SizedBox(width: 8),
+                _buildStatusFilter('Pending', 'PENDING'),
+                const SizedBox(width: 8),
+                _buildStatusFilter('Published', 'PUBLISHED'),
+                const SizedBox(width: 8),
+                _buildStatusFilter('Rejected', 'REJECTED'),
+                const SizedBox(width: 8),
+                _buildStatusFilter('Hidden', 'HIDDEN'),
+                const SizedBox(width: 8),
+                _buildStatusFilter('Draft', 'DRAFT'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          // 2. Filters controls row
+          compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    searchField,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: sortByDropdown),
+                        const SizedBox(width: 12),
+                        Expanded(child: timePeriodDropdown),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton.filledTonal(
+                        tooltip: 'Refresh queue',
+                        onPressed: _loadCourses,
+                        icon: const Icon(Icons.refresh),
+                        style: IconButton.styleFrom(
+                          foregroundColor: const Color(0xFF20B486),
+                          backgroundColor: const Color(0xFFE6F7F1),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(flex: 3, child: searchField),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 1, child: sortByDropdown),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 1, child: timePeriodDropdown),
+                    const SizedBox(width: 16),
+                    IconButton.filledTonal(
+                      tooltip: 'Refresh queue',
+                      onPressed: _loadCourses,
+                      icon: const Icon(Icons.refresh),
+                      style: IconButton.styleFrom(
+                        foregroundColor: const Color(0xFF20B486),
+                        backgroundColor: const Color(0xFFE6F7F1),
+                      ),
+                    ),
+                  ],
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
+          style: const TextStyle(
+            color: Color(0xFF334155),
+            fontSize: 14,
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w500,
+          ),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
     );
   }
 
   Widget _buildStatusFilter(String label, String status) {
-    final selected = _statusFilter == status;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      selectedColor: const Color(0xFFE6F7F1),
-      labelStyle: TextStyle(
-        color: selected ? const Color(0xFF0F8B68) : const Color(0xFF475569),
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        fontFamily: 'Outfit',
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: selected ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      onSelected: (_) {
-        setState(() {
-          _statusFilter = status;
-        });
+    final isActive = _statusFilter == status;
+    return InkWell(
+      onTap: () {
+        setState(() => _statusFilter = status);
         _loadCourses();
       },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFE6FFFA) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? const Color(0xFF20B486) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? const Color(0xFF0D9488) : const Color(0xFF64748B),
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

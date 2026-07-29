@@ -196,6 +196,325 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
   }
 
+  // Show dialog to add questions from Question Bank
+  Future<void> _showAddFromQuestionBankDialog() async {
+    bool isLoading = false;
+    bool initialLoaded = false;
+    List<dynamic> bankQuestions = [];
+    Set<int> selectedIds = {};
+    String searchQuery = '';
+    
+    // Filter states
+    int? selectedSkillId;
+    int? selectedCategoryId;
+    int? selectedDifficultyId;
+    String sortBy = 'NEWEST';
+
+    List<dynamic> skillsList = [];
+    List<dynamic> categoriesList = [];
+    List<dynamic> difficultyList = [];
+
+    Future<void> fetchFilters(StateSetter setStateSB) async {
+      try {
+        final token = await _authService.getToken();
+        if (token == null) return;
+
+        // Fetch Skills
+        http.get(Uri.parse('$apiBaseUrl/metadata/parameters?type=SKILL_TYPE'), headers: {'Authorization': 'Bearer $token'})
+          .then((res) {
+            if (res.statusCode == 200) setStateSB(() => skillsList = jsonDecode(utf8.decode(res.bodyBytes)));
+        });
+
+        // Fetch Categories
+        http.get(Uri.parse('$apiBaseUrl/metadata/categories'), headers: {'Authorization': 'Bearer $token'})
+          .then((res) {
+            if (res.statusCode == 200) setStateSB(() => categoriesList = jsonDecode(utf8.decode(res.bodyBytes)));
+        });
+
+        // Fetch Difficulties
+        http.get(Uri.parse('$apiBaseUrl/metadata/parameters?type=DIFFICULTY'), headers: {'Authorization': 'Bearer $token'})
+          .then((res) {
+            if (res.statusCode == 200) setStateSB(() => difficultyList = jsonDecode(utf8.decode(res.bodyBytes)));
+        });
+      } catch (e) {
+        debugPrint('Error fetching filters: $e');
+      }
+    }
+
+    Future<void> fetchBank(StateSetter setStateSB) async {
+      setStateSB(() => isLoading = true);
+      try {
+        final token = await _authService.getToken();
+        if (token == null) return;
+        
+        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy';
+        if (selectedSkillId != null) url += '&skillId=$selectedSkillId';
+        if (selectedCategoryId != null) url += '&categoryId=$selectedCategoryId';
+        if (selectedDifficultyId != null) url += '&difficultyId=$selectedDifficultyId';
+        
+        final uri = Uri.parse(url);
+        final response = await http.get(uri, headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        });
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          setStateSB(() {
+            bankQuestions = data as List<dynamic>;
+            isLoading = false;
+            initialLoaded = true;
+          });
+        } else {
+          setStateSB(() {
+            isLoading = false;
+            initialLoaded = true;
+          });
+        }
+      } catch (e) {
+        setStateSB(() {
+          isLoading = false;
+          initialLoaded = true;
+        });
+      }
+    }
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setStateSB) {
+            if (!initialLoaded && !isLoading) {
+              fetchBank(setStateSB);
+              fetchFilters(setStateSB);
+            }
+            
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Add from Question Bank', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B))),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 600,
+                height: 500,
+                child: Column(
+                  children: [
+                    // Row 1: Search & Sort
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            onSubmitted: (val) {
+                              searchQuery = val;
+                              fetchBank(setStateSB);
+                            },
+                            textInputAction: TextInputAction.search,
+                            decoration: InputDecoration(
+                              hintText: 'Search questions...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 1,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: sortBy,
+                                items: const [
+                                  DropdownMenuItem(value: 'NEWEST', child: Text('Newest', style: TextStyle(fontFamily: 'Outfit', fontSize: 13))),
+                                  DropdownMenuItem(value: 'OLDEST', child: Text('Oldest', style: TextStyle(fontFamily: 'Outfit', fontSize: 13))),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setStateSB(() => sortBy = val);
+                                    fetchBank(setStateSB);
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Row 2: Category, Skill, Difficulty
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                hint: const Text('All Categories', style: TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                value: selectedCategoryId,
+                                items: [
+                                  const DropdownMenuItem<int>(value: null, child: Text('All Categories', style: TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF64748B)))),
+                                  ...categoriesList.map((cat) => DropdownMenuItem<int>(
+                                        value: cat['id'] as int,
+                                        child: Text(cat['name'] ?? '', style: const TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                      )).toList(),
+                                ],
+                                onChanged: (val) {
+                                  setStateSB(() => selectedCategoryId = val);
+                                  fetchBank(setStateSB);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                hint: const Text('All Skills', style: TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                value: selectedSkillId,
+                                items: [
+                                  const DropdownMenuItem<int>(value: null, child: Text('All Skills', style: TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF64748B)))),
+                                  ...skillsList.map((skill) => DropdownMenuItem<int>(
+                                        value: skill['id'] as int,
+                                        child: Text(skill['paramValue'] ?? '', style: const TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                      )).toList(),
+                                ],
+                                onChanged: (val) {
+                                  setStateSB(() => selectedSkillId = val);
+                                  fetchBank(setStateSB);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                hint: const Text('All Difficulties', style: TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                value: selectedDifficultyId,
+                                items: [
+                                  const DropdownMenuItem<int>(value: null, child: Text('All Difficulties', style: TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF64748B)))),
+                                  ...difficultyList.map((diff) => DropdownMenuItem<int>(
+                                        value: diff['id'] as int,
+                                        child: Text(diff['paramValue'] ?? '', style: const TextStyle(fontFamily: 'Outfit', fontSize: 13)),
+                                      )).toList(),
+                                ],
+                                onChanged: (val) {
+                                  setStateSB(() => selectedDifficultyId = val);
+                                  fetchBank(setStateSB);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: isLoading
+                          ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486)))
+                          : bankQuestions.isEmpty
+                              ? const Center(child: Text('No questions found.', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')))
+                              : ListView.builder(
+                                  itemCount: bankQuestions.length,
+                                  itemBuilder: (context, index) {
+                                    final q = bankQuestions[index];
+                                    final int qId = q['id'] as int;
+                                    final bool isSelected = selectedIds.contains(qId);
+                                    
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: isSelected ? const Color(0xFF20B486) : const Color(0xFFE2E8F0)),
+                                        borderRadius: BorderRadius.circular(8),
+                                        color: isSelected ? const Color(0xFFE2F9F3) : Colors.white,
+                                      ),
+                                      child: CheckboxListTile(
+                                        activeColor: const Color(0xFF20B486),
+                                        value: isSelected,
+                                        onChanged: (val) {
+                                          setStateSB(() {
+                                            if (val == true) {
+                                              selectedIds.add(qId);
+                                            } else {
+                                              selectedIds.remove(qId);
+                                            }
+                                          });
+                                        },
+                                        title: Text(q['questionText'] ?? '', style: const TextStyle(fontSize: 14, fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
+                                        subtitle: Text(q['categoryName'] ?? 'Multiple Choice', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                                        controlAffinity: ListTileControlAffinity.leading,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      ),
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                ),
+                ElevatedButton(
+                  onPressed: selectedIds.isEmpty ? null : () {
+                    Navigator.pop(ctx);
+                    _associateQuestionsToQuiz(selectedIds.toList());
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20B486),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: Text('Add Selected (${selectedIds.length})', style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          }
+        );
+      }
+    );
+  }
+
   // Edit Question Dialog
   Future<void> _showEditQuestionDialog(Map<String, dynamic> q) async {
     final TextEditingController textCtrl = TextEditingController(text: q['questionText'] ?? '');
@@ -1018,43 +1337,67 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                             },
                           ),
                 const SizedBox(height: 16),
-                // Add Question Button
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AddNewQuestionPage(
-                          courseId: widget.courseId,
-                          courseTitle: widget.courseTitle,
-                          trainerName: widget.trainerName,
-                          trainerInitials: widget.trainerInitials,
-                          sections: widget.sections,
-                          sectionIndex: widget.sectionIndex,
-                          sectionId: widget.sections[widget.sectionIndex]['id'] as int,
-                          sectionTitle: widget.sections[widget.sectionIndex]['title'] as String,
-                          onQuestionCreated: (newQuestionIds) {
-                            _associateQuestionsToQuiz(newQuestionIds);
-                          },
+                // Add Question Buttons
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddNewQuestionPage(
+                              courseId: widget.courseId,
+                              courseTitle: widget.courseTitle,
+                              trainerName: widget.trainerName,
+                              trainerInitials: widget.trainerInitials,
+                              sections: widget.sections,
+                              sectionIndex: widget.sectionIndex,
+                              sectionId: widget.sections[widget.sectionIndex]['id'] as int,
+                              sectionTitle: widget.sections[widget.sectionIndex]['title'] as String,
+                              onQuestionCreated: (newQuestionIds) {
+                                _associateQuestionsToQuiz(newQuestionIds);
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF20B486)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                      ),
+                      icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
+                      label: const Text(
+                        'Add Question',
+                        style: TextStyle(
+                          color: Color(0xFF20B486),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
                         ),
                       ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF20B486)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
-                  label: const Text(
-                    'Add Question',
-                    style: TextStyle(
-                      color: Color(0xFF20B486),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      fontFamily: 'Outfit',
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _showAddFromQuestionBankDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE2F9F3),
+                        foregroundColor: const Color(0xFF20B486),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                      ),
+                      icon: const Icon(Icons.library_books, size: 16),
+                      label: const Text(
+                        'Add from Question Bank',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

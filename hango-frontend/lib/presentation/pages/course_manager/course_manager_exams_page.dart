@@ -243,7 +243,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF38C9A6)),
+                    borderSide: const BorderSide(color: Color(0xFF20B486)),
                   ),
                 ),
               );
@@ -342,7 +342,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           color: isActive ? const Color(0xFFE6FFFA) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive ? const Color(0xFF38C9A6) : Colors.transparent,
+            color: isActive ? const Color(0xFF20B486) : Colors.transparent,
           ),
         ),
         child: Row(
@@ -352,7 +352,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               label,
               style: TextStyle(
                 color: isActive
-                    ? const Color(0xFF38C9A6)
+                    ? const Color(0xFF20B486)
                     : const Color(0xFF4B5563),
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                 fontSize: 14,
@@ -364,7 +364,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: isActive
-                    ? const Color(0xFF38C9A6)
+                    ? const Color(0xFF20B486)
                     : const Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -675,7 +675,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                       // View button for all others
                       if (!isCreator || status != 'DRAFT')
                         IconButton(
-                          icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF38C9A6), size: 20),
+                          icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF20B486), size: 20),
                           onPressed: () async {
                             await Navigator.push(
                               context,
@@ -756,6 +756,69 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     );
   }
 
+  Widget _buildVisibilityChip(Map<String, dynamic> exam) {
+    String? visibility = exam['visibility'];
+    bool isPublic = visibility?.toUpperCase() == 'PUBLIC';
+    bool canEdit = _currentUserId != null && exam['creatorId'] == _currentUserId;
+
+    return InkWell(
+      onTap: canEdit ? () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Change Visibility', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+            content: Text(
+              'Do you want to change visibility to ${isPublic ? "Private" : "Public"}?',
+              style: const TextStyle(fontFamily: 'Outfit'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _updateExamVisibility(exam['id'], isPublic ? 'PRIVATE' : 'PUBLIC');
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20B486)),
+                child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+      } : null,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: canEdit ? (isPublic ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)) : Colors.transparent),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPublic ? Icons.public : Icons.lock_outline,
+              size: 14,
+              color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isPublic ? 'Public' : 'Private',
+              style: TextStyle(
+                color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   Widget _buildPaginationButton(IconData icon, {VoidCallback? onPressed}) {
     return InkWell(
       onTap: onPressed,
@@ -838,7 +901,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF38C9A6),
+              backgroundColor: const Color(0xFF20B486),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

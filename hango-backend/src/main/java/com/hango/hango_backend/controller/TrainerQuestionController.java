@@ -26,12 +26,15 @@ public class TrainerQuestionController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "QUIZ") String type,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long skillId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long difficultyId,
             @RequestParam(defaultValue = "NEWEST") String sortBy) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
         List<QuestionDTO> questions = trainerQuestionService.getTrainerQuestions(
-                userDetails.getUsername(), type, search, sortBy);
+                userDetails.getUsername(), type, search, sortBy, skillId, categoryId, difficultyId);
         return ResponseEntity.ok(questions);
     }
 
