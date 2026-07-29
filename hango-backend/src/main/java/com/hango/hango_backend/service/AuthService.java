@@ -148,7 +148,7 @@ public class AuthService {
         return mapToUserResponse(savedUser);
     }
 
-    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "TRAINER_LEAD", "ADMINISTRATOR");
+    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "COURSE_MANAGER", "ADMINISTRATOR");
 
     public UserResponse createUserByAdmin(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.getEmail())) {

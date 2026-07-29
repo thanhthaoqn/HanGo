@@ -529,8 +529,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (token == null) return;
 
       String backendRole = 'TRAINER';
-      if (_editRole == 'Trainer Lead') {
-        backendRole = 'TRAINER_LEAD';
+      if (_editRole == 'Course Manager') {
+        backendRole = 'COURSE_MANAGER';
       } else if (_editRole == 'ADMIN') {
         backendRole = 'ADMINISTRATOR';
       }
@@ -876,8 +876,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           final role = (rolesList != null && rolesList.isNotEmpty)
               ? rolesList.first.toString()
               : 'Trainer';
-          if (role.contains('TRAINER_LEAD')) {
-            _editRole = 'Trainer Lead';
+          if (role.contains('COURSE_MANAGER')) {
+            _editRole = 'Course Manager';
           } else if (role.contains('ADMIN')) {
             _editRole = 'ADMIN';
           } else {
@@ -1064,7 +1064,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   ? 'Learner Account Detail'
                                   : (_selectedUserForEdit!['roles'].first
                                             .toString()
-                                            .contains('TRAINER_LEAD')
+                                            .contains('COURSE_MANAGER')
                                         ? 'Course Manager Account Detail'
                                         : 'Trainer Account Detail'))
                             : 'Trainer Account Detail')
@@ -2548,8 +2548,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                                 rolesList.isNotEmpty)
                                             ? rolesList.first.toString()
                                             : 'Trainer';
-                                        if (role.contains('TRAINER_LEAD')) {
-                                          _editRole = 'Trainer Lead';
+                                        if (role.contains('COURSE_MANAGER')) {
+                                          _editRole = 'Course Manager';
                                         } else if (role.contains('ADMIN')) {
                                           _editRole = 'ADMIN';
                                         } else {
@@ -2751,7 +2751,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         fg = const Color(0xFF7C3AED);
         label = 'Admin';
         break;
-      case 'TRAINER_LEAD':
+      case 'COURSE_MANAGER':
         bg = const Color(0xFFEEF2F6);
         fg = const Color(0xFF6366F1);
         label = 'Course Manager';
@@ -3138,7 +3138,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               cardWidth,
             ),
             _buildRoleConfigCard(
-              'COURSE MANAGER  (role: TRAINER_LEAD)',
+              'COURSE MANAGER  (role: COURSE_MANAGER)',
               'Content-quality oversight role. Views platform dashboard stats, creates/manages Exams, and receives Course rating-quality notifications (low rating / low average). '
               'Note: a full Course review/approve/publish workflow is not implemented in the backend yet — this role currently cannot approve or reject a Trainer\'s Course.',
               ['View Platform Dashboard', 'Create & Manage Exams', 'View Rating Notifications'],
@@ -3283,7 +3283,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ? rolesList.first.toString()
         : 'Trainer';
 
-    // Normalize role string for display (e.g. ROLE_TRAINER_LEAD -> Trainer Lead)
+    // Normalize role string for display (e.g. ROLE_COURSE_MANAGER -> Course Manager)
     String displayRole = role.replaceAll('ROLE_', '').replaceAll('_', ' ');
     // Capitalize words
     displayRole = displayRole
@@ -3614,7 +3614,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               child: Text('Trainer'),
                             ),
                             DropdownMenuItem(
-                              value: 'Trainer Lead',
+                              value: 'Course Manager',
                               child: Text('Course Manager'),
                             ),
                             DropdownMenuItem(
@@ -4174,8 +4174,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     String displayRole = 'Learner';
     if (role.contains('TRAINER')) {
       displayRole = 'Trainer';
-    } else if (role.contains('TRAINER_LEAD')) {
-      displayRole = 'Trainer Lead';
+    } else if (role.contains('COURSE_MANAGER')) {
+      displayRole = 'Course Manager';
     } else if (role.contains('ADMIN')) {
       displayRole = 'Admin';
     }
@@ -4615,7 +4615,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               child: Text('Trainer', style: TextStyle(fontFamily: 'Outfit')),
             ),
             DropdownMenuItem(
-              value: 'Trainer Lead',
+              value: 'Course Manager',
               child: Text(
                 'Course Manager',
                 style: TextStyle(fontFamily: 'Outfit'),
@@ -4683,8 +4683,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
 
       String backendRole = 'TRAINER';
-      if (_createRole == 'Trainer Lead') {
-        backendRole = 'TRAINER_LEAD';
+      if (_createRole == 'Course Manager') {
+        backendRole = 'COURSE_MANAGER';
       } else if (_createRole == 'Admin') {
         backendRole = 'ADMINISTRATOR';
       }

@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 /**
  * Generic notification inbox, available to any authenticated role. Complements the
- * TRAINER_LEAD-specific endpoints on {@link CourseManagerDashboardController}, which cover the same
+ * COURSE_MANAGER-specific endpoints on {@link CourseManagerDashboardController}, which cover the same
  * underlying data for that one role.
  */
 @RestController

@@ -63,7 +63,7 @@ public class LearningPathwayController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER') or hasRole('ADMINISTRATOR') or hasRole('TRAINER_LEAD') or hasRole('COURSE_MANAGER')")
+    @PreAuthorize("hasRole('LEARNER') or hasRole('TRAINER') or hasRole('ADMINISTRATOR') or hasRole('COURSE_MANAGER') or hasRole('COURSE_MANAGER')")
     public ResponseEntity<LearningPathwayResponseDTO> getMyPathway(
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         

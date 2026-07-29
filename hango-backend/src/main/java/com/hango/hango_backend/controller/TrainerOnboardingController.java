@@ -39,7 +39,7 @@ public class TrainerOnboardingController {
     }
 
     @GetMapping("/trainers/profile")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
     public ResponseEntity<?> getTrainerProfile(@AuthenticationPrincipal UserDetails userDetails) {
         try {
             if (userDetails == null) {
@@ -54,7 +54,7 @@ public class TrainerOnboardingController {
     }
 
     @PutMapping("/trainers/profile")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
     public ResponseEntity<?> saveProfileDraft(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody TrainerProfileDTO request) {
@@ -71,7 +71,7 @@ public class TrainerOnboardingController {
     }
 
     @PostMapping("/trainers/profile/submit")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
     public ResponseEntity<?> submitProfile(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody TrainerProfileDTO request) {

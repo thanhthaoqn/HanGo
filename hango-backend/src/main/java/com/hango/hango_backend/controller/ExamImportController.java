@@ -28,7 +28,7 @@ public class ExamImportController {
     private final JdbcTemplate jdbcTemplate;
 
     @PostMapping("/import-excel-multiple")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
     @Transactional
     public ResponseEntity<Map<String, Object>> importExcelMultiple(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -275,7 +275,7 @@ public class ExamImportController {
     }
 
     @GetMapping("/import-excel/template")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
     public ResponseEntity<byte[]> downloadTemplate() {
         try {
             String fileName = "Hango_Exam_Import_Template.xlsx";

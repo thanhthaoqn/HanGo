@@ -347,14 +347,14 @@ class AuthServiceTest {
     @Test
     void createUserByAdminShouldAllowCreatingTrainerLeadRole() {
         when(userRepository.existsByEmail("cm2@example.com")).thenReturn(false);
-        when(roleRepository.findByRoleName("TRAINER_LEAD"))
-                .thenReturn(Optional.of(Role.builder().id(3L).roleName("TRAINER_LEAD").build()));
+        when(roleRepository.findByRoleName("COURSE_MANAGER"))
+                .thenReturn(Optional.of(Role.builder().id(3L).roleName("COURSE_MANAGER").build()));
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UserResponse response = authService.createUserByAdmin(registerRequest("cm2@example.com", "pass1234", "TRAINER_LEAD"));
+        UserResponse response = authService.createUserByAdmin(registerRequest("cm2@example.com", "pass1234", "COURSE_MANAGER"));
 
-        assertEquals(List.of("TRAINER_LEAD"), response.getRoles());
+        assertEquals(List.of("COURSE_MANAGER"), response.getRoles());
     }
 
     @Test

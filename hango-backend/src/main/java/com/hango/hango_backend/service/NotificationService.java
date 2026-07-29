@@ -24,7 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class NotificationService {
 
-    public static final String RECIPIENT_COURSE_MANAGER = "TRAINER_LEAD";
+    public static final String RECIPIENT_COURSE_MANAGER = "COURSE_MANAGER";
     public static final String RECIPIENT_ADMIN = "ADMINISTRATOR";
 
     public static final String TYPE_LOW_RATING = "LOW_RATING";
@@ -44,7 +44,7 @@ public class NotificationService {
     private final UserRepository userRepository;
 
     public void notifyCourseManagers(String type, String title, String message, Course course) {
-        List<User> managers = userRepository.findByRoleNames(List.of("COURSE_MANAGER", "TRAINER_LEAD", "ADMINISTRATOR"));
+        List<User> managers = userRepository.findByRoleNames(List.of("COURSE_MANAGER", "COURSE_MANAGER", "ADMINISTRATOR"));
         if (managers == null || managers.isEmpty()) return;
         for (User u : managers) {
             Notification notification = Notification.builder()

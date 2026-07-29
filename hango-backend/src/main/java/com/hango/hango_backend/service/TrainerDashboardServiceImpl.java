@@ -639,7 +639,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
  
         boolean isManager = course.getCreator().getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
         
         if (isManager) {
             course.setStatus("PUBLISHED");
@@ -669,7 +669,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         Long trainerId = user.getId();
         
         boolean isManager = user.getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
         
         List<com.hango.hango_backend.entity.Exam> exams;
         if (isManager) {
@@ -847,7 +847,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
                 
         boolean isManager = user.getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
         // verify that the user is the creator of the exam or is a manager
         if (!isManager && !exam.getCreatedBy().getId().equals(user.getId())) {
@@ -975,7 +975,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         boolean isManager = user.getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
         if (!isManager) {
             throw new org.springframework.security.access.AccessDeniedException("User is not authorized to approve courses");
         }
@@ -1014,7 +1014,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         boolean isManager = user.getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
         if (!isManager) {
             throw new org.springframework.security.access.AccessDeniedException("User is not authorized to reject courses");
         }

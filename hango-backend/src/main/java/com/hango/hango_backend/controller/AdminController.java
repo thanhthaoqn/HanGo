@@ -137,7 +137,7 @@ public class AdminController {
                         .anyMatch(r -> {
                             String name = r.getRoleName().toUpperCase();
                             if (name.startsWith("ROLE_")) name = name.substring(5);
-                            return name.equals("TRAINER_LEAD");
+                            return name.equals("COURSE_MANAGER");
                         });
                 boolean isAdmin = user.getRoles().stream()
                         .anyMatch(r -> {
@@ -154,7 +154,7 @@ public class AdminController {
                     if (isTrainer) {
                         filteredUsers.add(user);
                     }
-                } else if ("course_manager".equalsIgnoreCase(roleType) || "trainer_lead".equalsIgnoreCase(roleType)) {
+                } else if ("course_manager".equalsIgnoreCase(roleType) || "course_manager".equalsIgnoreCase(roleType)) {
                     if (isTrainerLead) {
                         filteredUsers.add(user);
                     }

@@ -23,7 +23,7 @@ public class TrainerExamMatrixController {
     private final QuestionRepository questionRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER', 'COURSE_MANAGER')")
     public ResponseEntity<List<ExamMatrixDTO>> getAllMatrices(
             @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
@@ -50,7 +50,7 @@ public class TrainerExamMatrixController {
     }
 
     @PostMapping("/{id}/generate")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER', 'COURSE_MANAGER')")
     public ResponseEntity<?> generateExamFromMatrix(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,

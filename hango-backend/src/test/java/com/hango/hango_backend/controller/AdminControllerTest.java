@@ -163,7 +163,7 @@ class AdminControllerTest {
 
     @Test
     void getUsersShouldTreatCourseManagerAsAliasForTrainerLead() {
-        User courseManager = userWithRole(1L, "cm@example.com", "TRAINER_LEAD");
+        User courseManager = userWithRole(1L, "cm@example.com", "COURSE_MANAGER");
         when(userRepository.findAll()).thenReturn(List.of(courseManager));
 
         ResponseEntity<?> response = adminController.getUsers("course_manager", null, 0, 10);
@@ -362,9 +362,9 @@ class AdminControllerTest {
         request.setEmail("newcm@example.com");
         request.setPassword("Password123");
         request.setFullName("New Course Manager");
-        request.setRole("TRAINER_LEAD");
+        request.setRole("COURSE_MANAGER");
         UserResponse created = UserResponse.builder().id(5L).email("newcm@example.com")
-                .roles(List.of("TRAINER_LEAD")).build();
+                .roles(List.of("COURSE_MANAGER")).build();
         when(authService.createUserByAdmin(request)).thenReturn(created);
         when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(targetUser(1L, "admin@example.com")));
 

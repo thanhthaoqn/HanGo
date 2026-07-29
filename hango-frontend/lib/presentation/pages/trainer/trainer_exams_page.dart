@@ -224,7 +224,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       _trainerInitials = initials;
       _trainerAvatarUrl = avatarUrl;
 
-      _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'TRAINER_LEAD' || r.toUpperCase() == 'ADMIN');
+      _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMIN');
     });
   }
 

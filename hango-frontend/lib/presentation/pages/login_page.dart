@@ -131,7 +131,7 @@ class _LoginPageState extends State<LoginPage> {
     // Determine role flags
     final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
     final isTrainerLead = roles.any(
-      (r) => r.toUpperCase().contains('TRAINER_LEAD'),
+      (r) => r.toUpperCase().contains('COURSE_MANAGER'),
     );
     final isCourseManager = roles.any(
       (r) => r.toUpperCase().contains('COURSE_MANAGER'),
