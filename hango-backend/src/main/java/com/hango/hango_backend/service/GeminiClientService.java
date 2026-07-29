@@ -38,7 +38,10 @@ public class GeminiClientService {
                 this.aiUsageLogRepository = aiUsageLogRepository;
         }
 
-        /** Records usage for FR-RBAC-07 (AI Usage Monitoring) — used by both real Gemini call sites below. */
+        /**
+         * Records usage for FR-RBAC-07 (AI Usage Monitoring) — used by both real Gemini
+         * call sites below.
+         */
         private void recordUsage(String callType, boolean success, long durationMs, String errorMessage) {
                 try {
                         String safeErrorMessage = errorMessage;
@@ -47,8 +50,9 @@ public class GeminiClientService {
                         }
                         Long userId = null;
                         try {
-                                userId = com.hango.hango_backend.sercurity.SecurityUtil.getCurrentUserId();
-                        } catch (Exception ignored) {}
+                                userId = com.hango.hango_backend.security.SecurityUtil.getCurrentUserId();
+                        } catch (Exception ignored) {
+                        }
 
                         aiUsageLogRepository.save(AiUsageLog.builder()
                                         .callType(callType)
@@ -68,22 +72,25 @@ public class GeminiClientService {
          */
         @PostConstruct
         public void init() {
-                // Lấy baseUrl cấu hình từ file properties, nếu trống thì dùng URL gốc của Google làm dự phòng
+                // Lấy baseUrl cấu hình từ file properties, nếu trống thì dùng URL gốc của
+                // Google làm dự phòng
                 String baseUrl = geminiProperties.getBaseUrl();
                 if (baseUrl == null || baseUrl.isBlank()) {
                         baseUrl = "https://generativelanguage.googleapis.com";
                 }
-                
+
                 // Đảm bảo baseUrl kết thúc bằng dấu gạch chéo để WebClient ghép path không lỗi
                 if (!baseUrl.endsWith("/")) {
                         baseUrl = baseUrl + "/";
                 }
 
-                // Cấu hình WebClient dùng chung: Đính kèm sẵn Header nhận diện API Key cho Google AI Studio
+                // Cấu hình WebClient dùng chung: Đính kèm sẵn Header nhận diện API Key cho
+                // Google AI Studio
                 this.webClient = WebClient.builder()
                                 .baseUrl(baseUrl)
                                 .defaultHeader("Content-Type", "application/json")
-                                // 🔥 ĐÂY LÀ DÒNG QUAN TRỌNG: Đưa trực tiếp API Key thế hệ mới vào Header hệ thống
+                                // 🔥 ĐÂY LÀ DÒNG QUAN TRỌNG: Đưa trực tiếp API Key thế hệ mới vào Header hệ
+                                // thống
                                 .defaultHeader("x-goog-api-key", geminiProperties.getApiKey())
                                 .build();
                 log.info("Gemini WebClient khởi tạo thành công với địa chỉ: {}", baseUrl);
@@ -140,7 +147,8 @@ public class GeminiClientService {
         }
 
         /**
-         * Gọi Gemini chat model để sinh câu trả lời, kèm theo TOÀN BỘ LỊCH SỬ cuộc trò chuyện.
+         * Gọi Gemini chat model để sinh câu trả lời, kèm theo TOÀN BỘ LỊCH SỬ cuộc trò
+         * chuyện.
          */
         public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
                 GeminiGenerateRequest request = GeminiGenerateRequest.builder()
@@ -186,7 +194,8 @@ public class GeminiClientService {
                         throw e;
                 } catch (Exception e) {
                         log.error("Lỗi khi gọi Gemini chat API", e);
-                        recordUsage("CHAT", false, System.currentTimeMillis() - startedAt, e.getClass().getSimpleName());
+                        recordUsage("CHAT", false, System.currentTimeMillis() - startedAt,
+                                        e.getClass().getSimpleName());
                         throw new ApiException("Không thể kết nối tới AI Assistant lúc này, vui lòng thử lại sau",
                                         HttpStatus.SERVICE_UNAVAILABLE);
                 }
@@ -223,7 +232,8 @@ public class GeminiClientService {
                                         .block();
 
                         if (response == null || response.getEmbedding() == null) {
-                                recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt, "Empty response");
+                                recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt,
+                                                "Empty response");
                                 throw new ApiException("Không thể tạo embedding cho nội dung này",
                                                 HttpStatus.BAD_GATEWAY);
                         }
@@ -234,7 +244,8 @@ public class GeminiClientService {
                         throw e;
                 } catch (Exception e) {
                         log.error("Lỗi khi gọi Gemini embedding API", e);
-                        recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt, e.getClass().getSimpleName());
+                        recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt,
+                                        e.getClass().getSimpleName());
                         throw new ApiException("Không thể xử lý nội dung lúc này, vui lòng thử lại sau",
                                         HttpStatus.SERVICE_UNAVAILABLE);
                 }
