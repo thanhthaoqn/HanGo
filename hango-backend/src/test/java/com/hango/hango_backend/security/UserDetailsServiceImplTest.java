@@ -1,4 +1,4 @@
-package com.hango.hango_backend.sercurity;
+package com.hango.hango_backend.security;
 
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.User;

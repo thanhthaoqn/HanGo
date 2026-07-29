@@ -55,16 +55,16 @@ public class CourseServiceImpl implements CourseService {
         
         if ("ENROLLED".equalsIgnoreCase(filterType) || "IN_PROGRESS".equalsIgnoreCase(filterType)) {
             org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
-                enrolledUserId = ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+            if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.security.UserDetailsImpl) {
+                enrolledUserId = ((com.hango.hango_backend.security.UserDetailsImpl) auth.getPrincipal()).getId();
                 if ("IN_PROGRESS".equalsIgnoreCase(filterType)) {
                     enrollmentStatus = "ENROLLED";
                 }
             }
         } else if ("COMPLETED".equalsIgnoreCase(filterType)) {
             org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
-                enrolledUserId = ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+            if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.security.UserDetailsImpl) {
+                enrolledUserId = ((com.hango.hango_backend.security.UserDetailsImpl) auth.getPrincipal()).getId();
                 enrollmentStatus = "COMPLETED";
             }
         }

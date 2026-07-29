@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
-import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.exception.ApiException;
 
 import java.util.Collections;
 import java.util.List;

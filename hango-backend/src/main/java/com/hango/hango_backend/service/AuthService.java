@@ -37,7 +37,7 @@ import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
 import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.util.JwtUtils;
 
 @Service

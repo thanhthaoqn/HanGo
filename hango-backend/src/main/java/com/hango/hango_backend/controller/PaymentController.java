@@ -3,7 +3,7 @@ package com.hango.hango_backend.controller;
 import com.hango.hango_backend.dto.PaymentRequestDTO;
 import com.hango.hango_backend.dto.PaymentResponseDTO;
 import com.hango.hango_backend.dto.PaymentStatusDTO;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.service.PaymentService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

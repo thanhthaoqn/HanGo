@@ -5,7 +5,7 @@ import com.hango.hango_backend.config.GeminiProperties;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIRequestDTO;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIResponseDTO;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
-import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.exception.ApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

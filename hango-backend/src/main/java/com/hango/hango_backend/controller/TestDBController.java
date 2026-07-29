@@ -1,19 +1,25 @@
 package com.hango.hango_backend.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/api/test-db")
+@Profile("dev")
+@PreAuthorize("hasRole('ADMINISTRATOR')")
 public class TestDBController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @GetMapping("/api/test-db")
+    @GetMapping({"", "/"})
     public String testDb() {
         try {
             Long matrixId = jdbcTemplate.queryForObject("SELECT id FROM exam_matrices WHERE title = 'Ma trận THPT Quốc Gia 2026' ORDER BY id DESC LIMIT 1", Long.class);
@@ -37,7 +43,7 @@ public class TestDBController {
         }
     }
 
-    @GetMapping("/api/test-db/init-prices")
+    @GetMapping("/init-prices")
     public String initPrices() {
         try {
             // Update prices for existing courses to test VNPay payment
@@ -58,7 +64,7 @@ public class TestDBController {
         }
     }
 
-    @GetMapping(value = "/api/test-db/seed-revenue-data", produces = "text/html;charset=UTF-8")
+    @GetMapping(value = "/seed-revenue-data", produces = "text/html;charset=UTF-8")
     public String seedRevenueData() {
         try {
             // 1. Tìm hoặc gán role Trainer cho user 1 hoặc user tìm được

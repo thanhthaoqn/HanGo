@@ -2,7 +2,7 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.MonthlyStatementDTO;
 import com.hango.hango_backend.dto.TrainerRevenueSummaryDTO;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.service.MonthlyStatementService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
