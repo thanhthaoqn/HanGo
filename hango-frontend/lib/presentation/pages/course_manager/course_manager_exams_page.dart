@@ -756,6 +756,31 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     );
   }
 
+  Future<void> _updateExamVisibility(int examId, String newVisibility) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final uri = Uri.parse('$apiBaseUrl/trainer/exams/$examId/visibility');
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'visibility': newVisibility}),
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exam visibility updated successfully')));
+        _fetchExamsData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update visibility: ${response.statusCode}')));
+      }
+    } catch (e) {
+      debugPrint('Error updating exam visibility: $e');
+    }
+  }
+
   Widget _buildVisibilityChip(Map<String, dynamic> exam) {
     String? visibility = exam['visibility'];
     bool isPublic = visibility?.toUpperCase() == 'PUBLIC';

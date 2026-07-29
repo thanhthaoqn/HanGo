@@ -857,6 +857,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         if (isManager && "SUBMITTED".equalsIgnoreCase(status) && exam.getCreatedBy().getId().equals(user.getId())) {
             exam.setStatus("PUBLISHED");
         } else {
+            if (!isManager && ("PUBLISHED".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status))) {
+                throw new org.springframework.security.access.AccessDeniedException("Only managers can publish or approve exams");
+            }
             exam.setStatus(status);
         }
         
@@ -969,6 +972,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Override
     @Transactional
     public void approveTrainerCourse(Long id, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        boolean isManager = user.getRoles().stream()
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+        if (!isManager) {
+            throw new org.springframework.security.access.AccessDeniedException("User is not authorized to approve courses");
+        }
+
         com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 
@@ -1000,6 +1011,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Override
     @Transactional
     public void rejectTrainerCourseDraft(Long id, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        boolean isManager = user.getRoles().stream()
+                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("TRAINER_LEAD") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
+        if (!isManager) {
+            throw new org.springframework.security.access.AccessDeniedException("User is not authorized to reject courses");
+        }
+
         // Rejects a PENDING_APPROVAL draft (V2). V2 goes back to DRAFT/REJECTED for editing.
         // V1 remains PUBLISHED and untouched.
         com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
