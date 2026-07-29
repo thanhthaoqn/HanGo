@@ -13,4 +13,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatus())
                 .body(Map.of("message", ex.getMessage()));
     }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleGlobalException(Exception ex) {
+        ex.printStackTrace(); // Log ra terminal để debug
+        return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "Lỗi nội bộ: " + ex.getClass().getSimpleName() + " - " + ex.getMessage()));
+    }
 }

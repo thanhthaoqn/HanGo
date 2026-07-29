@@ -32,10 +32,9 @@ public class SecurityUtil {
         }
 
         // 2. Trường hợp 2: Nếu principal là một Custom UserDetails (Ví dụ bạn đặt tên là UserPrincipal)
-        // Bạn hãy kiểm tra xem class UserDetails của bạn có hàm getId() hoặc tương tự không nhé
-        // if (principal instanceof UserPrincipal) {
-        //     return ((UserPrincipal) principal).getId();
-        // }
+        if (principal instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
+            return ((com.hango.hango_backend.sercurity.UserDetailsImpl) principal).getId();
+        }
         
         // 3. Trường hợp 3: Nếu principal đã là kiểu Long sẵn
         if (principal instanceof Long) {

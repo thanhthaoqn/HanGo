@@ -41,11 +41,21 @@ public class GeminiClientService {
         /** Records usage for FR-RBAC-07 (AI Usage Monitoring) — used by both real Gemini call sites below. */
         private void recordUsage(String callType, boolean success, long durationMs, String errorMessage) {
                 try {
+                        String safeErrorMessage = errorMessage;
+                        if (safeErrorMessage != null && safeErrorMessage.length() > 255) {
+                                safeErrorMessage = safeErrorMessage.substring(0, 250) + "...";
+                        }
+                        Long userId = null;
+                        try {
+                                userId = com.hango.hango_backend.sercurity.SecurityUtil.getCurrentUserId();
+                        } catch (Exception ignored) {}
+
                         aiUsageLogRepository.save(AiUsageLog.builder()
                                         .callType(callType)
                                         .success(success)
                                         .durationMs(durationMs)
-                                        .errorMessage(errorMessage)
+                                        .errorMessage(safeErrorMessage)
+                                        .userId(userId != null ? userId : 0L)
                                         .build());
                 } catch (Exception e) {
                         log.warn("Failed to record AI usage log (non-fatal)", e);
