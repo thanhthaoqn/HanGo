@@ -34,6 +34,7 @@ public class NotificationService {
     public static final String TYPE_CONTENT_REJECTED = "ContentRejected";
     public static final String TYPE_STATEMENT_READY = "StatementReady";
     public static final String TYPE_COURSE_UPDATED = "CourseUpdated";
+    public static final String TYPE_COURSE_SUBMITTED = "CourseSubmitted";
     public static final String TYPE_TRAINER_APPLICATION_SUBMITTED = "TrainerApplicationSubmitted";
     public static final String TYPE_TRAINER_APPLICATION_REVIEWED = "TrainerApplicationReviewed";
 
