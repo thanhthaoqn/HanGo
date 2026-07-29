@@ -133,10 +133,10 @@ class TrainerShellPageState extends State<TrainerShellPage> {
   String _formatNotificationTime(DateTime? createdAt) {
     if (createdAt == null) return '';
     final diff = DateTime.now().difference(createdAt);
-    if (diff.inMinutes < 1) return 'vừa xong';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
-    if (diff.inHours < 24) return '${diff.inHours} giờ trước';
-    return '${diff.inDays} ngày trước';
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    return '${diff.inDays} days ago';
   }
 
   IconData _notificationIcon(String type) {
