@@ -5,6 +5,7 @@ import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Notification;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.NotificationRepository;
+import com.hango.hango_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,11 +13,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Notification store - no realtime/WebSocket delivery yet (see doc/specs/14-notification.md).
  * A notification is either targeted at one user ({@link Notification#getUser()} set) or broadcast
- * to every user holding a given role ({@link Notification#getRecipientRole()} set, user null).
+ * to every user holding a given role. Broadcast now creates individual copies for per-user read state.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,20 +41,40 @@ public class NotificationService {
     public static final String TYPE_TRAINER_APPLICATION_REVIEWED = "TrainerApplicationReviewed";
 
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
 
     public void notifyCourseManagers(String type, String title, String message, Course course) {
-        notifyRole(RECIPIENT_COURSE_MANAGER, type, title, message, course);
+        List<User> managers = userRepository.findByRoleNames(List.of("COURSE_MANAGER", "TRAINER_LEAD", "ADMINISTRATOR"));
+        if (managers == null || managers.isEmpty()) return;
+        for (User u : managers) {
+            Notification notification = Notification.builder()
+                    .user(u)
+                    .recipientRole(RECIPIENT_COURSE_MANAGER)
+                    .type(type)
+                    .title(title)
+                    .message(message)
+                    .course(course)
+                    .build();
+            notificationRepository.save(notification);
+        }
     }
 
     public void notifyRole(String role, String type, String title, String message, Course course) {
-        Notification notification = Notification.builder()
-                .recipientRole(role)
-                .type(type)
-                .title(title)
-                .message(message)
-                .course(course)
-                .build();
-        notificationRepository.save(notification);
+        List<User> users = userRepository.findByRoleName(role);
+        if (users == null || users.isEmpty()) {
+            return;
+        }
+        for (User u : users) {
+            Notification notification = Notification.builder()
+                    .user(u)
+                    .recipientRole(role)
+                    .type(type)
+                    .title(title)
+                    .message(message)
+                    .course(course)
+                    .build();
+            notificationRepository.save(notification);
+        }
     }
 
     public void notifyUser(User user, String type, String title, String message, Course course) {
@@ -61,6 +83,7 @@ public class NotificationService {
         }
         Notification notification = Notification.builder()
                 .user(user)
+                .recipientRole("USER")
                 .type(type)
                 .title(title)
                 .message(message)

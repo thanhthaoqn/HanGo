@@ -97,9 +97,21 @@ class _SharedHeaderState extends State<SharedHeader> {
     }
   }
 
+  StateSetter? _popupSetState;
+
+  void _updatePopup() {
+    if (_popupSetState == null) return;
+    try {
+      _popupSetState!(() {});
+    } catch (_) {
+      _popupSetState = null;
+    }
+  }
+
   Future<void> _loadNotifications() async {
     if (_isLoadingNotifications) return;
     setState(() => _isLoadingNotifications = true);
+    _updatePopup();
     try {
       final notifications = await _notificationRepository.getNotifications();
       final unreadCount = await _notificationRepository.getUnreadCount();
@@ -109,8 +121,10 @@ class _SharedHeaderState extends State<SharedHeader> {
         _unreadNotificationCount = unreadCount;
         _isLoadingNotifications = false;
       });
+      _updatePopup();
     } catch (_) {
       if (mounted) setState(() => _isLoadingNotifications = false);
+      _updatePopup();
     }
   }
 
@@ -860,7 +874,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                 clipBehavior: Clip.none,
                 children: [
                   PopupMenuButton<void>(
-                    enabled: !widget.hideNavLinks,
+                    
                     offset: const Offset(0, 50),
                     color: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -874,7 +888,9 @@ class _SharedHeaderState extends State<SharedHeader> {
                       PopupMenuItem<void>(
                         enabled: false,
                         child: StatefulBuilder(
-                          builder: (context, setMenuState) => Container(
+                          builder: (context, setMenuState) {
+                            _popupSetState = setMenuState;
+                            return Container(
                             width: 320,
                             constraints: const BoxConstraints(maxHeight: 420),
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -976,7 +992,8 @@ class _SharedHeaderState extends State<SharedHeader> {
                                   ),
                               ],
                             ),
-                          ),
+                          );
+                          }
                         ),
                       ),
                     ],
