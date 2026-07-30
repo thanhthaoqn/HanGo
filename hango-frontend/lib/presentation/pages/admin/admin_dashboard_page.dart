@@ -535,54 +535,156 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
-            return AlertDialog(
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               backgroundColor: Colors.white,
-              title: Text('Edit Permissions: $roleName', style: const TextStyle(fontFamily: 'Outfit')),
-              content: SizedBox(
-                width: 400,
-                height: 400,
-                child: _allPermissions.isEmpty
-                    ? const Center(child: Text('No permissions loaded', style: TextStyle(fontFamily: 'Outfit')))
-                    : ListView.builder(
-                        itemCount: _allPermissions.length,
-                        itemBuilder: (context, index) {
-                          final perm = _allPermissions[index];
-                          final code = perm['code'] as String;
-                          final name = perm['name'] as String;
-                          final isSelected = selectedCodes.contains(code);
-
-                          return CheckboxListTile(
-                            title: Text(name, style: const TextStyle(fontFamily: 'Outfit', fontSize: 14)),
-                            subtitle: Text(code, style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Colors.grey)),
-                            value: isSelected,
-                            activeColor: const Color(0xFF28B79B),
-                            onChanged: (bool? value) {
-                              setStateDialog(() {
-                                if (value == true) {
-                                  selectedCodes.add(code);
-                                } else {
-                                  selectedCodes.remove(code);
-                                }
-                              });
-                            },
-                          );
-                        },
+              child: Container(
+                width: 480,
+                constraints: const BoxConstraints(maxHeight: 600),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: const Color(0xFFE6F7F4), borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF28B79B), size: 24),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Edit Permissions', style: TextStyle(fontFamily: 'Outfit', fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                                const SizedBox(height: 2),
+                                Text('Role: $roleName', style: const TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
                       ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    Flexible(
+                      child: _allPermissions.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(40.0),
+                              child: Center(child: Text('No permissions loaded', style: TextStyle(fontFamily: 'Outfit', color: Color(0xFF64748B)))),
+                            )
+                          : ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                              child: ListView.separated(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                itemCount: _allPermissions.length,
+                                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final perm = _allPermissions[index];
+                                  final code = perm['code'] as String;
+                                  final name = perm['name'] as String;
+                                  final isSelected = selectedCodes.contains(code);
+
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: isSelected ? const Color(0xFF28B79B).withOpacity(0.5) : const Color(0xFFF1F5F9)),
+                                      borderRadius: BorderRadius.circular(12),
+                                      color: isSelected ? const Color(0xFFF4FBF9) : Colors.white,
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () {
+                                          setStateDialog(() {
+                                            if (isSelected) {
+                                              selectedCodes.remove(code);
+                                            } else {
+                                              selectedCodes.add(code);
+                                            }
+                                          });
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(name, style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500, color: const Color(0xFF1E293B))),
+                                                    const SizedBox(height: 4),
+                                                    Text(code, style: const TextStyle(fontFamily: 'Outfit', fontSize: 11, color: Color(0xFF94A3B8))),
+                                                  ],
+                                                ),
+                                              ),
+                                              Switch(
+                                                value: isSelected,
+                                                activeColor: Colors.white,
+                                                activeTrackColor: const Color(0xFF28B79B),
+                                                inactiveThumbColor: Colors.white,
+                                                inactiveTrackColor: const Color(0xFFE2E8F0),
+                                                trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+                                                onChanged: (bool value) {
+                                                  setStateDialog(() {
+                                                    if (value) {
+                                                      selectedCodes.add(code);
+                                                    } else {
+                                                      selectedCodes.remove(code);
+                                                    }
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontWeight: FontWeight.w600)),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF28B79B),
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _updateRolePermissions(roleName, selectedCodes);
+                            },
+                            child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontFamily: 'Outfit')),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _updateRolePermissions(roleName, selectedCodes);
-                  },
-                  child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontFamily: 'Outfit')),
-                ),
-              ],
             );
           },
         );
@@ -3328,53 +3430,67 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       width: width,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF28B79B), fontFamily: 'Outfit')),
+                child: Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
               ),
               const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.edit, color: Color(0xFF28B79B), size: 20),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () {
-                  final currentCodes = permissions.map((p) => p['code'] as String).toList();
-                  _showEditRolePermissionsDialog(name, currentCodes);
-                },
+              Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.edit_rounded, color: Color(0xFF64748B), size: 18),
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    final currentCodes = permissions.map((p) => p['code'] as String).toList();
+                    _showEditRolePermissionsDialog(name, currentCodes);
+                  },
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Text(
             desc,
             style: const TextStyle(
-              color: Color(0xFF6B7280),
+              color: Color(0xFF64748B),
               fontSize: 13,
-              height: 1.4,
               fontFamily: 'Outfit',
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          const Divider(color: Color(0xFFF1F5F9), height: 1),
+          const SizedBox(height: 20),
           const Text(
-            'Primary Grants:',
+            'Primary Grants',
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: Color(0xFF1F2937),
+              color: Color(0xFF94A3B8),
+              letterSpacing: 0.5,
               fontFamily: 'Outfit',
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -3382,19 +3498,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               final permName = permObj['name'] as String? ?? 'Unknown';
               return Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
+                  horizontal: 12,
+                  vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFE6F7F4),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   permName,
                   style: const TextStyle(
-                    color: Color(0xFF4B5563),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF28B79B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     fontFamily: 'Outfit',
                   ),
                 ),

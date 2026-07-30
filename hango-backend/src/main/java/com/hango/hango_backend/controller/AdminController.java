@@ -512,6 +512,7 @@ public class AdminController {
             logAudit(currentAdmin, "UPDATE_ROLE_PERMISSIONS", null, "Updated permissions for role " + roleName);
             return ResponseEntity.ok(Map.of("success", true, "message", "Permissions updated successfully"));
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
