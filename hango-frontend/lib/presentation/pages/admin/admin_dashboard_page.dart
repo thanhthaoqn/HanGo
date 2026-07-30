@@ -66,6 +66,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isLoadingAuditLog = true;
   List<Map<String, dynamic>> _auditLogEntries = [];
 
+  // Roles tab state (FR-RBAC-DYNAMIC)
+  bool _isLoadingRoles = true;
+  List<Map<String, dynamic>> _rolesWithPermissions = [];
+
   // Accounts tab state and variables
   String _accountsTab = 'trainer'; // 'trainer' | 'course_manager' | 'learner'
   int _accountsPage = 0;
@@ -118,6 +122,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _fetchAccounts();
     _fetchAiUsageStats();
     _fetchAuditLog();
+    _fetchRoles();
     _loadNotifications();
   }
 
@@ -422,6 +427,76 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       setState(() {
         _isLoadingAuditLog = false;
       });
+    }
+  }
+
+  Future<void> _fetchRoles() async {
+    setState(() {
+      _isLoadingRoles = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _isLoadingRoles = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse('$apiBaseUrl/admin/roles');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _rolesWithPermissions = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _isLoadingRoles = false;
+        });
+      } else {
+        debugPrint('Failed to load roles: ${response.statusCode} - ${response.body}');
+        setState(() {
+          _isLoadingRoles = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching roles: $e');
+      setState(() {
+        _isLoadingRoles = false;
+      });
+    }
+  }
+
+  Future<void> _updateRolePermissions(String roleName, List<String> permissionCodes) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/roles/$roleName/permissions');
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'permissionCodes': permissionCodes}),
+      );
+
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(context, 'Permissions updated successfully');
+        _fetchRoles(); // Refresh the list
+      } else {
+        ToastHelper.showError(context, 'Failed to update permissions: ${response.statusCode}');
+      }
+    } catch (e) {
+      ToastHelper.showError(context, 'Error updating permissions');
+      debugPrint('Error updating role permissions: $e');
     }
   }
 
@@ -3096,6 +3171,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // TAB 3: ROLES INFO MOCK
   // ------------------------------------------------------------------------
   Widget _buildRolesTab(bool isDesktop) {
+    if (_isLoadingRoles) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B))),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3110,9 +3194,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Read-only reference of what each role can actually do today, enforced in backend code '
-          '(Spring Security @PreAuthorize per endpoint). There is no dynamic permission matrix yet — '
-          'permissions are fixed per role at the code level, not configurable from this screen.',
+          'Dynamic permission matrix. You can toggle specific permissions for each role.',
           style: TextStyle(
             fontSize: 14,
             color: Color(0xFF6B7280),
@@ -3124,63 +3206,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         LayoutBuilder(builder: (context, constraints) {
           final double cardWidth = isDesktop ? (constraints.maxWidth - 20) / 2 : constraints.maxWidth;
 
-          final cardsList = [
-            _buildRoleConfigCard(
-              'LEARNER',
-              'Default role for platform users. Enroll in and learn Courses, attempt Quiz/Exam (unlimited retakes), rate completed Courses, comment/reply on Lesson & Quiz, and use the AI Learning Assistant.',
-              ['Enroll & Learn Courses', 'Attempt Quiz & Exam', 'Rate Courses & Comment', 'AI Learning Assistant'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'TRAINER',
-              'Content creator role (Teacher/Tutor). Create and manage own Course/Section/Lesson/Quiz, manage own Question Bank, create Exams, and track own revenue. Also has Learner mode (dual-mode).',
-              ['Create & Manage Own Courses', 'Manage Question Bank', 'Create Exams', 'View Own Revenue'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'COURSE MANAGER  (role: COURSE_MANAGER)',
-              'Content-quality oversight role. Views platform dashboard stats, creates/manages Exams, and receives Course rating-quality notifications (low rating / low average). '
-              'Note: a full Course review/approve/publish workflow is not implemented in the backend yet — this role currently cannot approve or reject a Trainer\'s Course.',
-              ['View Platform Dashboard', 'Create & Manage Exams', 'View Rating Notifications'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'ADMINISTRATOR',
-              'System/user administration role. Manages user accounts (create/activate/deactivate/assign role), moderates comments, reviews Trainer applications, and views the platform dashboard, audit log, and AI usage stats. Does not manage revenue/payouts (Course Manager\'s job).',
-              ['Manage Accounts & Roles', 'Moderate Comments', 'Review Trainer Applications', 'Audit Log & AI Usage'],
-              cardWidth,
-            ),
-          ];
+          final cardsList = _rolesWithPermissions.map((roleObj) {
+            final roleName = roleObj['roleName'] as String? ?? 'UNKNOWN';
+            final permissions = (roleObj['permissions'] as List?)?.map((p) => p as Map<String, dynamic>).toList() ?? [];
 
-            if (isDesktop) {
-              return Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [cardsList[0], cardsList[1]],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [cardsList[2], cardsList[3]],
-                  ),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  cardsList[0],
-                  const SizedBox(height: 16),
-                  cardsList[1],
-                  const SizedBox(height: 16),
-                  cardsList[2],
-                  const SizedBox(height: 16),
-                  cardsList[3],
-                ],
-              );
-            }
-          },
-        ),
+            return _buildRoleConfigCard(
+              roleName,
+              'Role ID: $roleName',
+              permissions,
+              cardWidth,
+            );
+          }).toList();
+
+          return Wrap(
+            spacing: 20,
+            runSpacing: 20,
+            children: cardsList,
+          );
+        }),
       ],
     );
   }
@@ -3188,7 +3231,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildRoleConfigCard(
     String name,
     String desc,
-    List<String> permissions,
+    List<Map<String, dynamic>> permissions,
     double width,
   ) {
     return Container(
@@ -3237,7 +3280,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: permissions.map((perm) {
+            children: permissions.map((permObj) {
+              final permName = permObj['name'] as String? ?? 'Unknown';
               return Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -3248,7 +3292,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  perm,
+                  permName,
                   style: const TextStyle(
                     color: Color(0xFF4B5563),
                     fontSize: 11,

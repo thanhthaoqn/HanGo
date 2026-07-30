@@ -81,4 +81,4 @@ database.sql
 deploy.zip
 *.zip
 *.tar.gz
-*.pem
+*.pem
