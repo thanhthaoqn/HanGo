@@ -37,7 +37,7 @@ public class CourseManagerExamMatrixController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createMatrix(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody ExamMatrixCreateRequestDTO request) {
@@ -54,7 +54,7 @@ public class CourseManagerExamMatrixController {
     }
 
     @PostMapping("/{id}/generate")
-    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> generateExamFromMatrix(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -73,7 +73,7 @@ public class CourseManagerExamMatrixController {
     }
 
     @GetMapping("/count-available")
-    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> countAvailableQuestions(
             @RequestParam Long skillId,
             @RequestParam Long diffId,

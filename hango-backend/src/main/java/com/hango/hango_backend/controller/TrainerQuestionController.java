@@ -21,7 +21,7 @@ public class TrainerQuestionController {
     private final TrainerQuestionService trainerQuestionService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<QuestionDTO>> getQuestions(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "QUIZ") String type,
@@ -39,7 +39,7 @@ public class TrainerQuestionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> createQuestion(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody CreateGroupQuestionRequestDTO request) {
@@ -51,7 +51,7 @@ public class TrainerQuestionController {
     }
 
     @GetMapping("/detail/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<CreateGroupQuestionRequestDTO> getQuestionDetail(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
@@ -64,7 +64,7 @@ public class TrainerQuestionController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> updateQuestionBankGroup(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
@@ -78,7 +78,7 @@ public class TrainerQuestionController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> toggleQuestionStatus(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,

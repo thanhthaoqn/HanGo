@@ -47,7 +47,7 @@ public class CourseManagerDashboardController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasRole('COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getNotifications() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         List<Notification> notifications = notificationRepository
@@ -70,7 +70,7 @@ public class CourseManagerDashboardController {
     }
 
     @PutMapping("/notifications/{id}/read")
-    @PreAuthorize("hasRole('COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> markNotificationAsRead(@PathVariable Long id) {
         Optional<Notification> notificationOpt = notificationRepository.findById(id);
         if (notificationOpt.isEmpty()) {

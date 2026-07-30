@@ -519,7 +519,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ToastHelper.showSuccess(context, 'Permissions updated successfully');
         _fetchRoles(); // Refresh the list
       } else {
-        ToastHelper.showError(context, 'Failed to update permissions: ${response.statusCode}');
+        ToastHelper.showError(context, 'Failed to update permissions: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       ToastHelper.showError(context, 'Error updating permissions');

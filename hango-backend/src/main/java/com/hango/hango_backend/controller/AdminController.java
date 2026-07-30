@@ -67,7 +67,7 @@ public class AdminController {
     private EnrollmentRepository enrollmentRepository;
 
     @GetMapping("/dashboard/stats")
-    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getDashboardStats() {
         try {
             long totalUsers = userRepository.count();
@@ -117,7 +117,7 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getUsers(
             @RequestParam(defaultValue = "staff") String roleType,
             @RequestParam(required = false) String search,
@@ -233,7 +233,7 @@ public class AdminController {
     private static final Set<String> ALLOWED_USER_STATUSES = Set.of("ACTIVE", "INACTIVE");
 
     @PutMapping("/users/{id}/status")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateUserStatus(@PathVariable Long id, @RequestParam String status,
             @AuthenticationPrincipal UserDetails currentAdmin) {
         try {
@@ -263,7 +263,7 @@ public class AdminController {
     }
 
     @GetMapping("/users/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getUserDetail(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(authService.getUserById(id));
@@ -275,7 +275,7 @@ public class AdminController {
     }
 
     @PostMapping("/users")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createUserByAdmin(@Valid @RequestBody RegisterRequest registerRequest,
             @AuthenticationPrincipal UserDetails currentAdmin) {
         try {
@@ -289,7 +289,7 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateUserByAdmin(
             @PathVariable Long id,
             @Valid @RequestBody AdminUserUpdateRequest updateRequest,
@@ -373,14 +373,17 @@ public class AdminController {
         AuditLog log = AuditLog.builder()
                 .actor(actor)
                 .actionType(actionType)
+                .action(actionType)
                 .targetUserId(targetUserId)
+                .entityType(targetUserId != null ? "USER" : "ROLE")
+                .entityId(targetUserId != null ? targetUserId : 0L)
                 .details(details)
                 .build();
         auditLogRepository.save(log);
     }
 
     @GetMapping("/audit-log")
-    @PreAuthorize("hasAuthority('AUDIT_LOG_AI_USAGE') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_AI_USAGE') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAuditLog(@RequestParam(defaultValue = "50") int limit) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         List<AuditLog> logs = auditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit));
@@ -406,7 +409,7 @@ public class AdminController {
     // ------------------------------------------------------------------
 
     @GetMapping("/ai-usage")
-    @PreAuthorize("hasAuthority('AUDIT_LOG_AI_USAGE') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_AI_USAGE') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAiUsageStats() {
         long totalCalls = aiUsageLogRepository.count();
         long successCount = aiUsageLogRepository.countBySuccess(true);
@@ -443,7 +446,7 @@ public class AdminController {
     }
 
     @GetMapping("/permissions")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAllPermissions() {
         try {
             List<Permission> permissions = permissionRepository.findAll();
@@ -461,7 +464,7 @@ public class AdminController {
     }
 
     @GetMapping("/roles")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAllRolesWithPermissions() {
         try {
             List<Role> roles = roleRepository.findAll();
@@ -488,7 +491,7 @@ public class AdminController {
     }
 
     @PutMapping("/roles/{roleName}/permissions")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateRolePermissions(
             @PathVariable String roleName,
             @RequestBody RolePermissionsUpdateRequest request,

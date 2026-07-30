@@ -6,7 +6,9 @@ import '../pages/course_manager/course_manager_matrix_management_page.dart';
 import '../pages/course_manager/course_manager_question_bank_page.dart';
 import '../pages/course_manager/course_manager_settlement_page.dart';
 
-class CourseManagerSidebar extends StatelessWidget {
+import 'package:shared_preferences/shared_preferences.dart';
+
+class CourseManagerSidebar extends StatefulWidget {
   final String currentRoute;
   final Function(String route)? onSelectRoute;
 
@@ -15,6 +17,31 @@ class CourseManagerSidebar extends StatelessWidget {
     required this.currentRoute,
     this.onSelectRoute,
   });
+
+  @override
+  State<CourseManagerSidebar> createState() => _CourseManagerSidebarState();
+}
+
+class _CourseManagerSidebarState extends State<CourseManagerSidebar> {
+  List<String> _userRoles = [];
+  bool _canViewDashboard = false;
+  bool _canManageExams = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoles();
+  }
+
+  Future<void> _loadRoles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final roles = prefs.getStringList('user_roles') ?? [];
+    setState(() {
+      _userRoles = roles;
+      _canViewDashboard = roles.contains('VIEW_PLATFORM_DASHBOARD') || roles.contains('ROLE_ADMINISTRATOR');
+      _canManageExams = roles.contains('CREATE_AND_MANAGE_EXAMS_CM') || roles.contains('ROLE_ADMINISTRATOR');
+    });
+  }
 
   void _navigateSeamless(BuildContext context, Widget targetPage) {
     Navigator.pushReplacement(
@@ -35,91 +62,97 @@ class CourseManagerSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSidebarItem(
-            context,
-            Icons.dashboard,
-            'Dashboard',
-            isActive: currentRoute == 'dashboard',
-            onTap: () {
-              if (onSelectRoute != null) {
-                onSelectRoute!('dashboard');
-              } else if (currentRoute != 'dashboard') {
-                _navigateSeamless(context, const CourseManagerDashboardPage());
-              }
-            },
-          ),
+          if (_canViewDashboard) ...[
+            _buildSidebarItem(
+              context,
+              Icons.dashboard,
+              'Dashboard',
+              isActive: widget.currentRoute == 'dashboard',
+              onTap: () {
+                if (widget.onSelectRoute != null) {
+                  widget.onSelectRoute!('dashboard');
+                } else if (widget.currentRoute != 'dashboard') {
+                  _navigateSeamless(context, const CourseManagerDashboardPage());
+                }
+              },
+            ),
+          ],
           _buildSidebarItem(
             context,
             Icons.book_outlined,
             'Courses',
-            isActive: currentRoute == 'courses',
+            isActive: widget.currentRoute == 'courses',
             onTap: () {
-              if (onSelectRoute != null) {
-                onSelectRoute!('courses');
-              } else if (currentRoute != 'courses') {
+              if (widget.onSelectRoute != null) {
+                widget.onSelectRoute!('courses');
+              } else if (widget.currentRoute != 'courses') {
                 _navigateSeamless(context, const CourseManagerCoursesPage());
               }
             },
           ),
-          _buildSidebarItem(
-            context,
-            Icons.assignment_outlined,
-            'Exam',
-            isActive: currentRoute == 'exams',
-            onTap: () {
-              if (onSelectRoute != null) {
-                onSelectRoute!('exams');
-              } else if (currentRoute != 'exams') {
-                _navigateSeamless(context, const CourseManagerExamsPage());
-              }
-            },
-          ),
-          _buildSidebarItem(
-            context,
-            Icons.grid_on,
-            'Exam Matrix',
-            isActive: currentRoute == 'matrix',
-            onTap: () {
-              if (onSelectRoute != null) {
-                onSelectRoute!('matrix');
-              } else if (currentRoute != 'matrix') {
-                _navigateSeamless(
-                  context,
-                  CourseManagerMatrixManagementPage(
-                    onBack: () {
-                      _navigateSeamless(context, const CourseManagerDashboardPage());
-                    },
-                  ),
-                );
-              }
-            },
-          ),
-          _buildSidebarItem(
-            context,
-            Icons.question_answer_outlined,
-            'Question Bank',
-            isActive: currentRoute == 'question_bank',
-            onTap: () {
-              if (onSelectRoute != null) {
-                onSelectRoute!('question_bank');
-              } else if (currentRoute != 'question_bank') {
-                _navigateSeamless(context, const CourseManagerQuestionBankPage());
-              }
-            },
-          ),
-          _buildSidebarItem(
-            context,
-            Icons.account_balance_wallet_outlined,
-            'Revenue Settlement',
-            isActive: currentRoute == 'settlement',
-            onTap: () {
-              if (onSelectRoute != null) {
-                onSelectRoute!('settlement');
-              } else if (currentRoute != 'settlement') {
-                _navigateSeamless(context, const CourseManagerSettlementPage());
-              }
-            },
-          ),
+          if (_canManageExams) ...[
+            _buildSidebarItem(
+              context,
+              Icons.assignment_outlined,
+              'Exam',
+              isActive: widget.currentRoute == 'exams',
+              onTap: () {
+                if (widget.onSelectRoute != null) {
+                  widget.onSelectRoute!('exams');
+                } else if (widget.currentRoute != 'exams') {
+                  _navigateSeamless(context, const CourseManagerExamsPage());
+                }
+              },
+            ),
+            _buildSidebarItem(
+              context,
+              Icons.grid_on,
+              'Exam Matrix',
+              isActive: widget.currentRoute == 'matrix',
+              onTap: () {
+                if (widget.onSelectRoute != null) {
+                  widget.onSelectRoute!('matrix');
+                } else if (widget.currentRoute != 'matrix') {
+                  _navigateSeamless(
+                    context,
+                    CourseManagerMatrixManagementPage(
+                      onBack: () {
+                        _navigateSeamless(context, const CourseManagerDashboardPage());
+                      },
+                    ),
+                  );
+                }
+              },
+            ),
+            _buildSidebarItem(
+              context,
+              Icons.question_answer_outlined,
+              'Question Bank',
+              isActive: widget.currentRoute == 'question_bank',
+              onTap: () {
+                if (widget.onSelectRoute != null) {
+                  widget.onSelectRoute!('question_bank');
+                } else if (widget.currentRoute != 'question_bank') {
+                  _navigateSeamless(context, const CourseManagerQuestionBankPage());
+                }
+              },
+            ),
+          ],
+          if (_canViewDashboard) ...[
+            _buildSidebarItem(
+              context,
+              Icons.account_balance_wallet_outlined,
+              'Revenue Settlement',
+              isActive: widget.currentRoute == 'settlement',
+              onTap: () {
+                if (widget.onSelectRoute != null) {
+                  widget.onSelectRoute!('settlement');
+                } else if (widget.currentRoute != 'settlement') {
+                  _navigateSeamless(context, const CourseManagerSettlementPage());
+                }
+              },
+            ),
+          ],
           const Spacer(),
         ],
       ),
