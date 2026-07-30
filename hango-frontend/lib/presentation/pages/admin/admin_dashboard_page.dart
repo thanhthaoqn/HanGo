@@ -69,6 +69,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // Roles tab state (FR-RBAC-DYNAMIC)
   bool _isLoadingRoles = true;
   List<Map<String, dynamic>> _rolesWithPermissions = [];
+  List<Map<String, dynamic>> _allPermissions = [];
 
   // Accounts tab state and variables
   String _accountsTab = 'trainer'; // 'trainer' | 'course_manager' | 'learner'
@@ -123,6 +124,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _fetchAiUsageStats();
     _fetchAuditLog();
     _fetchRoles();
+    _fetchPermissions();
     _loadNotifications();
   }
 
@@ -430,6 +432,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  Future<void> _fetchPermissions() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/permissions');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _allPermissions = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching all permissions: $e');
+    }
+  }
+
   Future<void> _fetchRoles() async {
     setState(() {
       _isLoadingRoles = true;
@@ -498,6 +525,69 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       ToastHelper.showError(context, 'Error updating permissions');
       debugPrint('Error updating role permissions: $e');
     }
+  }
+
+  void _showEditRolePermissionsDialog(String roleName, List<String> currentCodes) {
+    List<String> selectedCodes = List.from(currentCodes);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: Text('Edit Permissions: $roleName', style: const TextStyle(fontFamily: 'Outfit')),
+              content: SizedBox(
+                width: 400,
+                height: 400,
+                child: _allPermissions.isEmpty
+                    ? const Center(child: Text('No permissions loaded', style: TextStyle(fontFamily: 'Outfit')))
+                    : ListView.builder(
+                        itemCount: _allPermissions.length,
+                        itemBuilder: (context, index) {
+                          final perm = _allPermissions[index];
+                          final code = perm['code'] as String;
+                          final name = perm['name'] as String;
+                          final isSelected = selectedCodes.contains(code);
+
+                          return CheckboxListTile(
+                            title: Text(name, style: const TextStyle(fontFamily: 'Outfit', fontSize: 14)),
+                            subtitle: Text(code, style: const TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Colors.grey)),
+                            value: isSelected,
+                            activeColor: const Color(0xFF28B79B),
+                            onChanged: (bool? value) {
+                              setStateDialog(() {
+                                if (value == true) {
+                                  selectedCodes.add(code);
+                                } else {
+                                  selectedCodes.remove(code);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontFamily: 'Outfit')),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _updateRolePermissions(roleName, selectedCodes);
+                  },
+                  child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontFamily: 'Outfit')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _fetchAccounts() async {
@@ -3253,7 +3343,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF28B79B), fontFamily: 'Outfit')),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.shield_outlined, color: Color(0xFF28B79B), size: 20),
+              IconButton(
+                icon: const Icon(Icons.edit, color: Color(0xFF28B79B), size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () {
+                  final currentCodes = permissions.map((p) => p['code'] as String).toList();
+                  _showEditRolePermissionsDialog(name, currentCodes);
+                },
+              ),
             ],
           ),
           const SizedBox(height: 10),

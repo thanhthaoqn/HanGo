@@ -442,6 +442,24 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/permissions")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getAllPermissions() {
+        try {
+            List<Permission> permissions = permissionRepository.findAll();
+            List<PermissionDTO> response = permissions.stream()
+                    .map(p -> PermissionDTO.builder()
+                            .code(p.getCode())
+                            .name(p.getName())
+                            .description(p.getDescription())
+                            .build())
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/roles")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAllRolesWithPermissions() {
