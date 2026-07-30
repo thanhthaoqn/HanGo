@@ -275,6 +275,33 @@ class CourseManagerApi {
     );
   }
 
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final metadataUrl = baseUrl.replaceAll(
+      '/course-manager',
+      '/metadata/categories',
+    );
+
+    final response = await http.get(
+      Uri.parse(metadataUrl),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return decoded.map((item) => item as Map<String, dynamic>).toList();
+    } else {
+      throw Exception(
+        'Failed to get categories: ${response.statusCode}',
+      );
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

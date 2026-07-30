@@ -9,14 +9,12 @@ import com.hango.hango_backend.entity.ExamMatrixDetail;
 import com.hango.hango_backend.entity.ExamQuestion;
 import com.hango.hango_backend.entity.ExamQuestionId;
 import com.hango.hango_backend.entity.Question;
-import com.hango.hango_backend.entity.QuestionCategory;
 import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.ExamMatrixDetailRepository;
 import com.hango.hango_backend.repository.ExamMatrixRepository;
 import com.hango.hango_backend.repository.ExamQuestionRepository;
 import com.hango.hango_backend.repository.ExamRepository;
-import com.hango.hango_backend.repository.QuestionCategoryRepository;
 import com.hango.hango_backend.repository.QuestionRepository;
 import com.hango.hango_backend.repository.SystemParameterRepository;
 import com.hango.hango_backend.repository.UserRepository;
@@ -36,7 +34,6 @@ public class TrainerExamMatrixServiceImpl implements TrainerExamMatrixService {
     private final ExamMatrixDetailRepository examMatrixDetailRepository;
     private final UserRepository userRepository;
     private final SystemParameterRepository systemParameterRepository;
-    private final QuestionCategoryRepository questionCategoryRepository;
     private final QuestionRepository questionRepository;
     private final ExamRepository examRepository;
     private final ExamQuestionRepository examQuestionRepository;
@@ -45,18 +42,23 @@ public class TrainerExamMatrixServiceImpl implements TrainerExamMatrixService {
     @Transactional(readOnly = true)
     public List<ExamMatrixDTO> getAllExamMatrices() {
         return examMatrixRepository.findAllByOrderByCreatedAtDesc().stream().map(matrix -> {
-            List<ExamMatrixDetailDTO> details = examMatrixDetailRepository.findByMatrixId(matrix.getId()).stream().map(detail ->
-                ExamMatrixDetailDTO.builder()
-                        .id(detail.getId())
-                        .skillParamId(detail.getSkillParam() != null ? detail.getSkillParam().getId() : null)
-                        .skillParamName(detail.getSkillParam() != null ? detail.getSkillParam().getParamValue() : "N/A")
-                        .difficultyParamId(detail.getDifficultyParam() != null ? detail.getDifficultyParam().getId() : null)
-                        .difficultyParamName(detail.getDifficultyParam() != null ? detail.getDifficultyParam().getParamValue() : "N/A")
-                        .categoryId(detail.getCategory() != null ? detail.getCategory().getId() : null)
-                        .categoryName(detail.getCategory() != null ? detail.getCategory().getName() : "Uncategorized")
-                        .quantity(detail.getQuantity())
-                        .build()
-            ).collect(Collectors.toList());
+            List<ExamMatrixDetailDTO> details = examMatrixDetailRepository.findByMatrixId(matrix.getId()).stream()
+                    .map(detail -> ExamMatrixDetailDTO.builder()
+                            .id(detail.getId())
+                            .skillParamId(detail.getSkillParam() != null ? detail.getSkillParam().getId() : null)
+                            .skillParamName(
+                                    detail.getSkillParam() != null ? detail.getSkillParam().getParamValue() : "N/A")
+                            .difficultyParamId(
+                                    detail.getDifficultyParam() != null ? detail.getDifficultyParam().getId() : null)
+                            .difficultyParamName(
+                                    detail.getDifficultyParam() != null ? detail.getDifficultyParam().getParamValue()
+                                            : "N/A")
+                            .groupTypeId(detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getId() : null)
+                            .groupTypeName(
+                                    detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getParamValue() : "N/A")
+                            .quantity(detail.getQuantity())
+                            .build())
+                    .collect(Collectors.toList());
 
             return ExamMatrixDTO.builder()
                     .id(matrix.getId())
@@ -86,15 +88,17 @@ public class TrainerExamMatrixServiceImpl implements TrainerExamMatrixService {
                 SystemParameter skill = systemParameterRepository.findById(detailReq.getSkillParamId())
                         .orElseThrow(() -> new RuntimeException("Skill not found: " + detailReq.getSkillParamId()));
                 SystemParameter diff = systemParameterRepository.findById(detailReq.getDifficultyParamId())
-                        .orElseThrow(() -> new RuntimeException("Difficulty not found: " + detailReq.getDifficultyParamId()));
-                QuestionCategory cat = questionCategoryRepository.findById(detailReq.getCategoryId())
-                        .orElseThrow(() -> new RuntimeException("Category not found: " + detailReq.getCategoryId()));
+                        .orElseThrow(() -> new RuntimeException(
+                                "Difficulty not found: " + detailReq.getDifficultyParamId()));
 
                 ExamMatrixDetail detail = new ExamMatrixDetail();
                 detail.setMatrix(savedMatrix);
                 detail.setSkillParam(skill);
                 detail.setDifficultyParam(diff);
-                detail.setCategory(cat);
+                if (detailReq.getGroupTypeId() != null) {
+                    SystemParameter groupType = systemParameterRepository.findById(detailReq.getGroupTypeId()).orElse(null);
+                    detail.setGroupTypeParam(groupType);
+                }
                 detail.setQuantity(detailReq.getQuantity());
                 examMatrixDetailRepository.save(detail);
             }
@@ -130,24 +134,23 @@ public class TrainerExamMatrixServiceImpl implements TrainerExamMatrixService {
 
         for (ExamMatrixDetail detail : details) {
             int requiredQty = detail.getQuantity();
-            if (requiredQty <= 0) continue;
+            if (requiredQty <= 0)
+                continue;
 
             List<Question> randomQuestions = questionRepository.findRandomQuestionsByCriteria(
                     detail.getSkillParam().getId(),
                     detail.getDifficultyParam().getId(),
-                    detail.getCategory().getId(),
-                    requiredQty
-            );
+                    detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getId() : null,
+                    requiredQty);
 
             if (randomQuestions.size() < requiredQty) {
                 throw new RuntimeException(String.format(
-                        "Not enough questions in bank for criteria: Skill='%s', Difficulty='%s', Type='%s'. Required: %d, Found: %d",
+                        "Not enough questions in bank for criteria: Skill='%s', Difficulty='%s', GroupType='%s'. Required: %d, Found: %d",
                         detail.getSkillParam().getParamValue(),
                         detail.getDifficultyParam().getParamValue(),
-                        detail.getCategory().getName(),
+                        detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getParamValue() : "None",
                         requiredQty,
-                        randomQuestions.size()
-                ));
+                        randomQuestions.size()));
             }
 
             for (Question q : randomQuestions) {

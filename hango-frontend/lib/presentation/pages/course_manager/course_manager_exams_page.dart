@@ -24,6 +24,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   String _errorMessage = '';
   int? _currentUserId;
   List<dynamic> _examsList = [];
+  bool _isCreatingExam = false;
   
   int _currentPage = 1;
   final int _itemsPerPage = 10;
@@ -76,19 +77,19 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       final api = CourseManagerApi();
       final data = await api.getExamsForReview(_selectedStatus);
       
+      // Filter out DRAFTs not created by the current user
+      final filteredData = data.where((e) => e['status'] != 'DRAFT' || (_currentUserId != null && e['creatorId'] == _currentUserId)).toList();
+      
       setState(() {
-        _examsList = data;
+        _examsList = filteredData;
         
         // Calculate counts if we fetched ALL
         if (_selectedStatus == 'ALL') {
-          _allCount = data.length;
-          _draftCount = data.where((e) => e['status'] == 'DRAFT').length;
-          _publishedCount = data.where((e) => e['status'] == 'PUBLISHED').length;
-          _hiddenCount = data.where((e) => e['status'] == 'HIDDEN').length;
-          _pendingCount = data.where((e) => e['status'] == 'PENDING_APPROVAL' || e['status'] == 'SUBMITTED').length;
-        } else {
-          // If we filtered, just update the selected count (or allCount as fallback)
-          _allCount = data.length;
+          _allCount = filteredData.length;
+          _draftCount = filteredData.where((e) => e['status'] == 'DRAFT').length;
+          _publishedCount = filteredData.where((e) => e['status'] == 'PUBLISHED').length;
+          _hiddenCount = filteredData.where((e) => e['status'] == 'HIDDEN').length;
+          _pendingCount = filteredData.where((e) => e['status'] == 'PENDING_APPROVAL' || e['status'] == 'SUBMITTED').length;
         }
         _isLoading = false;
       });
@@ -153,26 +154,35 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
         children: [
           if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildContentHeader(context, isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-
-                        _buildFilterContainer(),
-                        const SizedBox(height: 24),
-                        _buildExamsTable(),
-                      ],
-                    ),
+            child: _isCreatingExam
+                ? TrainerCreateExamPage(
+                    isEmbedded: true,
+                    onBack: () {
+                      setState(() {
+                        _isCreatingExam = false;
+                        _fetchExamsData();
+                      });
+                    },
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildContentHeader(context, isDesktop),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFilterContainer(),
+                              const SizedBox(height: 24),
+                              _buildExamsTable(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -909,12 +919,10 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           ),
           const Spacer(),
           ElevatedButton.icon(
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
-              );
-              _fetchExamsData();
+            onPressed: () {
+              setState(() {
+                _isCreatingExam = true;
+              });
             },
             icon: const Icon(Icons.add, color: Colors.white, size: 18),
             label: const Text(

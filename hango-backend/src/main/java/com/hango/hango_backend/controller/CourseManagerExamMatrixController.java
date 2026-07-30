@@ -65,7 +65,8 @@ public class CourseManagerExamMatrixController {
             }
             String title = request.get("title");
             Long generatedExamId = matrixService.generateExamFromMatrix(id, title, userDetails.getUsername());
-            return ResponseEntity.ok("{\"examId\": " + generatedExamId + ", \"message\": \"Exam generated successfully\"}");
+            return ResponseEntity
+                    .ok("{\"examId\": " + generatedExamId + ", \"message\": \"Exam generated successfully\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

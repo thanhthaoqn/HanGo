@@ -13,7 +13,14 @@ import 'trainer_exam_ai_generate_page.dart';
 import 'trainer_exam_matrix_page.dart';
 
 class TrainerCreateExamPage extends StatefulWidget {
-  const TrainerCreateExamPage({super.key});
+  final bool isEmbedded;
+  final VoidCallback? onBack;
+
+  const TrainerCreateExamPage({
+    super.key,
+    this.isEmbedded = false,
+    this.onBack,
+  });
 
   @override
   State<TrainerCreateExamPage> createState() => _TrainerCreateExamPageState();
@@ -156,7 +163,11 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (!mounted) return;
         ToastHelper.show(context, 'Exam created successfully in DRAFT status');
-        Navigator.pop(context);
+        if (widget.isEmbedded && widget.onBack != null) {
+          widget.onBack!();
+        } else {
+          Navigator.pop(context);
+        }
       } else {
         throw Exception('Failed to create exam: ${response.statusCode} - ${response.body}');
       }
@@ -177,26 +188,54 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    Widget content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!widget.isEmbedded) _buildHeader(context, !isDesktop, _currentView),
+        if (widget.isEmbedded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+            child: Row(
+              children: [
+                if (_currentView == 'selection' && widget.onBack != null)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Color(0xFF4B5563)),
+                    onPressed: widget.onBack,
+                  ),
+                if (_currentView == 'selection' && widget.onBack != null)
+                  const SizedBox(width: 12),
+                const Text(
+                  'Create New Exam',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: Align(
+            alignment: const Alignment(0, -0.3),
+            child: _buildCurrentView(),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return content;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 2)) : null,
       body: Row(
         children: [
           if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(context, !isDesktop, _currentView),
-                Expanded(
-                  child: Align(
-                    alignment: const Alignment(0, -0.3),
-                    child: _buildCurrentView(),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: content),
         ],
       ),
     );

@@ -24,8 +24,8 @@ public class ExamMatrixDetail {
     private SystemParameter difficultyParam;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", referencedColumnName = "id", nullable = false)
-    private QuestionCategory category;
+    @JoinColumn(name = "group_type_id", nullable = true)
+    private SystemParameter groupTypeParam;
 
     @Column(nullable = false)
     private Integer quantity;

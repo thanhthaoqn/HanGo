@@ -264,6 +264,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     .description(exam.getDescription())
                     .status(exam.getStatus())
                     .creatorName(exam.getCreatedBy() != null ? exam.getCreatedBy().getFullName() : "Unknown")
+                    .creatorId(exam.getCreatedBy() != null ? exam.getCreatedBy().getId() : null)
                     .questionCount(questionCount)
                     .durationMinutes(exam.getDurationMinutes())
                     .thumbnailUrl(exam.getThumbnailUrl())

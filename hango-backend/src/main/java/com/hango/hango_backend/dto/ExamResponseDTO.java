@@ -11,6 +11,7 @@ public class ExamResponseDTO {
     private String description;
     private String status;
     private String creatorName;
+    private Long creatorId;
     private Integer questionCount;
     private Integer durationMinutes;
     private Double rating;

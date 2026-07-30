@@ -11,7 +11,7 @@ public class ExamMatrixDetailDTO {
     private String skillParamName;
     private Long difficultyParamId;
     private String difficultyParamName;
-    private Long categoryId;
-    private String categoryName;
+    private Long groupTypeId;
+    private String groupTypeName;
     private Integer quantity;
 }

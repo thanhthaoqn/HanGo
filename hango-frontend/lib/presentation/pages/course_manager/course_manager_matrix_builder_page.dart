@@ -90,7 +90,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
           'type': type,
           'groupTypeId': null,
           'subQuestions': [
-            {'skillId': null, 'diffId': null}
+            <String, dynamic>{'skillId': null, 'diffId': null}
           ],
         });
       }
@@ -105,7 +105,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
 
   void _addSubQuestion(int ruleIndex) {
     setState(() {
-      (_rules[ruleIndex]['subQuestions'] as List).add({'skillId': null, 'diffId': null});
+      (_rules[ruleIndex]['subQuestions'] as List).add(<String, dynamic>{'skillId': null, 'diffId': null});
     });
   }
 
@@ -169,14 +169,14 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
           flatDetails.add({
             'skillParamId': r['skillId'],
             'difficultyParamId': r['diffId'],
-            'categoryId': 1,
+            'groupTypeId': null,
           });
         } else {
           for (var sq in (r['subQuestions'] as List)) {
             flatDetails.add({
               'skillParamId': sq['skillId'],
               'difficultyParamId': sq['diffId'],
-              'categoryId': 1,
+              'groupTypeId': r['groupTypeId'],
             });
           }
         }
@@ -184,14 +184,14 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
 
       final grouped = <String, Map<String, dynamic>>{};
       for (var d in flatDetails) {
-        final key = '${d['skillParamId']}_${d['difficultyParamId']}';
+        final key = '${d['skillParamId']}_${d['difficultyParamId']}_${d['groupTypeId']}';
         if (grouped.containsKey(key)) {
           grouped[key]!['quantity'] = (grouped[key]!['quantity'] as int) + 1;
         } else {
           grouped[key] = {
             'skillParamId': d['skillParamId'],
             'difficultyParamId': d['difficultyParamId'],
-            'categoryId': d['categoryId'],
+            'groupTypeId': d['groupTypeId'],
             'quantity': 1,
           };
         }
