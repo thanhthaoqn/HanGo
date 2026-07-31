@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../utils/file_picker_helper.dart';
 
 import '../../utils/config.dart';
@@ -124,6 +125,18 @@ class AuthService {
     cachedAvatarUrl = null;
     cachedIsLoggedIn = false;
     notifyUserChanged();
+
+    try {
+      final googleSignIn = GoogleSignIn(
+        clientId: '814191576087-mig0a1q44o8el7iqm8bkui1g0stb5a89.apps.googleusercontent.com',
+        scopes: const ['email', 'profile'],
+      );
+      if (await googleSignIn.isSignedIn()) {
+        await googleSignIn.disconnect();
+      }
+    } catch (e) {
+      debugPrint('Error disconnecting Google Sign In: $e');
+    }
 
     await CartManager.updateCount();
   }

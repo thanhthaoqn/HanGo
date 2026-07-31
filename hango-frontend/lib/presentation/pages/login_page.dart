@@ -285,7 +285,12 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  bool _isProcessingGoogleLogin = false;
+
   void _handleGoogleSignInSuccess(GoogleSignInAccount googleUser) async {
+    if (_isProcessingGoogleLogin) return;
+    _isProcessingGoogleLogin = true;
+
     setState(() {
       _isLoading = true;
     });
@@ -340,6 +345,8 @@ class _LoginPageState extends State<LoginPage> {
           'Google Sign In failed: ${e.toString()}',
         );
       }
+    } finally {
+      _isProcessingGoogleLogin = false;
     }
   }
 
