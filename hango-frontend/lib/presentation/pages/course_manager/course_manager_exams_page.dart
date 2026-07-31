@@ -5,8 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
-import '../trainer/trainer_create_exam_page.dart';
-import '../trainer/trainer_edit_exam_page.dart';
+import 'course_manager_create_exam_page.dart';
+import 'course_manager_edit_exam_page.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../../data/services/course_manager_api.dart';
@@ -24,6 +24,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   String _errorMessage = '';
   int? _currentUserId;
   List<dynamic> _examsList = [];
+  bool _isCreatingExam = false;
   
   int _currentPage = 1;
   final int _itemsPerPage = 10;
@@ -54,9 +55,11 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
 
   Future<void> _loadCourseManagerInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _currentUserId = prefs.getInt('user_id');
-    });
+    if (mounted) {
+      setState(() {
+        _currentUserId = prefs.getInt('user_id');
+      });
+    }
   }
 
   @override
@@ -76,29 +79,82 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       final api = CourseManagerApi();
       final data = await api.getExamsForReview(_selectedStatus);
       
-      setState(() {
-        _examsList = data;
-        
-        // Calculate counts if we fetched ALL
-        if (_selectedStatus == 'ALL') {
-          _allCount = data.length;
-          _draftCount = data.where((e) => e['status'] == 'DRAFT').length;
-          _publishedCount = data.where((e) => e['status'] == 'PUBLISHED').length;
-          _hiddenCount = data.where((e) => e['status'] == 'HIDDEN').length;
-          _pendingCount = data.where((e) => e['status'] == 'PENDING_APPROVAL' || e['status'] == 'SUBMITTED').length;
-        } else {
-          // If we filtered, just update the selected count (or allCount as fallback)
-          _allCount = data.length;
+      // Filter out DRAFTs not created by the current user
+      final baseData = data.where((e) => e['status'] != 'DRAFT' || (_currentUserId != null && e['creatorId'] == _currentUserId)).toList();
+      
+      var filteredData = List<dynamic>.from(baseData);
+
+      // 1. Search Filter
+      final searchQuery = _searchController.text.trim().toLowerCase();
+      if (searchQuery.isNotEmpty) {
+        filteredData = filteredData.where((e) {
+          final title = (e['title'] ?? '').toString().toLowerCase();
+          return title.contains(searchQuery);
+        }).toList();
+      }
+
+      // 2. Time Period Filter
+      if (_selectedTimePeriod != 'ALL') {
+        final now = DateTime.now();
+        DateTime threshold = DateTime(2000);
+        if (_selectedTimePeriod == 'THIS_WEEK') {
+          threshold = now.subtract(const Duration(days: 7));
+        } else if (_selectedTimePeriod == 'THIS_MONTH') {
+          threshold = now.subtract(const Duration(days: 30));
         }
-        _isLoading = false;
+        filteredData = filteredData.where((e) {
+          if (e['createdAt'] == null) return false;
+          try {
+            final createdAt = DateTime.parse(e['createdAt'].toString());
+            return createdAt.isAfter(threshold);
+          } catch (_) {
+            return false;
+          }
+        }).toList();
+      }
+
+      // 3. Sorting
+      filteredData.sort((a, b) {
+        if (_selectedSortBy == 'NEWEST') {
+          final dateA = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
+          final dateB = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
+          return dateB.compareTo(dateA);
+        } else if (_selectedSortBy == 'OLDEST') {
+          final dateA = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
+          final dateB = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
+          return dateA.compareTo(dateB);
+        } else if (_selectedSortBy == 'ALPHABETICAL') {
+          final nameA = (a['title'] ?? '').toString().toLowerCase();
+          final nameB = (b['title'] ?? '').toString().toLowerCase();
+          return nameA.compareTo(nameB);
+        }
+        return 0;
       });
+
+      if (mounted) {
+        setState(() {
+          _examsList = filteredData;
+          
+          // Calculate counts based on baseData (before search/filter)
+          if (_selectedStatus == 'ALL') {
+            _allCount = baseData.length;
+            _draftCount = baseData.where((e) => e['status'] == 'DRAFT').length;
+            _publishedCount = baseData.where((e) => e['status'] == 'PUBLISHED').length;
+            _hiddenCount = baseData.where((e) => e['status'] == 'HIDDEN').length;
+            _pendingCount = baseData.where((e) => e['status'] == 'PENDING_APPROVAL' || e['status'] == 'SUBMITTED').length;
+          }
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading exams data: $e');
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-      _loadMockFallback();
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+        _loadMockFallback();
+      }
     }
   }
 
@@ -153,26 +209,37 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
         children: [
           if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildContentHeader(context, isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-
-                        _buildFilterContainer(),
-                        const SizedBox(height: 24),
-                        _buildExamsTable(),
-                      ],
-                    ),
+            child: _isCreatingExam
+                ? CourseManagerCreateExamPage(
+                    isEmbedded: true,
+                    onBack: () {
+                      setState(() {
+                        _isCreatingExam = false;
+                        _fetchExamsData();
+                      });
+                    },
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildContentHeader(context, isDesktop),
+                      Expanded(
+                        child: ClipRect(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildFilterContainer(),
+                                const SizedBox(height: 24),
+                                _buildExamsTable(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -458,15 +525,22 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
           // Table Body
           currentExams.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: Center(
-                    child: Text(
-                      'No exams found.',
-                      style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
-                    ),
-                  ),
-                )
+              ? (_isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(80.0),
+                      child: Center(
+                        child: CircularProgressIndicator(color: Color(0xFF10B981)),
+                      ),
+                    )
+                  : const Padding(
+                      padding: EdgeInsets.all(40.0),
+                      child: Center(
+                        child: Text(
+                          'No exams found.',
+                          style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                        ),
+                      ),
+                    ))
               : ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -659,7 +733,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                           onPressed: () async {
                             await Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                              MaterialPageRoute(builder: (context) => CourseManagerEditExamPage(
                                 examId: exam['id'],
                                 examTitle: exam['title'] ?? 'Untitled',
                                 examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
@@ -679,7 +753,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                           onPressed: () async {
                             await Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => TrainerEditExamPage(
+                              MaterialPageRoute(builder: (context) => CourseManagerEditExamPage(
                                 examId: exam['id'],
                                 examTitle: exam['title'] ?? 'Untitled',
                                 examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
@@ -909,12 +983,10 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           ),
           const Spacer(),
           ElevatedButton.icon(
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
-              );
-              _fetchExamsData();
+            onPressed: () {
+              setState(() {
+                _isCreatingExam = true;
+              });
             },
             icon: const Icon(Icons.add, color: Colors.white, size: 18),
             label: const Text(

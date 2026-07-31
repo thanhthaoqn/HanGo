@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
-import 'trainer_create_exam_page.dart';
-import 'trainer_edit_exam_page.dart';
-import '../../../utils/toast_helper.dart';
+import '../course_manager/course_manager_create_exam_page.dart';
+import '../course_manager/course_manager_edit_exam_page.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
+import '../../../utils/toast_helper.dart';
 
 class TrainerExamsPage extends StatefulWidget {
   final bool isEmbedded;
@@ -94,33 +94,37 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        setState(() {
-          if (data is Map) {
-            _allCount = (data['allCount'] ?? 0) as int;
-            _draftCount = (data['draftCount'] ?? 0) as int;
-            _publishedCount = (data['publishedCount'] ?? 0) as int;
-            _hiddenCount = (data['hiddenCount'] ?? 0) as int;
-            _pendingCount = (data['pendingCount'] ?? 0) as int;
-            _examsList = data['exams'] ?? [];
-          } else if (data is List) {
-            _examsList = data;
-            _allCount = data.length;
-            _draftCount = 0;
-            _publishedCount = 0;
-            _hiddenCount = 0;
-            _pendingCount = 0;
-          }
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            if (data is Map) {
+              _allCount = (data['allCount'] ?? 0) as int;
+              _draftCount = (data['draftCount'] ?? 0) as int;
+              _publishedCount = (data['publishedCount'] ?? 0) as int;
+              _hiddenCount = (data['hiddenCount'] ?? 0) as int;
+              _pendingCount = (data['pendingCount'] ?? 0) as int;
+              _examsList = data['exams'] ?? [];
+            } else if (data is List) {
+              _examsList = data;
+              _allCount = data.length;
+              _draftCount = 0;
+              _publishedCount = 0;
+              _hiddenCount = 0;
+              _pendingCount = 0;
+            }
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('Failed to load exams data: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('Error loading exams data: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      _loadMockFallback();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _loadMockFallback();
+      }
     }
   }
   Future<void> _updateExamVisibility(int examId, String newVisibility) async {
@@ -219,13 +223,15 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         initials = parts.last[0].toUpperCase();
       }
     }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
+    if (mounted) {
+      setState(() {
+        _trainerName = fullName;
+        _trainerInitials = initials;
+        _trainerAvatarUrl = avatarUrl;
 
-      _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMIN');
-    });
+        _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMIN');
+      });
+    }
   }
 
   @override
@@ -300,7 +306,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           onPressed: () async {
             await Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
+              MaterialPageRoute(builder: (context) => const CourseManagerCreateExamPage(isEmbedded: true)),
             );
             _fetchExamsData();
           },
@@ -684,6 +690,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   }
 
   Widget _buildExamRow(Map<String, dynamic> exam) {
+    final status = exam['status']?.toString().toUpperCase() ?? '';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
@@ -782,7 +789,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             flex: 1,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _buildStatusChip(exam['status'] ?? 'DRAFT'),
+              child: _buildStatusChip(status),
             ),
           ),
           Expanded(
@@ -801,7 +808,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                       }
                     },
                     itemBuilder: (context) {
-                      final status = exam['status']?.toString().toUpperCase() ?? '';
                       return [
                         if (status != 'HIDDEN')
                           const PopupMenuItem(
@@ -833,10 +839,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   onPressed: () async {
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => TrainerEditExamPage(
-                        examId: exam['id'],
-                        examTitle: exam['title'] ?? 'Untitled',
-                        examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                      MaterialPageRoute(builder: (context) => CourseManagerEditExamPage(
+                        examId: exam['id'] as int,
+                        examTitle: exam['title'] ?? 'Untitled Exam',
+                        examExpectedCount: exam['expectedQuestionCount'] as int? ?? 10,
+                        isReadOnly: status == 'APPROVED' || status == 'PUBLISHED',
+                        isCourseManager: false,
                       )),
                     );
                     _fetchExamsData();

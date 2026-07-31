@@ -221,21 +221,47 @@ class QuestionTable extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 6),
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(4),
+                              if (q.categoryName.isNotEmpty && q.categoryName != 'Chưa phân loại')
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    q.categoryName,
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                                child: Text(
-                                  q.categoryName,
-                                  style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              if (q.skillName != null && q.skillName!.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE0E7FF),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    q.skillName!,
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF4338CA), fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                              ),
-                              if (!q.isGroup) ...[
-                                const SizedBox(width: 8),
+                              if (q.groupTypeName != null && q.groupTypeName!.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFCE7F3),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    q.groupTypeName!,
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFFBE185D), fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              if (!q.isGroup && q.difficultyName.isNotEmpty && q.difficultyName != 'null')
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
@@ -251,7 +277,6 @@ class QuestionTable extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              ],
                             ],
                           ),
                         ],
@@ -389,8 +414,13 @@ class QuestionTable extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     // Number buttons
-                    ...List.generate(totalPages, (index) {
-                      final p = index + 1;
+                    ..._getPageNumbers(currentPage, totalPages).map((p) {
+                      if (p == null) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text('...', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                        );
+                      }
                       final isSelected = p == currentPage;
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2.0),
@@ -400,7 +430,7 @@ class QuestionTable extends StatelessWidget {
                           onTap: () => onPageChanged(p),
                         ),
                       );
-                    }),
+                    }).toList(),
                     const SizedBox(width: 4),
                     // Next button
                     _buildPageButton(
@@ -480,5 +510,21 @@ class QuestionTable extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<int?> _getPageNumbers(int currentPage, int totalPages) {
+    if (totalPages <= 7) {
+      return List.generate(totalPages, (index) => index + 1);
+    }
+    
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, null, totalPages];
+    }
+    
+    if (currentPage >= totalPages - 3) {
+      return [1, null, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    
+    return [1, null, currentPage - 1, currentPage, currentPage + 1, null, totalPages];
   }
 }

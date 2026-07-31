@@ -38,7 +38,7 @@ import com.hango.hango_backend.repository.SystemParameterRepository;
 import com.hango.hango_backend.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
-class TrainerExamMatrixServiceTest {
+class CourseManagerExamMatrixServiceTest {
 
     @Mock
     private ExamMatrixRepository examMatrixRepository;
@@ -58,7 +58,7 @@ class TrainerExamMatrixServiceTest {
     private ExamQuestionRepository examQuestionRepository;
 
     @InjectMocks
-    private TrainerExamMatrixServiceImpl service;
+    private CourseManagerExamMatrixServiceImpl service;
 
     private User user(Long id, String email) {
         return User.builder().id(id).email(email).fullName("Trainer").build();
@@ -83,7 +83,8 @@ class TrainerExamMatrixServiceTest {
         return m;
     }
 
-    private ExamMatrixDetail detail(Long id, ExamMatrix m, SystemParameter skill, SystemParameter diff, QuestionCategory cat, int qty) {
+    private ExamMatrixDetail detail(Long id, ExamMatrix m, SystemParameter skill, SystemParameter diff,
+            QuestionCategory cat, int qty) {
         ExamMatrixDetail d = new ExamMatrixDetail();
         d.setId(id);
         d.setMatrix(m);
@@ -145,7 +146,8 @@ class TrainerExamMatrixServiceTest {
         return d;
     }
 
-    private ExamMatrixCreateRequestDTO createRequest(String title, List<ExamMatrixCreateRequestDTO.DetailRequest> details) {
+    private ExamMatrixCreateRequestDTO createRequest(String title,
+            List<ExamMatrixCreateRequestDTO.DetailRequest> details) {
         ExamMatrixCreateRequestDTO req = new ExamMatrixCreateRequestDTO();
         req.setTitle(title);
         req.setDescription("desc");
@@ -187,7 +189,8 @@ class TrainerExamMatrixServiceTest {
         when(systemParameterRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.createExamMatrix("trainer@example.com", createRequest("Matrix", List.of(detailRequest(99L, 2L, 1L, 5)))));
+                () -> service.createExamMatrix("trainer@example.com",
+                        createRequest("Matrix", List.of(detailRequest(99L, 2L, 1L, 5)))));
     }
 
     @Test
@@ -199,7 +202,8 @@ class TrainerExamMatrixServiceTest {
         when(systemParameterRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.createExamMatrix("trainer@example.com", createRequest("Matrix", List.of(detailRequest(1L, 99L, 1L, 5)))));
+                () -> service.createExamMatrix("trainer@example.com",
+                        createRequest("Matrix", List.of(detailRequest(1L, 99L, 1L, 5)))));
     }
 
     @Test
@@ -212,7 +216,8 @@ class TrainerExamMatrixServiceTest {
         when(questionCategoryRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.createExamMatrix("trainer@example.com", createRequest("Matrix", List.of(detailRequest(1L, 2L, 99L, 5)))));
+                () -> service.createExamMatrix("trainer@example.com",
+                        createRequest("Matrix", List.of(detailRequest(1L, 2L, 99L, 5)))));
     }
 
     @Test
@@ -240,7 +245,8 @@ class TrainerExamMatrixServiceTest {
 
     @Test
     void generateExamFromMatrixShouldThrowWhenMatrixNotFound() {
-        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(user(1L, "trainer@example.com")));
+        when(userRepository.findByEmail("trainer@example.com"))
+                .thenReturn(Optional.of(user(1L, "trainer@example.com")));
         when(examMatrixRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,

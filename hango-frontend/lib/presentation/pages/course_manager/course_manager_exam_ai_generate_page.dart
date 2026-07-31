@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import 'trainer_edit_exam_page.dart';
+import 'course_manager_edit_exam_page.dart';
 import '../../../utils/toast_helper.dart';
 
-class TrainerExamAiGeneratePage extends StatefulWidget {
+class CourseManagerExamAiGeneratePage extends StatefulWidget {
   final VoidCallback onBack;
-  const TrainerExamAiGeneratePage({super.key, required this.onBack});
+  final bool isCourseManager;
+  const CourseManagerExamAiGeneratePage({super.key, required this.onBack, this.isCourseManager = true});
 
   @override
-  State<TrainerExamAiGeneratePage> createState() =>
-      _TrainerExamAiGeneratePageState();
+  State<CourseManagerExamAiGeneratePage> createState() =>
+      _CourseManagerExamAiGeneratePageState();
 }
 
-class _TrainerExamAiGeneratePageState extends State<TrainerExamAiGeneratePage> {
+class _CourseManagerExamAiGeneratePageState extends State<CourseManagerExamAiGeneratePage> {
   final _topicController = TextEditingController();
   final _countController = TextEditingController();
   String _selectedDifficulty = 'Medium';
@@ -256,13 +257,14 @@ class _TrainerExamAiGeneratePageState extends State<TrainerExamAiGeneratePage> {
                         child: ElevatedButton(
                           onPressed: () {
                             ToastHelper.show(context, 'AI is generating exam...');
-                            Future.delayed(const Duration(seconds: 1), () {
-                              Navigator.pushReplacement(
+                            Future.delayed(const Duration(seconds: 1), () async {
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const TrainerEditExamPage(
+                                  builder: (context) => CourseManagerEditExamPage(
                                     examId: 2, // Dummy ID
                                     examTitle: 'AI Generated Exam',
+                                    isCourseManager: widget.isCourseManager,
                                   ),
                                 ),
                               );

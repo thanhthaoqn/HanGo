@@ -13,5 +13,6 @@ public class ExamMatrixDTO {
     private String description;
     private Long createdBy;
     private LocalDateTime createdAt;
+    private Boolean isPublic;
     private List<ExamMatrixDetailDTO> details;
 }
