@@ -610,6 +610,9 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
     required Function(int?)? onChanged,
     required String displayKey,
   }) {
+    final bool valueExists = value == null || items.any((item) => item['id'] == value);
+    final int? safeValue = valueExists ? value : null;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -619,7 +622,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int>(
-          value: value,
+          value: safeValue,
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
           items: items.map((item) {

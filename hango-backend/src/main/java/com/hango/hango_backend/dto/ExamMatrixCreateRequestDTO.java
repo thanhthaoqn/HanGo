@@ -14,6 +14,7 @@ public class ExamMatrixCreateRequestDTO {
         private Long skillParamId;
         private Long difficultyParamId;
         private Long groupTypeId;
+        private Long categoryId;
         private Integer quantity;
     }
 }

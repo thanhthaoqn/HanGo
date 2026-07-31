@@ -30,6 +30,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   String _trainerAvatarUrl = '';
   bool _isLoading = true;
   String _errorMessage = '';
+  bool _canManageCourses = false;
 
   // Tab Status Filters
   String _selectedStatus =
@@ -82,10 +83,13 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         initials = parts.last[0].toUpperCase();
       }
     }
+    final roles = prefs.getStringList('user_roles') ?? [];
+    final canManage = roles.contains('MANAGE_OWN_COURSES') || roles.contains('ROLE_ADMINISTRATOR');
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
       _trainerAvatarUrl = avatarUrl;
+      _canManageCourses = canManage;
     });
   }
 
@@ -757,89 +761,91 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       runSpacing: 12,
       alignment: WrapAlignment.end,
       children: [
-        OutlinedButton.icon(
-          onPressed: _isDownloadingTemplate ? null : _downloadImportTemplate,
-          icon: _isDownloadingTemplate
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
+        if (_canManageCourses) ...[
+          OutlinedButton.icon(
+            onPressed: _isDownloadingTemplate ? null : _downloadImportTemplate,
+            icon: _isDownloadingTemplate
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF20B486),
+                    ),
+                  )
+                : const Icon(
+                    Icons.download_outlined,
                     color: Color(0xFF20B486),
+                    size: 18,
                   ),
-                )
-              : const Icon(
-                  Icons.download_outlined,
-                  color: Color(0xFF20B486),
-                  size: 18,
-                ),
-          label: const Text(
-            'Download Template',
-            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF20B486),
-            side: const BorderSide(color: Color(0xFF20B486)),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+            label: const Text(
+              'Download Template',
+              style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF20B486),
+              side: const BorderSide(color: Color(0xFF20B486)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
-        ),
-        OutlinedButton.icon(
-          onPressed: _isImportingExcel ? null : _importCourseExcel,
-          icon: _isImportingExcel
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
+          OutlinedButton.icon(
+            onPressed: _isImportingExcel ? null : _importCourseExcel,
+            icon: _isImportingExcel
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF20B486),
+                    ),
+                  )
+                : const Icon(
+                    Icons.upload_file_outlined,
                     color: Color(0xFF20B486),
+                    size: 18,
                   ),
-                )
-              : const Icon(
-                  Icons.upload_file_outlined,
-                  color: Color(0xFF20B486),
-                  size: 18,
-                ),
-          label: const Text(
-            'Import Excel',
-            style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF20B486),
-            side: const BorderSide(color: Color(0xFF99F6E4)),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+            label: const Text(
+              'Import Excel',
+              style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF20B486),
+              side: const BorderSide(color: Color(0xFF99F6E4)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
-        ),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CreateCoursePage()),
-            ).then((_) => _fetchCoursesData());
-          },
-          icon: const Icon(Icons.add, color: Colors.white, size: 18),
-          label: const Text(
-            'Create New Course',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Outfit',
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CreateCoursePage()),
+              ).then((_) => _fetchCoursesData());
+            },
+            icon: const Icon(Icons.add, color: Colors.white, size: 18),
+            label: const Text(
+              'Create New Course',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
             ),
           ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF20B486),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            elevation: 0,
-          ),
-        ),
+        ],
       ],
     );
 
@@ -1437,21 +1443,23 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                 'View course feature is under development',
               ),
             ),
-            const SizedBox(width: 8),
-            _actionChip(
-              icon: Icons.edit_outlined,
-              label: 'Edit / Create New Version',
-              color: const Color(0xFF20B486),
-              bg: const Color(0xFFE6F7F1),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => EditCoursePage(courseId: extractId(course)),
-                  ),
-                ).then((_) => _fetchCoursesData());
-              },
-            ),
+            if (_canManageCourses) ...[
+              const SizedBox(width: 8),
+              _actionChip(
+                icon: Icons.edit_outlined,
+                label: 'Edit / Create New Version',
+                color: const Color(0xFF20B486),
+                bg: const Color(0xFFE6F7F1),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditCoursePage(courseId: extractId(course)),
+                    ),
+                  ).then((_) => _fetchCoursesData());
+                },
+              ),
+            ],
             const Spacer(),
             _iconBtn(
               icon: Icons.history,
@@ -1463,25 +1471,26 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           ],
         );
 
-      // ── State 2: Trainer editing in progress ─────────────────────────────
       case 'HAS_DRAFT':
         return Row(
           children: [
-            _actionChip(
-              icon: Icons.edit_note,
-              label: 'Continue Editing v2',
-              color: const Color(0xFFD97706),
-              bg: const Color(0xFFFEF3C7),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => EditCoursePage(courseId: extractId(draft)),
-                  ),
-                ).then((_) => _fetchCoursesData());
-              },
-            ),
-            const SizedBox(width: 8),
+            if (_canManageCourses) ...[
+              _actionChip(
+                icon: Icons.edit_note,
+                label: 'Continue Editing v2',
+                color: const Color(0xFFD97706),
+                bg: const Color(0xFFFEF3C7),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditCoursePage(courseId: extractId(draft)),
+                    ),
+                  ).then((_) => _fetchCoursesData());
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
             _actionChip(
               icon: Icons.history,
               label: 'Version History',
@@ -1491,37 +1500,40 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   _showVersionHistoryModal(context, title, allVersions),
             ),
             const Spacer(),
-            _actionChip(
-              icon: Icons.cancel_outlined,
-              label: 'Cancel Draft',
-              color: const Color(0xFFEF4444),
-              bg: const Color(0xFFFEE2E2),
-              onTap: () => _deleteCourse(draft),
-            ),
+            if (_canManageCourses) ...[
+              _actionChip(
+                icon: Icons.cancel_outlined,
+                label: 'Cancel Draft',
+                color: const Color(0xFFEF4444),
+                bg: const Color(0xFFFEE2E2),
+                onTap: () => _deleteCourse(draft),
+              ),
+            ],
           ],
         );
 
-      // ── State 4: Draft Only (or Rejected) ─────────────────────────────
       case 'DRAFT_ONLY':
         final s = (course['status'] ?? '').toString().toUpperCase();
         final isRejected = s == 'REJECTED';
         return Row(
           children: [
-            _actionChip(
-              icon: Icons.edit_outlined,
-              label: isRejected ? 'Edit Rejected Course' : 'Edit Draft',
-              color: isRejected ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
-              bg: isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => EditCoursePage(courseId: extractId(course)),
-                  ),
-                ).then((_) => _fetchCoursesData());
-              },
-            ),
-            const SizedBox(width: 8),
+            if (_canManageCourses) ...[
+              _actionChip(
+                icon: Icons.edit_outlined,
+                label: isRejected ? 'Edit Rejected Course' : 'Edit Draft',
+                color: isRejected ? const Color(0xFFEF4444) : const Color(0xFF2563EB),
+                bg: isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFEFF6FF),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditCoursePage(courseId: extractId(course)),
+                    ),
+                  ).then((_) => _fetchCoursesData());
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
             _actionChip(
               icon: Icons.history,
               label: 'Version History',
@@ -1531,12 +1543,14 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                   _showVersionHistoryModal(context, title, allVersions),
             ),
             const Spacer(),
-            _iconBtn(
-              icon: Icons.delete_outline,
-              tooltip: 'Delete course',
-              color: const Color(0xFFEF4444),
-              onTap: () => _deleteCourse(course),
-            ),
+            if (_canManageCourses) ...[
+              _iconBtn(
+                icon: Icons.delete_outline,
+                tooltip: 'Delete course',
+                color: const Color(0xFFEF4444),
+                onTap: () => _deleteCourse(course),
+              ),
+            ],
           ],
         );
 

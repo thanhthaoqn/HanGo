@@ -4,14 +4,20 @@ import '../../../utils/toast_helper.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
 
+enum MatrixMode { create, view, edit }
+
 class CourseManagerMatrixBuilderPage extends StatefulWidget {
   final CourseManagerApi api;
   final VoidCallback onSaved;
+  final MatrixMode mode;
+  final Map<String, dynamic>? initialData;
 
   const CourseManagerMatrixBuilderPage({
     super.key,
     required this.api,
     required this.onSaved,
+    this.mode = MatrixMode.create,
+    this.initialData,
   });
 
   @override
@@ -66,6 +72,46 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
           }).toList();
           
           _isLoadingData = false;
+
+          if (widget.initialData != null) {
+            _titleController.text = widget.initialData!['title'] ?? '';
+            _descController.text = widget.initialData!['description'] ?? '';
+            final details = widget.initialData!['details'] as List? ?? [];
+            _rules.clear();
+            
+            final groupMap = <int, List<Map<String, dynamic>>>{};
+            
+            for (var d in details) {
+              int qty = d['quantity'] ?? 1;
+              if (d['groupTypeId'] == null) {
+                for (int i = 0; i < qty; i++) {
+                  _rules.add({
+                    'type': 'single',
+                    'skillId': d['skillParamId'],
+                    'diffId': d['difficultyParamId'],
+                    'groupTypeId': null,
+                  });
+                }
+              } else {
+                int groupId = d['groupTypeId'];
+                if (!groupMap.containsKey(groupId)) groupMap[groupId] = [];
+                for (int i = 0; i < qty; i++) {
+                   groupMap[groupId]!.add({
+                     'skillId': d['skillParamId'],
+                     'diffId': d['difficultyParamId'],
+                   });
+                }
+              }
+            }
+            
+            for (var entry in groupMap.entries) {
+              _rules.add({
+                 'type': 'group',
+                 'groupTypeId': entry.key,
+                 'subQuestions': entry.value,
+              });
+            }
+          }
         });
       }
     } catch (e) {
@@ -203,9 +249,15 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
         'details': grouped.values.toList(),
       };
 
-      await widget.api.createExamMatrix(data);
+      if (widget.mode == MatrixMode.edit && widget.initialData != null) {
+        await widget.api.updateExamMatrix(widget.initialData!['id'], data);
+        if (mounted) ToastHelper.showSuccess(context, 'Matrix updated successfully!');
+      } else {
+        await widget.api.createExamMatrix(data);
+        if (mounted) ToastHelper.showSuccess(context, 'Matrix created successfully!');
+      }
+      
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Matrix created successfully!');
         widget.onSaved();
         Navigator.pop(context);
       }
@@ -406,60 +458,61 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
             },
           ),
         const SizedBox(height: 24),
-        Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => _addRule('single'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFF20B486)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add, color: Color(0xFF20B486), size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Add Single Question',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: InkWell(
-                onTap: () => _addRule('group'),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF20B486),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Add Reading Passage Group',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
-                      ),
-                    ],
+        if (widget.mode != MatrixMode.view)
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => _addRule('single'),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFF20B486)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add, color: Color(0xFF20B486), size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Add Single Question',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: InkWell(
+                  onTap: () => _addRule('group'),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF20B486),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Add Reading Passage Group',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -517,11 +570,12 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                   ),
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                tooltip: 'Delete',
-                onPressed: () => _removeRule(index),
-              ),
+              if (widget.mode != MatrixMode.view)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  tooltip: 'Delete',
+                  onPressed: () => _removeRule(index),
+                ),
             ],
           ),
           const SizedBox(height: 20),
@@ -536,7 +590,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                     decoration: _inputDecoration('Skill *', null),
                     value: rule['skillId'],
                     items: _skills.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name'], overflow: TextOverflow.ellipsis))).toList(),
-                    onChanged: (val) => setState(() => rule['skillId'] = val),
+                    onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['skillId'] = val),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -550,7 +604,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                       const DropdownMenuItem<int?>(value: null, child: Text('None', style: TextStyle(color: Colors.grey))),
                       ..._groupTypes.map((s) => DropdownMenuItem<int?>(value: s['id'], child: Text(s['name'])))
                     ],
-                    onChanged: (val) => setState(() => rule['groupTypeId'] = val),
+                    onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['groupTypeId'] = val),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -561,7 +615,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                     decoration: _inputDecoration('Difficulty *', null),
                     value: rule['diffId'],
                     items: _difficulties.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name']))).toList(),
-                    onChanged: (val) => setState(() => rule['diffId'] = val),
+                    onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['diffId'] = val),
                   ),
                 ),
               ],
@@ -572,7 +626,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
               decoration: _inputDecoration('Group Type *', null),
               value: rule['groupTypeId'],
               items: _groupTypes.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name']))).toList(),
-              onChanged: (val) => setState(() => rule['groupTypeId'] = val),
+              onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['groupTypeId'] = val),
             ),
             const SizedBox(height: 16),
             const Text('Sub Questions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4B5563))),
@@ -593,7 +647,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                         decoration: _inputDecoration('Skill *', null),
                         value: sq['skillId'],
                         items: _skills.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name'], overflow: TextOverflow.ellipsis))).toList(),
-                        onChanged: (val) => setState(() => sq['skillId'] = val),
+                        onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => sq['skillId'] = val),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -604,22 +658,24 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                         decoration: _inputDecoration('Difficulty *', null),
                         value: sq['diffId'],
                         items: _difficulties.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name']))).toList(),
-                        onChanged: (val) => setState(() => sq['diffId'] = val),
+                        onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => sq['diffId'] = val),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                      onPressed: () => _removeSubQuestion(index, subIdx),
-                    ),
+                    if (widget.mode != MatrixMode.view)
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                        onPressed: () => _removeSubQuestion(index, subIdx),
+                      ),
                   ],
                 ),
               );
             }).toList(),
-            TextButton.icon(
-              onPressed: () => _addSubQuestion(index),
-              icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
-              label: const Text('Add Question to Group', style: TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold)),
-            ),
+            if (widget.mode != MatrixMode.view)
+              TextButton.icon(
+                onPressed: () => _addSubQuestion(index),
+                icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
+                label: const Text('Add Question to Group', style: TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold)),
+              ),
           ],
         ],
       ),
@@ -638,21 +694,23 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
           ),
           child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
         ),
-        const SizedBox(width: 16),
-        ElevatedButton.icon(
-          onPressed: (_isValid && !_isSaving) ? _saveMatrix : null,
-          icon: _isSaving 
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : const Icon(Icons.save_outlined, size: 20),
-          label: Text(_isSaving ? 'Saving...' : 'Save Matrix'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF20B486),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            elevation: 0,
+        if (widget.mode != MatrixMode.view) ...[
+          const SizedBox(width: 16),
+          ElevatedButton.icon(
+            onPressed: (_isValid && !_isSaving) ? _saveMatrix : null,
+            icon: _isSaving 
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.save_outlined, size: 20),
+            label: Text(_isSaving ? 'Saving...' : 'Save Matrix'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

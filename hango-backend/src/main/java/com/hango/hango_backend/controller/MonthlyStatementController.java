@@ -25,7 +25,7 @@ public class MonthlyStatementController {
     // --- Trainer Endpoints ---
 
     @GetMapping("/trainer/revenue-summary")
-    @PreAuthorize("hasAnyAuthority('TRAINER', 'COURSE_MANAGER', 'ROLE_TRAINER', 'ROLE_COURSE_MANAGER', 'TEACHER', 'ROLE_TEACHER')")
+    @PreAuthorize("hasAuthority('VIEW_OWN_REVENUE') or hasAuthority('VIEW_PLATFORM_DASHBOARD')")
     public ResponseEntity<TrainerRevenueSummaryDTO> getTrainerRevenueSummary(
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         TrainerRevenueSummaryDTO summary = statementService.getTrainerRevenueSummary(currentUser.getId());
@@ -33,7 +33,7 @@ public class MonthlyStatementController {
     }
 
     @GetMapping("/trainer/statements")
-    @PreAuthorize("hasAnyAuthority('TRAINER', 'COURSE_MANAGER', 'ROLE_TRAINER', 'ROLE_COURSE_MANAGER', 'TEACHER', 'ROLE_TEACHER')")
+    @PreAuthorize("hasAuthority('VIEW_OWN_REVENUE') or hasAuthority('VIEW_PLATFORM_DASHBOARD')")
     public ResponseEntity<List<MonthlyStatementDTO>> getTrainerStatements(
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         List<MonthlyStatementDTO> statements = statementService.getTrainerStatements(currentUser.getId());
@@ -41,7 +41,7 @@ public class MonthlyStatementController {
     }
 
     @PostMapping("/trainer/statements/{id}/confirm")
-    @PreAuthorize("hasAnyAuthority('TRAINER', 'COURSE_MANAGER', 'ROLE_TRAINER', 'ROLE_COURSE_MANAGER', 'TEACHER', 'ROLE_TEACHER')")
+    @PreAuthorize("hasAuthority('VIEW_OWN_REVENUE') or hasAuthority('VIEW_PLATFORM_DASHBOARD')")
     public ResponseEntity<MonthlyStatementDTO> confirmTrainerStatement(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -52,7 +52,7 @@ public class MonthlyStatementController {
     // --- Course Manager / Admin Endpoints ---
 
     @GetMapping("/course-manager/statements")
-    @PreAuthorize("hasAnyAuthority('COURSE_MANAGER', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_COURSE_MANAGER', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<MonthlyStatementDTO>> getCourseManagerStatements(
             @RequestParam(name = "periodMonth", required = false) String periodMonth,
             @RequestParam(name = "status", required = false) String status) {
@@ -61,7 +61,7 @@ public class MonthlyStatementController {
     }
 
     @PostMapping("/course-manager/statements/generate")
-    @PreAuthorize("hasAnyAuthority('COURSE_MANAGER', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_COURSE_MANAGER', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<MonthlyStatementDTO>> generateMonthlyCutoff(
             @RequestParam(name = "periodMonth", required = false) String periodMonth) {
         List<MonthlyStatementDTO> generated = statementService.generateMonthlyCutoff(periodMonth);
@@ -69,7 +69,7 @@ public class MonthlyStatementController {
     }
 
     @PostMapping("/course-manager/statements/{id}/settle")
-    @PreAuthorize("hasAnyAuthority('COURSE_MANAGER', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_COURSE_MANAGER', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<MonthlyStatementDTO> settleStatement(
             @PathVariable("id") Long id,
             @RequestBody SettleRequestDTO request) {

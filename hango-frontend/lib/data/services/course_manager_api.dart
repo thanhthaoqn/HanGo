@@ -155,7 +155,9 @@ class CourseManagerApi {
   Future<void> rejectCourse(int courseId, {String? reason}) async {
     final response = await _post(
       '/courses/$courseId/reject',
-      body: reason != null && reason.isNotEmpty ? jsonEncode({'reason': reason}) : null,
+      body: reason != null && reason.isNotEmpty
+          ? jsonEncode({'reason': reason})
+          : null,
     );
     if (response.statusCode != 200) {
       throw Exception(
@@ -182,29 +184,59 @@ class CourseManagerApi {
     }
   }
 
+  Future<int> generateExamFromMatrix(
+      int matrixId,
+      String? title,
+      String? description,
+      int? durationMinutes,
+      int? expectedQuestionCount,
+      double? passingScore) async {
+    final payload = {};
+    if (title != null && title.isNotEmpty) payload['title'] = title;
+    if (description != null && description.isNotEmpty) payload['description'] = description;
+    if (durationMinutes != null) payload['durationMinutes'] = durationMinutes;
+    if (expectedQuestionCount != null) payload['expectedQuestionCount'] = expectedQuestionCount;
+    if (passingScore != null) payload['passingScore'] = passingScore;
+
+    final response = await _post('/matrices/$matrixId/generate', body: jsonEncode(payload));
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return data['examId'] as int;
+    }
+    throw Exception('Failed to generate exam: ${response.statusCode} ${response.body}');
+  }
+
   Future<List<dynamic>> getExamsForReview(String status) async {
     final response = await _get('/exams/review?status=$status');
     if (response.statusCode == 200) {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
       return decoded;
     }
-    throw Exception('Failed to get exams for review: ${response.statusCode} ${response.body}');
+    throw Exception(
+      'Failed to get exams for review: ${response.statusCode} ${response.body}',
+    );
   }
 
   Future<void> publishExam(int examId) async {
     final response = await _post('/exams/$examId/publish');
     if (response.statusCode != 200) {
-      throw Exception('Failed to publish exam: ${response.statusCode} ${response.body}');
+      throw Exception(
+        'Failed to publish exam: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
   Future<void> rejectExam(int examId, {String? reason}) async {
     final response = await _post(
       '/exams/$examId/reject',
-      body: reason != null && reason.isNotEmpty ? jsonEncode({'reason': reason}) : null,
+      body: reason != null && reason.isNotEmpty
+          ? jsonEncode({'reason': reason})
+          : null,
     );
     if (response.statusCode != 200) {
-      throw Exception('Failed to reject exam: ${response.statusCode} ${response.body}');
+      throw Exception(
+        'Failed to reject exam: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
@@ -212,8 +244,10 @@ class CourseManagerApi {
     // Note: uses trainer endpoint because COURSE_MANAGER role is allowed to call it to view full exam details
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    
-    final uri = Uri.parse('${EnvConfig.apiBaseUrl}/api/v1/trainer/exams/$examId/questions');
+
+    final uri = Uri.parse(
+      '${EnvConfig.apiBaseUrl}/api/v1/trainer/exams/$examId/questions',
+    );
     final response = await http.get(
       uri,
       headers: {
@@ -225,7 +259,9 @@ class CourseManagerApi {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     }
-    throw Exception('Failed to get exam details: ${response.statusCode} ${response.body}');
+    throw Exception(
+      'Failed to get exam details: ${response.statusCode} ${response.body}',
+    );
   }
 
   Future<List<Map<String, dynamic>>> getExamMatrices() async {
@@ -247,6 +283,24 @@ class CourseManagerApi {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception(
         'Failed to create exam matrix: ${response.statusCode} ${response.body}',
+      );
+    }
+  }
+
+  Future<void> toggleMatrixStatus(int id) async {
+    final response = await _put('/matrices/$id/toggle-public');
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to toggle matrix status: ${response.statusCode} ${response.body}',
+      );
+    }
+  }
+
+  Future<void> updateExamMatrix(int id, Map<String, dynamic> data) async {
+    final response = await _put('/matrices/$id', body: jsonEncode(data));
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Failed to update exam matrix: ${response.statusCode} ${response.body}',
       );
     }
   }
@@ -296,9 +350,7 @@ class CourseManagerApi {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as List;
       return decoded.map((item) => item as Map<String, dynamic>).toList();
     } else {
-      throw Exception(
-        'Failed to get categories: ${response.statusCode}',
-      );
+      throw Exception('Failed to get categories: ${response.statusCode}');
     }
   }
 
@@ -354,6 +406,20 @@ class CourseManagerApi {
     final token = prefs.getString('auth_token');
 
     return http.post(
+      Uri.parse('$baseUrl$path'),
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: body,
+    );
+  }
+
+  Future<http.Response> _put(String path, {Object? body}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    return http.put(
       Uri.parse('$baseUrl$path'),
       headers: {
         'Content-Type': 'application/json',

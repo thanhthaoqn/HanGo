@@ -66,6 +66,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isLoadingAuditLog = true;
   List<Map<String, dynamic>> _auditLogEntries = [];
 
+  // Roles tab state (FR-RBAC-DYNAMIC)
+  bool _isLoadingRoles = true;
+  List<Map<String, dynamic>> _rolesWithPermissions = [];
+  List<Map<String, dynamic>> _allPermissions = [];
+
   // Accounts tab state and variables
   String _accountsTab = 'trainer'; // 'trainer' | 'course_manager' | 'learner'
   int _accountsPage = 0;
@@ -118,6 +123,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _fetchAccounts();
     _fetchAiUsageStats();
     _fetchAuditLog();
+    _fetchRoles();
+    _fetchPermissions();
     _loadNotifications();
   }
 
@@ -423,6 +430,266 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _isLoadingAuditLog = false;
       });
     }
+  }
+
+  Future<void> _fetchPermissions() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/permissions');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _allPermissions = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching all permissions: $e');
+    }
+  }
+
+  Future<void> _fetchRoles() async {
+    setState(() {
+      _isLoadingRoles = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _isLoadingRoles = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse('$apiBaseUrl/admin/roles');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _rolesWithPermissions = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _isLoadingRoles = false;
+        });
+      } else {
+        debugPrint('Failed to load roles: ${response.statusCode} - ${response.body}');
+        setState(() {
+          _isLoadingRoles = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching roles: $e');
+      setState(() {
+        _isLoadingRoles = false;
+      });
+    }
+  }
+
+  Future<void> _updateRolePermissions(String roleName, List<String> permissionCodes) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/roles/$roleName/permissions');
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'permissionCodes': permissionCodes}),
+      );
+
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(context, 'Permissions updated successfully');
+        _fetchRoles(); // Refresh the list
+      } else {
+        ToastHelper.showError(context, 'Failed to update permissions: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      ToastHelper.showError(context, 'Error updating permissions');
+      debugPrint('Error updating role permissions: $e');
+    }
+  }
+
+  void _showEditRolePermissionsDialog(String roleName, List<String> currentCodes) {
+    List<String> selectedCodes = List.from(currentCodes);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: Colors.white,
+              child: Container(
+                width: 480,
+                constraints: const BoxConstraints(maxHeight: 600),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: const Color(0xFFE6F7F4), borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFF28B79B), size: 24),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Edit Permissions', style: TextStyle(fontFamily: 'Outfit', fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                                const SizedBox(height: 2),
+                                Text('Role: $roleName', style: const TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    Flexible(
+                      child: _allPermissions.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(40.0),
+                              child: Center(child: Text('No permissions loaded', style: TextStyle(fontFamily: 'Outfit', color: Color(0xFF64748B)))),
+                            )
+                          : ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                              child: ListView.separated(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                itemCount: _allPermissions.length,
+                                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final perm = _allPermissions[index];
+                                  final code = perm['code'] as String;
+                                  final name = perm['name'] as String;
+                                  final isSelected = selectedCodes.contains(code);
+
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: isSelected ? const Color(0xFF28B79B).withOpacity(0.5) : const Color(0xFFF1F5F9)),
+                                      borderRadius: BorderRadius.circular(12),
+                                      color: isSelected ? const Color(0xFFF4FBF9) : Colors.white,
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () {
+                                          setStateDialog(() {
+                                            if (isSelected) {
+                                              selectedCodes.remove(code);
+                                            } else {
+                                              selectedCodes.add(code);
+                                            }
+                                          });
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(name, style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500, color: const Color(0xFF1E293B))),
+                                                    const SizedBox(height: 4),
+                                                    Text(code, style: const TextStyle(fontFamily: 'Outfit', fontSize: 11, color: Color(0xFF94A3B8))),
+                                                  ],
+                                                ),
+                                              ),
+                                              Switch(
+                                                value: isSelected,
+                                                activeColor: Colors.white,
+                                                activeTrackColor: const Color(0xFF28B79B),
+                                                inactiveThumbColor: Colors.white,
+                                                inactiveTrackColor: const Color(0xFFE2E8F0),
+                                                trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+                                                onChanged: (bool value) {
+                                                  setStateDialog(() {
+                                                    if (value) {
+                                                      selectedCodes.add(code);
+                                                    } else {
+                                                      selectedCodes.remove(code);
+                                                    }
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                    ),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontWeight: FontWeight.w600)),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF28B79B),
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _updateRolePermissions(roleName, selectedCodes);
+                            },
+                            child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _fetchAccounts() async {
@@ -3096,6 +3363,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // TAB 3: ROLES INFO MOCK
   // ------------------------------------------------------------------------
   Widget _buildRolesTab(bool isDesktop) {
+    if (_isLoadingRoles) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B))),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3110,9 +3386,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Read-only reference of what each role can actually do today, enforced in backend code '
-          '(Spring Security @PreAuthorize per endpoint). There is no dynamic permission matrix yet — '
-          'permissions are fixed per role at the code level, not configurable from this screen.',
+          'Dynamic permission matrix. You can toggle specific permissions for each role.',
           style: TextStyle(
             fontSize: 14,
             color: Color(0xFF6B7280),
@@ -3124,63 +3398,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         LayoutBuilder(builder: (context, constraints) {
           final double cardWidth = isDesktop ? (constraints.maxWidth - 20) / 2 : constraints.maxWidth;
 
-          final cardsList = [
-            _buildRoleConfigCard(
-              'LEARNER',
-              'Default role for platform users. Enroll in and learn Courses, attempt Quiz/Exam (unlimited retakes), rate completed Courses, comment/reply on Lesson & Quiz, and use the AI Learning Assistant.',
-              ['Enroll & Learn Courses', 'Attempt Quiz & Exam', 'Rate Courses & Comment', 'AI Learning Assistant'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'TRAINER',
-              'Content creator role (Teacher/Tutor). Create and manage own Course/Section/Lesson/Quiz, manage own Question Bank, create Exams, and track own revenue. Also has Learner mode (dual-mode).',
-              ['Create & Manage Own Courses', 'Manage Question Bank', 'Create Exams', 'View Own Revenue'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'COURSE MANAGER  (role: COURSE_MANAGER)',
-              'Content-quality oversight role. Views platform dashboard stats, creates/manages Exams, and receives Course rating-quality notifications (low rating / low average). '
-              'Note: a full Course review/approve/publish workflow is not implemented in the backend yet — this role currently cannot approve or reject a Trainer\'s Course.',
-              ['View Platform Dashboard', 'Create & Manage Exams', 'View Rating Notifications'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'ADMINISTRATOR',
-              'System/user administration role. Manages user accounts (create/activate/deactivate/assign role), moderates comments, reviews Trainer applications, and views the platform dashboard, audit log, and AI usage stats. Does not manage revenue/payouts (Course Manager\'s job).',
-              ['Manage Accounts & Roles', 'Moderate Comments', 'Review Trainer Applications', 'Audit Log & AI Usage'],
-              cardWidth,
-            ),
-          ];
+          final cardsList = _rolesWithPermissions.map((roleObj) {
+            final roleName = roleObj['roleName'] as String? ?? 'UNKNOWN';
+            final permissions = (roleObj['permissions'] as List?)?.map((p) => p as Map<String, dynamic>).toList() ?? [];
 
-            if (isDesktop) {
-              return Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [cardsList[0], cardsList[1]],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [cardsList[2], cardsList[3]],
-                  ),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  cardsList[0],
-                  const SizedBox(height: 16),
-                  cardsList[1],
-                  const SizedBox(height: 16),
-                  cardsList[2],
-                  const SizedBox(height: 16),
-                  cardsList[3],
-                ],
-              );
-            }
-          },
-        ),
+            return _buildRoleConfigCard(
+              roleName,
+              'Role ID: $roleName',
+              permissions,
+              cardWidth,
+            );
+          }).toList();
+
+          return Wrap(
+            spacing: 20,
+            runSpacing: 20,
+            children: cardsList,
+          );
+        }),
       ],
     );
   }
@@ -3188,71 +3423,94 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildRoleConfigCard(
     String name,
     String desc,
-    List<String> permissions,
+    List<Map<String, dynamic>> permissions,
     double width,
   ) {
     return Container(
       width: width,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF28B79B), fontFamily: 'Outfit')),
+                child: Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.shield_outlined, color: Color(0xFF28B79B), size: 20),
+              Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.edit_rounded, color: Color(0xFF64748B), size: 18),
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    final currentCodes = permissions.map((p) => p['code'] as String).toList();
+                    _showEditRolePermissionsDialog(name, currentCodes);
+                  },
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Text(
             desc,
             style: const TextStyle(
-              color: Color(0xFF6B7280),
+              color: Color(0xFF64748B),
               fontSize: 13,
-              height: 1.4,
               fontFamily: 'Outfit',
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          const Divider(color: Color(0xFFF1F5F9), height: 1),
+          const SizedBox(height: 20),
           const Text(
-            'Primary Grants:',
+            'Primary Grants',
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: Color(0xFF1F2937),
+              color: Color(0xFF94A3B8),
+              letterSpacing: 0.5,
               fontFamily: 'Outfit',
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: permissions.map((perm) {
+            children: permissions.map((permObj) {
+              final permName = permObj['name'] as String? ?? 'Unknown';
               return Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
+                  horizontal: 12,
+                  vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFFE6F7F4),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  perm,
+                  permName,
                   style: const TextStyle(
-                    color: Color(0xFF4B5563),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF28B79B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     fontFamily: 'Outfit',
                   ),
                 ),

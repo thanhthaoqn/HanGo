@@ -6,17 +6,18 @@ import '../../../data/services/auth_service.dart';
 import '../../../utils/download_helper.dart';
 import '../../../utils/config.dart';
 
-class TrainerExamImportExcelPage extends StatefulWidget {
+class CourseManagerExamImportExcelPage extends StatefulWidget {
   final VoidCallback onBack;
-  const TrainerExamImportExcelPage({super.key, required this.onBack});
+  final bool isCourseManager;
+  const CourseManagerExamImportExcelPage({super.key, required this.onBack, this.isCourseManager = true});
 
   @override
-  State<TrainerExamImportExcelPage> createState() =>
-      _TrainerExamImportExcelPageState();
+  State<CourseManagerExamImportExcelPage> createState() =>
+      _CourseManagerExamImportExcelPageState();
 }
 
-class _TrainerExamImportExcelPageState
-    extends State<TrainerExamImportExcelPage> {
+class _CourseManagerExamImportExcelPageState
+    extends State<CourseManagerExamImportExcelPage> {
   bool _isLoading = false;
   bool _agreedToTerms = false;
 

@@ -14,7 +14,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/test-db")
 @Profile("dev")
-@PreAuthorize("hasRole('ADMINISTRATOR')")
+@PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
 public class TestDBController {
     @Autowired
     private JdbcTemplate jdbcTemplate;

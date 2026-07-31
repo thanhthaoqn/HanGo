@@ -423,7 +423,7 @@ class HangoApi {
   }
   Future<List<Map<String, dynamic>>> getExamMatrices() async {
     final response = await http.get(
-      _uri('/api/v1/trainer/matrices'),
+      _uri('/trainer/matrices'),
       headers: _headers,
     );
     if (response.statusCode >= 400) {
@@ -433,15 +433,23 @@ class HangoApi {
     return data.cast<Map<String, dynamic>>();
   }
 
-  Future<int> generateExamFromMatrix(int matrixId, String? title) async {
+  Future<int> generateExamFromMatrix(
+      int matrixId,
+      String? title,
+      String? description,
+      int? durationMinutes,
+      int? expectedQuestionCount,
+      double? passingScore) async {
     final payload = {};
-    if (title != null && title.isNotEmpty) {
-      payload['title'] = title;
-    }
-    
+    if (title != null && title.isNotEmpty) payload['title'] = title;
+    if (description != null && description.isNotEmpty) payload['description'] = description;
+    if (durationMinutes != null) payload['durationMinutes'] = durationMinutes;
+    if (expectedQuestionCount != null) payload['expectedQuestionCount'] = expectedQuestionCount;
+    if (passingScore != null) payload['passingScore'] = passingScore;
+
     final body = await _send(
       http.post(
-        _uri('/api/v1/trainer/matrices/$matrixId/generate'),
+        _uri('/trainer/matrices/$matrixId/generate'),
         headers: _headers,
         body: jsonEncode(payload),
       ),
@@ -451,6 +459,7 @@ class HangoApi {
     }
     throw const ApiFailure('Cannot retrieve ID of generated exam');
   }
+
   Future<Map<String, dynamic>> createExamMatrix(Map<String, dynamic> data) async {
     final response = await _send(http.post(
       _uri('/trainer/matrices'),

@@ -25,6 +25,9 @@ public class ExamMatrix {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "is_public", nullable = false)
+    private Boolean isPublic = true;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

@@ -7,26 +7,30 @@ import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
-import '../../widgets/trainer/trainer_sidebar.dart';
-import 'trainer_exam_import_excel_page.dart';
-import 'trainer_exam_ai_generate_page.dart';
-import 'trainer_exam_matrix_page.dart';
+import '../../widgets/course_manager_sidebar.dart';
+import 'course_manager_exam_import_excel_page.dart';
+import 'course_manager_exam_ai_generate_page.dart';
+import 'course_manager_exam_matrix_page.dart';
 
-class TrainerCreateExamPage extends StatefulWidget {
+class CourseManagerCreateExamPage extends StatefulWidget {
   final bool isEmbedded;
   final VoidCallback? onBack;
+  final bool isCourseManager;
 
-  const TrainerCreateExamPage({
+  const CourseManagerCreateExamPage({
     super.key,
     this.isEmbedded = false,
     this.onBack,
+    this.isCourseManager = true,
   });
 
   @override
-  State<TrainerCreateExamPage> createState() => _TrainerCreateExamPageState();
+  State<CourseManagerCreateExamPage> createState() =>
+      _CourseManagerCreateExamPageState();
 }
 
-class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
+class _CourseManagerCreateExamPageState
+    extends State<CourseManagerCreateExamPage> {
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
   String _trainerName = 'Thảo';
@@ -55,11 +59,12 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
     super.initState();
     // Initialize current date
     final now = DateTime.now();
-    _dateController.text = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    _loadTrainerInfo();
+    _dateController.text =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    _loadUserInfo();
   }
 
-  Future<void> _loadTrainerInfo() async {
+  Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
@@ -98,14 +103,18 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
         _uploadStatusText = 'Uploading...';
       });
 
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      );
       final request = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          picked.bytes!,
-          filename: picked.name,
-        ));
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            picked.bytes!,
+            filename: picked.name,
+          ),
+        );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
@@ -117,7 +126,9 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
           _isUploadingImage = false;
         });
       } else {
-        throw Exception('Cloudinary upload failed with status: ${response.statusCode}');
+        throw Exception(
+          'Cloudinary upload failed with status: ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -145,8 +156,10 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
       final payload = {
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
-        'expectedQuestionCount': int.tryParse(_questionsController.text.trim()) ?? 0,
-        'passingScore': double.tryParse(_passingScoreController.text.trim()) ?? 0.0,
+        'expectedQuestionCount':
+            int.tryParse(_questionsController.text.trim()) ?? 0,
+        'passingScore':
+            double.tryParse(_passingScoreController.text.trim()) ?? 0.0,
         'durationMinutes': int.tryParse(_durationController.text.trim()) ?? 0,
         'thumbnailUrl': _uploadedImageUrl ?? '',
       };
@@ -169,7 +182,9 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
           Navigator.pop(context);
         }
       } else {
-        throw Exception('Failed to create exam: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Failed to create exam: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -192,17 +207,20 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!widget.isEmbedded) _buildHeader(context, !isDesktop, _currentView),
-        if (widget.isEmbedded)
+        if (widget.isEmbedded && _currentView == 'selection')
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
             child: Row(
               children: [
-                if (_currentView == 'selection' && widget.onBack != null)
+                if (widget.onBack != null)
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Color(0xFF4B5563)),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Color(0xFF4B5563),
+                    ),
                     onPressed: widget.onBack,
                   ),
-                if (_currentView == 'selection' && widget.onBack != null)
+                if (widget.onBack != null)
                   const SizedBox(width: 12),
                 const Text(
                   'Create New Exam',
@@ -231,10 +249,22 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 2)) : null,
+      drawer: !isDesktop
+          ? const Drawer(
+              child: CourseManagerSidebar(
+                currentRoute: '/course-manager/exams',
+              ),
+            )
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
+          if (isDesktop)
+            const SizedBox(
+              width: 260,
+              child: CourseManagerSidebar(
+                currentRoute: '/course-manager/exams',
+              ),
+            ),
           Expanded(child: content),
         ],
       ),
@@ -252,11 +282,20 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
       case 'form':
         return _buildExamForm();
       case 'import':
-        return TrainerExamImportExcelPage(onBack: onBack);
+        return CourseManagerExamImportExcelPage(
+          onBack: onBack,
+          isCourseManager: widget.isCourseManager,
+        );
       case 'matrix':
-        return TrainerExamMatrixPage(onBack: onBack);
+        return CourseManagerExamMatrixPage(
+          onBack: onBack,
+          isCourseManager: widget.isCourseManager,
+        );
       case 'ai':
-        return TrainerExamAiGeneratePage(onBack: onBack);
+        return CourseManagerExamAiGeneratePage(
+          onBack: onBack,
+          isCourseManager: widget.isCourseManager,
+        );
       case 'selection':
       default:
         return _buildMethodSelection();
@@ -297,7 +336,8 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
             children: [
               _buildMethodCard(
                 title: 'Import by Excel',
-                description: 'Upload an Excel file containing questions and answers based on our template.',
+                description:
+                    'Upload an Excel file containing questions and answers based on our template.',
                 icon: Icons.table_chart_outlined,
                 color: const Color(0xFF3B82F6),
                 onTap: () {
@@ -306,7 +346,8 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
               ),
               _buildMethodCard(
                 title: 'Create by Exam Matrix',
-                description: 'Define an exam matrix structure and pick questions manually from bank.',
+                description:
+                    'Define an exam matrix structure and pick questions manually from bank.',
                 icon: Icons.grid_view_outlined,
                 color: const Color(0xFF20B486),
                 onTap: () {
@@ -315,7 +356,8 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
               ),
               _buildMethodCard(
                 title: 'Generate with AI',
-                description: 'Use AI to automatically generate a complete exam based on your criteria.',
+                description:
+                    'Use AI to automatically generate a complete exam based on your criteria.',
                 icon: Icons.auto_awesome_outlined,
                 color: const Color(0xFF8B5CF6),
                 isDisabled: true,
@@ -325,7 +367,6 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
               ),
             ],
           ),
-
         ],
       ),
     );
@@ -340,7 +381,9 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
     bool isDisabled = false,
   }) {
     return MouseRegion(
-      cursor: isDisabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+      cursor: isDisabled
+          ? SystemMouseCursors.forbidden
+          : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: isDisabled ? null : onTap,
         child: Opacity(
@@ -422,8 +465,12 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Color(0xFF64748B)),
-                      onPressed: () => setState(() => _currentView = 'selection'),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Color(0xFF64748B),
+                      ),
+                      onPressed: () =>
+                          setState(() => _currentView = 'selection'),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
@@ -471,7 +518,9 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF20B486)),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF20B486),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -486,47 +535,47 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
                           ],
                         )
                       : _uploadedImageUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _uploadedImageUrl!,
-                                width: double.infinity,
-                                height: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Icon(
-                                  Icons.cloud_upload_outlined,
-                                  color: Color(0xFF64748B),
-                                  size: 40,
-                                ),
-                                SizedBox(height: 12),
-                                Text(
-                                  'Click to upload or drag & drop',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF475569),
-                                    fontFamily: 'Outfit',
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Recommended: 1280x720\n(PNG/JPG)',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF94A3B8),
-                                    fontFamily: 'Outfit',
-                                    height: 1.4,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            _uploadedImageUrl!,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.cloud_upload_outlined,
+                              color: Color(0xFF64748B),
+                              size: 40,
                             ),
+                            SizedBox(height: 12),
+                            Text(
+                              'Click to upload or drag & drop',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569),
+                                fontFamily: 'Outfit',
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Recommended: 1280x720\n(PNG/JPG)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                                fontFamily: 'Outfit',
+                                height: 1.4,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -535,7 +584,8 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
             _buildTextField(
               controller: _titleController,
               hintText: 'Đề thi THPTQG môn tiếng anh năm 2025',
-              validator: (val) => val == null || val.isEmpty ? 'Title is required' : null,
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Title is required' : null,
             ),
             const SizedBox(height: 24),
             _buildLabel('EXAM DESCRIPTION'),
@@ -614,27 +664,59 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 OutlinedButton(
-                  onPressed: _isSubmitting ? null : () => setState(() => _currentView = 'selection'),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => setState(() => _currentView = 'selection'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF64748B),
                     side: const BorderSide(color: Color(0xFFCBD5E1)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Outfit')),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitForm,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     elevation: 0,
                   ),
                   child: _isSubmitting
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('Create Exam', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Create Exam',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -684,10 +766,16 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
         hintText: hintText,
         hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
         suffixText: suffixText,
-        suffixStyle: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        suffixStyle: const TextStyle(
+          color: Color(0xFF64748B),
+          fontWeight: FontWeight.w500,
+        ),
         filled: true,
         fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -704,7 +792,11 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton, String currentView) {
+  Widget _buildHeader(
+    BuildContext context,
+    bool showMenuButton,
+    String currentView,
+  ) {
     String subTitle = '';
     if (currentView == 'import') subTitle = ' > Import Exam by Excel';
     if (currentView == 'matrix') subTitle = ' > Import by Matrix';
@@ -726,7 +818,11 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
           ],
           Row(
             children: [
-              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF38C9A6)),
+              const Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: Color(0xFF38C9A6),
+              ),
               const SizedBox(width: 4),
               RichText(
                 text: TextSpan(
@@ -742,7 +838,11 @@ class _TrainerCreateExamPageState extends State<TrainerCreateExamPage> {
                     ),
                     TextSpan(
                       text: 'Create New Exam',
-                      style: TextStyle(fontWeight: subTitle.isEmpty ? FontWeight.bold : FontWeight.normal),
+                      style: TextStyle(
+                        fontWeight: subTitle.isEmpty
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
                     ),
                     if (subTitle.isNotEmpty)
                       TextSpan(
@@ -876,28 +976,44 @@ class DashedBorderPainter extends CustomPainter {
     // Top border
     double x = 0;
     while (x < w) {
-      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth > w ? w : x + dashWidth, 0), paint);
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + dashWidth > w ? w : x + dashWidth, 0),
+        paint,
+      );
       x += dashWidth + dashSpace;
     }
 
     // Bottom border
     x = 0;
     while (x < w) {
-      canvas.drawLine(Offset(x, h), Offset(x + dashWidth > w ? w : x + dashWidth, h), paint);
+      canvas.drawLine(
+        Offset(x, h),
+        Offset(x + dashWidth > w ? w : x + dashWidth, h),
+        paint,
+      );
       x += dashWidth + dashSpace;
     }
 
     // Left border
     double y = 0;
     while (y < h) {
-      canvas.drawLine(Offset(0, y), Offset(0, y + dashWidth > h ? h : y + dashWidth), paint);
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(0, y + dashWidth > h ? h : y + dashWidth),
+        paint,
+      );
       y += dashWidth + dashSpace;
     }
 
     // Right border
     y = 0;
     while (y < h) {
-      canvas.drawLine(Offset(w, y), Offset(w, y + dashWidth > h ? h : y + dashWidth), paint);
+      canvas.drawLine(
+        Offset(w, y),
+        Offset(w, y + dashWidth > h ? h : y + dashWidth),
+        paint,
+      );
       y += dashWidth + dashSpace;
     }
   }
