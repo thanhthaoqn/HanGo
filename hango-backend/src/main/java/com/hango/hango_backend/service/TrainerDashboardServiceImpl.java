@@ -196,6 +196,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         long publishedCount = latestProjections.stream().filter(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus())).count();
         long hiddenCount = latestProjections.stream().filter(p -> "HIDDEN".equalsIgnoreCase(p.getStatus())).count();
         long pendingCount = latestProjections.stream().filter(p -> "PENDING_APPROVAL".equalsIgnoreCase(p.getStatus())).count();
+        long rejectedCount = latestProjections.stream().filter(p -> "REJECTED".equalsIgnoreCase(p.getStatus())).count();
 
         // 4. Apply Filters (Status, Search, Time Period)
         String searchParam = (search == null || search.trim().isEmpty()) ? null : search.trim().toLowerCase();
@@ -289,6 +290,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .code(p.getCode())
                 .version(p.getVersion())
                 .parentId(p.getParentId())
+                .rejectionReason(p.getRejectionReason())
                 .build();
         }).collect(Collectors.toList());
 
@@ -298,6 +300,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .publishedCount(publishedCount)
                 .hiddenCount(hiddenCount)
                 .pendingCount(pendingCount)
+                .rejectedCount(rejectedCount)
                 .courses(courses)
                 .build();
     }
@@ -634,8 +637,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("You are not authorized to submit this course");
         }
  
-        if (!"DRAFT".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only draft courses can be submitted for review");
+        if (!"DRAFT".equalsIgnoreCase(course.getStatus()) && !"REJECTED".equalsIgnoreCase(course.getStatus())) {
+            throw new RuntimeException("Only draft or rejected courses can be submitted for review");
         }
  
         boolean isManager = course.getCreator().getRoles().stream()
@@ -657,6 +660,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             }
         } else {
             course.setStatus("PENDING_APPROVAL");
+            course.setRejectionReason(null);
             courseRepository.save(course);
             notificationService.notifyCourseManagers(NotificationService.TYPE_COURSE_SUBMITTED, "Course Submitted", "Course '" + course.getTitle() + "' has been submitted for review by " + email, course);
         }
@@ -969,69 +973,4 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         courseRepository.save(course);
     }
 
-    @Override
-    @Transactional
-    public void approveTrainerCourse(Long id, String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-        boolean isManager = user.getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
-        if (!isManager) {
-            throw new org.springframework.security.access.AccessDeniedException("User is not authorized to approve courses");
-        }
-
-        com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
-
-        if (!"PENDING_APPROVAL".equalsIgnoreCase(draftCourse.getStatus())) {
-            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be approved");
-        }
-
-        if (draftCourse.getParentId() == null) {
-            throw new RuntimeException("This course is not a draft version. Cannot approve.");
-        }
-
-        // Publish the draft (V2)
-        draftCourse.setStatus("PUBLISHED");
-        draftCourse.setPublishedAt(java.time.LocalDateTime.now());
-        draftCourse.setLatestVersionId(draftCourse.getId());
-        courseRepository.save(draftCourse);
-
-        notificationService.notifyUser(draftCourse.getCreator(), NotificationService.TYPE_CONTENT_APPROVED, "Course Approved", "Your course '" + draftCourse.getTitle() + "' has been approved and published.", draftCourse);
-
-        // Update original published version (V1) to point latestVersionId to V2 (keep V1 PUBLISHED)
-        com.hango.hango_backend.entity.Course originalCourse = courseRepository.findById(draftCourse.getParentId())
-                .orElseThrow(() -> new RuntimeException("Original course (V1) not found"));
-        if ("PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
-            originalCourse.setLatestVersionId(draftCourse.getId());
-            courseRepository.save(originalCourse);
-        }
-    }
-
-    @Override
-    @Transactional
-    public void rejectTrainerCourseDraft(Long id, String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-        boolean isManager = user.getRoles().stream()
-                .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER") || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR") || r.getRoleName().equalsIgnoreCase("ADMIN"));
-        if (!isManager) {
-            throw new org.springframework.security.access.AccessDeniedException("User is not authorized to reject courses");
-        }
-
-        // Rejects a PENDING_APPROVAL draft (V2). V2 goes back to DRAFT/REJECTED for editing.
-        // V1 remains PUBLISHED and untouched.
-        com.hango.hango_backend.entity.Course draftCourse = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
-
-        if (!"PENDING_APPROVAL".equalsIgnoreCase(draftCourse.getStatus())) {
-            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be rejected");
-        }
-
-        draftCourse.setStatus("REJECTED");
-        courseRepository.save(draftCourse);
-
-        notificationService.notifyUser(draftCourse.getCreator(), NotificationService.TYPE_CONTENT_REJECTED, "Course Rejected", "Your draft course '" + draftCourse.getTitle() + "' has been rejected.", draftCourse);
-        // V1 remains PUBLISHED - no changes needed
-    }
 }

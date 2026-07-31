@@ -42,6 +42,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   int _publishedCount = 0;
   int _hiddenCount = 0;
   int _pendingCount = 0;
+  int _rejectedCount = 0;
 
   // Filter values
   final TextEditingController _searchController = TextEditingController();
@@ -135,6 +136,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           _publishedCount = (data['publishedCount'] ?? 0) as int;
           _hiddenCount = (data['hiddenCount'] ?? 0) as int;
           _pendingCount = (data['pendingCount'] ?? 0) as int;
+          _rejectedCount = (data['rejectedCount'] ?? 0) as int;
           _coursesList = data['courses'] ?? [];
           _isLoading = false;
         });
@@ -158,6 +160,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       _publishedCount = 1;
       _hiddenCount = 0;
       _pendingCount = 0;
+      _rejectedCount = 0;
       _coursesList = [
         {
           'id': 1,
@@ -906,6 +909,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                 _buildStatusTab('Hidden', 'HIDDEN', _hiddenCount),
                 const SizedBox(width: 8),
                 _buildStatusTab('Pending', 'PENDING', _pendingCount),
+                const SizedBox(width: 8),
+                _buildStatusTab('Rejected', 'REJECTED', _rejectedCount),
               ],
             ),
           ),
@@ -1205,6 +1210,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     final lessons = course['lessonsCount'] ?? 0;
     final dateStr = _formatDate(course['createdAt']);
     final thumbnail = (course['thumbnailUrl'] ?? '') as String;
+    final rejectionReason = (course['rejectionReason'] ?? '') as String;
 
     final state = _lifecycleState(
       published: published,
@@ -1371,6 +1377,35 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         height: 1.4,
                       ),
                     ),
+                    if (rejectionReason.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Rejected: $rejectionReason',
+                                style: const TextStyle(
+                                  color: Color(0xFF991B1B),
+                                  fontSize: 12,
+                                  fontFamily: 'Outfit',
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 );
 

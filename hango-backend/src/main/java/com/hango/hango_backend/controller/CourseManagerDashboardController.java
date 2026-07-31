@@ -121,9 +121,12 @@ public class CourseManagerDashboardController {
     @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> rejectCourse(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body) {
         try {
-            // Reason could be used later: String reason = body != null ? body.get("reason") : null;
-            courseManagerDashboardService.returnCourseToDraft(id);
-            return ResponseEntity.ok("{\"message\": \"Course returned to draft\"}");
+            String reason = body != null ? body.get("reason") : null;
+            if (reason == null || reason.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"Rejection reason is required\"}");
+            }
+            courseManagerDashboardService.rejectCourse(id, reason);
+            return ResponseEntity.ok("{\"message\": \"Course rejected successfully\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

@@ -181,39 +181,7 @@ public class TrainerDashboardController {
         }
     }
 
-    @PostMapping("/courses/{id}/approve")
-    @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<?> approveCourse(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            if (userDetails == null) {
-                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
-            }
-            trainerDashboardService.approveTrainerCourse(id, userDetails.getUsername());
-            return ResponseEntity.ok("{\"message\": \"Course approved and published successfully\"}");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
-        }
-    }
 
-    @PostMapping("/courses/{id}/reject")
-    @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<?> rejectCourse(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            if (userDetails == null) {
-                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
-            }
-            trainerDashboardService.rejectTrainerCourseDraft(id, userDetails.getUsername());
-            return ResponseEntity.ok("{\"message\": \"Course draft rejected\"}");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
-        }
-    }
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")

@@ -26,6 +26,4 @@ public interface TrainerDashboardService {
     void deleteTrainerExam(Long examId, String email);
     void deleteTrainerCourse(Long id, String email);
     void publishTrainerCourse(Long id, String email);
-    void approveTrainerCourse(Long id, String email);
-    void rejectTrainerCourseDraft(Long id, String email);
 }

@@ -25,4 +25,5 @@ public class TrainerCourseDetailDTO {
     private String code;
     private String version;
     private Long parentId;
+    private String rejectionReason;
 }

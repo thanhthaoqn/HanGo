@@ -135,27 +135,28 @@ class CourseManagerDashboardServiceTest {
     }
 
     // =================================================================
-    // returnCourseToDraft
+    // rejectCourse
     // =================================================================
 
     @Test
-    void returnCourseToDraftShouldThrowWhenNotPendingApproval() {
+    void rejectCourseShouldThrowWhenNotPendingApproval() {
         Course c = course(1L, "DRAFT", user(2L));
         when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
 
-        assertThrows(RuntimeException.class, () -> service.returnCourseToDraft(1L));
+        assertThrows(RuntimeException.class, () -> service.rejectCourse(1L, "Reason"));
         verify(notificationService, never()).notifyUser(any(), any(), any(), any(), any());
     }
 
     @Test
-    void returnCourseToDraftShouldNotifyCreator() {
+    void rejectCourseShouldNotifyCreator() {
         User creator = user(2L);
         Course c = course(1L, "PENDING_APPROVAL", creator);
         when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
 
-        service.returnCourseToDraft(1L);
+        service.rejectCourse(1L, "Some reason");
 
-        assertEquals("DRAFT", c.getStatus());
+        assertEquals("REJECTED", c.getStatus());
+        assertEquals("Some reason", c.getRejectionReason());
         verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_CONTENT_REJECTED), any(), any(), eq(c));
     }
 
