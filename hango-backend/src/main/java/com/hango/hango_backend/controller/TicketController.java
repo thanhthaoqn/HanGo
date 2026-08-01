@@ -2,7 +2,7 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.*;
 import com.hango.hango_backend.service.TicketService;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

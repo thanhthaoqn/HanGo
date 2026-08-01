@@ -100,7 +100,7 @@ public class SectionQuestionControllerTest {
     @Test
     public void testCreateQuestionSuccess() {
         org.springframework.security.core.Authentication auth = Mockito.mock(org.springframework.security.core.Authentication.class);
-        com.hango.hango_backend.sercurity.UserDetailsImpl userDetails = Mockito.mock(com.hango.hango_backend.sercurity.UserDetailsImpl.class);
+        com.hango.hango_backend.security.UserDetailsImpl userDetails = Mockito.mock(com.hango.hango_backend.security.UserDetailsImpl.class);
         Mockito.when(userDetails.getId()).thenReturn(1L);
         Mockito.when(auth.getPrincipal()).thenReturn(userDetails);
         
@@ -128,7 +128,7 @@ public class SectionQuestionControllerTest {
     @Test
     public void testCreateGroupQuestionSuccess() {
         org.springframework.security.core.Authentication auth = Mockito.mock(org.springframework.security.core.Authentication.class);
-        com.hango.hango_backend.sercurity.UserDetailsImpl userDetails = Mockito.mock(com.hango.hango_backend.sercurity.UserDetailsImpl.class);
+        com.hango.hango_backend.security.UserDetailsImpl userDetails = Mockito.mock(com.hango.hango_backend.security.UserDetailsImpl.class);
         Mockito.when(userDetails.getId()).thenReturn(1L);
         Mockito.when(auth.getPrincipal()).thenReturn(userDetails);
         

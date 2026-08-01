@@ -98,6 +98,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         }
 
         course.setStatus("PUBLISHED");
+        course.setRejectionReason(null);
         course.setPublishedAt(java.time.LocalDateTime.now());
         course.setLatestVersionId(course.getId());
         courseRepository.save(course);
@@ -133,22 +134,23 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
 
     @Override
     @Transactional
-    public void returnCourseToDraft(Long courseId) {
+    public void rejectCourse(Long courseId, String reason) {
         Course course = courseRepository.findById(courseId)
                 .filter(c -> c.getDeletedAt() == null)
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
 
         if (!"PENDING_APPROVAL".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be returned to draft");
+            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be rejected");
         }
 
-        course.setStatus("DRAFT");
+        course.setStatus("REJECTED");
+        course.setRejectionReason(reason);
         courseRepository.save(course);
         // V1 remains PUBLISHED untouched - no changes needed
 
         notificationService.notifyUser(course.getCreator(), NotificationService.TYPE_CONTENT_REJECTED,
-                "Course returned to draft",
-                "Your course \"" + course.getTitle() + "\" was returned to draft by the course manager.", course);
+                "Course rejected",
+                "Your course \"" + course.getTitle() + "\" was rejected" + (reason != null && !reason.isBlank() ? " with reason: " + reason : "."), course);
     }
 
     @Override
@@ -238,6 +240,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 .sectionsCount(sectionsCount)
                 .lessonsCount(lessonsCount)
                 .submittedAt(course.getCreatedAt())
+                .rejectionReason(course.getRejectionReason())
                 .sessions(sessions)
                 .build();
     }
@@ -264,6 +267,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     .description(exam.getDescription())
                     .status(exam.getStatus())
                     .creatorName(exam.getCreatedBy() != null ? exam.getCreatedBy().getFullName() : "Unknown")
+                    .creatorId(exam.getCreatedBy() != null ? exam.getCreatedBy().getId() : null)
                     .questionCount(questionCount)
                     .durationMinutes(exam.getDurationMinutes())
                     .thumbnailUrl(exam.getThumbnailUrl())

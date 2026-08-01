@@ -37,7 +37,7 @@ import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
 import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.util.JwtUtils;
 
 @Service
@@ -148,7 +148,7 @@ public class AuthService {
         return mapToUserResponse(savedUser);
     }
 
-    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "TRAINER_LEAD", "ADMINISTRATOR");
+    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "COURSE_MANAGER", "ADMINISTRATOR");
 
     public UserResponse createUserByAdmin(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.getEmail())) {

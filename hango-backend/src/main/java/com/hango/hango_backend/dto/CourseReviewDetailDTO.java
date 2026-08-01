@@ -24,5 +24,6 @@ public class CourseReviewDetailDTO {
     private Integer sectionsCount;
     private Integer lessonsCount;
     private LocalDateTime submittedAt;
+    private String rejectionReason;
     private List<CourseSessionDTO> sessions;
 }

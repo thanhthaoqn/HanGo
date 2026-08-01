@@ -2,6 +2,8 @@ class TrainerQuestion {
   final int id;
   final String questionText;
   final String categoryName;
+  final String? skillName;
+  final String? groupTypeName;
   final String difficultyName;
   String status;
   final String creatorName;
@@ -16,6 +18,8 @@ class TrainerQuestion {
     this.displayNo,
     required this.questionText,
     required this.categoryName,
+    this.skillName,
+    this.groupTypeName,
     required this.difficultyName,
     required this.status,
     required this.creatorName,
@@ -29,6 +33,8 @@ class TrainerQuestion {
       id: json['id'] as int? ?? 0,
       questionText: json['questionText'] as String? ?? '',
       categoryName: json['categoryName'] as String? ?? 'Chưa phân loại',
+      skillName: json['skillName'] as String?,
+      groupTypeName: json['groupTypeName'] as String?,
       difficultyName: json['difficultyName'] as String? ?? 'Medium',
       status: json['status'] as String? ?? 'PRIVATE',
       creatorName: json['creatorName'] as String? ?? 'Unknown',

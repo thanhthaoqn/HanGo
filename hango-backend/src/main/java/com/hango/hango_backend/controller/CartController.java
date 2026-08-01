@@ -1,7 +1,7 @@
 package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.CourseSummaryDTO;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -7,7 +7,7 @@ import '../../../utils/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
-import '../../widgets/trainer/trainer_sidebar.dart';
+import '../../widgets/course_manager_sidebar.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/course_manager_api.dart';
 
@@ -45,26 +45,28 @@ class QuestionBlockState {
   List<QuestionState> questions = [QuestionState()];
 }
 
-class TrainerEditExamPage extends StatefulWidget {
+class CourseManagerEditExamPage extends StatefulWidget {
   final int examId;
   final String examTitle;
   final int examExpectedCount;
   final bool isReadOnly;
   final String? courseManagerActionStatus;
-  const TrainerEditExamPage({
+  final bool isCourseManager;
+  const CourseManagerEditExamPage({
     Key? key,
     required this.examId,
     required this.examTitle,
     this.examExpectedCount = 10,
     this.isReadOnly = false,
     this.courseManagerActionStatus,
+    this.isCourseManager = true,
   }) : super(key: key);
 
   @override
-  State<TrainerEditExamPage> createState() => _TrainerEditExamPageState();
+  State<CourseManagerEditExamPage> createState() => _CourseManagerEditExamPageState();
 }
 
-class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
+class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   final _authService = AuthService();
   String _trainerName = 'Trainer';
   String _trainerInitials = 'T';
@@ -487,17 +489,29 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
 
   Future<void> _handleSubmitForReview() async {
     // Hiện popup xác nhận
+    final isCm = widget.isCourseManager;
+    final actionName = isCm ? 'Publish Exam' : 'Submit for Review';
+    final description = isCm
+        ? 'Are you sure you want to publish the exam "${widget.examTitle}" directly?'
+        : 'Are you sure you want to submit the exam "${widget.examTitle}" for review?';
+    final infoMessage = isCm
+        ? 'After publishing, the exam will be available to assigned users immediately.'
+        : 'After submission, the exam will wait for the Course Manager\'s review before being published.';
+    final iconData = isCm ? Icons.publish : Icons.send_rounded;
+    final buttonText = isCm ? 'Confirm Publish' : 'Confirm Submission';
+    final targetStatus = isCm ? 'PUBLISHED' : 'PENDING_APPROVAL';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
-          children: const [
-            Icon(Icons.send_rounded, color: Color(0xFF6366F1), size: 24),
-            SizedBox(width: 10),
+          children: [
+            Icon(iconData, color: const Color(0xFF6366F1), size: 24),
+            const SizedBox(width: 10),
             Text(
-              'Submit for Review',
-              style: TextStyle(
+              actionName,
+              style: const TextStyle(
                 fontFamily: 'Outfit',
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
@@ -510,7 +524,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Are you sure you want to submit the exam "${widget.examTitle}" for review?',
+              description,
               style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF475569),
@@ -537,7 +551,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'After submission, the exam will wait for the Course Manager\'s review before being published.',
+                      infoMessage,
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF6366F1),
@@ -567,9 +581,9 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
               ),
               elevation: 0,
             ),
-            child: const Text(
-              'Confirm Submission',
-              style: TextStyle(
+            child: Text(
+              buttonText,
+              style: const TextStyle(
                 color: Colors.white,
                 fontFamily: 'Outfit',
                 fontWeight: FontWeight.bold,
@@ -585,14 +599,14 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
     setState(() => _isSubmitting = true);
     try {
       final api = await _getApi();
-      await api.updateExamStatus(widget.examId, 'PENDING_APPROVAL');
+      await api.updateExamStatus(widget.examId, targetStatus);
       if (mounted) {
-        ToastHelper.show(context, 'Exam submitted for review successfully!');
+        ToastHelper.show(context, isCm ? 'Exam published successfully!' : 'Exam submitted for review successfully!');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ToastHelper.show(context, 'Failed to submit: $e', isError: true);
+        ToastHelper.show(context, 'Failed to update status: $e', isError: true);
       }
     } finally {
       if (mounted) {
@@ -600,6 +614,7 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
       }
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -607,10 +622,10 @@ class _TrainerEditExamPageState extends State<TrainerEditExamPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 2)) : null,
+      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: '/course-manager/exams')) : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
+          if (isDesktop) const SizedBox(width: 260, child: CourseManagerSidebar(currentRoute: '/course-manager/exams')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -4,7 +4,9 @@ import '../../pages/login_page.dart';
 import '../../pages/trainer/trainer_shell_page.dart';
 import '../../../data/services/auth_service.dart';
 
-class TrainerSidebar extends StatelessWidget {
+import 'package:shared_preferences/shared_preferences.dart';
+
+class TrainerSidebar extends StatefulWidget {
   final int activeIndex;
   final bool isEnabled;
   final List<int> disabledIndices;
@@ -18,11 +20,36 @@ class TrainerSidebar extends StatelessWidget {
     this.onTabSelect,
   });
 
-  void _handleSelectTab(BuildContext context, int index) {
-    if (!isEnabled || disabledIndices.contains(index)) return;
+  @override
+  State<TrainerSidebar> createState() => _TrainerSidebarState();
+}
 
-    if (onTabSelect != null) {
-      onTabSelect!(index);
+class _TrainerSidebarState extends State<TrainerSidebar> {
+  bool _canManageCourses = false;
+  bool _canManageExams = false;
+  bool _canViewRevenue = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoles();
+  }
+
+  Future<void> _loadRoles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final roles = prefs.getStringList('user_roles') ?? [];
+    setState(() {
+      _canManageCourses = roles.contains('MANAGE_OWN_COURSES') || roles.contains('ROLE_ADMINISTRATOR');
+      _canManageExams = roles.contains('CREATE_EXAMS_TRAINER') || roles.contains('ROLE_ADMINISTRATOR');
+      _canViewRevenue = roles.contains('VIEW_OWN_REVENUE') || roles.contains('ROLE_ADMINISTRATOR');
+    });
+  }
+
+  void _handleSelectTab(BuildContext context, int index) {
+    if (!widget.isEnabled || widget.disabledIndices.contains(index)) return;
+
+    if (widget.onTabSelect != null) {
+      widget.onTabSelect!(index);
       if (Scaffold.maybeOf(context)?.isDrawerOpen == true) {
         Navigator.of(context).pop();
       }
@@ -105,10 +132,14 @@ class TrainerSidebar extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           _buildItem(context, 0, Icons.dashboard_outlined, 'Dashboard'),
-          _buildItem(context, 1, Icons.book_outlined, 'Courses'),
-          _buildItem(context, 2, Icons.assignment_outlined, 'Exam'),
-          _buildItem(context, 3, Icons.question_answer_outlined, 'Question Bank'),
-          _buildItem(context, 4, Icons.account_balance_wallet_outlined, 'Revenue'),
+          if (_canManageCourses)
+            _buildItem(context, 1, Icons.book_outlined, 'Courses'),
+          if (_canManageExams) ...[
+            _buildItem(context, 2, Icons.assignment_outlined, 'Exam'),
+            _buildItem(context, 3, Icons.question_answer_outlined, 'Question Bank'),
+          ],
+          if (_canViewRevenue)
+            _buildItem(context, 4, Icons.account_balance_wallet_outlined, 'Revenue'),
           _buildItem(context, 5, Icons.person_outline, 'My Profile'),
           _buildItem(context, 6, Icons.confirmation_number_outlined, 'Support & Tickets'),
           const Spacer(),
@@ -121,8 +152,8 @@ class TrainerSidebar extends StatelessWidget {
   }
 
   Widget _buildItem(BuildContext context, int index, IconData icon, String title) {
-    final isActive = (activeIndex == index);
-    final itemEnabled = isEnabled && !disabledIndices.contains(index);
+    final isActive = (widget.activeIndex == index);
+    final itemEnabled = widget.isEnabled && !widget.disabledIndices.contains(index);
     final activeColor = const Color(0xFF20B486);
 
     return Padding(

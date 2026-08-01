@@ -14,4 +14,5 @@ public interface TrainerCourseDetailProjection {
     String getCode();
     String getVersion();
     Long getParentId();
+    String getRejectionReason();
 }

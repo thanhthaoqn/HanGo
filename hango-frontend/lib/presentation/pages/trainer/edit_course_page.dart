@@ -398,6 +398,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
           if (data['sessions'] != null) {
             _sections = List.from(data['sessions']);
           }
+          _courseStatus = data['status'] ?? 'DRAFT';
+          _versionController.text = data['version'] ?? 'v1.0';
         });
       }
     } catch (e) {

@@ -1,7 +1,7 @@
 package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.NotificationDTO;
-import com.hango.hango_backend.sercurity.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 /**
  * Generic notification inbox, available to any authenticated role. Complements the
- * TRAINER_LEAD-specific endpoints on {@link CourseManagerDashboardController}, which cover the same
+ * COURSE_MANAGER-specific endpoints on {@link CourseManagerDashboardController}, which cover the same
  * underlying data for that one role.
  */
 @RestController

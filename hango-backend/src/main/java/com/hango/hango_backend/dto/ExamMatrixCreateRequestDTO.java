@@ -13,6 +13,7 @@ public class ExamMatrixCreateRequestDTO {
     public static class DetailRequest {
         private Long skillParamId;
         private Long difficultyParamId;
+        private Long groupTypeId;
         private Long categoryId;
         private Integer quantity;
     }

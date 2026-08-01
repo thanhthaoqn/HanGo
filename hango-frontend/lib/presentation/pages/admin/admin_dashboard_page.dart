@@ -11,6 +11,8 @@ import '../ticket/management_tickets_page.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
+import '../../widgets/admin/role/role_matrix_tab.dart';
+import '../../widgets/admin/role/role_detail_drawer.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   final int initialIndex;
@@ -68,6 +70,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isLoadingAuditLog = true;
   List<Map<String, dynamic>> _auditLogEntries = [];
 
+  // Roles tab state (FR-RBAC-DYNAMIC)
+  bool _isLoadingRoles = true;
+  List<Map<String, dynamic>> _rolesWithPermissions = [];
+  List<Map<String, dynamic>> _allPermissions = [];
+
   // Accounts tab state and variables
   String _accountsTab = 'trainer'; // 'trainer' | 'course_manager' | 'learner'
   int _accountsPage = 0;
@@ -121,6 +128,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _fetchAccounts();
     _fetchAiUsageStats();
     _fetchAuditLog();
+    _fetchRoles();
+    _fetchPermissions();
     _loadNotifications();
   }
 
@@ -428,6 +437,103 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  Future<void> _fetchPermissions() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/permissions');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _allPermissions = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching all permissions: $e');
+    }
+  }
+
+  Future<void> _fetchRoles() async {
+    setState(() {
+      _isLoadingRoles = true;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _isLoadingRoles = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse('$apiBaseUrl/admin/roles');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _rolesWithPermissions = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _isLoadingRoles = false;
+        });
+      } else {
+        debugPrint('Failed to load roles: ${response.statusCode} - ${response.body}');
+        setState(() {
+          _isLoadingRoles = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching roles: $e');
+      setState(() {
+        _isLoadingRoles = false;
+      });
+    }
+  }
+
+  Future<void> _updateRolePermissions(String roleName, List<String> permissionCodes) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+
+      final url = Uri.parse('$apiBaseUrl/admin/roles/$roleName/permissions');
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'permissionCodes': permissionCodes}),
+      );
+
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(context, 'Permissions updated successfully');
+        _fetchRoles(); // Refresh the list
+      } else {
+        ToastHelper.showError(context, 'Failed to update permissions: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      ToastHelper.showError(context, 'Error updating permissions');
+      debugPrint('Error updating role permissions: $e');
+    }
+  }
+
+
+
   Future<void> _fetchAccounts() async {
     setState(() {
       _isLoadingAccounts = true;
@@ -532,8 +638,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (token == null) return;
 
       String backendRole = 'TRAINER';
-      if (_editRole == 'Trainer Lead') {
-        backendRole = 'TRAINER_LEAD';
+      if (_editRole == 'Course Manager') {
+        backendRole = 'COURSE_MANAGER';
       } else if (_editRole == 'ADMIN') {
         backendRole = 'ADMINISTRATOR';
       }
@@ -879,8 +985,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           final role = (rolesList != null && rolesList.isNotEmpty)
               ? rolesList.first.toString()
               : 'Trainer';
-          if (role.contains('TRAINER_LEAD')) {
-            _editRole = 'Trainer Lead';
+          if (role.contains('COURSE_MANAGER')) {
+            _editRole = 'Course Manager';
           } else if (role.contains('ADMIN')) {
             _editRole = 'ADMIN';
           } else {
@@ -1067,7 +1173,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   ? 'Learner Account Detail'
                                   : (_selectedUserForEdit!['roles'].first
                                             .toString()
-                                            .contains('TRAINER_LEAD')
+                                            .contains('COURSE_MANAGER')
                                         ? 'Course Manager Account Detail'
                                         : 'Trainer Account Detail'))
                             : 'Trainer Account Detail')
@@ -2551,8 +2657,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                                 rolesList.isNotEmpty)
                                             ? rolesList.first.toString()
                                             : 'Trainer';
-                                        if (role.contains('TRAINER_LEAD')) {
-                                          _editRole = 'Trainer Lead';
+                                        if (role.contains('COURSE_MANAGER')) {
+                                          _editRole = 'Course Manager';
                                         } else if (role.contains('ADMIN')) {
                                           _editRole = 'ADMIN';
                                         } else {
@@ -2754,7 +2860,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         fg = const Color(0xFF7C3AED);
         label = 'Admin';
         break;
-      case 'TRAINER_LEAD':
+      case 'COURSE_MANAGER':
         bg = const Color(0xFFEEF2F6);
         fg = const Color(0xFF6366F1);
         label = 'Course Manager';
@@ -3099,171 +3205,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // TAB 3: ROLES INFO MOCK
   // ------------------------------------------------------------------------
   Widget _buildRolesTab(bool isDesktop) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Role Configurations',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-            fontFamily: 'Outfit',
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Read-only reference of what each role can actually do today, enforced in backend code '
-          '(Spring Security @PreAuthorize per endpoint). There is no dynamic permission matrix yet — '
-          'permissions are fixed per role at the code level, not configurable from this screen.',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF6B7280),
-            fontFamily: 'Outfit',
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        LayoutBuilder(builder: (context, constraints) {
-          final double cardWidth = isDesktop ? (constraints.maxWidth - 20) / 2 : constraints.maxWidth;
-
-          final cardsList = [
-            _buildRoleConfigCard(
-              'LEARNER',
-              'Default role for platform users. Enroll in and learn Courses, attempt Quiz/Exam (unlimited retakes), rate completed Courses, comment/reply on Lesson & Quiz, and use the AI Learning Assistant.',
-              ['Enroll & Learn Courses', 'Attempt Quiz & Exam', 'Rate Courses & Comment', 'AI Learning Assistant'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'TRAINER',
-              'Content creator role (Teacher/Tutor). Create and manage own Course/Section/Lesson/Quiz, manage own Question Bank, create Exams, and track own revenue. Also has Learner mode (dual-mode).',
-              ['Create & Manage Own Courses', 'Manage Question Bank', 'Create Exams', 'View Own Revenue'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'COURSE MANAGER  (role: TRAINER_LEAD)',
-              'Content-quality oversight role. Views platform dashboard stats, creates/manages Exams, and receives Course rating-quality notifications (low rating / low average). '
-              'Note: a full Course review/approve/publish workflow is not implemented in the backend yet — this role currently cannot approve or reject a Trainer\'s Course.',
-              ['View Platform Dashboard', 'Create & Manage Exams', 'View Rating Notifications'],
-              cardWidth,
-            ),
-            _buildRoleConfigCard(
-              'ADMINISTRATOR',
-              'System/user administration role. Manages user accounts (create/activate/deactivate/assign role), moderates comments, reviews Trainer applications, and views the platform dashboard, audit log, and AI usage stats. Does not manage revenue/payouts (Course Manager\'s job).',
-              ['Manage Accounts & Roles', 'Moderate Comments', 'Review Trainer Applications', 'Audit Log & AI Usage'],
-              cardWidth,
-            ),
-          ];
-
-            if (isDesktop) {
-              return Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [cardsList[0], cardsList[1]],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [cardsList[2], cardsList[3]],
-                  ),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  cardsList[0],
-                  const SizedBox(height: 16),
-                  cardsList[1],
-                  const SizedBox(height: 16),
-                  cardsList[2],
-                  const SizedBox(height: 16),
-                  cardsList[3],
-                ],
-              );
-            }
+    return RoleMatrixTab(
+      isLoading: _isLoadingRoles,
+      allPermissions: _allPermissions,
+      rolesWithPermissions: _rolesWithPermissions,
+      onEditRole: (roleName, currentCodes) {
+        showRoleDetailDrawer(
+          context,
+          roleName: roleName,
+          initialPermissions: currentCodes,
+          allPermissions: _allPermissions,
+          onSave: (newPermissions) {
+            _updateRolePermissions(roleName, newPermissions);
           },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRoleConfigCard(
-    String name,
-    String desc,
-    List<String> permissions,
-    double width,
-  ) {
-    return Container(
-      width: width,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF28B79B), fontFamily: 'Outfit')),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.shield_outlined, color: Color(0xFF28B79B), size: 20),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            desc,
-            style: const TextStyle(
-              color: Color(0xFF6B7280),
-              fontSize: 13,
-              height: 1.4,
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Primary Grants:',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-              color: Color(0xFF1F2937),
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: permissions.map((perm) {
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  perm,
-                  style: const TextStyle(
-                    color: Color(0xFF4B5563),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -3286,7 +3242,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ? rolesList.first.toString()
         : 'Trainer';
 
-    // Normalize role string for display (e.g. ROLE_TRAINER_LEAD -> Trainer Lead)
+    // Normalize role string for display (e.g. ROLE_COURSE_MANAGER -> Course Manager)
     String displayRole = role.replaceAll('ROLE_', '').replaceAll('_', ' ');
     // Capitalize words
     displayRole = displayRole
@@ -3617,7 +3573,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               child: Text('Trainer'),
                             ),
                             DropdownMenuItem(
-                              value: 'Trainer Lead',
+                              value: 'Course Manager',
                               child: Text('Course Manager'),
                             ),
                             DropdownMenuItem(
@@ -4177,8 +4133,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     String displayRole = 'Learner';
     if (role.contains('TRAINER')) {
       displayRole = 'Trainer';
-    } else if (role.contains('TRAINER_LEAD')) {
-      displayRole = 'Trainer Lead';
+    } else if (role.contains('COURSE_MANAGER')) {
+      displayRole = 'Course Manager';
     } else if (role.contains('ADMIN')) {
       displayRole = 'Admin';
     }
@@ -4618,7 +4574,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               child: Text('Trainer', style: TextStyle(fontFamily: 'Outfit')),
             ),
             DropdownMenuItem(
-              value: 'Trainer Lead',
+              value: 'Course Manager',
               child: Text(
                 'Course Manager',
                 style: TextStyle(fontFamily: 'Outfit'),
@@ -4686,8 +4642,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
 
       String backendRole = 'TRAINER';
-      if (_createRole == 'Trainer Lead') {
-        backendRole = 'TRAINER_LEAD';
+      if (_createRole == 'Course Manager') {
+        backendRole = 'COURSE_MANAGER';
       } else if (_createRole == 'Admin') {
         backendRole = 'ADMINISTRATOR';
       }

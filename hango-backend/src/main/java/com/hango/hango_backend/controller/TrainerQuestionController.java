@@ -21,22 +21,25 @@ public class TrainerQuestionController {
     private final TrainerQuestionService trainerQuestionService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<QuestionDTO>> getQuestions(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "QUIZ") String type,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long skillId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long difficultyId,
             @RequestParam(defaultValue = "NEWEST") String sortBy) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
         List<QuestionDTO> questions = trainerQuestionService.getTrainerQuestions(
-                userDetails.getUsername(), type, search, sortBy);
+                userDetails.getUsername(), type, search, sortBy, skillId, categoryId, difficultyId);
         return ResponseEntity.ok(questions);
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> createQuestion(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody CreateGroupQuestionRequestDTO request) {
@@ -48,7 +51,7 @@ public class TrainerQuestionController {
     }
 
     @GetMapping("/detail/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<CreateGroupQuestionRequestDTO> getQuestionDetail(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
@@ -61,7 +64,7 @@ public class TrainerQuestionController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> updateQuestionBankGroup(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
@@ -75,7 +78,7 @@ public class TrainerQuestionController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> toggleQuestionStatus(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,

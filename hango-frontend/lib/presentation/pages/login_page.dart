@@ -131,7 +131,7 @@ class _LoginPageState extends State<LoginPage> {
     // Determine role flags
     final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
     final isTrainerLead = roles.any(
-      (r) => r.toUpperCase().contains('TRAINER_LEAD'),
+      (r) => r.toUpperCase().contains('COURSE_MANAGER'),
     );
     final isCourseManager = roles.any(
       (r) => r.toUpperCase().contains('COURSE_MANAGER'),
@@ -285,7 +285,12 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  bool _isProcessingGoogleLogin = false;
+
   void _handleGoogleSignInSuccess(GoogleSignInAccount googleUser) async {
+    if (_isProcessingGoogleLogin) return;
+    _isProcessingGoogleLogin = true;
+
     setState(() {
       _isLoading = true;
     });
@@ -340,6 +345,8 @@ class _LoginPageState extends State<LoginPage> {
           'Google Sign In failed: ${e.toString()}',
         );
       }
+    } finally {
+      _isProcessingGoogleLogin = false;
     }
   }
 

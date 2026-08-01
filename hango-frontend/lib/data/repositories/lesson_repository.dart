@@ -34,7 +34,7 @@ class LessonRepository {
 
   Future<LessonComment> postComment(int lessonId, int userId, String content, {int? parentCommentId}) async {
     try {
-      final uri = Uri.parse('$baseUrl/comments/lesson/$lessonId?userId=$userId'); // Using request param for user id as defined in backend controller
+      final uri = Uri.parse('$baseUrl/comments/lesson/$lessonId'); // Using request param for user id as defined in backend controller
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -64,7 +64,7 @@ class LessonRepository {
 
   Future<LessonComment> updateComment(int commentId, int userId, String content) async {
     try {
-      final uri = Uri.parse('$baseUrl/comments/$commentId?userId=$userId');
+      final uri = Uri.parse('$baseUrl/comments/$commentId');
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -91,7 +91,7 @@ class LessonRepository {
 
   Future<void> deleteComment(int commentId, int userId) async {
     try {
-      final uri = Uri.parse('$baseUrl/comments/$commentId?userId=$userId');
+      final uri = Uri.parse('$baseUrl/comments/$commentId');
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -113,7 +113,7 @@ class LessonRepository {
 
   Future<List<dynamic>> fetchQuizAttempts(int lessonId, int userId) async {
     try {
-      final uri = Uri.parse('$baseUrl/lessons/$lessonId/quiz-attempts?userId=$userId');
+      final uri = Uri.parse('$baseUrl/lessons/$lessonId/quiz-attempts');
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -138,7 +138,7 @@ class LessonRepository {
 
   Future<dynamic> postQuizAttempt(int lessonId, int userId, double score, Map<int, int> answers) async {
     try {
-      final uri = Uri.parse('$baseUrl/lessons/$lessonId/quiz-attempts?userId=$userId');
+      final uri = Uri.parse('$baseUrl/lessons/$lessonId/quiz-attempts');
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -175,7 +175,7 @@ class LessonRepository {
 
   Future<void> completeLesson(int lessonId, int userId, bool completed) async {
     try {
-      final uri = Uri.parse('$baseUrl/lessons/$lessonId/complete?userId=$userId&completed=$completed');
+      final uri = Uri.parse('$baseUrl/lessons/$lessonId/complete?completed=$completed');
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -197,7 +197,7 @@ class LessonRepository {
 
   Future<void> likeComment(int commentId, int userId) async {
     try {
-      final uri = Uri.parse('$baseUrl/comments/$commentId/like?userId=$userId');
+      final uri = Uri.parse('$baseUrl/comments/$commentId/like');
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
@@ -219,7 +219,7 @@ class LessonRepository {
 
   Future<void> unlikeComment(int commentId, int userId) async {
     try {
-      final uri = Uri.parse('$baseUrl/comments/$commentId/unlike?userId=$userId');
+      final uri = Uri.parse('$baseUrl/comments/$commentId/unlike');
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');

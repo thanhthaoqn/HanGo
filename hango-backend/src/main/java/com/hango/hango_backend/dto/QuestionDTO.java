@@ -14,6 +14,8 @@ public class QuestionDTO {
     private Long id;
     private String questionText;
     private String categoryName;
+    private String skillName;
+    private String groupTypeName;
     private String difficultyName;
     private String status;
     private String creatorName;

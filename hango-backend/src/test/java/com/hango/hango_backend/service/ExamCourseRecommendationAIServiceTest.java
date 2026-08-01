@@ -6,7 +6,7 @@ import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.ExamAttempt;
 import com.hango.hango_backend.entity.SystemParameter;
-import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
 import org.junit.jupiter.api.BeforeEach;

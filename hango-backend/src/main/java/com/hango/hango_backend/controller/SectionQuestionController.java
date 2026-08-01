@@ -549,8 +549,8 @@ public class SectionQuestionController {
 
     private Long getCurrentUserId() {
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
-            return ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
+        if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.security.UserDetailsImpl) {
+            return ((com.hango.hango_backend.security.UserDetailsImpl) auth.getPrincipal()).getId();
         }
         return null;
     }

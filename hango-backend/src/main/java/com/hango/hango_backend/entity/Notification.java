@@ -21,7 +21,7 @@ public class Notification {
 
     /**
      * Broadcast target: Spring Security role name this notification is addressed to (e.g.
-     * "TRAINER_LEAD"), used when {@link #user} is null. Mutually exclusive with per-user targeting.
+     * "COURSE_MANAGER"), used when {@link #user} is null. Mutually exclusive with per-user targeting.
      */
     @Column(name = "recipient_role", length = 30)
     private String recipientRole;

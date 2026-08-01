@@ -25,8 +25,8 @@ public class ExamController {
             return null;
         }
         Object principal = auth.getPrincipal();
-        if (principal instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
-            return ((com.hango.hango_backend.sercurity.UserDetailsImpl) principal).getId();
+        if (principal instanceof com.hango.hango_backend.security.UserDetailsImpl) {
+            return ((com.hango.hango_backend.security.UserDetailsImpl) principal).getId();
         } else if (principal instanceof com.hango.hango_backend.entity.User) {
             return ((com.hango.hango_backend.entity.User) principal).getId();
         }

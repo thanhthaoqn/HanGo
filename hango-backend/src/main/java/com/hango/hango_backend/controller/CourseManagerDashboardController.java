@@ -35,7 +35,7 @@ public class CourseManagerDashboardController {
     private final NotificationRepository notificationRepository;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> getDashboardSummary() {
         try {
             CourseManagerDashboardSummaryDTO summary = courseManagerDashboardService.getDashboardSummary();
@@ -47,7 +47,7 @@ public class CourseManagerDashboardController {
     }
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasRole('TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getNotifications() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         List<Notification> notifications = notificationRepository
@@ -70,7 +70,7 @@ public class CourseManagerDashboardController {
     }
 
     @PutMapping("/notifications/{id}/read")
-    @PreAuthorize("hasRole('TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> markNotificationAsRead(@PathVariable Long id) {
         Optional<Notification> notificationOpt = notificationRepository.findById(id);
         if (notificationOpt.isEmpty()) {
@@ -83,7 +83,7 @@ public class CourseManagerDashboardController {
     }
 
     @GetMapping("/courses/review")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> getCoursesForReview(@RequestParam(defaultValue = "PENDING") String status) {
         try {
             List<CourseReviewDetailDTO> courses = courseManagerDashboardService.getCoursesForReview(status);
@@ -95,7 +95,7 @@ public class CourseManagerDashboardController {
     }
 
     @GetMapping("/courses/{id}/review-detail")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> getCourseReviewDetail(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(courseManagerDashboardService.getCourseReviewDetail(id));
@@ -106,7 +106,7 @@ public class CourseManagerDashboardController {
     }
 
     @PostMapping("/courses/{id}/publish")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> publishCourse(@PathVariable Long id) {
         try {
             courseManagerDashboardService.publishCourse(id);
@@ -118,12 +118,15 @@ public class CourseManagerDashboardController {
     }
 
     @PostMapping("/courses/{id}/reject")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> rejectCourse(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body) {
         try {
-            // Reason could be used later: String reason = body != null ? body.get("reason") : null;
-            courseManagerDashboardService.returnCourseToDraft(id);
-            return ResponseEntity.ok("{\"message\": \"Course returned to draft\"}");
+            String reason = body != null ? body.get("reason") : null;
+            if (reason == null || reason.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"Rejection reason is required\"}");
+            }
+            courseManagerDashboardService.rejectCourse(id, reason);
+            return ResponseEntity.ok("{\"message\": \"Course rejected successfully\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -131,7 +134,7 @@ public class CourseManagerDashboardController {
     }
 
     @PostMapping("/courses/{id}/hide")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> hideCourse(@PathVariable Long id) {
         try {
             courseManagerDashboardService.hideCourse(id);
@@ -143,7 +146,7 @@ public class CourseManagerDashboardController {
     }
 
     @PostMapping("/courses/{id}/unhide")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> unhideCourse(@PathVariable Long id) {
         try {
             courseManagerDashboardService.unhideCourse(id);
@@ -155,7 +158,7 @@ public class CourseManagerDashboardController {
     }
 
     @GetMapping("/exams/review")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> getExamsForReview(@RequestParam(defaultValue = "PENDING_APPROVAL") String status) {
         try {
             List<com.hango.hango_backend.dto.ExamResponseDTO> exams = courseManagerDashboardService.getExamsForReview(status);
@@ -167,7 +170,7 @@ public class CourseManagerDashboardController {
     }
 
     @PostMapping("/exams/{id}/publish")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> publishExam(@PathVariable Long id) {
         try {
             courseManagerDashboardService.publishExam(id);
@@ -179,7 +182,7 @@ public class CourseManagerDashboardController {
     }
 
     @PostMapping("/exams/{id}/reject")
-    @PreAuthorize("hasAnyRole('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR')")
+    @PreAuthorize("hasAnyRole('COURSE_MANAGER', 'ADMINISTRATOR')")
     public ResponseEntity<?> rejectExam(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body) {
         try {
             String reason = body != null ? body.get("reason") : null;

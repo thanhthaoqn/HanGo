@@ -5,6 +5,7 @@ import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Notification;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.NotificationRepository;
+import com.hango.hango_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,17 +14,18 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Notification store - no realtime/WebSocket delivery yet (see doc/specs/14-notification.md).
  * A notification is either targeted at one user ({@link Notification#getUser()} set) or broadcast
- * to every user holding a given role ({@link Notification#getRecipientRole()} set, user null).
+ * to every user holding a given role. Broadcast now creates individual copies for per-user read state.
  */
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
-    public static final String RECIPIENT_COURSE_MANAGER = "TRAINER_LEAD";
+    public static final String RECIPIENT_COURSE_MANAGER = "COURSE_MANAGER";
     public static final String RECIPIENT_ADMIN = "ADMINISTRATOR";
 
     public static final String TYPE_LOW_RATING = "LOW_RATING";
@@ -35,26 +37,55 @@ public class NotificationService {
     public static final String TYPE_CONTENT_REJECTED = "ContentRejected";
     public static final String TYPE_STATEMENT_READY = "StatementReady";
     public static final String TYPE_COURSE_UPDATED = "CourseUpdated";
+    public static final String TYPE_COURSE_SUBMITTED = "CourseSubmitted";
     public static final String TYPE_TRAINER_APPLICATION_SUBMITTED = "TrainerApplicationSubmitted";
     public static final String TYPE_TRAINER_APPLICATION_REVIEWED = "TrainerApplicationReviewed";
 
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
 
     public void notifyCourseManagers(String type, String title, String message, Course course) {
-        notifyRole(RECIPIENT_COURSE_MANAGER, type, title, message, course);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Throwable.class)
-    public void notifyRole(String role, String type, String title, String message, Course course) {
-        try {
+        List<User> managers = userRepository.findByRoleNames(List.of("COURSE_MANAGER", "COURSE_MANAGER", "ADMINISTRATOR"));
+        if (managers == null || managers.isEmpty()) return;
+        for (User u : managers) {
             Notification notification = Notification.builder()
-                    .recipientRole(role)
+                    .user(u)
+                    .recipientRole(RECIPIENT_COURSE_MANAGER)
                     .type(type)
                     .title(title)
                     .message(message)
                     .course(course)
                     .build();
-            notificationRepository.saveAndFlush(notification);
+            notificationRepository.save(notification);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Throwable.class)
+    public void notifyRole(String role, String type, String title, String message, Course course) {
+        try {
+            List<User> users = userRepository.findByRoleName(role);
+            if (users != null && !users.isEmpty()) {
+                for (User u : users) {
+                    Notification notification = Notification.builder()
+                            .user(u)
+                            .recipientRole(role)
+                            .type(type)
+                            .title(title)
+                            .message(message)
+                            .course(course)
+                            .build();
+                    notificationRepository.saveAndFlush(notification);
+                }
+            } else {
+                Notification notification = Notification.builder()
+                        .recipientRole(role)
+                        .type(type)
+                        .title(title)
+                        .message(message)
+                        .course(course)
+                        .build();
+                notificationRepository.saveAndFlush(notification);
+            }
         } catch (Throwable e) {
             System.err.println("[NotificationService] notifyRole failed: " + e.getMessage());
         }
@@ -68,6 +99,7 @@ public class NotificationService {
         try {
             Notification notification = Notification.builder()
                     .user(user)
+                    .recipientRole("USER")
                     .type(type)
                     .title(title)
                     .message(message)

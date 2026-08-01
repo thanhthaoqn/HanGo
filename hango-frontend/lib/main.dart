@@ -75,7 +75,7 @@ class MyApp extends StatelessWidget {
                 return const AdminDashboardPage();
               } else if (role == 'COURSE_MANAGER') {
                 return const CourseManagerDashboardPage();
-              } else if (role == 'TRAINER_LEAD') {
+              } else if (role == 'COURSE_MANAGER') {
                 return const CourseManagerDashboardPage();
               } else if (role == 'TRAINER') {
                 return const TrainerRouteGate();

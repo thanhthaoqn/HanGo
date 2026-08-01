@@ -4,7 +4,7 @@ import com.hango.hango_backend.dto.AiHealthResponse;
 import com.hango.hango_backend.dto.SendMessageRequest;
 import com.hango.hango_backend.dto.SendMessageResponse;
 import com.hango.hango_backend.entity.AIConversation;
-import com.hango.hango_backend.sercurity.SecurityUtil;
+import com.hango.hango_backend.security.SecurityUtil;
 import com.hango.hango_backend.service.AIAssistantService;
 import com.hango.hango_backend.service.GeminiClientService;
 import jakarta.validation.Valid;
@@ -95,8 +95,8 @@ public class AIAssistantController {
             }
 
             // 4. Nếu principal là UserDetails custom của dự án, lấy trực tiếp id
-            if (principal instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
-                return ((com.hango.hango_backend.sercurity.UserDetailsImpl) principal).getId();
+            if (principal instanceof com.hango.hango_backend.security.UserDetailsImpl) {
+                return ((com.hango.hango_backend.security.UserDetailsImpl) principal).getId();
             }
 
             // 5. Kiểm tra qua SecurityUtil

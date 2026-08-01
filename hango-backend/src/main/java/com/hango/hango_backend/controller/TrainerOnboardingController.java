@@ -39,7 +39,7 @@ public class TrainerOnboardingController {
     }
 
     @GetMapping("/trainers/profile")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getTrainerProfile(@AuthenticationPrincipal UserDetails userDetails) {
         try {
             if (userDetails == null) {
@@ -54,7 +54,7 @@ public class TrainerOnboardingController {
     }
 
     @PutMapping("/trainers/profile")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> saveProfileDraft(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody TrainerProfileDTO request) {
@@ -71,7 +71,7 @@ public class TrainerOnboardingController {
     }
 
     @PostMapping("/trainers/profile/submit")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> submitProfile(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody TrainerProfileDTO request) {
@@ -88,7 +88,7 @@ public class TrainerOnboardingController {
     }
 
     @GetMapping("/admin/trainer-profiles")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getTrainerProfilesForAdmin(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "ALL") String status) {
@@ -102,7 +102,7 @@ public class TrainerOnboardingController {
     }
 
     @PutMapping("/admin/trainer-profiles/{id}/review")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> reviewTrainerProfile(
             @PathVariable Long id,
             @RequestBody TrainerReviewRequest request) {

@@ -1,4 +1,4 @@
-package com.hango.hango_backend.sercurity;
+package com.hango.hango_backend.security;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.hango.hango_backend.entity.User;
@@ -33,17 +33,25 @@ public class UserDetailsImpl implements UserDetails {
     }
 
     public static UserDetailsImpl build(User user) {
-        List<GrantedAuthority> authorities = user.getRoles().stream()
-                .flatMap(role -> {
-                    String r = role.getRoleName() != null ? role.getRoleName().trim() : "";
+        List<GrantedAuthority> authoritiesList = new java.util.ArrayList<>();
+        if (user.getRoles() != null) {
+            user.getRoles().forEach(role -> {
+                String r = role.getRoleName() != null ? role.getRoleName().trim() : "";
+                if (!r.isEmpty()) {
                     String cleanRole = r.startsWith("ROLE_") ? r.substring(5) : r;
-                    return java.util.stream.Stream.of(
-                            new SimpleGrantedAuthority(cleanRole),
-                            new SimpleGrantedAuthority("ROLE_" + cleanRole)
-                    );
-                })
-                .distinct()
-                .collect(Collectors.toList());
+                    authoritiesList.add(new SimpleGrantedAuthority(cleanRole));
+                    authoritiesList.add(new SimpleGrantedAuthority("ROLE_" + cleanRole));
+                }
+                if (role.getPermissions() != null) {
+                    role.getPermissions().forEach(permission -> {
+                        if (permission.getCode() != null && !permission.getCode().isEmpty()) {
+                            authoritiesList.add(new SimpleGrantedAuthority(permission.getCode()));
+                        }
+                    });
+                }
+            });
+        }
+        List<GrantedAuthority> authorities = authoritiesList.stream().distinct().collect(Collectors.toList());
 
         return new UserDetailsImpl(
                 user.getId(),

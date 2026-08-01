@@ -38,7 +38,7 @@ public class TrainerDashboardController {
     private final CourseImportService courseImportService;
 
     @PostMapping("/courses/upload")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> uploadCourseThumbnail(@RequestPart("file") MultipartFile file) {
         try {
             String url = cloudinaryService.uploadImage(file);
@@ -50,7 +50,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/courses/import/template")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<byte[]> downloadCourseImportTemplate() {
         try {
             byte[] workbook = courseImportService.buildTemplateWorkbook();
@@ -65,7 +65,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/courses/import")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> importCoursesFromExcel(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestPart("file") MultipartFile file) {
@@ -82,7 +82,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/system-parameters")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getSystemParameters(@RequestParam("type") String type) {
         try {
             return ResponseEntity.ok(trainerDashboardService.getSystemParametersByType(type));
@@ -93,7 +93,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/courses")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createCourse(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody TrainerCreateCourseRequestDTO request) {
@@ -110,7 +110,7 @@ public class TrainerDashboardController {
     }
 
     @DeleteMapping("/courses/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> deleteTrainerCourse(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -127,7 +127,7 @@ public class TrainerDashboardController {
     }
 
     @PutMapping("/courses/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateCourse(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -148,7 +148,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/courses/{id}/publish")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> publishCourse(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -165,7 +165,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/courses/{id}/submit")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> submitCourseForReview(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -181,42 +181,10 @@ public class TrainerDashboardController {
         }
     }
 
-    @PostMapping("/courses/{id}/approve")
-    @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
-    public ResponseEntity<?> approveCourse(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            if (userDetails == null) {
-                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
-            }
-            trainerDashboardService.approveTrainerCourse(id, userDetails.getUsername());
-            return ResponseEntity.ok("{\"message\": \"Course approved and published successfully\"}");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
-        }
-    }
 
-    @PostMapping("/courses/{id}/reject")
-    @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
-    public ResponseEntity<?> rejectCourse(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        try {
-            if (userDetails == null) {
-                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
-            }
-            trainerDashboardService.rejectTrainerCourseDraft(id, userDetails.getUsername());
-            return ResponseEntity.ok("{\"message\": \"Course draft rejected\"}");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
-        }
-    }
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getTrainerDashboard(@AuthenticationPrincipal UserDetails userDetails) {
         try {
             if (userDetails == null) {
@@ -231,7 +199,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/courses")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getTrainerCourses(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "ALL") String status,
@@ -252,7 +220,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/exams")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getTrainerExams(@AuthenticationPrincipal UserDetails userDetails) {
         try {
             if (userDetails == null) {
@@ -267,7 +235,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/exams")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createTrainerExam(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody com.hango.hango_backend.dto.TrainerCreateExamRequestDTO request) {
@@ -284,7 +252,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/exams/{id}/questions")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> saveExamQuestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -302,7 +270,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/exams/{id}/questions")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getExamQuestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -319,7 +287,7 @@ public class TrainerDashboardController {
     }
 
     @org.springframework.web.bind.annotation.PatchMapping("/exams/{id}/status")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateExamStatus(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -341,7 +309,7 @@ public class TrainerDashboardController {
     }
 
     @org.springframework.web.bind.annotation.PatchMapping("/exams/{id}/visibility")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateExamVisibility(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -363,7 +331,7 @@ public class TrainerDashboardController {
     }
 
     @org.springframework.web.bind.annotation.DeleteMapping("/exams/{id}")
-    @PreAuthorize("hasAnyRole('TRAINER', 'ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> deleteTrainerExam(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {

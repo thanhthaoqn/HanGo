@@ -35,4 +35,7 @@ public class AiUsageLog {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 }

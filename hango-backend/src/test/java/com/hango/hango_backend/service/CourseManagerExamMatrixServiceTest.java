@@ -38,7 +38,7 @@ import com.hango.hango_backend.repository.SystemParameterRepository;
 import com.hango.hango_backend.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
-class TrainerExamMatrixServiceTest {
+class CourseManagerExamMatrixServiceTest {
 
     @Mock
     private ExamMatrixRepository examMatrixRepository;
@@ -58,7 +58,7 @@ class TrainerExamMatrixServiceTest {
     private ExamQuestionRepository examQuestionRepository;
 
     @InjectMocks
-    private TrainerExamMatrixServiceImpl service;
+    private CourseManagerExamMatrixServiceImpl service;
 
     private User user(Long id, String email) {
         return User.builder().id(id).email(email).fullName("Trainer").build();
@@ -83,7 +83,8 @@ class TrainerExamMatrixServiceTest {
         return m;
     }
 
-    private ExamMatrixDetail detail(Long id, ExamMatrix m, SystemParameter skill, SystemParameter diff, QuestionCategory cat, int qty) {
+    private ExamMatrixDetail detail(Long id, ExamMatrix m, SystemParameter skill, SystemParameter diff,
+            QuestionCategory cat, int qty) {
         ExamMatrixDetail d = new ExamMatrixDetail();
         d.setId(id);
         d.setMatrix(m);
@@ -145,7 +146,8 @@ class TrainerExamMatrixServiceTest {
         return d;
     }
 
-    private ExamMatrixCreateRequestDTO createRequest(String title, List<ExamMatrixCreateRequestDTO.DetailRequest> details) {
+    private ExamMatrixCreateRequestDTO createRequest(String title,
+            List<ExamMatrixCreateRequestDTO.DetailRequest> details) {
         ExamMatrixCreateRequestDTO req = new ExamMatrixCreateRequestDTO();
         req.setTitle(title);
         req.setDescription("desc");
@@ -187,7 +189,8 @@ class TrainerExamMatrixServiceTest {
         when(systemParameterRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.createExamMatrix("trainer@example.com", createRequest("Matrix", List.of(detailRequest(99L, 2L, 1L, 5)))));
+                () -> service.createExamMatrix("trainer@example.com",
+                        createRequest("Matrix", List.of(detailRequest(99L, 2L, 1L, 5)))));
     }
 
     @Test
@@ -199,7 +202,8 @@ class TrainerExamMatrixServiceTest {
         when(systemParameterRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.createExamMatrix("trainer@example.com", createRequest("Matrix", List.of(detailRequest(1L, 99L, 1L, 5)))));
+                () -> service.createExamMatrix("trainer@example.com",
+                        createRequest("Matrix", List.of(detailRequest(1L, 99L, 1L, 5)))));
     }
 
     @Test
@@ -212,7 +216,8 @@ class TrainerExamMatrixServiceTest {
         when(questionCategoryRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.createExamMatrix("trainer@example.com", createRequest("Matrix", List.of(detailRequest(1L, 2L, 99L, 5)))));
+                () -> service.createExamMatrix("trainer@example.com",
+                        createRequest("Matrix", List.of(detailRequest(1L, 2L, 99L, 5)))));
     }
 
     @Test
@@ -235,16 +240,17 @@ class TrainerExamMatrixServiceTest {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.generateExamFromMatrix(1L, "My Exam", "unknown@example.com"));
+                () -> service.generateExamFromMatrix(1L, "My Exam", null, null, null, null, "unknown@example.com"));
     }
 
     @Test
     void generateExamFromMatrixShouldThrowWhenMatrixNotFound() {
-        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(user(1L, "trainer@example.com")));
+        when(userRepository.findByEmail("trainer@example.com"))
+                .thenReturn(Optional.of(user(1L, "trainer@example.com")));
         when(examMatrixRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class,
-                () -> service.generateExamFromMatrix(99L, "My Exam", "trainer@example.com"));
+                () -> service.generateExamFromMatrix(99L, "My Exam", null, null, null, null, "trainer@example.com"));
     }
 
     @Test
@@ -267,8 +273,7 @@ class TrainerExamMatrixServiceTest {
                 .thenReturn(List.of(question(11L), question(12L), question(13L)));
         when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 2))
                 .thenReturn(List.of(question(14L), question(15L)));
-
-        Long examId = service.generateExamFromMatrix(1L, "My Custom Exam", "trainer@example.com");
+        Long examId = service.generateExamFromMatrix(1L, "My Custom Exam", null, null, null, null, "trainer@example.com");
 
         assertEquals(500L, examId);
         ArgumentCaptor<Exam> captor = ArgumentCaptor.forClass(Exam.class);
@@ -289,7 +294,7 @@ class TrainerExamMatrixServiceTest {
         when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of());
         when(examRepository.save(any(Exam.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.generateExamFromMatrix(1L, "  ", "trainer@example.com");
+        service.generateExamFromMatrix(1L, "  ", null, null, null, null, "trainer@example.com");
 
         ArgumentCaptor<Exam> captor = ArgumentCaptor.forClass(Exam.class);
         verify(examRepository).save(captor.capture());
@@ -315,7 +320,7 @@ class TrainerExamMatrixServiceTest {
                 .thenReturn(List.of(question(11L), question(12L)));
 
         RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> service.generateExamFromMatrix(1L, "My Exam", "trainer@example.com"));
+                () -> service.generateExamFromMatrix(1L, "My Exam", null, null, null, null, "trainer@example.com"));
         assertTrue(ex.getMessage().contains("Not enough questions"));
         verify(examQuestionRepository, never()).save(any());
     }
@@ -332,7 +337,7 @@ class TrainerExamMatrixServiceTest {
         when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of(detail(1L, m, skill, diff, cat, 0)));
         when(examRepository.save(any(Exam.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.generateExamFromMatrix(1L, "My Exam", "trainer@example.com");
+        service.generateExamFromMatrix(1L, "My Exam", null, null, null, null, "trainer@example.com");
 
         verify(questionRepository, never()).findRandomQuestionsByCriteria(any(), any(), any(), anyInt());
         verify(examQuestionRepository, never()).save(any());

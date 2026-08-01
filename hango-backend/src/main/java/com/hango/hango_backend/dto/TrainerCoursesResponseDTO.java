@@ -16,5 +16,6 @@ public class TrainerCoursesResponseDTO {
     private long publishedCount;
     private long hiddenCount;
     private long pendingCount;
+    private long rejectedCount;
     private List<TrainerCourseDetailDTO> courses;
 }

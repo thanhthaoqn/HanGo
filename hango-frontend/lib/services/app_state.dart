@@ -59,12 +59,12 @@ class AppState extends ChangeNotifier {
     try {
       final roles = List<String>.from(result['roles'] ?? []);
       final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
-      final isTrainerLead = roles.any((r) => r.toUpperCase().contains('TRAINER_LEAD'));
+      final isTrainerLead = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
       final isCourseManager = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
       final isTrainer = roles.any((r) => r.toUpperCase().contains('TRAINER')) && !isTrainerLead && !isCourseManager;
       final primaryRole = isAdmin
           ? 'ADMIN'
-          : (isCourseManager ? 'COURSE_MANAGER' : (isTrainerLead ? 'TRAINER_LEAD' : (isTrainer ? 'TRAINER' : 'LEARNER')));
+          : (isCourseManager ? 'COURSE_MANAGER' : (isTrainerLead ? 'COURSE_MANAGER' : (isTrainer ? 'TRAINER' : 'LEARNER')));
 
       final nextSession = AuthSession(
         token: result['token'] ?? '',

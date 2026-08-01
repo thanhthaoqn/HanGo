@@ -16,6 +16,11 @@ import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
 import com.hango.hango_backend.dto.AdminUserUpdateRequest;
 import jakarta.validation.Valid;
+import com.hango.hango_backend.entity.Permission;
+import com.hango.hango_backend.repository.PermissionRepository;
+import com.hango.hango_backend.dto.RoleDTO;
+import com.hango.hango_backend.dto.PermissionDTO;
+import com.hango.hango_backend.dto.RolePermissionsUpdateRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +49,9 @@ public class AdminController {
     private RoleRepository roleRepository;
 
     @Autowired
+    private PermissionRepository permissionRepository;
+
+    @Autowired
     private AuthService authService;
 
     @Autowired
@@ -59,7 +67,7 @@ public class AdminController {
     private EnrollmentRepository enrollmentRepository;
 
     @GetMapping("/dashboard/stats")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getDashboardStats() {
         try {
             long totalUsers = userRepository.count();
@@ -109,7 +117,7 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getUsers(
             @RequestParam(defaultValue = "staff") String roleType,
             @RequestParam(required = false) String search,
@@ -137,7 +145,7 @@ public class AdminController {
                         .anyMatch(r -> {
                             String name = r.getRoleName().toUpperCase();
                             if (name.startsWith("ROLE_")) name = name.substring(5);
-                            return name.equals("TRAINER_LEAD");
+                            return name.equals("COURSE_MANAGER");
                         });
                 boolean isAdmin = user.getRoles().stream()
                         .anyMatch(r -> {
@@ -154,7 +162,7 @@ public class AdminController {
                     if (isTrainer) {
                         filteredUsers.add(user);
                     }
-                } else if ("course_manager".equalsIgnoreCase(roleType) || "trainer_lead".equalsIgnoreCase(roleType)) {
+                } else if ("course_manager".equalsIgnoreCase(roleType) || "course_manager".equalsIgnoreCase(roleType)) {
                     if (isTrainerLead) {
                         filteredUsers.add(user);
                     }
@@ -225,7 +233,7 @@ public class AdminController {
     private static final Set<String> ALLOWED_USER_STATUSES = Set.of("ACTIVE", "INACTIVE");
 
     @PutMapping("/users/{id}/status")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateUserStatus(@PathVariable Long id, @RequestParam String status,
             @AuthenticationPrincipal UserDetails currentAdmin) {
         try {
@@ -255,7 +263,7 @@ public class AdminController {
     }
 
     @GetMapping("/users/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getUserDetail(@PathVariable Long id) {
         try {
             return ResponseEntity.ok(authService.getUserById(id));
@@ -267,7 +275,7 @@ public class AdminController {
     }
 
     @PostMapping("/users")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createUserByAdmin(@Valid @RequestBody RegisterRequest registerRequest,
             @AuthenticationPrincipal UserDetails currentAdmin) {
         try {
@@ -281,7 +289,7 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateUserByAdmin(
             @PathVariable Long id,
             @Valid @RequestBody AdminUserUpdateRequest updateRequest,
@@ -365,14 +373,17 @@ public class AdminController {
         AuditLog log = AuditLog.builder()
                 .actor(actor)
                 .actionType(actionType)
+                .action(actionType)
                 .targetUserId(targetUserId)
+                .entityType(targetUserId != null ? "USER" : "ROLE")
+                .entityId(targetUserId != null ? targetUserId : 0L)
                 .details(details)
                 .build();
         auditLogRepository.save(log);
     }
 
     @GetMapping("/audit-log")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_AI_USAGE') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAuditLog(@RequestParam(defaultValue = "50") int limit) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         List<AuditLog> logs = auditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit));
@@ -398,7 +409,7 @@ public class AdminController {
     // ------------------------------------------------------------------
 
     @GetMapping("/ai-usage")
-    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('AUDIT_LOG_AI_USAGE') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAiUsageStats() {
         long totalCalls = aiUsageLogRepository.count();
         long successCount = aiUsageLogRepository.countBySuccess(true);
@@ -432,5 +443,82 @@ public class AdminController {
         response.put("weeklyValues", values);
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/permissions")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getAllPermissions() {
+        try {
+            List<Permission> permissions = permissionRepository.findAll();
+            List<PermissionDTO> response = permissions.stream()
+                    .map(p -> PermissionDTO.builder()
+                            .code(p.getCode())
+                            .name(p.getName())
+                            .description(p.getDescription())
+                            .module(p.getModule())
+                            .build())
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/roles")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getAllRolesWithPermissions() {
+        try {
+            List<Role> roles = roleRepository.findAll();
+            List<RoleDTO> response = roles.stream().map(role -> {
+                List<PermissionDTO> perms = new ArrayList<>();
+                if (role.getPermissions() != null) {
+                    perms = role.getPermissions().stream()
+                            .map(p -> PermissionDTO.builder()
+                                    .code(p.getCode())
+                                    .name(p.getName())
+                                    .description(p.getDescription())
+                                    .module(p.getModule())
+                                    .build())
+                            .toList();
+                }
+                return RoleDTO.builder()
+                        .roleName(role.getRoleName())
+                        .permissions(perms)
+                        .build();
+            }).toList();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/roles/{roleName}/permissions")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> updateRolePermissions(
+            @PathVariable String roleName,
+            @RequestBody RolePermissionsUpdateRequest request,
+            @AuthenticationPrincipal UserDetails currentAdmin) {
+        try {
+            Optional<Role> roleOpt = roleRepository.findByRoleName(roleName.toUpperCase());
+            if (roleOpt.isEmpty()) {
+                return ResponseEntity.status(404).body("Role not found");
+            }
+            Role role = roleOpt.get();
+            Set<Permission> newPermissions = new HashSet<>();
+            if (request.getPermissionCodes() != null) {
+                for (String code : request.getPermissionCodes()) {
+                    Optional<Permission> pOpt = permissionRepository.findByCode(code);
+                    pOpt.ifPresent(newPermissions::add);
+                }
+            }
+            role.setPermissions(newPermissions);
+            roleRepository.save(role);
+
+            logAudit(currentAdmin, "UPDATE_ROLE_PERMISSIONS", null, "Updated permissions for role " + roleName);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Permissions updated successfully"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
     }
 }

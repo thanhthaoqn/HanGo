@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
-import 'trainer_create_exam_page.dart';
-import 'trainer_edit_exam_page.dart';
-import '../../../utils/toast_helper.dart';
+import '../course_manager/course_manager_create_exam_page.dart';
+import '../course_manager/course_manager_edit_exam_page.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
+import '../../../utils/toast_helper.dart';
 
 class TrainerExamsPage extends StatefulWidget {
   final bool isEmbedded;
@@ -22,7 +22,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
-  int? _currentUserId;
+
   bool _isCourseManager = false;
 
   bool _isLoading = true;
@@ -94,36 +94,39 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        setState(() {
-          if (data is Map) {
-            _allCount = (data['allCount'] ?? 0) as int;
-            _draftCount = (data['draftCount'] ?? 0) as int;
-            _publishedCount = (data['publishedCount'] ?? 0) as int;
-            _hiddenCount = (data['hiddenCount'] ?? 0) as int;
-            _pendingCount = (data['pendingCount'] ?? 0) as int;
-            _examsList = data['exams'] ?? [];
-          } else if (data is List) {
-            _examsList = data;
-            _allCount = data.length;
-            _draftCount = 0;
-            _publishedCount = 0;
-            _hiddenCount = 0;
-            _pendingCount = 0;
-          }
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            if (data is Map) {
+              _allCount = (data['allCount'] ?? 0) as int;
+              _draftCount = (data['draftCount'] ?? 0) as int;
+              _publishedCount = (data['publishedCount'] ?? 0) as int;
+              _hiddenCount = (data['hiddenCount'] ?? 0) as int;
+              _pendingCount = (data['pendingCount'] ?? 0) as int;
+              _examsList = data['exams'] ?? [];
+            } else if (data is List) {
+              _examsList = data;
+              _allCount = data.length;
+              _draftCount = 0;
+              _publishedCount = 0;
+              _hiddenCount = 0;
+              _pendingCount = 0;
+            }
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('Failed to load exams data: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('Error loading exams data: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      _loadMockFallback();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _loadMockFallback();
+      }
     }
   }
-
   Future<void> _updateExamVisibility(int examId, String newVisibility) async {
     try {
       final token = await _authService.getToken();
@@ -210,7 +213,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Thảo';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    final userId = prefs.getInt('user_id');
+
     final roles = prefs.getStringList('user_roles') ?? [];
     
     String initials = 'T';
@@ -220,13 +223,15 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         initials = parts.last[0].toUpperCase();
       }
     }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
-      _currentUserId = userId;
-      _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'TRAINER_LEAD' || r.toUpperCase() == 'ADMIN');
-    });
+    if (mounted) {
+      setState(() {
+        _trainerName = fullName;
+        _trainerInitials = initials;
+        _trainerAvatarUrl = avatarUrl;
+
+        _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMIN');
+      });
+    }
   }
 
   @override
@@ -301,7 +306,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           onPressed: () async {
             await Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const TrainerCreateExamPage()),
+              MaterialPageRoute(builder: (context) => const CourseManagerCreateExamPage(isEmbedded: true)),
             );
             _fetchExamsData();
           },
@@ -597,7 +602,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 Expanded(flex: 1, child: _buildTableHeaderText('Questions')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Duration')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Status')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Visibility')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Actions', align: TextAlign.center)),
               ],
             ),
@@ -686,6 +690,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   }
 
   Widget _buildExamRow(Map<String, dynamic> exam) {
+    final status = exam['status']?.toString().toUpperCase() ?? '';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
@@ -784,14 +789,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             flex: 1,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: _buildStatusChip(exam['status'] ?? 'DRAFT'),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _buildVisibilityChip(exam),
+              child: _buildStatusChip(status),
             ),
           ),
           Expanded(
@@ -810,7 +808,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                       }
                     },
                     itemBuilder: (context) {
-                      final status = exam['status']?.toString().toUpperCase() ?? '';
                       return [
                         if (status != 'HIDDEN')
                           const PopupMenuItem(
@@ -842,10 +839,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   onPressed: () async {
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => TrainerEditExamPage(
-                        examId: exam['id'],
-                        examTitle: exam['title'] ?? 'Untitled',
-                        examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
+                      MaterialPageRoute(builder: (context) => CourseManagerEditExamPage(
+                        examId: exam['id'] as int,
+                        examTitle: exam['title'] ?? 'Untitled Exam',
+                        examExpectedCount: exam['expectedQuestionCount'] as int? ?? 10,
+                        isReadOnly: status == 'APPROVED' || status == 'PUBLISHED',
+                        isCourseManager: false,
                       )),
                     );
                     _fetchExamsData();
@@ -911,82 +910,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildVisibilityChip(Map<String, dynamic> exam) {
-    String? status = exam['status'];
-    String? visibility = exam['visibility'];
-    
-    if (status == null || (status.toUpperCase() != 'PUBLISHED' && status.toUpperCase() != 'APPROVED')) {
-      return const Text(
-        '-',
-        style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold),
-      );
-    }
-    
-    bool isPublic = visibility?.toUpperCase() == 'PUBLIC';
-    bool canEdit = _currentUserId != null && exam['creatorId'] == _currentUserId;
-
-    return InkWell(
-      onTap: canEdit ? () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Change Visibility'),
-            content: Text('Do you want to make this exam ${isPublic ? 'PRIVATE' : 'PUBLIC'}?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _updateExamVisibility(exam['id'], isPublic ? 'PRIVATE' : 'PUBLIC');
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38C9A6)),
-                child: const Text('Confirm', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        );
-      } : () {
-        ToastHelper.showError(context, 'You do not have permission to change visibility of this exam');
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isPublic ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: canEdit ? (isPublic ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0)) : Colors.transparent),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isPublic ? Icons.public : Icons.lock_outline,
-              size: 14,
-              color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              isPublic ? 'Public' : 'Private',
-              style: TextStyle(
-                color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                fontFamily: 'Outfit',
-              ),
-            ),
-            if (canEdit) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_drop_down, size: 14, color: isPublic ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
-            ]
-          ],
-        ),
       ),
     );
   }

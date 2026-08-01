@@ -10,7 +10,7 @@ public interface CourseManagerDashboardService {
     List<CourseReviewDetailDTO> getCoursesForReview(String status);
     CourseReviewDetailDTO getCourseReviewDetail(Long courseId);
     void publishCourse(Long courseId);
-    void returnCourseToDraft(Long courseId);
+    void rejectCourse(Long courseId, String reason);
     void hideCourse(Long courseId);
     void unhideCourse(Long courseId);
 

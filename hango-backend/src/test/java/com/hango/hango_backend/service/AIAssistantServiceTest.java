@@ -9,7 +9,7 @@ import com.hango.hango_backend.entity.AIConversation;
 import com.hango.hango_backend.entity.AIMessage;
 import com.hango.hango_backend.entity.Lesson;
 import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.exeption.ApiException;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.AIConversationRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;

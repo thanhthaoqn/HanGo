@@ -1,7 +1,7 @@
 package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.LessonDetailDTO;
-import com.hango.hango_backend.dto.LessonQuizAttemptDTO;
+import com.hango.hango_backend.dto.LessonDetailDTO;
 import com.hango.hango_backend.dto.LessonQuizAttemptRequestDTO;
 import com.hango.hango_backend.service.LessonService;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.hango.hango_backend.security.UserDetailsImpl;
+import com.hango.hango_backend.security.UserDetailsImpl;
 
 @RestController
 @RequestMapping("/api/v1/lessons")
@@ -23,53 +25,46 @@ public class LessonController {
 
     private final LessonService lessonService;
 
-    private Long getCurrentUserId() {
-        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.sercurity.UserDetailsImpl) {
-            return ((com.hango.hango_backend.sercurity.UserDetailsImpl) auth.getPrincipal()).getId();
-        }
-        return null;
-    }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<LessonDetailDTO> getLessonDetail(
             @PathVariable Long id,
-            @RequestParam(required = false) Long userId) {
-        Long currentUserId = userId;
-        if (currentUserId == null) {
-            currentUserId = getCurrentUserId();
-        }
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        Long currentUserId = currentUser != null ? currentUser.getId() : null;
         return ResponseEntity.ok(lessonService.getLessonDetail(id, currentUserId));
     }
 
     @PutMapping("/{id}/complete")
     public ResponseEntity<?> completeLesson(
             @PathVariable Long id,
-            @RequestParam(required = false) Long userId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @RequestParam(required = false, defaultValue = "true") boolean completed) {
-        Long currentUserId = userId;
-        if (currentUserId == null) {
-            currentUserId = getCurrentUserId();
-        }
-        if (currentUserId == null) {
+        if (currentUser == null) {
             return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
         }
-        lessonService.completeLesson(id, currentUserId, completed);
+        lessonService.completeLesson(id, currentUser.getId(), completed);
         return ResponseEntity.ok().body("{\"message\": \"Lesson progress updated successfully\"}");
     }
 
     @GetMapping("/{id}/quiz-attempts")
-    public ResponseEntity<List<LessonQuizAttemptDTO>> getQuizAttempts(
+    public ResponseEntity<?> getQuizAttempts(
             @PathVariable Long id,
-            @RequestParam Long userId) {
-        return ResponseEntity.ok(lessonService.getQuizAttempts(id, userId));
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+        }
+        return ResponseEntity.ok(lessonService.getQuizAttempts(id, currentUser.getId()));
     }
 
     @PostMapping("/{id}/quiz-attempts")
-    public ResponseEntity<LessonQuizAttemptDTO> saveQuizAttempt(
+    public ResponseEntity<?> saveQuizAttempt(
             @PathVariable Long id,
-            @RequestParam Long userId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser,
             @RequestBody LessonQuizAttemptRequestDTO request) {
-        return ResponseEntity.ok(lessonService.saveQuizAttempt(id, userId, request));
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+        }
+        return ResponseEntity.ok(lessonService.saveQuizAttempt(id, currentUser.getId(), request));
     }
 }
