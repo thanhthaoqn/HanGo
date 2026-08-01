@@ -455,6 +455,7 @@ public class AdminController {
                             .code(p.getCode())
                             .name(p.getName())
                             .description(p.getDescription())
+                            .module(p.getModule())
                             .build())
                     .toList();
             return ResponseEntity.ok(response);
@@ -476,6 +477,7 @@ public class AdminController {
                                     .code(p.getCode())
                                     .name(p.getName())
                                     .description(p.getDescription())
+                                    .module(p.getModule())
                                     .build())
                             .toList();
                 }

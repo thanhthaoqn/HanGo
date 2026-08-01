@@ -23,4 +23,7 @@ public class Permission {
 
     @Column(name = "description")
     private String description;
+
+    @Column(name = "module", length = 50)
+    private String module; // e.g., "Course Management", "System"
 }
