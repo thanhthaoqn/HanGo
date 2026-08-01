@@ -77,6 +77,10 @@ public class MonthlyStatement {
     @Column(name = "admin_notes", columnDefinition = "TEXT")
     private String adminNotes;
 
+    @Column(name = "payout_receipt_url", length = 500)
+    private String payoutReceiptUrl;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
+
 }

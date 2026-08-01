@@ -14,7 +14,8 @@ import '../login_page.dart';
 import '../../widgets/payment_qr_dialog.dart';
 
 class CartPage extends StatefulWidget {
-  const CartPage({Key? key}) : super(key: key);
+  final bool isEmbedded;
+  const CartPage({Key? key, this.isEmbedded = false}) : super(key: key);
 
   @override
   State<CartPage> createState() => _CartPageState();
@@ -264,7 +265,7 @@ class _CartPageState extends State<CartPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(isDesktop: isDesktop, activeTab: ''),
+      appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: ''),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(

@@ -6,6 +6,7 @@ import 'trainer_exams_page.dart';
 import 'question_bank/trainer_question_bank_page.dart';
 import 'trainer_revenue_page.dart';
 import 'trainer_profile_page.dart';
+import 'trainer_tickets_page.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
 
 class TrainerShellPage extends StatefulWidget {
@@ -87,6 +88,7 @@ class TrainerShellPageState extends State<TrainerShellPage> {
                       TrainerQuestionBankPage(isEmbedded: true),
                       TrainerRevenuePage(isEmbedded: true),
                       TrainerProfilePage(isEmbedded: true),
+                      TrainerTicketsPage(isEmbedded: true),
                     ],
                   ),
                 ),

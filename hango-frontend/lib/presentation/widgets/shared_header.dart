@@ -8,12 +8,16 @@ import '../pages/course/list_courses_page.dart';
 import '../pages/course/cart_page.dart';
 import '../pages/course/course_detail_page.dart';
 import '../pages/learner/learner_home_page.dart';
+import '../pages/learner/learner_shell_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/course_manager/course_manager_dashboard_page.dart';
-import '../pages/trainer/trainer_dashboard_page.dart';
 import '../pages/learner/my_learning_page.dart';
+import '../pages/admin/admin_dashboard_page.dart';
+import '../pages/trainer/trainer_dashboard_page.dart';
+import '../pages/trainer/trainer_shell_page.dart';
+import '../pages/ticket/management_tickets_page.dart';
 import '../../../domain/model/course.dart';
 import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
@@ -683,7 +687,7 @@ class _SharedHeaderState extends State<SharedHeader> {
               ),
               onPressed: () {
                 _hideCartOverlay();
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                _navigateToLearnerTab(6);
               },
               tooltip: _isVietnamese ? 'Giỏ hàng' : 'Cart',
             ),
@@ -719,18 +723,25 @@ class _SharedHeaderState extends State<SharedHeader> {
     );
   }
 
+  void _navigateToLearnerTab(int tabIndex, {int subTab = 0}) {
+    final shellState = LearnerShellPage.of(context);
+    if (shellState != null) {
+      shellState.selectTab(tabIndex, subTab: subTab);
+    } else {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LearnerShellPage(initialIndex: tabIndex, initialSubTab: subTab),
+        ),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final logoWidget = InkWell(
-      onTap: () {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const LearnerHomePage(),
-          ),
-          (route) => false,
-        );
-      },
+      onTap: () => _navigateToLearnerTab(0),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -787,60 +798,25 @@ class _SharedHeaderState extends State<SharedHeader> {
         _buildHeaderNavLink(
           _isVietnamese ? 'Trang chủ' : 'Home',
           active: widget.activeTab == 'Trang chủ' || widget.activeTab == '',
-          onTap: () {
-            if (widget.activeTab != '') {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LearnerHomePage(),
-                ),
-                (route) => false,
-              );
-            }
-          },
+          onTap: () => _navigateToLearnerTab(0),
         ),
         const SizedBox(width: 12),
         _buildHeaderNavLink(
           _isVietnamese ? 'Khóa học' : 'Courses',
           active: widget.activeTab == 'Courses',
-          onTap: () {
-            if (widget.activeTab != 'Courses') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ListCoursesPage(),
-                ),
-              );
-            }
-          },
+          onTap: () => _navigateToLearnerTab(1),
         ),
         const SizedBox(width: 12),
         _buildHeaderNavLink(
           _isVietnamese ? 'Đề thi' : 'Exams',
           active: widget.activeTab == 'Exams',
-          onTap: () {
-            if (widget.activeTab != 'Exams') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ListExamsPage()),
-              );
-            }
-          },
+          onTap: () => _navigateToLearnerTab(2),
         ),
         const SizedBox(width: 12),
         _buildHeaderNavLink(
           _isVietnamese ? 'Lộ trình' : 'Pathway',
           active: widget.activeTab == 'Learning Pathway',
-          onTap: () {
-            if (widget.activeTab != 'Learning Pathway') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LearningPathwayPage(),
-                ),
-              );
-            }
-          },
+          onTap: () => _navigateToLearnerTab(3),
         ),
       ],
     );
@@ -1029,35 +1005,40 @@ class _SharedHeaderState extends State<SharedHeader> {
                   } else if (val == 'logout') {
                     _handleLogout();
                   } else if (val == 'my_info' || val == 'profile') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => widget.hideCommerceActions
-                            ? const CourseManagerMyInformationPage()
-                            : const MyInformationPage(),
-                      ),
-                    );
+                    if (widget.hideCommerceActions) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CourseManagerMyInformationPage(),
+                        ),
+                      );
+                    } else {
+                      _navigateToLearnerTab(5, subTab: 0);
+                    }
                   } else if (val == 'learning') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MyLearningPage(),
-                      ),
-                    );
+                    _navigateToLearnerTab(4);
                   } else if (val == 'cart') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CartPage(),
-                      ),
-                    );
+                    _navigateToLearnerTab(6);
                   } else if (val == 'purchase_history') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MyInformationPage(initialTab: 2),
-                      ),
-                    );
+                    _navigateToLearnerTab(5, subTab: 2);
+                  } else if (val == 'support_tickets') {
+                    if (_userRoles.contains('ROLE_COURSE_MANAGER')) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ManagementTicketsPage(),
+                        ),
+                      );
+                    } else if (_userRoles.contains('ROLE_TRAINER')) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TrainerShellPage(initialIndex: 6),
+                        ),
+                      );
+                    } else {
+                      _navigateToLearnerTab(5, subTab: 3);
+                    }
                   } else if (val == 'notifications') {
                     ToastHelper.show(
                       context,
@@ -1256,6 +1237,32 @@ class _SharedHeaderState extends State<SharedHeader> {
                   ),
 
 
+                  if (_userRoles.any((r) => r.toUpperCase().contains('TRAINER') || r.toUpperCase().contains('MANAGER')))
+                    PopupMenuItem(
+                      value: 'support_tickets',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.confirmation_number_outlined,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _isVietnamese ? 'Phiếu hỗ trợ' : 'Support Tickets',
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                color: Color(0xFF1E293B),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   PopupMenuItem(
                     value: 'purchase_history',
                     child: Container(

@@ -7,12 +7,14 @@ import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'comment_management_page.dart';
 import 'admin_trainer_reviews_page.dart';
+import '../ticket/management_tickets_page.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
 
 class AdminDashboardPage extends StatefulWidget {
-  const AdminDashboardPage({super.key});
+  final int initialIndex;
+  const AdminDashboardPage({super.key, this.initialIndex = 0});
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
@@ -113,6 +115,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _selectedMenuIndex = widget.initialIndex;
     _loadAdminInfo();
     _fetchDashboardStats();
     _fetchAccounts();

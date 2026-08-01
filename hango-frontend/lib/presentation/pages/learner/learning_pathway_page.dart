@@ -9,7 +9,8 @@ import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 
 class LearningPathwayPage extends StatefulWidget {
-  const LearningPathwayPage({super.key});
+  final bool isEmbedded;
+  const LearningPathwayPage({super.key, this.isEmbedded = false});
 
   @override
   State<LearningPathwayPage> createState() => _LearningPathwayPageState();
@@ -173,7 +174,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
 
         return Scaffold(
           backgroundColor: bg,
-          appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Learning Pathway'),
+          appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: 'Learning Pathway'),
           body: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(

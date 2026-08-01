@@ -5,6 +5,7 @@ import '../pages/course_manager/course_manager_exams_page.dart';
 import '../pages/course_manager/course_manager_matrix_management_page.dart';
 import '../pages/course_manager/course_manager_question_bank_page.dart';
 import '../pages/course_manager/course_manager_settlement_page.dart';
+import '../pages/ticket/management_tickets_page.dart';
 
 class CourseManagerSidebar extends StatelessWidget {
   final String currentRoute;
@@ -117,6 +118,19 @@ class CourseManagerSidebar extends StatelessWidget {
                 onSelectRoute!('settlement');
               } else if (currentRoute != 'settlement') {
                 _navigateSeamless(context, const CourseManagerSettlementPage());
+              }
+            },
+          ),
+          _buildSidebarItem(
+            context,
+            Icons.confirmation_number_outlined,
+            'Support Tickets',
+            isActive: currentRoute == 'support',
+            onTap: () {
+              if (onSelectRoute != null) {
+                onSelectRoute!('support');
+              } else if (currentRoute != 'support') {
+                _navigateSeamless(context, const ManagementTicketsPage());
               }
             },
           ),

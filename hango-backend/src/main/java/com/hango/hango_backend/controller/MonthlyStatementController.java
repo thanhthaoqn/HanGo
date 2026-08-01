@@ -75,13 +75,37 @@ public class MonthlyStatementController {
             @RequestBody SettleRequestDTO request) {
         String bankTxnRef = request != null ? request.getBankTxnRef() : null;
         String notes = request != null ? request.getNotes() : null;
-        MonthlyStatementDTO settled = statementService.settleStatement(id, bankTxnRef, notes);
+        String payoutReceiptUrl = request != null ? request.getPayoutReceiptUrl() : null;
+        MonthlyStatementDTO settled = statementService.settleStatement(id, bankTxnRef, notes, payoutReceiptUrl);
         return ResponseEntity.ok(settled);
+    }
+
+    @GetMapping("/course-manager/statements/{id}/items")
+    @PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR', 'TRAINER', 'ROLE_TRAINER', 'TEACHER', 'ROLE_TEACHER')")
+    public ResponseEntity<List<com.hango.hango_backend.dto.ManagerPaymentDTO>> getStatementPayments(
+            @PathVariable("id") Long id) {
+        List<com.hango.hango_backend.dto.ManagerPaymentDTO> items = statementService.getStatementPayments(id);
+        return ResponseEntity.ok(items);
+    }
+
+    @GetMapping("/course-manager/statements/export-excel")
+    @PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
+    public ResponseEntity<byte[]> exportStatementsToExcel(
+            @RequestParam(name = "periodMonth", required = false) String periodMonth,
+            @RequestParam(name = "status", required = false) String status) {
+        byte[] excelBytes = statementService.exportStatementsToExcel(periodMonth, status);
+        String filename = "HanGo_Revenue_Settlement_" + (periodMonth != null && !periodMonth.isEmpty() ? periodMonth : "All") + ".xlsx";
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .body(excelBytes);
     }
 
     @Data
     public static class SettleRequestDTO {
         private String bankTxnRef;
         private String notes;
+        private String payoutReceiptUrl;
     }
 }
+

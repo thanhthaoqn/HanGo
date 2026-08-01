@@ -27,7 +27,8 @@ import '../../../data/services/trainer_onboarding_service.dart';
 import '../../../utils/toast_helper.dart';
 
 class LearnerHomePage extends StatefulWidget {
-  const LearnerHomePage({super.key});
+  final bool isEmbedded;
+  const LearnerHomePage({super.key, this.isEmbedded = false});
 
   @override
   State<LearnerHomePage> createState() => _LearnerHomePageState();
@@ -684,8 +685,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       builder: (context, isVi, child) {
         return Scaffold(
           backgroundColor: const Color(0xFFF9FAFB),
-          appBar: SharedHeader(isDesktop: isDesktop, activeTab: ''),
-          drawer: isDesktop ? null : _buildDrawer(context),
+          appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: ''),
+          drawer: (widget.isEmbedded || isDesktop) ? null : _buildDrawer(context),
           body: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

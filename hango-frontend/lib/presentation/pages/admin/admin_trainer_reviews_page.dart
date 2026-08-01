@@ -184,7 +184,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Approving account: ${isPro ? "Professional" : "Peer Tutor"}.',
+                'Approving account: ${isPro ? "Teacher" : "Peer Tutor"}.',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
               ),
               const SizedBox(height: 16),
@@ -245,7 +245,9 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
     );
   }
 
-  void _showBanConfirmDialog(int userId) {
+  void _showRejectProfileConfirmDialog(int userId) {
+    final noteController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) {
@@ -254,17 +256,43 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: const [
-              Icon(Icons.gavel_rounded, color: Colors.redAccent, size: 28),
+              Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 28),
               SizedBox(width: 12),
               Text(
-                'Ban Account',
+                'Reject Profile Application',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          content: const Text(
-            'Are you sure you want to ban/suspend this instructor? They will lose access to their teaching dashboard immediately.',
-            style: TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF475569), height: 1.5),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you sure you want to reject this trainer profile application?',
+                style: TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF475569), height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Reason for Rejection (Visible to Trainer) *',
+                style: TextStyle(fontFamily: 'Outfit', fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: noteController,
+                maxLines: 3,
+                style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Enter reason for rejection (e.g., Unclear diploma scan, invalid language certificate, unverified credentials)...',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+                  ),
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -276,8 +304,13 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             ),
             ElevatedButton(
               onPressed: () {
+                final notes = noteController.text.trim();
+                if (notes.isEmpty) {
+                  ToastHelper.showError(context, 'Please enter a rejection reason.');
+                  return;
+                }
                 Navigator.pop(context);
-                _handleReview(userId, 'SUSPENDED', 'Account suspended due to policy violations', null);
+                _handleReview(userId, 'SUSPENDED', notes, null);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
@@ -286,7 +319,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
               child: const Text(
-                'Confirm Ban',
+                'Confirm Reject',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ),
@@ -295,6 +328,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
       },
     );
   }
+
 
   void _showDetailDialog(dynamic app) {
     final userId = app['userId'] as int;
@@ -400,24 +434,32 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                   Builder(
                     builder: (context) {
                       List<Map<String, String>> certList = [];
-                      if (app['certificates'] != null && app['certificates'] is List) {
-                        certList = (app['certificates'] as List).map((c) => Map<String, String>.from(c as Map)).toList();
+                      final rawCerts = app['certificates'];
+                      if (rawCerts != null && rawCerts is List && rawCerts.isNotEmpty) {
+                        certList = (rawCerts as List).map((c) => Map<String, String>.from(c as Map)).toList();
                       } else {
-                        if (degreeUrl != null && degreeUrl.isNotEmpty) certList.add({'name': 'Degree Proof', 'url': degreeUrl});
-                        if (ieltsUrl != null && ieltsUrl.isNotEmpty) certList.add({'name': 'Language Proof', 'url': ieltsUrl});
+                        Set<String> addedUrls = {};
+                        if (degreeUrl != null && degreeUrl.isNotEmpty) {
+                          certList.add({'name': 'Degree Proof', 'url': degreeUrl});
+                          addedUrls.add(degreeUrl);
+                        }
+                        if (ieltsUrl != null && ieltsUrl.isNotEmpty && !addedUrls.contains(ieltsUrl)) {
+                          certList.add({'name': 'Language Proof', 'url': ieltsUrl});
+                          addedUrls.add(ieltsUrl);
+                        }
                         if (scoreUrl != null && scoreUrl.isNotEmpty) {
                           if (scoreUrl.startsWith('[')) {
                             try {
                               final List parsed = jsonDecode(scoreUrl);
                               certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
-                            } catch (_) {
-                              certList.add({'name': 'Other Credential', 'url': scoreUrl});
-                            }
-                          } else {
+                            } catch (_) {}
+                          } else if (!addedUrls.contains(scoreUrl)) {
                             certList.add({'name': 'Other Credential', 'url': scoreUrl});
+                            addedUrls.add(scoreUrl);
                           }
                         }
                       }
+
 
                       if (certList.isEmpty) {
                         return const Text(
@@ -451,27 +493,13 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                         OutlinedButton.icon(
                           onPressed: () {
                             Navigator.pop(context);
-                            _showBanConfirmDialog(userId);
+                            _showRejectProfileConfirmDialog(userId);
                           },
-                          icon: const Icon(Icons.gavel_rounded, size: 16, color: Colors.redAccent),
-                          label: const Text('Ban account'),
+                          icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.redAccent),
+                          label: const Text('Reject profile'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.redAccent,
                             side: const BorderSide(color: Colors.redAccent),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showRejectDialog(userId);
-                          },
-                          icon: const Icon(Icons.reply_rounded, size: 16, color: Color(0xFFD97706)),
-                          label: const Text('Request edits'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFD97706),
-                            side: const BorderSide(color: Color(0xFFFDE68A)),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),

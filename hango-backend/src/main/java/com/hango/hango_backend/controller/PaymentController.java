@@ -113,6 +113,45 @@ public class PaymentController {
         }
     }
 
+    /**
+     * Lấy danh sách toàn bộ giao dịch mua khóa học cho Course Manager
+     * GET /api/v1/payment/manager/all
+     */
+    @GetMapping("/manager/all")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
+    public ResponseEntity<?> getAllPaymentsForManager(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String settlementStatus,
+            @RequestParam(required = false) String search) {
+        try {
+            return ResponseEntity.ok(paymentService.getAllPaymentsForManager(status, settlementStatus, search, page, size));
+        } catch (Exception e) {
+            log.error("Error fetching all payments for manager", e);
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Xuất danh sách toàn bộ giao dịch mua khóa học ra file Excel (.xlsx)
+     * GET /api/v1/payment/manager/export-excel
+     */
+    @GetMapping("/manager/export-excel")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR')")
+    public ResponseEntity<byte[]> exportPaymentsToExcel(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String settlementStatus,
+            @RequestParam(required = false) String search) {
+        byte[] excelBytes = paymentService.exportPaymentsToExcel(status, settlementStatus, search);
+        String filename = "HanGo_Payment_Transactions.xlsx";
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .body(excelBytes);
+    }
+
+
     private String getClientIpAddress(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {

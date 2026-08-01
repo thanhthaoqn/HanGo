@@ -90,10 +90,12 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
           }
         });
       } else {
-        _showErrorSnackBar('Failed to load profile: ${res['message']}');
+        if (res['message'] != null && res['message'] != 'No auth token found.') {
+          _showErrorSnackBar('Failed to load profile: ${res['message']}');
+        }
       }
     } catch (e) {
-      _showErrorSnackBar('Error: $e');
+      // Ignore unauthenticated guest errors silently
     } finally {
       setState(() {
         _isLoading = false;

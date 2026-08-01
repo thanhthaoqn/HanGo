@@ -214,13 +214,18 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         TrainerProfile saved = trainerProfileRepository.save(profile);
         log.info("Trainer profile submitted for review: {}", email);
 
-        String trainerName = user.getFullName() != null ? user.getFullName() : email;
-        notificationService.notifyRole(
-                NotificationService.RECIPIENT_ADMIN,
-                NotificationService.TYPE_TRAINER_APPLICATION_SUBMITTED,
-                "Đơn đăng ký giảng viên mới",
-                trainerName + " vừa nộp hồ sơ giảng viên chờ xét duyệt.",
-                null);
+        try {
+            String trainerName = user.getFullName() != null ? user.getFullName() : email;
+            notificationService.notifyRole(
+                    NotificationService.RECIPIENT_ADMIN,
+                    NotificationService.TYPE_TRAINER_APPLICATION_SUBMITTED,
+                    "Đơn đăng ký giảng viên mới",
+                    trainerName + " vừa nộp hồ sơ giảng viên chờ xét duyệt.",
+                    null);
+        } catch (Throwable e) {
+            log.warn("Could not send admin notification for trainer submission: {}", e.getMessage());
+        }
+
 
         return mapToDTO(saved);
     }
@@ -281,6 +286,22 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 double defaultShare = "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType()) ? 0.60 : 0.70;
                 profile.setRevenueShare(defaultShare);
             }
+
+            // Automatically grant TRAINER role to user if not already present
+            if (profile.getUser() != null) {
+                User user = profile.getUser();
+                Role trainerRole = roleRepository.findByRoleName("TRAINER").orElse(null);
+                if (trainerRole != null) {
+                    if (user.getRoles() == null) {
+                        user.setRoles(new java.util.HashSet<>());
+                    }
+                    if (!user.getRoles().contains(trainerRole)) {
+                        user.getRoles().add(trainerRole);
+                        userRepository.save(user);
+                        log.info("Granted TRAINER role to user ID: {}", user.getId());
+                    }
+                }
+            }
             log.info("Admin APPROVED trainer ID: {} with split rate: {}", userId, profile.getRevenueShare());
         } else {
             log.info("Admin reviewed trainer ID: {} with new status: {}", userId, newStatus);
@@ -288,20 +309,28 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
 
         TrainerProfile saved = trainerProfileRepository.save(profile);
         if (saved.getUser() != null && saved.getUser().getEmail() != null) {
-            emailService.sendTrainerStatusNotificationEmail(saved.getUser().getEmail(), newStatus, request.getAdminNotes());
+            try {
+                emailService.sendTrainerStatusNotificationEmail(saved.getUser().getEmail(), newStatus, request.getAdminNotes());
+            } catch (Exception e) {
+                log.warn("Failed to send trainer status email notification: {}", e.getMessage());
+            }
         }
         if (saved.getUser() != null) {
             boolean approved = "VERIFIED".equalsIgnoreCase(newStatus);
-            notificationService.notifyUser(
-                    saved.getUser(),
-                    NotificationService.TYPE_TRAINER_APPLICATION_REVIEWED,
-                    approved ? "Hồ sơ giảng viên đã được duyệt" : "Hồ sơ giảng viên bị từ chối",
-                    approved
-                            ? "Chúc mừng! Hồ sơ đăng ký giảng viên của bạn đã được phê duyệt."
-                            : "Hồ sơ đăng ký giảng viên của bạn đã bị từ chối." +
-                                (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()
-                                        ? " Lý do: " + request.getAdminNotes() : ""),
-                    null);
+            try {
+                notificationService.notifyUser(
+                        saved.getUser(),
+                        NotificationService.TYPE_TRAINER_APPLICATION_REVIEWED,
+                        approved ? "Hồ sơ giảng viên đã được duyệt" : "Hồ sơ giảng viên bị từ chối",
+                        approved
+                                ? "Chúc mừng! Hồ sơ đăng ký giảng viên của bạn đã được phê duyệt."
+                                : "Hồ sơ đăng ký giảng viên của bạn đã bị từ chối." +
+                                    (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()
+                                            ? " Lý do: " + request.getAdminNotes() : ""),
+                        null);
+            } catch (Exception e) {
+                log.warn("Failed to send trainer review in-app notification: {}", e.getMessage());
+            }
         }
         return mapToDTO(saved);
     }

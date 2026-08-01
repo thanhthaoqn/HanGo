@@ -15,4 +15,7 @@ public interface PaymentService {
     PaymentStatusDTO getPaymentStatus(String txnRef, Long userId);
     List<PaymentHistoryDTO> getMyPaymentHistory(Long userId);
     Page<PaymentHistoryDTO> getMyPaymentHistory(Long userId, String status, int page, int size);
+    Page<com.hango.hango_backend.dto.ManagerPaymentDTO> getAllPaymentsForManager(String status, String settlementStatus, String search, int page, int size);
+    byte[] exportPaymentsToExcel(String status, String settlementStatus, String search);
 }
+

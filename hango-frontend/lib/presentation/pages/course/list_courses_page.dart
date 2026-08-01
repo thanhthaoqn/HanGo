@@ -10,7 +10,8 @@ import '../learner/learner_home_page.dart';
 import 'course_detail_page.dart';
 
 class ListCoursesPage extends StatefulWidget {
-  const ListCoursesPage({Key? key}) : super(key: key);
+  final bool isEmbedded;
+  const ListCoursesPage({Key? key, this.isEmbedded = false}) : super(key: key);
 
   @override
   State<ListCoursesPage> createState() => _ListCoursesPageState();
@@ -70,7 +71,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
     
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Courses'),
+      appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: 'Courses'),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(

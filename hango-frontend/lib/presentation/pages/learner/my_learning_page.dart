@@ -13,7 +13,8 @@ import '../../../domain/model/course_detail.dart';
 import '../../../utils/language_manager.dart';
 
 class MyLearningPage extends StatefulWidget {
-  const MyLearningPage({super.key});
+  final bool isEmbedded;
+  const MyLearningPage({super.key, this.isEmbedded = false});
 
   @override
   State<MyLearningPage> createState() => _MyLearningPageState();
@@ -165,7 +166,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
-          appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Learning'),
+          appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: 'Learning'),
           body: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(color: Color(0xFF28B79B)),

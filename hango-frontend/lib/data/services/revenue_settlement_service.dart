@@ -7,8 +7,9 @@ import '../../utils/config.dart';
 class RevenueSettlementService {
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('jwt_token');
+    return prefs.getString('auth_token') ?? prefs.getString('jwt_token');
   }
+
 
   // --- Trainer APIs ---
 
@@ -121,7 +122,7 @@ class RevenueSettlementService {
     return [];
   }
 
-  Future<bool> settleStatement(int statementId, {String? bankTxnRef, String? notes}) async {
+  Future<bool> settleStatement(int statementId, {String? bankTxnRef, String? notes, String? payoutReceiptUrl}) async {
     try {
       final token = await _getToken();
       final response = await http.post(
@@ -133,6 +134,7 @@ class RevenueSettlementService {
         body: jsonEncode({
           'bankTxnRef': bankTxnRef ?? '',
           'notes': notes ?? '',
+          'payoutReceiptUrl': payoutReceiptUrl ?? '',
         }),
       );
       return response.statusCode == 200;
@@ -141,4 +143,115 @@ class RevenueSettlementService {
     }
     return false;
   }
+
+  Future<List<dynamic>> getStatementPayments(int statementId) async {
+    try {
+      final token = await _getToken();
+      final response = await http.get(
+        Uri.parse('${EnvConfig.v1BaseUrl}/course-manager/statements/$statementId/items'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error getting statement payments: $e');
+    }
+    return [];
+  }
+
+
+  Future<Map<String, dynamic>?> getAllPayments({
+    int page = 0,
+    int size = 20,
+    String? status,
+    String? settlementStatus,
+    String? search,
+  }) async {
+    try {
+      final token = await _getToken();
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'size': size.toString(),
+      };
+      if (status != null && status.isNotEmpty) queryParams['status'] = status;
+      if (settlementStatus != null && settlementStatus.isNotEmpty) queryParams['settlementStatus'] = settlementStatus;
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+      final uri = Uri.parse('${EnvConfig.v1BaseUrl}/payment/manager/all').replace(queryParameters: queryParams);
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error getting all payments for manager: $e');
+    }
+    return null;
+  }
+
+  Future<List<int>?> exportStatementsExcel({String? periodMonth, String? status}) async {
+    try {
+      final token = await _getToken();
+      final queryParams = <String, String>{};
+      if (periodMonth != null && periodMonth.isNotEmpty) queryParams['periodMonth'] = periodMonth;
+      if (status != null && status.isNotEmpty) queryParams['status'] = status;
+
+      final uri = Uri.parse('${EnvConfig.v1BaseUrl}/course-manager/statements/export-excel')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final response = await http.get(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Error exporting statements excel: $e');
+    }
+    return null;
+  }
+
+  Future<List<int>?> exportPaymentsExcel({
+    String? status,
+    String? settlementStatus,
+    String? search,
+  }) async {
+    try {
+      final token = await _getToken();
+      final queryParams = <String, String>{};
+      if (status != null && status.isNotEmpty) queryParams['status'] = status;
+      if (settlementStatus != null && settlementStatus.isNotEmpty) queryParams['settlementStatus'] = settlementStatus;
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+      final uri = Uri.parse('${EnvConfig.v1BaseUrl}/payment/manager/export-excel')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final response = await http.get(
+        uri,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+    } catch (e) {
+      debugPrint('Error exporting payments excel: $e');
+    }
+    return null;
+  }
 }
+

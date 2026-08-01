@@ -47,4 +47,46 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     List<Payment> findByCourseCreatorIdAndStatus(Long creatorId, String status);
     List<Payment> findByCourseCreatorIdAndStatusAndSettlementStatus(Long creatorId, String status, String settlementStatus);
+
+    @Query(value = "SELECT p FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +
+                   "WHERE (:status IS NULL OR :status = '' OR :status = 'ALL' OR UPPER(p.status) = UPPER(:status)) " +
+                   "AND (:settlementStatus IS NULL OR :settlementStatus = '' OR :settlementStatus = 'ALL' OR UPPER(COALESCE(p.settlementStatus, 'PENDING')) = UPPER(:settlementStatus)) " +
+                   "AND (:search IS NULL OR :search = '' OR " +
+                   "     LOWER(p.txnRef) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                   "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                   "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                   "     (p.course IS NOT NULL AND LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')))) " +
+                   "ORDER BY p.createdAt DESC",
+           countQuery = "SELECT COUNT(p) FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +
+                        "WHERE (:status IS NULL OR :status = '' OR :status = 'ALL' OR UPPER(p.status) = UPPER(:status)) " +
+                        "AND (:settlementStatus IS NULL OR :settlementStatus = '' OR :settlementStatus = 'ALL' OR UPPER(COALESCE(p.settlementStatus, 'PENDING')) = UPPER(:settlementStatus)) " +
+                        "AND (:search IS NULL OR :search = '' OR " +
+                        "     LOWER(p.txnRef) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                        "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                        "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                        "     (p.course IS NOT NULL AND LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%'))))")
+    Page<Payment> findAllForManager(@Param("status") String status,
+                                     @Param("settlementStatus") String settlementStatus,
+                                     @Param("search") String search,
+                                     Pageable pageable);
+
+    @Query("SELECT p FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +
+           "WHERE (:status IS NULL OR :status = '' OR :status = 'ALL' OR UPPER(p.status) = UPPER(:status)) " +
+           "AND (:settlementStatus IS NULL OR :settlementStatus = '' OR :settlementStatus = 'ALL' OR UPPER(COALESCE(p.settlementStatus, 'PENDING')) = UPPER(:settlementStatus)) " +
+           "AND (:search IS NULL OR :search = '' OR " +
+           "     LOWER(p.txnRef) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "     (p.course IS NOT NULL AND LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')))) " +
+           "ORDER BY p.createdAt DESC")
+    List<Payment> findAllForManagerList(@Param("status") String status,
+                                         @Param("settlementStatus") String settlementStatus,
+                                         @Param("search") String search);
+
+    List<Payment> findByStatementId(Long statementId);
 }
+
+
+
+
+

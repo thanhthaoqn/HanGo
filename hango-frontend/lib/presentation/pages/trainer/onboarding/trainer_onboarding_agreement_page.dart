@@ -147,8 +147,8 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
     final isPro = widget.trainerType == 'PROFESSIONAL';
 
     final splitText = isVi
-        ? (isPro ? '70% doanh thu dành cho Giáo viên chuyên nghiệp (30% phí nền tảng HanGo)' : '60% doanh thu dành cho Gia sư đồng học (40% phí nền tảng HanGo)')
-        : (isPro ? '70% revenue share for Professional Teacher (30% HanGo platform fee)' : '60% revenue share for Peer Tutor (40% HanGo platform fee)');
+        ? (isPro ? '70% doanh thu dành cho Giáo viên (30% phí nền tảng HanGo)' : '60% doanh thu dành cho Gia sư đồng học (40% phí nền tảng HanGo)')
+        : (isPro ? '70% revenue share for Teacher (30% HanGo platform fee)' : '60% revenue share for Peer Tutor (40% HanGo platform fee)');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -209,8 +209,8 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                                   _buildTermTitle(isVi ? 'ĐIỀU 1: PHÂN CHIA DOANH THU' : 'ARTICLE 1: REVENUE SHARE'),
                                   _buildTermText(
                                     isVi
-                                        ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên chuyên nghiệp (Chia 70/30)" : "Gia sư đồng học (Chia 60/40)"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giáo viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
-                                        : 'Based on selected profile: ${isPro ? "Professional Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Revenue Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
+                                        ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên (Chia 70/30)" : "Gia sư đồng học (Chia 60/40)"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giáo viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
+                                        : 'Based on selected profile: ${isPro ? "Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Revenue Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
                                   ),
                                   const SizedBox(height: 16),
                                   _buildTermTitle(isVi ? 'ĐIỀU 2: BẢO MẬT & BẢN QUYỀN NỘI DUNG' : 'ARTICLE 2: CONTENT COPYRIGHTS'),

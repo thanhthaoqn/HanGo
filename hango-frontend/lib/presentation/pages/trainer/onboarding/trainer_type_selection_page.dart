@@ -237,7 +237,7 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
     final isPro = type == 'PROFESSIONAL';
 
     final title = isPro
-        ? (isVi ? 'Giáo viên Chuyên nghiệp' : 'Professional Trainer')
+        ? (isVi ? 'Giáo viên' : 'Teacher')
         : (isVi ? 'Gia sư / Trợ giảng' : 'Peer Tutor');
 
     final desc = isPro

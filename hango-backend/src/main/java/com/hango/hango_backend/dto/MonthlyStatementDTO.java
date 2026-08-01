@@ -31,5 +31,7 @@ public class MonthlyStatementDTO {
     private LocalDateTime paidAt;
     private String bankTxnRef;
     private String adminNotes;
+    private String payoutReceiptUrl;
     private LocalDateTime createdAt;
+
 }

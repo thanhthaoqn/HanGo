@@ -416,6 +416,129 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<com.hango.hango_backend.dto.ManagerPaymentDTO> getAllPaymentsForManager(
+            String status, String settlementStatus, String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Payment> paymentPage = paymentRepository.findAllForManager(status, settlementStatus, search, pageable);
+        return paymentPage.map(this::mapToManagerDTO);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportPaymentsToExcel(String status, String settlementStatus, String search) {
+        List<Payment> payments = paymentRepository.findAllForManagerList(status, settlementStatus, search);
+        List<com.hango.hango_backend.dto.ManagerPaymentDTO> dtos = payments.stream()
+                .map(this::mapToManagerDTO)
+                .collect(Collectors.toList());
+
+        try (org.apache.poi.ss.usermodel.Workbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("Payment Transactions");
+
+            org.apache.poi.ss.usermodel.CellStyle headerStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(org.apache.poi.ss.usermodel.IndexedColors.WHITE.getIndex());
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(org.apache.poi.ss.usermodel.IndexedColors.TEAL.getIndex());
+            headerStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+
+            String[] columns = {
+                    "STT", "Txn Ref", "Learner Name", "Learner Email", "Course Title",
+                    "Trainer Name", "Gross Amount (VND)", "Platform Fee (VND)",
+                    "Trainer Earnings (VND)", "Payment Status", "Settlement Status",
+                    "Statement ID", "Bank Code", "Paid At", "Created At"
+            };
+
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < columns.length; i++) {
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIdx = 1;
+            for (com.hango.hango_backend.dto.ManagerPaymentDTO dto : dtos) {
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(rowIdx - 1);
+                row.createCell(1).setCellValue(dto.getTxnRef() != null ? dto.getTxnRef() : "");
+                row.createCell(2).setCellValue(dto.getLearnerName() != null ? dto.getLearnerName() : "");
+                row.createCell(3).setCellValue(dto.getLearnerEmail() != null ? dto.getLearnerEmail() : "");
+                row.createCell(4).setCellValue(dto.getCourseTitle() != null ? dto.getCourseTitle() : "");
+                row.createCell(5).setCellValue(dto.getTrainerName() != null ? dto.getTrainerName() : "");
+                row.createCell(6).setCellValue(dto.getAmount() != null ? dto.getAmount().doubleValue() : 0);
+                row.createCell(7).setCellValue(dto.getPlatformFee() != null ? dto.getPlatformFee().doubleValue() : 0);
+                row.createCell(8).setCellValue(dto.getTrainerEarnings() != null ? dto.getTrainerEarnings().doubleValue() : 0);
+                row.createCell(9).setCellValue(dto.getStatus() != null ? dto.getStatus() : "");
+                row.createCell(10).setCellValue(dto.getSettlementStatus() != null ? dto.getSettlementStatus() : "");
+                row.createCell(11).setCellValue(dto.getStatementId() != null ? dto.getStatementId().toString() : "");
+                row.createCell(12).setCellValue(dto.getBankCode() != null ? dto.getBankCode() : "");
+                row.createCell(13).setCellValue(dto.getPaidAt() != null ? dto.getPaidAt().toString() : "");
+                row.createCell(14).setCellValue(dto.getCreatedAt() != null ? dto.getCreatedAt().toString() : "");
+            }
+
+            for (int i = 0; i < columns.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Error exporting payment transactions to excel", e);
+            throw new RuntimeException("Failed to export payment transactions to Excel: " + e.getMessage());
+        }
+    }
+
+    private com.hango.hango_backend.dto.ManagerPaymentDTO mapToManagerDTO(Payment p) {
+        String title = null;
+        if (p.getCourseIds() != null && !p.getCourseIds().trim().isEmpty()) {
+            String[] ids = p.getCourseIds().split(",");
+            if (ids.length > 1) {
+                title = "Cart Payment (" + ids.length + " courses)";
+            }
+        }
+        if (title == null && p.getCourse() != null) {
+            title = p.getCourse().getTitle();
+        }
+        if (title == null) {
+            title = "HanGo Course";
+        }
+
+        String trainerName = "N/A";
+        Long trainerId = null;
+        if (p.getCourse() != null && p.getCourse().getCreator() != null) {
+            trainerName = p.getCourse().getCreator().getFullName();
+            trainerId = p.getCourse().getCreator().getId();
+        }
+
+        return com.hango.hango_backend.dto.ManagerPaymentDTO.builder()
+                .id(p.getId())
+                .txnRef(p.getTxnRef())
+                .learnerId(p.getUser() != null ? p.getUser().getId() : null)
+                .learnerName(p.getUser() != null ? p.getUser().getFullName() : "N/A")
+                .learnerEmail(p.getUser() != null ? p.getUser().getEmail() : "N/A")
+                .courseId(p.getCourse() != null ? p.getCourse().getId() : null)
+                .courseTitle(title)
+                .trainerId(trainerId)
+                .trainerName(trainerName)
+                .amount(p.getAmount())
+                .platformFee(p.getPlatformFee())
+                .trainerEarnings(p.getTrainerEarnings())
+                .status(p.getStatus())
+                .settlementStatus(p.getSettlementStatus() != null ? p.getSettlementStatus() : "PENDING")
+                .statementId(p.getStatementId())
+                .bankCode(p.getBankCode())
+                .vnpayTxnNo(p.getVnpayTxnNo())
+                .paidAt(p.getPaidAt())
+                .createdAt(p.getCreatedAt())
+                .build();
+    }
+
+
     private String formatValue(Object value) {
         if (value == null) {
             return "";

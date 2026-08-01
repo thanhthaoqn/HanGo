@@ -209,7 +209,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Thanh toán qua VietQR (PayOS)',
+                          'VietQR Payment (PayOS)',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 17,
@@ -250,7 +250,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                           children: [
                             CircularProgressIndicator(color: _primary),
                             SizedBox(height: 16),
-                            Text('Đang tạo mã QR thanh toán...',
+                            Text('Generating payment QR code...',
                                 style: TextStyle(color: Color(0xFF64748B))),
                           ],
                         ),
@@ -296,7 +296,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Thử lại'),
+              child: const Text('Try Again'),
             ),
           ],
         ),
@@ -309,7 +309,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
 
     return Column(
       children: [
-        // Giá tiền
+        // Price
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
@@ -320,7 +320,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Số tiền thanh toán',
+                'Total Amount',
                 style: TextStyle(color: Color(0xFF475569), fontSize: 14),
               ),
               Text(
@@ -353,12 +353,12 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                   backgroundColor: Colors.white,
                   errorStateBuilder: (context, error) => const SizedBox(
                     height: 200,
-                    child: Center(child: Text('Không thể tạo QR')),
+                    child: Center(child: Text('Unable to generate QR code')),
                   ),
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Quét mã bằng bất kỳ ứng dụng ngân hàng nào',
+                  'Scan this QR code using any Banking App',
                   style: TextStyle(
                     color: Color(0xFF64748B),
                     fontSize: 12,
@@ -378,7 +378,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                   size: 16, color: Color(0xFF94A3B8)),
               const SizedBox(width: 6),
               Text(
-                'Hết hạn sau: $_countdownText',
+                'Expires in: $_countdownText',
                 style: TextStyle(
                   color: _secondsRemaining < 60
                       ? Colors.red
@@ -391,13 +391,13 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
           ),
           const SizedBox(height: 20),
 
-          // Nút mở trang VNPay
+          // Open PayOS checkout button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _openPaymentUrl,
               icon: const Icon(Icons.open_in_new_rounded, size: 18),
-              label: const Text('Mở trang thanh toán PayOS'),
+              label: const Text('Open PayOS Payment Page'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
                 foregroundColor: Colors.white,
@@ -412,7 +412,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
           ),
           const SizedBox(height: 12),
 
-          // Nút "Tôi đã thanh toán" - bắt đầu polling
+          // Check payment button
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -427,7 +427,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                   : const Icon(Icons.check_circle_outline_rounded,
                       size: 18),
               label: Text(
-                _isPolling ? 'Đang kiểm tra thanh toán...' : 'Tôi đã thanh toán',
+                _isPolling ? 'Verifying Payment Status...' : 'I Have Completed Payment',
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _primary,
@@ -443,7 +443,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
 
           const SizedBox(height: 12),
           const Text(
-            '🔒 Thanh toán bảo mật qua PayOS',
+            '🔒 Secure Payment via PayOS Gate',
             style: TextStyle(
               color: Color(0xFF94A3B8),
               fontSize: 11,

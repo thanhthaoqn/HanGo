@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -43,30 +44,41 @@ public class NotificationService {
         notifyRole(RECIPIENT_COURSE_MANAGER, type, title, message, course);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Throwable.class)
     public void notifyRole(String role, String type, String title, String message, Course course) {
-        Notification notification = Notification.builder()
-                .recipientRole(role)
-                .type(type)
-                .title(title)
-                .message(message)
-                .course(course)
-                .build();
-        notificationRepository.save(notification);
+        try {
+            Notification notification = Notification.builder()
+                    .recipientRole(role)
+                    .type(type)
+                    .title(title)
+                    .message(message)
+                    .course(course)
+                    .build();
+            notificationRepository.saveAndFlush(notification);
+        } catch (Throwable e) {
+            System.err.println("[NotificationService] notifyRole failed: " + e.getMessage());
+        }
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Throwable.class)
     public void notifyUser(User user, String type, String title, String message, Course course) {
         if (user == null) {
             return;
         }
-        Notification notification = Notification.builder()
-                .user(user)
-                .type(type)
-                .title(title)
-                .message(message)
-                .course(course)
-                .build();
-        notificationRepository.save(notification);
+        try {
+            Notification notification = Notification.builder()
+                    .user(user)
+                    .type(type)
+                    .title(title)
+                    .message(message)
+                    .course(course)
+                    .build();
+            notificationRepository.saveAndFlush(notification);
+        } catch (Throwable e) {
+            System.err.println("[NotificationService] notifyUser failed: " + e.getMessage());
+        }
     }
+
 
     @Transactional(readOnly = true)
     public Page<NotificationDTO> getNotificationsForUser(Long userId, Collection<String> roles, int page, int size) {

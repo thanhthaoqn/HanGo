@@ -74,24 +74,37 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     final avatarUrl = widget.initialProfile['avatarUrl'] ?? _trainerAvatarUrl;
 
     List<Map<String, String>> certList = [];
-    if (widget.initialProfile['certificates'] != null && widget.initialProfile['certificates'] is List) {
-      certList = (widget.initialProfile['certificates'] as List).map((c) => Map<String, String>.from(c as Map)).toList();
+    final rawCerts = widget.initialProfile['certificates'];
+    if (rawCerts != null && rawCerts is List && rawCerts.isNotEmpty) {
+      certList = (rawCerts as List).map((c) => Map<String, String>.from(c as Map)).toList();
     } else {
-      if (degree != null && degree.toString().isNotEmpty) certList.add({'name': isVi ? 'Bằng cấp / Chứng chỉ' : 'Degree / Qualification', 'url': degree.toString()});
-      if (ielts != null && ielts.toString().isNotEmpty) certList.add({'name': isVi ? 'Chứng chỉ Tiếng Anh' : 'Language Proficiency', 'url': ielts.toString()});
+      Set<String> addedUrls = {};
+      if (degree != null && degree.toString().isNotEmpty) {
+        final dUrl = degree.toString();
+        certList.add({'name': isVi ? 'Bằng cấp / Chứng chỉ' : 'Degree / Qualification', 'url': dUrl});
+        addedUrls.add(dUrl);
+      }
+      if (ielts != null && ielts.toString().isNotEmpty) {
+        final iUrl = ielts.toString();
+        if (!addedUrls.contains(iUrl)) {
+          certList.add({'name': isVi ? 'Chứng chỉ Tiếng Anh' : 'Language Proficiency', 'url': iUrl});
+          addedUrls.add(iUrl);
+        }
+      }
       if (score != null && score.toString().isNotEmpty) {
-        if (score.toString().startsWith('[')) {
+        final sStr = score.toString();
+        if (sStr.startsWith('[')) {
           try {
-            final List parsed = jsonDecode(score.toString());
+            final List parsed = jsonDecode(sStr);
             certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
-          } catch (_) {
-            certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': score.toString()});
-          }
-        } else {
-          certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': score.toString()});
+          } catch (_) {}
+        } else if (!addedUrls.contains(sStr)) {
+          certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': sStr});
+          addedUrls.add(sStr);
         }
       }
     }
+
 
     showDialog(
       context: context,
@@ -145,7 +158,7 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                             const SizedBox(height: 4),
                             Text(
                               type == 'PROFESSIONAL'
-                                  ? (isVi ? 'Giáo viên Chuyên nghiệp' : 'Professional')
+                                  ? (isVi ? 'Giáo viên' : 'Teacher')
                                   : (isVi ? 'Gia sư / Trợ giảng' : 'Peer Tutor'),
                               style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                             ),
@@ -368,8 +381,9 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                               ),
                               const SizedBox(height: 24),
 
-                              // If rejected, show admin feedback
-                              if (status == 'PENDING_VERIFICATION' && adminNotes != null && adminNotes.toString().isNotEmpty) ...[
+                              // If rejected/revision needed, show admin feedback
+                              if (adminNotes != null && adminNotes.toString().isNotEmpty) ...[
+
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(16),

@@ -140,10 +140,11 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
     final trainerType = _summaryData?['trainerType'] ?? 'PROFESSIONAL';
     final typeLabel = trainerType == 'PEER_TUTOR'
         ? (isVi ? 'Gia sư đồng học (Chia 60/40)' : 'Peer Tutor (60/40 Split)')
-        : (isVi ? 'Giáo viên chuyên nghiệp (Chia 70/30)' : 'Professional Teacher (70/30 Split)');
+        : (isVi ? 'Giáo viên (Chia 70/30)' : 'Teacher (70/30 Split)');
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,25 +165,177 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
             ),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE6F4F1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.stars_rounded, color: Color(0xFF28B79B), size: 18),
-              const SizedBox(width: 8),
-              Text(
-                typeLabel,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF15803D),
-                  fontSize: 13,
-                  fontFamily: 'Outfit',
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => _showSalaryCalculationModal(context, isVi),
+              icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF28B79B), size: 18),
+              label: Text(
+                isVi ? 'Công thức tính lương' : 'Salary Breakdown',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF28B79B)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6F4F1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF28B79B).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.stars_rounded, color: Color(0xFF28B79B), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    typeLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF15803D),
+                      fontSize: 13,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showSalaryCalculationModal(BuildContext context, bool isVi) {
+    final trainerType = _summaryData?['trainerType'] ?? 'PROFESSIONAL';
+    final isTeacher = trainerType == 'PROFESSIONAL';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 600),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F4F1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.calculate_rounded, color: Color(0xFF28B79B), size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Text(
+                          isVi ? 'Chính sách & Công thức tính lương' : 'Salary & Revenue Policy',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 16),
+                const Divider(color: Color(0xFFE2E8F0)),
+                const SizedBox(height: 16),
+                _buildPolicyRow(
+                  icon: Icons.pie_chart_outline_rounded,
+                  title: isVi ? '1. Tỷ lệ phân chia doanh thu' : '1. Revenue Split Ratio',
+                  content: isTeacher
+                      ? (isVi
+                          ? '• Loại tài khoản: Giáo viên (Teacher).\n• Tỷ lệ: 70% thuộc về Giáo viên, 30% phí nền tảng HanGo.'
+                          : '• Account Type: Teacher.\n• Ratio: 70% Trainer Share / 30% HanGo Platform Fee.')
+                      : (isVi
+                          ? '• Loại tài khoản: Gia sư / Sinh viên (Peer Tutor).\n• Tỷ lệ: 60% thuộc về Gia sư, 40% phí nền tảng HanGo.'
+                          : '• Account Type: Peer Tutor.\n• Ratio: 60% Trainer Share / 40% HanGo Platform Fee.'),
+                ),
+                const SizedBox(height: 16),
+                _buildPolicyRow(
+                  icon: Icons.account_balance_outlined,
+                  title: isVi ? '2. Thuế thu nhập cá nhân (10% PIT Tax)' : '2. Personal Income Tax (10% PIT)',
+                  content: isVi
+                      ? '• Khấu trừ 10% Thuế TNCN tại nguồn theo quy định pháp luật (Thông tư 111/2013/TT-BTC).\n• Công thức: Thu nhập thực nhận = Doanh thu thô x (1 - 10%).'
+                      : '• Mandatory 10% Personal Income Tax deducted at source per VN Tax Laws.\n• Formula: Net Payout = Gross Earnings x 90%.',
+                ),
+                const SizedBox(height: 16),
+                _buildPolicyRow(
+                  icon: Icons.hourglass_top_rounded,
+                  title: isVi ? '3. Thời gian giữ tiền bảo hành 7 ngày' : '3. 7-Day Pending Hold Warranty',
+                  content: isVi
+                      ? '• Doanh thu khóa học mới mua sẽ giữ ở trạng thái Tạm giữ trong 7 ngày để phục vụ chính sách hoàn tiền cho học viên.\n• Sau 7 ngày, tiền tự động chuyển sang Số dư khả dụng.'
+                      : '• Course sales are held in Pending Hold for 7 days to cover student refund warranties.\n• After 7 days, funds automatically transfer to Available Balance.',
+                ),
+                const SizedBox(height: 16),
+                _buildPolicyRow(
+                  icon: Icons.calendar_month_rounded,
+                  title: isVi ? '4. Chốt sổ & Thanh toán hàng tháng' : '4. Monthly Cutoff & Settlement',
+                  content: isVi
+                      ? '• Quản lý đào tạo thực hiện chốt sổ báo cáo doanh thu hàng tháng.\n• Tiền được chuyển khoản thẳng vào tài khoản ngân hàng đã liên kết của Trainer.'
+                      : '• Monthly statements are cut off at the end of each billing cycle.\n• Net earnings are wired directly to your registered bank account upon confirmation.',
+                ),
+                const SizedBox(height: 24),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28B79B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(isVi ? 'Đã hiểu' : 'Got it'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPolicyRow({required IconData icon, required String title, required String content}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFF28B79B), size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                content,
+                style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.5, fontFamily: 'Outfit'),
               ),
             ],
           ),

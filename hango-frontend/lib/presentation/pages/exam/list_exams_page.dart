@@ -10,7 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../learner/learner_home_page.dart';
 
 class ListExamsPage extends StatefulWidget {
-  const ListExamsPage({Key? key}) : super(key: key);
+  final bool isEmbedded;
+  const ListExamsPage({Key? key, this.isEmbedded = false}) : super(key: key);
 
   @override
   State<ListExamsPage> createState() => _ListExamsPageState();
@@ -61,7 +62,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
+      appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(

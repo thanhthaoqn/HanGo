@@ -110,6 +110,7 @@ class TrainerSidebar extends StatelessWidget {
           _buildItem(context, 3, Icons.question_answer_outlined, 'Question Bank'),
           _buildItem(context, 4, Icons.account_balance_wallet_outlined, 'Revenue'),
           _buildItem(context, 5, Icons.person_outline, 'My Profile'),
+          _buildItem(context, 6, Icons.confirmation_number_outlined, 'Support & Tickets'),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),

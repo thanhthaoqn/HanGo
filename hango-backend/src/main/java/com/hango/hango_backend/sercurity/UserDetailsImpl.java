@@ -34,7 +34,15 @@ public class UserDetailsImpl implements UserDetails {
 
     public static UserDetailsImpl build(User user) {
         List<GrantedAuthority> authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getRoleName()))
+                .flatMap(role -> {
+                    String r = role.getRoleName() != null ? role.getRoleName().trim() : "";
+                    String cleanRole = r.startsWith("ROLE_") ? r.substring(5) : r;
+                    return java.util.stream.Stream.of(
+                            new SimpleGrantedAuthority(cleanRole),
+                            new SimpleGrantedAuthority("ROLE_" + cleanRole)
+                    );
+                })
+                .distinct()
                 .collect(Collectors.toList());
 
         return new UserDetailsImpl(
@@ -44,6 +52,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getPasswordHash(),
                 authorities);
     }
+
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -1,7 +1,9 @@
 package com.hango.hango_backend.service;
 
+import com.hango.hango_backend.dto.ManagerPaymentDTO;
 import com.hango.hango_backend.dto.MonthlyStatementDTO;
 import com.hango.hango_backend.dto.TrainerRevenueSummaryDTO;
+
 import com.hango.hango_backend.entity.MonthlyStatement;
 import com.hango.hango_backend.entity.Payment;
 import com.hango.hango_backend.entity.TrainerProfile;
@@ -235,6 +237,12 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
     @Override
     @Transactional
     public MonthlyStatementDTO settleStatement(Long statementId, String bankTxnRef, String notes) {
+        return settleStatement(statementId, bankTxnRef, notes, null);
+    }
+
+    @Override
+    @Transactional
+    public MonthlyStatementDTO settleStatement(Long statementId, String bankTxnRef, String notes, String payoutReceiptUrl) {
         MonthlyStatement statement = statementRepository.findById(statementId)
                 .orElseThrow(() -> new RuntimeException("Statement not found with ID: " + statementId));
 
@@ -243,6 +251,9 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
         statement.setBankTxnRef(bankTxnRef);
         if (notes != null && !notes.trim().isEmpty()) {
             statement.setAdminNotes(notes);
+        }
+        if (payoutReceiptUrl != null && !payoutReceiptUrl.trim().isEmpty()) {
+            statement.setPayoutReceiptUrl(payoutReceiptUrl);
         }
 
         MonthlyStatement saved = statementRepository.save(statement);
@@ -259,13 +270,119 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 );
             }
         } catch (Exception e) {
-            log.warn("Could not send email for statement settlement: {}", e.getMessage());
+            log.warn("Could not send settlement paid email: {}", e.getMessage());
         }
 
         return mapToDTO(saved);
     }
 
+    @Override
+    public List<ManagerPaymentDTO> getStatementPayments(Long statementId) {
+        List<Payment> payments = paymentRepository.findByStatementId(statementId);
+        return payments.stream().map(p -> {
+            String uName = p.getUser() != null ? p.getUser().getFullName() : "N/A";
+            String uEmail = p.getUser() != null ? p.getUser().getEmail() : "N/A";
+            String cTitle = p.getCourse() != null ? p.getCourse().getTitle() : "N/A";
+            String tName = (p.getCourse() != null && p.getCourse().getCreator() != null)
+                    ? p.getCourse().getCreator().getFullName() : "N/A";
+            Long tId = (p.getCourse() != null && p.getCourse().getCreator() != null)
+                    ? p.getCourse().getCreator().getId() : null;
+
+            return ManagerPaymentDTO.builder()
+                    .id(p.getId())
+                    .txnRef(p.getTxnRef())
+                    .learnerId(p.getUser() != null ? p.getUser().getId() : null)
+                    .learnerName(uName)
+                    .learnerEmail(uEmail)
+                    .courseId(p.getCourse() != null ? p.getCourse().getId() : null)
+                    .courseTitle(cTitle)
+                    .trainerId(tId)
+                    .trainerName(tName)
+                    .amount(p.getAmount())
+                    .platformFee(p.getPlatformFee())
+                    .trainerEarnings(p.getTrainerEarnings())
+                    .bankCode(p.getBankCode())
+                    .vnpayTxnNo(p.getVnpayTxnNo())
+                    .status(p.getStatus())
+                    .settlementStatus(p.getSettlementStatus())
+                    .statementId(p.getStatementId())
+                    .paidAt(p.getPaidAt())
+                    .createdAt(p.getCreatedAt())
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportStatementsToExcel(String periodMonth, String status) {
+        List<MonthlyStatementDTO> list = getCourseManagerStatements(periodMonth, status);
+
+        try (org.apache.poi.ss.usermodel.Workbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("Monthly Statements");
+
+            org.apache.poi.ss.usermodel.CellStyle headerStyle = workbook.createCellStyle();
+            org.apache.poi.ss.usermodel.Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(org.apache.poi.ss.usermodel.IndexedColors.WHITE.getIndex());
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(org.apache.poi.ss.usermodel.IndexedColors.TEAL.getIndex());
+            headerStyle.setFillPattern(org.apache.poi.ss.usermodel.FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+
+            String[] columns = {
+                    "STT", "Code", "Period", "Trainer Name", "Trainer Email", "Trainer Type",
+                    "Bank Name", "Bank Account", "Account Name", "Total Orders",
+                    "Gross Amount (VND)", "Platform Fee (VND)", "Trainer Gross (VND)",
+                    "PIT Tax 10% (VND)", "Net Payout (VND)", "Status", "Paid At", "Bank Txn Ref"
+            };
+
+            org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < columns.length; i++) {
+                org.apache.poi.ss.usermodel.Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIdx = 1;
+            for (MonthlyStatementDTO dto : list) {
+                org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(rowIdx - 1);
+                row.createCell(1).setCellValue(dto.getStatementCode() != null ? dto.getStatementCode() : "");
+                row.createCell(2).setCellValue(dto.getPeriodMonth() != null ? dto.getPeriodMonth() : "");
+                row.createCell(3).setCellValue(dto.getTrainerName() != null ? dto.getTrainerName() : "");
+                row.createCell(4).setCellValue(dto.getTrainerEmail() != null ? dto.getTrainerEmail() : "");
+                row.createCell(5).setCellValue(dto.getTrainerType() != null ? dto.getTrainerType() : "");
+                row.createCell(6).setCellValue(dto.getBankName() != null ? dto.getBankName() : "");
+                row.createCell(7).setCellValue(dto.getBankAccount() != null ? dto.getBankAccount() : "");
+                row.createCell(8).setCellValue(dto.getBankAccountName() != null ? dto.getBankAccountName() : "");
+                row.createCell(9).setCellValue(dto.getTotalOrders() != null ? dto.getTotalOrders() : 0);
+                row.createCell(10).setCellValue(dto.getTotalGrossAmount() != null ? dto.getTotalGrossAmount().doubleValue() : 0);
+                row.createCell(11).setCellValue(dto.getTotalPlatformFee() != null ? dto.getTotalPlatformFee().doubleValue() : 0);
+                row.createCell(12).setCellValue(dto.getTotalTrainerGross() != null ? dto.getTotalTrainerGross().doubleValue() : 0);
+                row.createCell(13).setCellValue(dto.getPitTaxAmount() != null ? dto.getPitTaxAmount().doubleValue() : 0);
+                row.createCell(14).setCellValue(dto.getNetPayoutAmount() != null ? dto.getNetPayoutAmount().doubleValue() : 0);
+                row.createCell(15).setCellValue(dto.getStatus() != null ? dto.getStatus() : "");
+                row.createCell(16).setCellValue(dto.getPaidAt() != null ? dto.getPaidAt().toString() : "");
+                row.createCell(17).setCellValue(dto.getBankTxnRef() != null ? dto.getBankTxnRef() : "");
+            }
+
+            for (int i = 0; i < columns.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Error exporting monthly statements to excel", e);
+            throw new RuntimeException("Failed to export statements to Excel: " + e.getMessage());
+        }
+    }
+
     private MonthlyStatementDTO mapToDTO(MonthlyStatement s) {
+
         TrainerProfile profile = trainerProfileRepository.findById(s.getTrainer().getId()).orElse(null);
         String tType = profile != null && profile.getTrainerType() != null ? profile.getTrainerType() : "PROFESSIONAL";
 
@@ -291,7 +408,9 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 .paidAt(s.getPaidAt())
                 .bankTxnRef(s.getBankTxnRef())
                 .adminNotes(s.getAdminNotes())
+                .payoutReceiptUrl(s.getPayoutReceiptUrl())
                 .createdAt(s.getCreatedAt())
                 .build();
+
     }
 }

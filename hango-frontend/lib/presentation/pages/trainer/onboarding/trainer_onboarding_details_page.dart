@@ -175,9 +175,10 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
   Map<String, dynamic> _buildPayload() {
     final degree = _certificates.isNotEmpty ? _certificates.first['url'] ?? '' : '';
     final ielts = _certificates.length > 1 ? _certificates[1]['url'] ?? '' : '';
-    final score = _certificates.length > 2 ? jsonEncode(_certificates) : (_certificates.isNotEmpty ? _certificates.last['url'] ?? '' : '');
+    final score = _certificates.length > 2 ? jsonEncode(_certificates) : '';
 
     return {
+
       'trainerType': widget.initialProfile['trainerType'] ?? 'PROFESSIONAL',
       'bio': _bioController.text.trim(),
       'phoneNumber': _phoneNumberController.text.trim(),
@@ -251,7 +252,7 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
         });
         _triggerAutoSave();
         if (mounted) {
-          ToastHelper.showSuccess(context, 'Tải lên avatar thành công!');
+          ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Tải lên avatar thành công!' : 'Avatar uploaded successfully!');
         }
       }
     } catch (e) {
@@ -410,18 +411,92 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
     );
   }
 
-  Widget _buildUnifiedUploadBox(bool isVi) {
+  Widget _buildCertificateRequirementsNoteCard(bool isVi) {
+    final trainerType = widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
+    final isTeacher = trainerType == 'PROFESSIONAL';
+
+    final title = isTeacher
+        ? (isVi ? 'Hồ sơ minh chứng yêu cầu đối với Giáo viên:' : 'Required Document Credentials for Teachers:')
+        : (isVi ? 'Hồ sơ minh chứng yêu cầu đối với Gia sư / Sinh viên:' : 'Required Document Credentials for Peer Tutors / Students:');
+
+    final bulletPoints = isTeacher
+        ? [
+            isVi ? 'Bằng cử nhân sư phạm tiếng Anh hoặc chứng chỉ bồi dưỡng nghiệp vụ sư phạm' : 'Degree in English Pedagogy or Teaching Certification',
+            isVi ? 'Chứng chỉ tiếng Anh quốc tế (IELTS / TOEFL / TOEIC / Cambridge...)' : 'International English Certificate (IELTS / TOEFL / TOEIC / Cambridge)',
+            isVi ? 'Các văn bằng, chứng chỉ giảng dạy liên quan khác (nếu có)' : 'Other related teaching credentials & diplomas (optional)',
+          ]
+        : [
+            isVi ? 'Bảng điểm 3 năm Cấp 3 (THPT) hoặc Học bạ THPT' : 'High school transcripts (Grades 10, 11, 12 / 3 years)',
+            isVi ? 'Chứng chỉ tiếng Anh quốc tế (IELTS / TOEFL...)' : 'International English Certificate (IELTS / TOEFL / Cambridge)',
+            isVi ? 'Chứng chỉ liên quan đến phương pháp & giảng dạy tiếng Anh' : 'Certificates related to English teaching methodology',
+            isVi ? 'Bằng khen / Giải thưởng HSG Tiếng Anh cấp Tỉnh, Thành phố (nếu có)' : 'Provincial / City-level English Competition awards (optional)',
+          ];
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: const Color(0xFFEFF6FF),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFCBD5E1)),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              const Icon(Icons.verified_user_outlined, color: Color(0xFF2563EB), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: Color(0xFF1E40AF),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...bulletPoints.map((item) => Padding(
+                padding: const EdgeInsets.only(left: 28, bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('• ', style: TextStyle(color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF1E3A8A), fontFamily: 'Outfit'),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnifiedUploadBox(bool isVi) {
+    return Column(
+      children: [
+        _buildCertificateRequirementsNoteCard(isVi),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -536,7 +611,9 @@ class _TrainerOnboardingDetailsPageState extends State<TrainerOnboardingDetailsP
           ),
         ],
       ),
-    );
+    ),
+  ],
+);
   }
 
   bool _validateFields() {
