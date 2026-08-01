@@ -26,4 +26,10 @@ public class Permission {
 
     @Column(name = "module", length = 50)
     private String module; // e.g., "Course Management", "System"
+
+    @Column(name = "core_for_roles")
+    private String coreForRoles; // e.g. "LEARNER"
+
+    @Column(name = "restricted_for_roles")
+    private String restrictedForRoles; // e.g. "TRAINER,COURSE_MANAGER"
 }

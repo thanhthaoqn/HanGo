@@ -456,6 +456,8 @@ public class AdminController {
                             .name(p.getName())
                             .description(p.getDescription())
                             .module(p.getModule())
+                            .coreForRoles(p.getCoreForRoles())
+                            .restrictedForRoles(p.getRestrictedForRoles())
                             .build())
                     .toList();
             return ResponseEntity.ok(response);
@@ -478,6 +480,8 @@ public class AdminController {
                                     .name(p.getName())
                                     .description(p.getDescription())
                                     .module(p.getModule())
+                                    .coreForRoles(p.getCoreForRoles())
+                                    .restrictedForRoles(p.getRestrictedForRoles())
                                     .build())
                             .toList();
                 }
@@ -508,9 +512,24 @@ public class AdminController {
             if (request.getPermissionCodes() != null) {
                 for (String code : request.getPermissionCodes()) {
                     Optional<Permission> pOpt = permissionRepository.findByCode(code);
-                    pOpt.ifPresent(newPermissions::add);
+                    pOpt.ifPresent(p -> {
+                        String restricted = p.getRestrictedForRoles();
+                        if (restricted == null || !restricted.contains(role.getRoleName())) {
+                            newPermissions.add(p);
+                        }
+                    });
                 }
             }
+            
+            // Enforce Core permissions (must have)
+            List<Permission> allPermissions = permissionRepository.findAll();
+            for (Permission p : allPermissions) {
+                String core = p.getCoreForRoles();
+                if (core != null && core.contains(role.getRoleName())) {
+                    newPermissions.add(p);
+                }
+            }
+
             role.setPermissions(newPermissions);
             roleRepository.save(role);
 

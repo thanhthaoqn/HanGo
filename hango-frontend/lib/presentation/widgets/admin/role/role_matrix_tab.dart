@@ -256,14 +256,46 @@ class _RoleMatrixTabState extends State<RoleMatrixTab> {
                                         ],
                                       ),
                                     ),
-                                    ...roles.map((r) => SizedBox(
-                                          width: 140,
-                                          child: Center(
-                                            child: _hasPermission(r, perm['code'])
-                                                ? const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 22)
-                                                : const Icon(Icons.cancel, color: Color(0xFFD1D5DB), size: 22),
+                                    ...roles.map((r) {
+                                      final roleName = r as String;
+                                      final coreRoles = perm['coreForRoles'] as String? ?? '';
+                                      final restrictedRoles = perm['restrictedForRoles'] as String? ?? '';
+                                      
+                                      final isCore = coreRoles.contains(roleName);
+                                      final isRestricted = restrictedRoles.contains(roleName);
+                                      
+                                      Widget icon;
+                                      if (isCore) {
+                                        icon = const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 22);
+                                      } else if (isRestricted) {
+                                        icon = const Icon(Icons.remove, color: Color(0xFFD1D5DB), size: 22);
+                                      } else if (_hasPermission(r, perm['code'])) {
+                                        icon = const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 22);
+                                      } else {
+                                        icon = const Icon(Icons.cancel, color: Color(0xFFD1D5DB), size: 22);
+                                      }
+
+                                      return SizedBox(
+                                        width: 140,
+                                        child: Center(
+                                          child: Opacity(
+                                            opacity: (isCore || isRestricted) ? 0.5 : 1.0,
+                                            child: Stack(
+                                              alignment: Alignment.center,
+                                              children: [
+                                                icon,
+                                                if (isCore || isRestricted)
+                                                  Positioned(
+                                                    right: -8,
+                                                    top: -8,
+                                                    child: Icon(Icons.lock, size: 12, color: Colors.grey.shade600),
+                                                  )
+                                              ],
+                                            ),
                                           ),
-                                        )),
+                                        ),
+                                      );
+                                    }),
                                   ],
                                 ),
                               ),

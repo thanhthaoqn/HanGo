@@ -136,32 +136,59 @@ class _RoleDetailDrawerState extends State<RoleDetailDrawer> {
                           child: Column(
                             children: perms.map((perm) {
                               final code = perm['code'] as String;
-                              final isSelected = _selectedPermissions.contains(code);
+                              
+                              final coreRoles = perm['coreForRoles'] as String? ?? '';
+                              final restrictedRoles = perm['restrictedForRoles'] as String? ?? '';
+                              
+                              final isCore = coreRoles.contains(widget.roleName);
+                              final isRestricted = restrictedRoles.contains(widget.roleName);
+                              
+                              if (isRestricted) {
+                                return const SizedBox.shrink(); // Hide restricted permissions completely
+                              }
+                              
+                              final isSelected = _selectedPermissions.contains(code) || isCore;
+
                               return CheckboxListTile(
                                 value: isSelected,
+                                onChanged: isCore ? null : (bool? value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      _selectedPermissions.add(code);
+                                    } else {
+                                      _selectedPermissions.remove(code);
+                                    }
+                                  });
+                                },
                                 activeColor: const Color(0xFF28B79B),
-                                title: Text(
-                                  perm['name'] ?? code,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF1F2937),
-                                  ),
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        perm['name'] ?? code,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 14,
+                                          color: isCore ? Colors.grey : const Color(0xFF1E293B),
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                    ),
+                                    if (isCore)
+                                      const Icon(Icons.lock, size: 16, color: Colors.grey),
+                                  ],
                                 ),
                                 subtitle: Text(
                                   perm['description'] ?? '',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: Color(0xFF6B7280),
+                                    color: isCore ? Colors.grey.shade400 : const Color(0xFF64748B),
+                                    fontFamily: 'Outfit',
                                   ),
                                 ),
-                                onChanged: (val) {
-                                  if (val == true) {
-                                    setState(() => _selectedPermissions.add(code));
-                                  } else {
-                                    setState(() => _selectedPermissions.remove(code));
-                                  }
-                                },
+                                controlAffinity: ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
                               );
                             }).toList(),
                           ),
