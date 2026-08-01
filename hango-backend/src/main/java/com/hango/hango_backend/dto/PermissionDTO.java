@@ -11,4 +11,6 @@ public class PermissionDTO {
     private String name;
     private String description;
     private String module;
+    private String coreForRoles;
+    private String restrictedForRoles;
 }
