@@ -6,7 +6,10 @@ import '../../../../utils/toast_helper.dart';
 import '../../../../utils/config.dart';
 import '../../../widgets/trainer/trainer_sidebar.dart';
 import '../../../../services/hango_api.dart';
-import 'models/trainer_question.dart';
+import 'models/course_manager_question.dart';
+import '../../../widgets/course_manager_sidebar.dart';
+import '../../../widgets/shared_header.dart';
+import '../../../../data/repositories/trainer_ai_recommendation_repository.dart';
 
 class OptionState {
   int? id;
@@ -35,23 +38,27 @@ class QuestionState {
   }
 }
 
-class TrainerCreateQuestionPage extends StatefulWidget {
-  final TrainerQuestion? question;
+class CourseManagerCreateQuestionPage extends StatefulWidget {
+  final CourseManagerQuestion? question;
   final bool isReadOnly;
   final bool isEdit;
+  final bool isCourseManager;
+  final Map<String, dynamic>? initialData;
 
-  const TrainerCreateQuestionPage({
+  const CourseManagerCreateQuestionPage({
     Key? key,
     this.question,
     this.isReadOnly = false,
     this.isEdit = false,
+    this.isCourseManager = false,
+    this.initialData,
   }) : super(key: key);
 
   @override
-  State<TrainerCreateQuestionPage> createState() => _TrainerCreateQuestionPageState();
+  State<CourseManagerCreateQuestionPage> createState() => _CourseManagerCreateQuestionPageState();
 }
 
-class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
+class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQuestionPage> {
   final _authService = AuthService();
   String _trainerName = 'Trainer';
   String _trainerInitials = 'T';
@@ -60,6 +67,12 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
   bool _isQuestionGroup = true;
   bool _isLoadingMetadata = true;
   bool _isSaving = false;
+  bool _isGeneratingByAi = false;
+  int _aiQuantity = 2;
+  int? _globalSkillId;
+  int? _globalDifficultyId;
+
+  final TrainerAiQuestionRepository _aiRepo = TrainerAiQuestionRepository();
 
   List<Map<String, dynamic>> _skills = [];
   List<Map<String, dynamic>> _groupTypes = [];
@@ -110,10 +123,12 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       final groupTypes = await api.getSystemParameters('GROUP_TYPE');
 
       Map<String, dynamic>? detail;
-      if (widget.question != null) {
+      if (widget.initialData != null) {
+        detail = widget.initialData;
+      } else if (widget.question != null) {
         final q = widget.question!;
         try {
-          detail = await api.getTrainerQuestionDetail(q.id, isGroup: q.isGroup);
+          detail = await api.getCourseManagerQuestionDetail(q.id, isGroup: q.isGroup);
         } catch (e) {
           print("Error loading detail: $e");
         }
@@ -124,26 +139,28 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
         _difficulties = difficulties;
         _groupTypes = groupTypes;
 
-        if (_skills.isNotEmpty) {
-          for (var q in _questions) {
-            q.selectedSkillId = _skills.first['id'] as int;
-          }
-        }
-        if (_difficulties.isNotEmpty) {
-          for (var q in _questions) {
-            q.selectedDifficultyId = _difficulties.first['id'] as int;
-          }
-        }
-        if (_groupTypes.isNotEmpty) _selectedGroupTypeId = _groupTypes.first['id'] as int;
-
-        if (widget.question != null) {
-          final q = widget.question!;
-          _isQuestionGroup = q.isGroup;
+        if (widget.initialData != null || widget.question != null) {
+          final isGroup = widget.initialData != null 
+              ? (widget.initialData!['isGroup'] as bool? ?? false) 
+              : widget.question!.isGroup;
+          _isQuestionGroup = isGroup;
           
           if (detail != null) {
-            _selectedGroupTypeId = detail['categoryId'] as int?;
+            if (widget.initialData != null) {
+              // Resolve names to IDs for Excel Import
+              String gName = detail['groupTypeName'] ?? '';
+              if (gName.isNotEmpty) {
+                var match = _groupTypes.firstWhere(
+                  (t) => t['paramValue'].toString().toLowerCase() == gName.toLowerCase(),
+                  orElse: () => <String, dynamic>{},
+                );
+                _selectedGroupTypeId = match['id'] as int?;
+              }
+            } else {
+              _selectedGroupTypeId = detail['categoryId'] as int?;
+            }
             
-            if (q.isGroup) {
+            if (isGroup) {
               _passageController.text = detail['passageText'] ?? '';
             }
 
@@ -154,8 +171,28 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
               qs.id = subQ['id'] as int?;
               qs.questionTextController.text = subQ['questionText'] ?? '';
               qs.explanationController.text = subQ['explanation'] ?? '';
-              qs.selectedSkillId = subQ['skillParamId'] as int? ?? (_skills.isNotEmpty ? _skills.first['id'] : null);
-              qs.selectedDifficultyId = subQ['difficultyId'] as int? ?? (_difficulties.isNotEmpty ? _difficulties.first['id'] : null);
+              if (widget.initialData != null) {
+                // Resolve names to IDs for Excel Import
+                String sName = subQ['skillName'] ?? '';
+                if (sName.isNotEmpty) {
+                  var match = _skills.firstWhere(
+                    (t) => t['paramValue'].toString().toLowerCase() == sName.toLowerCase(),
+                    orElse: () => <String, dynamic>{},
+                  );
+                  qs.selectedSkillId = match['id'] as int?;
+                }
+                String dName = subQ['diffName'] ?? '';
+                if (dName.isNotEmpty) {
+                  var match = _difficulties.firstWhere(
+                    (t) => t['paramValue'].toString().toLowerCase() == dName.toLowerCase(),
+                    orElse: () => <String, dynamic>{},
+                  );
+                  qs.selectedDifficultyId = match['id'] as int?;
+                }
+              } else {
+                qs.selectedSkillId = subQ['skillParamId'] as int?;
+                qs.selectedDifficultyId = subQ['difficultyId'] as int?;
+              }
               
               final optsList = subQ['options'] as List? ?? [];
               qs.options = [];
@@ -197,19 +234,144 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
     }
   }
 
+  Future<void> _handleGenerateByAI() async {
+    setState(() {
+      _isGeneratingByAi = true;
+    });
+
+    try {
+      final String mode = _isQuestionGroup ? 'MULTIPLE' : 'SINGLE';
+      
+      String? groupTypeName;
+      if (_isQuestionGroup && _selectedGroupTypeId != null) {
+        final match = _groupTypes.firstWhere(
+          (t) => t['id'] == _selectedGroupTypeId,
+          orElse: () => <String, dynamic>{},
+        );
+        groupTypeName = match['paramValue']?.toString();
+      }
+      
+      String? skillTypeName;
+      if (_globalSkillId != null) {
+        final match = _skills.firstWhere(
+          (t) => t['id'] == _globalSkillId,
+          orElse: () => <String, dynamic>{},
+        );
+        skillTypeName = match['paramValue']?.toString();
+      }
+
+      final resp = await _aiRepo.generate(
+        mode: mode,
+        sectionId: 1, // Dummy sectionId required by backend DTO
+        topicSeed: skillTypeName ?? 'English test questions', // Dummy topic if no topic input
+        quantity: _isQuestionGroup ? _aiQuantity : 1,
+        difficultyId: _globalDifficultyId,
+        categoryId: _selectedGroupTypeId,
+        skillType: skillTypeName,
+        groupType: groupTypeName,
+      );
+
+      if (_isQuestionGroup && resp.group != null) {
+        if (resp.group!.passageText.isNotEmpty) {
+          _passageController.text = resp.group!.passageText;
+        }
+        
+        final generatedSubs = resp.group!.subQuestions;
+        if (generatedSubs.isEmpty) {
+          ToastHelper.showError(context, 'AI did not return any sub-questions.');
+          return;
+        }
+
+        _questions.clear();
+        for (final q in generatedSubs) {
+          final opts = <Map<String, dynamic>>[];
+          for (final o in q.options) {
+            opts.add({
+              'optionText': o.optionText,
+              'isCorrect': o.isCorrect,
+            });
+          }
+          
+          final qs = QuestionState();
+          qs.questionTextController.text = q.questionText;
+          qs.explanationController.text = q.explanation;
+          qs.selectedSkillId = _globalSkillId;
+          qs.selectedDifficultyId = _globalDifficultyId;
+          
+          qs.options = [];
+          for (var opt in opts) {
+            qs.options.add(OptionState(
+              text: opt['optionText'] ?? '',
+              isCorrect: opt['isCorrect'] as bool? ?? false,
+            ));
+          }
+          _questions.add(qs);
+        }
+      } else {
+        final generated = resp.questions ?? [];
+        if (generated.isEmpty) {
+          ToastHelper.showError(context, 'AI did not return any questions.');
+          return;
+        }
+
+        _questions.clear();
+        for (final q in generated) {
+          final opts = <Map<String, dynamic>>[];
+          for (final o in q.options) {
+            opts.add({
+              'optionText': o.optionText,
+              'isCorrect': o.isCorrect,
+            });
+          }
+          
+          final qs = QuestionState();
+          qs.questionTextController.text = q.questionText;
+          qs.explanationController.text = q.explanation;
+          qs.selectedSkillId = _globalSkillId;
+          qs.selectedDifficultyId = _globalDifficultyId;
+          
+          qs.options = [];
+          for (var opt in opts) {
+            qs.options.add(OptionState(
+              text: opt['optionText'] ?? '',
+              isCorrect: opt['isCorrect'] as bool? ?? false,
+            ));
+          }
+          _questions.add(qs);
+        }
+      }
+      
+      ToastHelper.show(context, 'Questions generated successfully!');
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'AI Generation Failed: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingByAi = false;
+        });
+      }
+    }
+  }
+
   Future<void> _handleSave() async {
     // Validate
     if (_isQuestionGroup && _passageController.text.trim().isEmpty) {
       ToastHelper.show(context, 'Passage text cannot be empty for a Question Group.', isError: true);
       return;
     }
+    if (_isQuestionGroup && _selectedGroupTypeId == null) {
+      ToastHelper.show(context, 'Please select a Group Type.', isError: true);
+      return;
+    }
     for (var i = 0; i < _questions.length; i++) {
       if (_questions[i].selectedSkillId == null) {
-        ToastHelper.show(context, 'Question ${i + 1} must have a Skill Type.', isError: true);
+        ToastHelper.show(context, 'Please select a Skill Type for Question ${i + 1}.', isError: true);
         return;
       }
       if (_questions[i].selectedDifficultyId == null) {
-        ToastHelper.show(context, 'Question ${i + 1} must have a Difficulty.', isError: true);
+        ToastHelper.show(context, 'Please select a Difficulty for Question ${i + 1}.', isError: true);
         return;
       }
       if (_questions[i].questionTextController.text.trim().isEmpty) {
@@ -245,9 +407,9 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
 
       final api = await _getApi();
       if (widget.question != null) {
-        await api.updateTrainerQuestionGroup(widget.question!.id, payload, isGroup: widget.question!.isGroup);
+        await api.updateCourseManagerQuestionGroup(widget.question!.id, payload, isGroup: widget.question!.isGroup);
       } else {
-        await api.createTrainerQuestionGroup(payload);
+        await api.createCourseManagerQuestionGroup(payload);
       }
 
       if (mounted) {
@@ -272,15 +434,30 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 3)) : null,
+      appBar: widget.isCourseManager
+          ? SharedHeader(
+              isDesktop: isDesktop,
+              activeTab: '',
+              hideNavLinks: true,
+              hideCommerceActions: true,
+              hideLanguageSwitcher: true,
+            )
+          : null,
+      drawer: !isDesktop 
+          ? (widget.isCourseManager ? const Drawer(child: CourseManagerSidebar(currentRoute: 'question_bank')) : const Drawer(child: TrainerSidebar(activeIndex: 3)))
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 3)),
+          if (isDesktop) 
+            SizedBox(
+              width: widget.isCourseManager ? 240 : 260, 
+              child: widget.isCourseManager ? const CourseManagerSidebar(currentRoute: 'question_bank') : const TrainerSidebar(activeIndex: 3)
+            ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                if (!widget.isCourseManager) _buildHeader(context, !isDesktop),
                 Expanded(
                   child: _isLoadingMetadata
                       ? const Center(child: CircularProgressIndicator(color: Color(0xFF38C9A6)))
@@ -456,142 +633,117 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          if (!_isQuestionGroup) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('SKILL TYPE'),
-                      _buildDropdown(
-                        value: _questions.isNotEmpty ? _questions[0].selectedSkillId : null,
-                        items: _skills,
-                        onChanged: widget.isReadOnly ? null : (val) {
-                          if (_questions.isNotEmpty) {
-                            setState(() => _questions[0].selectedSkillId = val);
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('SKILL TYPE'),
+                    _buildDropdown(
+                      value: _globalSkillId ?? (_questions.isNotEmpty ? _questions[0].selectedSkillId : null),
+                      items: _skills,
+                      onChanged: widget.isReadOnly ? null : (val) {
+                        setState(() {
+                          _globalSkillId = val;
+                          if (!_isQuestionGroup && _questions.isNotEmpty) {
+                            _questions[0].selectedSkillId = val;
                           }
-                        },
-                        displayKey: 'paramValue',
-                      ),
-                    ],
-                  ),
+                        });
+                      },
+                      displayKey: 'paramValue',
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('GROUP TYPE'),
-                      _buildDropdown(
-                        value: _selectedGroupTypeId,
-                        items: _groupTypes,
-                        onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
-                        displayKey: 'paramValue',
-                      ),
-                    ],
-                  ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('DIFFICULTY'),
+                    _buildDropdown(
+                      value: _globalDifficultyId ?? (_questions.isNotEmpty ? _questions[0].selectedDifficultyId : null),
+                      items: _difficulties,
+                      onChanged: widget.isReadOnly ? null : (val) {
+                        setState(() {
+                          _globalDifficultyId = val;
+                          if (!_isQuestionGroup && _questions.isNotEmpty) {
+                            _questions[0].selectedDifficultyId = val;
+                          }
+                        });
+                      },
+                      displayKey: 'paramValue',
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLabel('GROUP TYPE'),
+              _buildDropdown(
+                value: _selectedGroupTypeId,
+                items: _groupTypes,
+                onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
+                displayKey: 'paramValue',
+                allowNone: true,
+              ),
+            ],
+          ),
+          if (_isQuestionGroup) ...[
             const SizedBox(height: 16),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const Text(
+                  'Number of Questions (AI Generate)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF64748B),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Row(
                     children: [
-                      _buildLabel('DIFFICULTY'),
-                      _buildDropdown(
-                        value: _questions.isNotEmpty ? _questions[0].selectedDifficultyId : null,
-                        items: _difficulties,
-                        onChanged: widget.isReadOnly ? null : (val) {
-                          if (_questions.isNotEmpty) {
-                            setState(() => _questions[0].selectedDifficultyId = val);
-                          }
+                      IconButton(
+                        icon: const Icon(Icons.remove, size: 16, color: Color(0xFF64748B)),
+                        onPressed: widget.isReadOnly ? null : () {
+                          setState(() {
+                            if (_aiQuantity > 2) _aiQuantity--;
+                          });
                         },
-                        displayKey: 'paramValue',
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('STATUS'),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: widget.isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _status,
-                            isExpanded: true,
-                            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
-                            onChanged: widget.isReadOnly ? null : (val) {
-                              if (val != null) setState(() => _status = val);
-                            },
-                            items: const [
-                              DropdownMenuItem(value: 'PRIVATE', child: Text('Private')),
-                              DropdownMenuItem(value: 'PUBLIC', child: Text('Public')),
-                            ],
+                        width: 40,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$_aiQuantity',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Outfit',
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('GROUP TYPE'),
-                      _buildDropdown(
-                        value: _selectedGroupTypeId,
-                        items: _groupTypes,
-                        onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
-                        displayKey: 'paramValue',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('STATUS'),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: widget.isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _status,
-                            isExpanded: true,
-                            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
-                            onChanged: widget.isReadOnly ? null : (val) {
-                              if (val != null) setState(() => _status = val);
-                            },
-                            items: const [
-                              DropdownMenuItem(value: 'PRIVATE', child: Text('Private')),
-                              DropdownMenuItem(value: 'PUBLIC', child: Text('Public')),
-                            ],
-                          ),
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.add, size: 16, color: Color(0xFF64748B)),
+                        onPressed: widget.isReadOnly ? null : () {
+                          setState(() {
+                            if (_aiQuantity < 10) _aiQuantity++;
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -599,6 +751,32 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
               ],
             ),
           ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: (_isGeneratingByAi ||
+                          _globalSkillId == null ||
+                          _globalDifficultyId == null ||
+                          (_isQuestionGroup && _selectedGroupTypeId == null))
+                  ? null
+                  : _handleGenerateByAI,
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: _isGeneratingByAi
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Generate by AI', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF38C9A6),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -609,6 +787,7 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
     required List<Map<String, dynamic>> items,
     required Function(int?)? onChanged,
     required String displayKey,
+    bool allowNone = false,
   }) {
     final bool valueExists = value == null || items.any((item) => item['id'] == value);
     final int? safeValue = valueExists ? value : null;
@@ -621,16 +800,23 @@ class _TrainerCreateQuestionPageState extends State<TrainerCreateQuestionPage> {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
+        child: DropdownButton<int?>(
           value: safeValue,
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
-          items: items.map((item) {
-            return DropdownMenuItem<int>(
-              value: item['id'] as int,
-              child: Text(item[displayKey] ?? '', style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B))),
-            );
-          }).toList(),
+          items: [
+            if (allowNone)
+              const DropdownMenuItem<int?>(
+                value: null,
+                child: Text('None', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
+              ),
+            ...items.map((item) {
+              return DropdownMenuItem<int?>(
+                value: item['id'] as int?,
+                child: Text(item[displayKey] ?? '', style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B))),
+              );
+            }),
+          ],
           onChanged: onChanged,
         ),
       ),

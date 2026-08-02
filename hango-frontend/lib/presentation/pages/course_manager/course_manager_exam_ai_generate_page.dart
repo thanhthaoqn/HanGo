@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'course_manager_edit_exam_page.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../utils/config.dart';
+import '../../../data/repositories/trainer_ai_recommendation_repository.dart';
+import '../../../domain/model/trainer_ai_exam_models.dart';
+import '../../../domain/model/trainer_ai_question_models.dart';
 
 class CourseManagerExamAiGeneratePage extends StatefulWidget {
   final VoidCallback onBack;
@@ -13,17 +21,131 @@ class CourseManagerExamAiGeneratePage extends StatefulWidget {
 }
 
 class _CourseManagerExamAiGeneratePageState extends State<CourseManagerExamAiGeneratePage> {
-  final _topicController = TextEditingController();
-  final _countController = TextEditingController();
-  String _selectedDifficulty = 'Medium';
-  String? _selectedSkillType;
-  String? _selectedGroupType;
+  final _chatController = TextEditingController();
+  final _scrollController = ScrollController();
+  final TrainerAiQuestionRepository _repository = TrainerAiQuestionRepository();
+  
+  List<TrainerExamChatMessage> _messages = [];
+  bool _isLoading = false;
+  bool _isGenerating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _messages.add(TrainerExamChatMessage(
+      role: 'model',
+      text: 'Hi there! I am your AI Assistant. I can help you generate a complete exam. To get started, please tell me the **Exam Title**, **Description**, **Duration**, **Passing Score**, and the **number and types of questions** you want (e.g. 10 easy vocabulary single questions, 1 medium reading comprehension group).',
+    ));
+  }
 
   @override
   void dispose() {
-    _topicController.dispose();
-    _countController.dispose();
+    _chatController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _chatController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _messages.add(TrainerExamChatMessage(role: 'user', text: text));
+      _isLoading = true;
+    });
+    _chatController.clear();
+    _scrollToBottom();
+
+    try {
+      final responseText = await _repository.chatExam(_messages);
+      if (mounted) {
+        setState(() {
+          _messages.add(TrainerExamChatMessage(role: 'model', text: responseText));
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.show(context, 'Failed to get AI response: $e', isError: true);
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _generateExam() async {
+    setState(() => _isGenerating = true);
+    ToastHelper.show(context, 'AI is generating exam based on our chat. This may take a minute...');
+    try {
+      final response = await _repository.generateExamFromChat(_messages);
+      
+      // Create the exam in the DB
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token == null) throw Exception('No token found');
+
+      final apiBaseUrl = EnvConfig.apiBaseUrl;
+      final payload = {
+        'title': response.title,
+        'description': response.description,
+        'expectedQuestionCount': response.expectedQuestionCount,
+        'passingScore': response.passingScore,
+        'durationMinutes': response.durationMinutes,
+        'thumbnailUrl': '',
+      };
+
+      final createResp = await http.post(
+        Uri.parse('$apiBaseUrl/trainer/exams'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (createResp.statusCode != 200 && createResp.statusCode != 201) {
+        throw Exception('Failed to create exam: ${createResp.statusCode} - ${createResp.body}');
+      }
+      
+      final createData = jsonDecode(createResp.body);
+      final newExamId = createData['id'] as int;
+
+      if (mounted) {
+        ToastHelper.show(context, 'Exam created successfully!');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseManagerEditExamPage(
+              examId: newExamId,
+              examTitle: response.title,
+              examExpectedCount: response.expectedQuestionCount,
+              isCourseManager: widget.isCourseManager,
+              initialAiData: response,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.show(context, 'Failed to generate exam: $e', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGenerating = false);
+      }
+    }
   }
 
   @override
@@ -36,305 +158,186 @@ class _CourseManagerExamAiGeneratePageState extends State<CourseManagerExamAiGen
           Padding(
             padding: const EdgeInsets.all(24.0),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
-                  onPressed: widget.onBack,
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+                      onPressed: widget.onBack,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Generate Exam with AI',
+                        style: TextStyle(
+                            fontSize: 24,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Outfit',
+                            fontWeight: FontWeight.bold)),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                const Text('Generate Exam with AI',
-                    style: TextStyle(
-                        fontSize: 24,
-                        color: Color(0xFF1E293B),
-                        fontFamily: 'Outfit',
-                        fontWeight: FontWeight.bold)),
+                ElevatedButton.icon(
+                  onPressed: _isGenerating ? null : _generateExam,
+                  icon: _isGenerating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                  label: Text(
+                    _isGenerating ? 'Generating...' : 'Generate Exam',
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B5CF6),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
               ],
             ),
           ),
           Expanded(
             child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 600),
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'AI Exam Generation Settings',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                          fontFamily: 'Outfit',
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 800),
+                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(24),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = _messages[index];
+                          final isUser = msg.role == 'user';
+                          return _buildChatMessage(msg, isUser);
+                        },
+                      ),
+                    ),
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      _buildLabel('TOPIC OR DOCUMENT CONTENT'),
-                      TextField(
-                        controller: _topicController,
-                        maxLines: 4,
-                        decoration: _inputDecoration('Enter the topic or paste context for AI...'),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
                       ),
-                      const SizedBox(height: 24),
-                      Row(
+                      child: Row(
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('NUMBER OF QUESTIONS'),
-                                TextField(
-                                  controller: _countController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: _inputDecoration('e.g., 20'),
+                            child: TextField(
+                              controller: _chatController,
+                              decoration: InputDecoration(
+                                hintText: 'Type your requirements here...',
+                                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide.none,
                                 ),
-                              ],
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
                             ),
                           ),
-                          const SizedBox(width: 24),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('DIFFICULTY'),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedDifficulty,
-                                      isExpanded: true,
-                                      items: ['Easy', 'Medium', 'Hard']
-                                          .map((e) => DropdownMenuItem(
-                                                value: e,
-                                                child: Text(e, style: const TextStyle(fontFamily: 'Outfit')),
-                                              ))
-                                          .toList(),
-                                      onChanged: (val) {
-                                        if (val != null) {
-                                          setState(() => _selectedDifficulty = val);
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(width: 12),
+                          Container(
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF8B5CF6),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.send, color: Colors.white),
+                              onPressed: _sendMessage,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('SKILL TYPE (Optional)'),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedSkillType,
-                                      hint: const Text(
-                                        'Select Skill Type',
-                                        style: TextStyle(
-                                          color: Color(0xFF94A3B8),
-                                          fontSize: 12,
-                                          fontFamily: 'Outfit',
-                                        ),
-                                      ),
-                                      isExpanded: true,
-                                      items: [
-                                        'Phonetics',
-                                        'Word order',
-                                        'Reduced relative clause',
-                                        'Preposition',
-                                        'Collocation',
-                                        'To-infinitive',
-                                        'Quantifier',
-                                        'Phrasal verb',
-                                        'Prepositional phrase',
-                                        'Vocabulary',
-                                        'Conversation ordering',
-                                        'Letter ordering',
-                                        'Paragraph ordering',
-                                        'Passive voice',
-                                        'Relative clause',
-                                        'Contextual meaning',
-                                        'Factual / Detail question',
-                                        'Synonym in context',
-                                        'Antonym in context',
-                                        'Reference question',
-                                        'Paraphrasing question',
-                                        'Paragraph-specific information question',
-                                        'Main idea / Central theme question',
-                                        'TRUE / NOT TRUE question',
-                                        'Inference question',
-                                      ]
-                                          .map((e) => DropdownMenuItem(
-                                                value: e,
-                                                child: Text(e, style: const TextStyle(fontFamily: 'Outfit', fontSize: 13)),
-                                              ))
-                                          .toList(),
-                                      onChanged: (val) {
-                                        setState(() => _selectedSkillType = val);
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 24),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel('GROUP TYPE (Optional)'),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedGroupType,
-                                      hint: const Text(
-                                        'Select Group Type',
-                                        style: TextStyle(
-                                          color: Color(0xFF94A3B8),
-                                          fontSize: 12,
-                                          fontFamily: 'Outfit',
-                                        ),
-                                      ),
-                                      isExpanded: true,
-                                      items: [
-                                        'Read and Fill in a Notice',
-                                        'Read and Fill in a Leaflet/Advertisement',
-                                        'Paragraph/Text Reordering',
-                                        'Guided Cloze Test',
-                                        'Reading Comprehension - 8 questions',
-                                        'Reading Comprehension - 10 questions'
-                                      ]
-                                          .map((e) => DropdownMenuItem(
-                                                value: e,
-                                                child: Text(e, style: const TextStyle(fontFamily: 'Outfit', fontSize: 13)),
-                                              ))
-                                          .toList(),
-                                      onChanged: (val) {
-                                        setState(() => _selectedGroupType = val);
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 48),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            ToastHelper.show(context, 'AI is generating exam...');
-                            Future.delayed(const Duration(seconds: 1), () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CourseManagerEditExamPage(
-                                    examId: 2, // Dummy ID
-                                    examTitle: 'AI Generated Exam',
-                                    isCourseManager: widget.isCourseManager,
-                                  ),
-                                ),
-                              );
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF8B5CF6), // AI Purple
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.auto_awesome, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text('Generate Exam',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Outfit',
-                                      fontSize: 16)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildLabel(String text) {
+  Widget _buildChatMessage(TrainerExamChatMessage msg, bool isUser) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0xFF64748B),
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.0,
-          fontFamily: 'Outfit',
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF8B5CF6)),
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Row(
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isUser) ...[
+            const CircleAvatar(
+              backgroundColor: Color(0xFFEDE9FE),
+              child: Icon(Icons.auto_awesome, color: Color(0xFF8B5CF6), size: 20),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isUser ? const Color(0xFF8B5CF6) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16).copyWith(
+                  bottomRight: isUser ? const Radius.circular(0) : const Radius.circular(16),
+                  bottomLeft: !isUser ? const Radius.circular(0) : const Radius.circular(16),
+                ),
+              ),
+              child: MarkdownBody(
+                data: msg.text,
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(
+                    color: isUser ? Colors.white : const Color(0xFF1E293B),
+                    fontFamily: 'Outfit',
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (isUser) ...[
+            const SizedBox(width: 12),
+            const CircleAvatar(
+              backgroundColor: Color(0xFFE2E8F0),
+              child: Icon(Icons.person, color: Color(0xFF64748B), size: 20),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -11,7 +11,7 @@ import '../domain/model/course.dart'; // Sử dụng duy nhất model Course nà
 import '../domain/model/exam_models.dart';
 import '../domain/model/recommendation.dart';
 import '../domain/model/ai_pathway_models.dart';
-import '../presentation/pages/trainer/question_bank/models/trainer_question.dart';
+import '../presentation/pages/course_manager/question_bank/models/course_manager_question.dart';
 
 class ApiFailure implements Exception {
   const ApiFailure(this.message, {this.statusCode});
@@ -225,15 +225,21 @@ class HangoApi {
     return SendMessageResponse.fromJson(body as Map<String, dynamic>);
   }
 
-  Future<List<TrainerQuestion>> getTrainerQuestions({
+  Future<List<CourseManagerQuestion>> getCourseManagerQuestions({
     required String type,
     String? search,
     String? sortBy,
+    int? skillId,
+    int? categoryId,
+    int? difficultyId,
   }) async {
     final queryParams = <String, String>{
       'type': type,
       if (search != null && search.isNotEmpty) 'search': search,
       if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
+      if (skillId != null) 'skillId': skillId.toString(),
+      if (categoryId != null) 'categoryId': categoryId.toString(),
+      if (difficultyId != null) 'difficultyId': difficultyId.toString(),
     };
 
     // Build URL with query params
@@ -249,7 +255,7 @@ class HangoApi {
     final body = await _send(http.get(uri, headers: _headers));
     return (body as List? ?? const [])
         .whereType<Map<String, dynamic>>()
-        .map((json) => TrainerQuestion.fromJson(json))
+        .map((json) => CourseManagerQuestion.fromJson(json))
         .toList();
   }
 
@@ -266,7 +272,7 @@ class HangoApi {
     await _send(http.patch(uri, headers: _headers));
   }
 
-  Future<Map<String, dynamic>> getTrainerQuestionDetail(int id, {bool isGroup = false}) async {
+  Future<Map<String, dynamic>> getCourseManagerQuestionDetail(int id, {bool isGroup = false}) async {
     final queryParams = {'isGroup': isGroup.toString()};
     final baseUri = _uri('/api/v1/trainer/question-bank/detail/$id');
     final uri = Uri(
@@ -280,7 +286,7 @@ class HangoApi {
     return body as Map<String, dynamic>;
   }
 
-  Future<void> updateTrainerQuestionGroup(int id, Map<String, dynamic> payload, {bool isGroup = false}) async {
+  Future<void> updateCourseManagerQuestionGroup(int id, Map<String, dynamic> payload, {bool isGroup = false}) async {
     final queryParams = {'isGroup': isGroup.toString()};
     final baseUri = _uri('/api/v1/trainer/question-bank/$id');
     final uri = Uri(
@@ -313,7 +319,7 @@ class HangoApi {
     return (body as List? ?? const []).whereType<Map<String, dynamic>>().toList();
   }
 
-  Future<void> createTrainerQuestionGroup(Map<String, dynamic> payload) async {
+  Future<void> createCourseManagerQuestionGroup(Map<String, dynamic> payload) async {
     await _send(
       http.post(
         _uri('/api/v1/trainer/question-bank'),

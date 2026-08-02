@@ -1,4 +1,4 @@
-class TrainerQuestion {
+﻿class CourseManagerQuestion {
   final int id;
   final String questionText;
   final String categoryName;
@@ -13,7 +13,7 @@ class TrainerQuestion {
 
   final String? displayNo;
 
-  TrainerQuestion({
+  CourseManagerQuestion({
     required this.id,
     this.displayNo,
     required this.questionText,
@@ -28,8 +28,8 @@ class TrainerQuestion {
     this.isGroup = false,
   });
 
-  factory TrainerQuestion.fromJson(Map<String, dynamic> json) {
-    return TrainerQuestion(
+  factory CourseManagerQuestion.fromJson(Map<String, dynamic> json) {
+    return CourseManagerQuestion(
       id: json['id'] as int? ?? 0,
       questionText: json['questionText'] as String? ?? '',
       categoryName: json['categoryName'] as String? ?? 'Chưa phân loại',

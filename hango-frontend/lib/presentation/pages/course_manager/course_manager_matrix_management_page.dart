@@ -18,8 +18,33 @@ class CourseManagerMatrixManagementPage extends StatefulWidget {
 class _CourseManagerMatrixManagementPageState
     extends State<CourseManagerMatrixManagementPage> {
   final _api = CourseManagerApi();
-  List<Map<String, dynamic>> _matrices = [];
+  List<Map<String, dynamic>> _allMatrices = [];
   bool _isLoading = true;
+  String _searchQuery = '';
+  String _selectedStatus = 'ALL';
+  String _sortBy = 'NEWEST';
+
+  List<Map<String, dynamic>> get _displayedMatrices {
+    var filtered = _allMatrices.where((m) {
+      final matchesSearch = _searchQuery.isEmpty ||
+          (m['title']?.toString().toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+      
+      final isPublic = m['isPublic'] as bool? ?? false;
+      final matchesStatus = _selectedStatus == 'ALL' ||
+          (_selectedStatus == 'PUBLIC' && isPublic) ||
+          (_selectedStatus == 'PRIVATE' && !isPublic);
+          
+      return matchesSearch && matchesStatus;
+    }).toList();
+
+    filtered.sort((a, b) {
+      final dateA = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
+      final dateB = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
+      return _sortBy == 'NEWEST' ? dateB.compareTo(dateA) : dateA.compareTo(dateB);
+    });
+
+    return filtered;
+  }
 
   @override
   void initState() {
@@ -34,7 +59,7 @@ class _CourseManagerMatrixManagementPageState
       print('[MatrixMgmt] fetched ${data.length} matrices: $data');
       if (mounted) {
         setState(() {
-          _matrices = data;
+          _allMatrices = data;
           _isLoading = false;
         });
       }
@@ -100,6 +125,8 @@ class _CourseManagerMatrixManagementPageState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        _buildFilterBar(),
+                        const SizedBox(height: 16),
                         if (_isLoading)
                           const Padding(
                             padding: EdgeInsets.all(80.0),
@@ -109,7 +136,7 @@ class _CourseManagerMatrixManagementPageState
                               ),
                             ),
                           )
-                        else if (_matrices.isEmpty)
+                        else if (_displayedMatrices.isEmpty)
                           _buildEmptyState()
                         else
                           _buildMatrixTable(),
@@ -159,18 +186,22 @@ class _CourseManagerMatrixManagementPageState
                 ),
               );
             },
-            icon: const Icon(Icons.add, color: Colors.white, size: 20),
+            icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 18),
             label: const Text(
-              'Create New Matrix',
+              'Create\nNew Matrix',
               style: TextStyle(
-                fontFamily: 'Outfit',
-                fontWeight: FontWeight.bold,
                 color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                height: 1.2,
+                fontFamily: 'Outfit',
               ),
+              textAlign: TextAlign.center,
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF20B486),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              minimumSize: const Size(130, 48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -183,44 +214,185 @@ class _CourseManagerMatrixManagementPageState
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 60),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Color(0xFFE6FFFA),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.grid_on_outlined,
-              size: 48,
-              color: Color(0xFF20B486),
-            ),
-          ),
-          const SizedBox(height: 24),
+          Icon(Icons.description_outlined,
+              size: 64, color: const Color(0xFF94A3B8).withOpacity(0.5)),
+          const SizedBox(height: 16),
           const Text(
-            'No exam matrices yet',
+            'No matrices found',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A),
+              color: Color(0xFF64748B),
               fontFamily: 'Outfit',
             ),
           ),
           const SizedBox(height: 8),
           const Text(
-            'You haven\'t created any exam matrices.\nCreate a new one to get started.',
-            textAlign: TextAlign.center,
+            'Try adjusting your search or filters.',
             style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF64748B),
+              color: Color(0xFF94A3B8),
               fontFamily: 'Outfit',
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    final searchField = SizedBox(
+      height: 48,
+      child: TextField(
+        onChanged: (value) => setState(() => _searchQuery = value),
+        decoration: InputDecoration(
+          hintText: 'Search by title...',
+          prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF94A3B8)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+        ),
+      ),
+    );
+
+    final statusDropdown = Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.filter_list, color: Color(0xFF64748B), size: 18),
+          const SizedBox(width: 6),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedStatus == 'ALL' ? null : _selectedStatus,
+              hint: const Text('All Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 16),
+              dropdownColor: Colors.white,
+              items: const [
+                DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('All Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+                ),
+                DropdownMenuItem<String>(
+                  value: 'PUBLIC',
+                  child: Text('Public', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+                ),
+                DropdownMenuItem<String>(
+                  value: 'PRIVATE',
+                  child: Text('Private', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+                ),
+              ],
+              onChanged: (val) {
+                setState(() => _selectedStatus = val ?? 'ALL');
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final sortDropdown = Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.sort, color: Color(0xFF64748B), size: 18),
+          const SizedBox(width: 6),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _sortBy == 'NEWEST' ? 'Newest' : 'Oldest',
+              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 16),
+              dropdownColor: Colors.white,
+              items: ['Newest', 'Oldest'].map((String val) {
+                return DropdownMenuItem<String>(
+                  value: val,
+                  child: Text(
+                    'Sort by:\n$val',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                      height: 1.1,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _sortBy = val == 'Newest' ? 'NEWEST' : 'OLDEST');
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final refreshButton = InkWell(
+      onTap: _fetchMatrices,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 48,
+        width: 48,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFCBD5E1)),
+        ),
+        child: const Icon(Icons.refresh, color: Color(0xFF64748B), size: 20),
+      ),
+    );
+
+    final isDesktop = MediaQuery.of(context).size.width > 1024;
+    if (!isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          searchField,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: statusDropdown),
+              const SizedBox(width: 12),
+              Expanded(child: sortDropdown),
+              const SizedBox(width: 12),
+              refreshButton,
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: searchField),
+        const SizedBox(width: 12),
+        statusDropdown,
+        const SizedBox(width: 12),
+        sortDropdown,
+        const SizedBox(width: 12),
+        refreshButton,
+      ],
     );
   }
 
@@ -293,7 +465,7 @@ class _CourseManagerMatrixManagementPageState
             ),
           ),
         ],
-        rows: _matrices.map((matrix) {
+        rows: _displayedMatrices.map((matrix) {
           bool isPublic = matrix['isPublic'] == true;
 
           return DataRow(

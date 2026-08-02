@@ -1,17 +1,17 @@
-import 'package:flutter/material.dart';
-import '../models/trainer_question.dart';
+﻿import 'package:flutter/material.dart';
+import '../models/course_manager_question.dart';
 
 class QuestionTable extends StatelessWidget {
-  final List<TrainerQuestion> questions;
+  final List<CourseManagerQuestion> questions;
   final bool isLoading;
   final int currentPage;
   final int totalRecords;
   final int pageSize;
   final ValueChanged<int> onPageChanged;
-  final ValueChanged<TrainerQuestion> onViewPressed;
-  final ValueChanged<TrainerQuestion> onEditPressed;
-  final Function(TrainerQuestion, bool) onStatusToggled;
-
+  final ValueChanged<CourseManagerQuestion> onViewPressed;
+  final ValueChanged<CourseManagerQuestion> onEditPressed;
+  final Function(CourseManagerQuestion, bool) onStatusToggled;
+  final bool isCourseManager;
 
   const QuestionTable({
     Key? key,
@@ -24,6 +24,7 @@ class QuestionTable extends StatelessWidget {
     required this.onViewPressed,
     required this.onEditPressed,
     required this.onStatusToggled,
+    this.isCourseManager = false,
   }) : super(key: key);
 
   String _formatTime(DateTime dt) {
@@ -106,8 +107,8 @@ class QuestionTable extends StatelessWidget {
               ),
             ),
             child: Row(
-              children: const [
-                SizedBox(
+              children: [
+                const SizedBox(
                   width: 60,
                   child: Text(
                     'NO.',
@@ -151,18 +152,19 @@ class QuestionTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Status',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
+                if (!isCourseManager)
+                  const Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Status',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(
+                const SizedBox(
                   width: 120,
                   child: Text(
                     'Actions',
@@ -333,33 +335,34 @@ class QuestionTable extends StatelessWidget {
                       ),
                     ),
                     // Status (Toggle)
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        alignment: Alignment.centerLeft,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Switch(
-                              value: q.status == 'PUBLIC',
-                              activeColor: const Color(0xFF20B486),
-                              onChanged: (val) {
-                                onStatusToggled(q, val);
-                              },
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              q.status == 'PUBLIC' ? 'Public' : 'Private',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: q.status == 'PUBLIC' ? const Color(0xFF20B486) : const Color(0xFF64748B),
-                                fontWeight: FontWeight.w600,
+                    if (!isCourseManager)
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Switch(
+                                value: q.status == 'PUBLIC',
+                                activeColor: const Color(0xFF20B486),
+                                onChanged: (val) {
+                                  onStatusToggled(q, val);
+                                },
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 4),
+                              Text(
+                                q.status == 'PUBLIC' ? 'Public' : 'Private',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: q.status == 'PUBLIC' ? const Color(0xFF20B486) : const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
                     // Actions
                     SizedBox(
                       width: 120,

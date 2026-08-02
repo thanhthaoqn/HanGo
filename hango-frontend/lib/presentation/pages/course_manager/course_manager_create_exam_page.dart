@@ -220,8 +220,7 @@ class _CourseManagerCreateExamPageState
                     ),
                     onPressed: widget.onBack,
                   ),
-                if (widget.onBack != null)
-                  const SizedBox(width: 12),
+                if (widget.onBack != null) const SizedBox(width: 12),
                 const Text(
                   'Create New Exam',
                   style: TextStyle(
@@ -347,7 +346,7 @@ class _CourseManagerCreateExamPageState
               _buildMethodCard(
                 title: 'Create by Exam Matrix',
                 description:
-                    'Define an exam matrix structure and pick questions manually from bank.',
+                    'Define an exam matrix structure and pick questions automatically from question bank.',
                 icon: Icons.grid_view_outlined,
                 color: const Color(0xFF20B486),
                 onTap: () {
@@ -360,7 +359,6 @@ class _CourseManagerCreateExamPageState
                     'Use AI to automatically generate a complete exam based on your criteria.',
                 icon: Icons.auto_awesome_outlined,
                 color: const Color(0xFF8B5CF6),
-                isDisabled: true,
                 onTap: () {
                   setState(() => _currentView = 'ai');
                 },

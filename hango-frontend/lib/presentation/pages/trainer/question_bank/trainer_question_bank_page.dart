@@ -1,25 +1,25 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
-import 'trainer_create_question_page.dart';
+import '../../course_manager/question_bank/course_manager_create_question_page.dart';
 import '../trainer_profile_page.dart';
-import 'models/trainer_question.dart';
-import 'widgets/question_search_bar.dart';
-import 'widgets/question_table.dart';
+import '../../course_manager/question_bank/models/course_manager_question.dart';
+import '../../course_manager/question_bank/widgets/question_search_bar.dart';
+import '../../course_manager/question_bank/widgets/question_table.dart';
 import '../../../widgets/trainer/trainer_sidebar.dart';
 
-class TrainerQuestionBankPage extends StatefulWidget {
+class CourseManagerQuestionBankPage extends StatefulWidget {
   final bool isEmbedded;
-  const TrainerQuestionBankPage({super.key, this.isEmbedded = false});
+  const CourseManagerQuestionBankPage({super.key, this.isEmbedded = false});
 
   @override
-  State<TrainerQuestionBankPage> createState() => _TrainerQuestionBankPageState();
+  State<CourseManagerQuestionBankPage> createState() => _CourseManagerQuestionBankPageState();
 }
 
-class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
+class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBankPage> {
   final _authService = AuthService();
   final _searchController = TextEditingController();
   
@@ -35,8 +35,8 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   int _currentPage = 1;
   static const int _pageSize = 5;
 
-  List<TrainerQuestion> _allQuestions = [];
-  List<TrainerQuestion> _displayedQuestions = [];
+  List<CourseManagerQuestion> _allQuestions = [];
+  List<CourseManagerQuestion> _displayedQuestions = [];
   Timer? _debounceTimer;
 
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
@@ -85,7 +85,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       }
 
       final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-      final questionsList = await api.getTrainerQuestions(
+      final questionsList = await api.getCourseManagerQuestions(
         type: _selectedType,
         search: _searchQuery,
         sortBy: _sortBy,
@@ -191,7 +191,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   onCreatePressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const TrainerCreateQuestionPage()),
+                      MaterialPageRoute(builder: (context) => const CourseManagerCreateQuestionPage()),
                     ).then((_) => _fetchQuestions());
                   },
                   onImportPressed: () {
@@ -216,7 +216,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   onViewPressed: (q) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                      MaterialPageRoute(builder: (context) => CourseManagerCreateQuestionPage(
                         question: q,
                         isReadOnly: true,
                       )),
@@ -225,7 +225,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   onEditPressed: (q) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => TrainerCreateQuestionPage(
+                      MaterialPageRoute(builder: (context) => CourseManagerCreateQuestionPage(
                         question: q,
                         isEdit: true,
                       )),

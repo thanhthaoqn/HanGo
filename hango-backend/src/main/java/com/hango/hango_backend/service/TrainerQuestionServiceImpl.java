@@ -182,9 +182,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
         QuestionCategory category = null;
-        if (request.getCategoryId() != null) {
-            category = categoryRepository.findById(request.getCategoryId()).orElse(null);
-        }
+        // categoryId from frontend is actually the Group Type (SystemParameter) when it's a group question.
+        // So we don't look it up in QuestionCategory.
 
         SystemParameter skillParam = null;
         if (request.getSkillParamId() != null) {
@@ -201,8 +200,14 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         if (request.getPassageText() != null && !request.getPassageText().trim().isEmpty()) {
             group = new QuestionGroup();
             group.setContextText(request.getPassageText());
-            // group_type_param_id = 17 is the standard reading comprehension param (matches existing logic)
-            SystemParameter groupType = systemParameterRepository.findById(17L).orElse(null);
+            
+            SystemParameter groupType = null;
+            if (request.getCategoryId() != null) {
+                groupType = systemParameterRepository.findById(request.getCategoryId()).orElse(null);
+            }
+            if (groupType == null) {
+                groupType = systemParameterRepository.findById(17L).orElse(null); // Fallback
+            }
             group.setGroupTypeParam(groupType);
             group = questionGroupRepository.save(group);
         }
@@ -277,7 +282,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             dto.setPassageText(group.getContextText());
             
             if (!questions.isEmpty()) {
-                dto.setCategoryId(questions.get(0).getCategory() != null ? questions.get(0).getCategory().getId() : null);
+                // If it's a group, the frontend expects categoryId to be the group type SystemParameter ID
+                dto.setCategoryId(group.getGroupTypeParam() != null ? group.getGroupTypeParam().getId() : null);
                 dto.setStatus(questions.get(0).getStatus());
             }
             
@@ -338,7 +344,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
         QuestionCategory category = null;
-        if (request.getCategoryId() != null) {
+        if (!isGroup && request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId()).orElse(null);
         }
 
@@ -357,6 +363,16 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             group = questionGroupRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Question Group not found"));
             group.setContextText(request.getPassageText());
+            
+            SystemParameter groupType = null;
+            if (request.getCategoryId() != null) {
+                groupType = systemParameterRepository.findById(request.getCategoryId()).orElse(null);
+            }
+            if (groupType == null) {
+                groupType = systemParameterRepository.findById(17L).orElse(null);
+            }
+            group.setGroupTypeParam(groupType);
+            
             questionGroupRepository.save(group);
             
             // For simplicity, we just delete old questions and create new ones

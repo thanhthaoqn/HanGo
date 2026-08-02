@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
+import '../../../domain/model/trainer_ai_exam_models.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
@@ -52,6 +53,7 @@ class CourseManagerEditExamPage extends StatefulWidget {
   final bool isReadOnly;
   final String? courseManagerActionStatus;
   final bool isCourseManager;
+  final TrainerAiExamGenerateResponse? initialAiData;
   const CourseManagerEditExamPage({
     Key? key,
     required this.examId,
@@ -60,6 +62,7 @@ class CourseManagerEditExamPage extends StatefulWidget {
     this.isReadOnly = false,
     this.courseManagerActionStatus,
     this.isCourseManager = true,
+    this.initialAiData,
   }) : super(key: key);
 
   @override
@@ -91,11 +94,46 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
 
   Future<void> _loadData() async {
     await _loadMetadata();
-    await _loadQuestions();
+    
+    if (widget.initialAiData != null) {
+      _loadDataFromAi(widget.initialAiData!);
+    } else {
+      await _loadQuestions();
+    }
+    
     if (mounted) {
       setState(() {
         _isLoadingMetadata = false;
       });
+    }
+  }
+
+  void _loadDataFromAi(TrainerAiExamGenerateResponse aiData) {
+    _blocks.clear();
+    for (var aiBlock in aiData.blocks) {
+      final block = QuestionBlockState();
+      block.isQuestionGroup = aiBlock.isQuestionGroup;
+      block.passageController.text = aiBlock.passageText;
+      block.selectedGroupTypeId = aiBlock.isQuestionGroup ? aiBlock.categoryId : null; // Mapping groupType to categoryId
+      block.selectedSkillId = aiBlock.skillParamId;
+      block.selectedDifficultyId = aiBlock.difficultyId;
+      block.questions = aiBlock.questions.map((aiQ) {
+        final q = QuestionState();
+        q.questionTextController.text = aiQ.questionText;
+        q.explanationController.text = aiQ.explanation;
+        q.selectedSkillId = aiBlock.skillParamId; // Use block\'s skill
+        q.selectedDifficultyId = aiQ.difficultyId;
+        q.options = aiQ.options.map((aiOpt) => OptionState(
+          text: aiOpt.optionText,
+          isCorrect: aiOpt.isCorrect,
+        )).toList();
+        // Ensure 4 options
+        while (q.options.length < 4) {
+          q.options.add(OptionState());
+        }
+        return q;
+      }).toList();
+      _blocks.add(block);
     }
   }
 
