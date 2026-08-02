@@ -47,8 +47,12 @@ class LearnerShellPageState extends State<LearnerShellPage> {
     final fragment = Uri.base.fragment;
     final fullUrl = '$currentUri#$fragment';
 
-    final isSuccess = fullUrl.contains('payment-success');
-    final isFailed = fullUrl.contains('payment-failed');
+    final isSuccess = fullUrl.contains('payment-success') ||
+        fullUrl.contains('paymentStatus=success') ||
+        (fullUrl.contains('status=PAID') && (fullUrl.contains('code=00') || fullUrl.contains('cancel=false')));
+    final isFailed = fullUrl.contains('payment-failed') ||
+        fullUrl.contains('paymentStatus=failed') ||
+        fullUrl.contains('cancel=true');
 
     if (!isSuccess && !isFailed) return;
 
@@ -64,7 +68,11 @@ class LearnerShellPageState extends State<LearnerShellPage> {
       if (!mounted) return;
 
       if (isSuccess) {
-        await CartManager.updateCount();
+        if (courseId != null) {
+          await CartManager.removeFromCart(courseId);
+        } else {
+          await CartManager.updateCount();
+        }
         if (mounted) {
           ToastHelper.showSuccess(
             context,
