@@ -85,6 +85,9 @@ class _CartPageState extends State<CartPage> {
         }
       }
 
+      // Filter out courses that are currently pending deletion
+      coursesInCart = coursesInCart.where((c) => !CartManager.isPendingDeletion(c.id)).toList();
+
       final enrolled = <String>{};
       for (final c in coursesInCart) {
         final isEnrolled = prefs.getBool('enrolled_course_id_${c.id}') ?? false;
@@ -94,6 +97,8 @@ class _CartPageState extends State<CartPage> {
       }
 
       if (mounted) {
+        CartManager.cartCoursesNotifier.value = coursesInCart;
+        CartManager.cartCountNotifier.value = coursesInCart.length;
         setState(() {
           _cartCourses = coursesInCart;
           _enrolledCourseIds = enrolled;

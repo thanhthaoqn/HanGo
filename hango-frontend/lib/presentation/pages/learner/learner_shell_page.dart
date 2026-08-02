@@ -7,6 +7,10 @@ import 'learning_pathway_page.dart';
 import 'my_learning_page.dart';
 import 'my_information_page.dart';
 import '../course/cart_page.dart';
+import '../course/course_detail_page.dart';
+import '../../../utils/toast_helper.dart';
+import '../../../utils/cart_manager.dart';
+import '../../../utils/web_session_helper.dart';
 
 class LearnerShellPage extends StatefulWidget {
   final int initialIndex;
@@ -35,6 +39,54 @@ class LearnerShellPageState extends State<LearnerShellPage> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _informationSubTab = widget.initialSubTab;
+    _handlePayOSRedirect();
+  }
+
+  void _handlePayOSRedirect() {
+    final currentUri = Uri.base.toString();
+    final fragment = Uri.base.fragment;
+    final fullUrl = '$currentUri#$fragment';
+
+    final isSuccess = fullUrl.contains('payment-success');
+    final isFailed = fullUrl.contains('payment-failed');
+
+    if (!isSuccess && !isFailed) return;
+
+    int? courseId;
+    final match = RegExp(r'[?&]courseId=(\d+)').firstMatch(fullUrl);
+    if (match != null) {
+      courseId = int.tryParse(match.group(1)!);
+    }
+
+    clearPaymentUrlFromAddressBar();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      if (isSuccess) {
+        await CartManager.updateCount();
+        if (mounted) {
+          ToastHelper.showSuccess(
+            context,
+            '🎉 Thanh toán thành công! Khóa học đã được mở khóa.',
+          );
+        }
+      } else {
+        ToastHelper.showError(
+          context,
+          '❌ Đã hủy thanh toán khóa học.',
+        );
+      }
+
+      if (courseId != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseDetailPage(courseId: courseId!),
+          ),
+        );
+      }
+    });
   }
 
   void selectTab(int index, {int subTab = 0}) {

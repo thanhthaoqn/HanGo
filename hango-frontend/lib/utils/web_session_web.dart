@@ -12,3 +12,12 @@ bool isSessionActive() {
 void setSessionActive() {
   html.window.sessionStorage['hango.active'] = 'true';
 }
+
+void clearPaymentUrlFromAddressBar() {
+  try {
+    final location = html.window.location;
+    if (location.href.contains('payment-success') || location.href.contains('payment-failed')) {
+      html.window.history.replaceState(null, '', location.pathname);
+    }
+  } catch (_) {}
+}

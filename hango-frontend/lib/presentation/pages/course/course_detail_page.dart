@@ -49,6 +49,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     _loadCurrentUserId();
     _loadCourseDetail();
     _checkCartStatus();
+    _isInCart = CartManager.cartCoursesNotifier.value.any((c) => c.id == widget.courseId);
+    CartManager.cartCoursesNotifier.addListener(_onCartChanged);
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (mounted) {
@@ -59,8 +61,19 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     _reviewsFuture = _repository.fetchCourseReviews(widget.courseId);
   }
 
+  void _onCartChanged() {
+    if (!mounted) return;
+    final isNowInCart = CartManager.cartCoursesNotifier.value.any((c) => c.id == widget.courseId);
+    if (isNowInCart != _isInCart) {
+      setState(() {
+        _isInCart = isNowInCart;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    CartManager.cartCoursesNotifier.removeListener(_onCartChanged);
     _tabController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -1497,6 +1510,15 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   Future<void> _checkCartStatus() async {
+    final inMemory = CartManager.cartCoursesNotifier.value.any((c) => c.id == widget.courseId);
+    if (inMemory) {
+      if (mounted) {
+        setState(() {
+          _isInCart = true;
+        });
+      }
+      return;
+    }
     final cart = await CartManager.getCartIds();
     if (mounted) {
       setState(() {
@@ -1762,29 +1784,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         children: [
           // Price Display Section
           if (isFree)
-            const Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  'Miễn phí',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF28B79B),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Free',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF94A3B8),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
+            const Text(
+              'Free',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF28B79B),
+                fontFamily: 'Outfit',
+              ),
             )
           else
             Column(
@@ -1826,7 +1833,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
-                    'Tiết kiệm 30%',
+                    'Save 30%',
                     style: TextStyle(
                       color: Color(0xFFEF4444),
                       fontSize: 10,
@@ -2094,7 +2101,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     ),
                   ),
                   child: Text(
-                    _isInCart ? 'Go to Cart' : 'Add to Cart',
+                    LanguageManager.isVi
+                        ? (_isInCart ? 'Xem giỏ hàng' : 'Thêm vào giỏ hàng')
+                        : (_isInCart ? 'Go to Cart' : 'Add to Cart'),
                     style: const TextStyle(
                       color: Color(0xFF28B79B),
                       fontSize: 16,

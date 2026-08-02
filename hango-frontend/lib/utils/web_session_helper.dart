@@ -14,3 +14,9 @@ void setSessionActive() {
     impl.setSessionActive();
   } catch (_) {}
 }
+
+void clearPaymentUrlFromAddressBar() {
+  try {
+    impl.clearPaymentUrlFromAddressBar();
+  } catch (_) {}
+}

@@ -10,6 +10,12 @@ class CartManager {
   static final CartRepository _cartRepository = CartRepository();
   static final CourseRepository _courseRepository = CourseRepository();
 
+  static final Set<int> _pendingDeletedCourseIds = <int>{};
+
+  static bool isPendingDeletion(int courseId) {
+    return _pendingDeletedCourseIds.contains(courseId);
+  }
+
   static Future<String> getCartKey() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -28,9 +34,10 @@ class CartManager {
     if (token != null && token.isNotEmpty) {
       try {
         final items = await _cartRepository.getCartItems();
-        cartCoursesNotifier.value = items;
-        cartCountNotifier.value = items.length;
-        final ids = items.map((c) => c.id.toString()).toList();
+        final filteredItems = items.where((c) => !_pendingDeletedCourseIds.contains(c.id)).toList();
+        cartCoursesNotifier.value = filteredItems;
+        cartCountNotifier.value = filteredItems.length;
+        final ids = filteredItems.map((c) => c.id.toString()).toList();
         final key = await getCartKey();
         await prefs.setStringList(key, ids);
         return ids;
@@ -81,6 +88,7 @@ class CartManager {
   }
 
   static Future<void> removeFromCart(int courseId) async {
+    _pendingDeletedCourseIds.add(courseId);
     final courseIdStr = courseId.toString();
 
     // 1. Optimistic memory update (0ms lag)
@@ -102,7 +110,11 @@ class CartManager {
         await _cartRepository.removeItemFromCart(courseId);
       } catch (e) {
         debugPrint('Error removing item from DB cart: $e');
+      } finally {
+        _pendingDeletedCourseIds.remove(courseId);
       }
+    } else {
+      _pendingDeletedCourseIds.remove(courseId);
     }
   }
 
@@ -128,8 +140,9 @@ class CartManager {
     if (token != null && token.isNotEmpty) {
       try {
         final items = await _cartRepository.getCartItems();
-        cartCoursesNotifier.value = items;
-        cartCountNotifier.value = items.length;
+        final filteredItems = items.where((c) => !_pendingDeletedCourseIds.contains(c.id)).toList();
+        cartCoursesNotifier.value = filteredItems;
+        cartCountNotifier.value = filteredItems.length;
         return;
       } catch (e) {
         debugPrint('Error updating DB cart count: $e');
