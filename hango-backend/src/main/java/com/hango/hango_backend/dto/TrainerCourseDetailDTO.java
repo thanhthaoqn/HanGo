@@ -24,6 +24,9 @@ public class TrainerCourseDetailDTO {
     private LocalDateTime createdAt;
     private String code;
     private String version;
+    private java.math.BigDecimal price;
+    private java.math.BigDecimal suggestedPrice;
+    private String priceNote;
     private Long parentId;
     private String rejectionReason;
 }

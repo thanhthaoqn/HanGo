@@ -42,6 +42,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
   final TextEditingController _priceController = TextEditingController(
     text: '0',
   );
+  final TextEditingController _priceNoteController = TextEditingController();
+  num? _suggestedPrice;
   final TextEditingController _objectivesController = TextEditingController();
 
   // Dynamic dropdown lists (populated from DB with default fallbacks)
@@ -92,6 +94,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     _versionController.dispose();
     _codeController.dispose();
     _priceController.dispose();
+    _priceNoteController.dispose();
     _objectivesController.dispose();
     super.dispose();
   }
@@ -210,6 +213,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _versionController.text = data['version'] ?? 'v1.0';
           _codeController.text = data['code'] ?? '';
           _priceController.text = data['price']?.toString() ?? '0';
+          _suggestedPrice = data['suggestedPrice'];
+          _priceNoteController.text = data['priceNote'] ?? '';
           _objectivesController.text = data['objectives'] ?? '';
 
           final currentCats = data['categories'] as List<dynamic>? ?? [];
@@ -244,6 +249,38 @@ class _EditCoursePageState extends State<EditCoursePage> {
         _isLoadingCourse = false;
       });
       ToastHelper.showError(context, 'Error loading course details: $e');
+    }
+  }
+
+  Future<void> _reEvaluatePrice() async {
+    final success = await _saveCourse(showToast: false);
+    if (!success) return;
+    
+    setState(() => _isSaving = true);
+    try {
+      final token = await AuthService().getToken();
+      if (token == null) throw Exception('Token not found');
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/courses/$_currentCourseId/re-evaluate-price');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(context, 'Price re-evaluated successfully');
+        await _loadCourseDetail(); // Reload to get new suggested price
+      } else {
+        throw Exception('Failed to re-evaluate price: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error re-evaluating price: $e');
+      if (mounted) ToastHelper.showError(context, 'Error: $e');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -296,9 +333,9 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
   }
 
-  void _saveCourse() async {
+  Future<bool> _saveCourse({bool showToast = true}) async {
     if (!_formKey.currentState!.validate()) {
-      return;
+      return false;
     }
 
     setState(() {
@@ -355,24 +392,26 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _lastSavedText = 'Last saved: Just now';
         });
         await _refreshCourseDetail();
-        if (mounted) {
+        if (mounted && showToast) {
           if (isNewDraft) {
             ToastHelper.showSuccess(context, 'A new draft has been created. You are now editing the draft.');
           } else {
             ToastHelper.showSuccess(context, 'Course updated successfully!');
           }
         }
+        return true;
       } else {
         throw Exception('Failed to update course: ${response.body}');
       }
     } catch (e) {
       debugPrint('Error updating course: $e');
       if (mounted) {
-        ToastHelper.showError(context, 'Error saving course: $e');
+        if (showToast) ToastHelper.showError(context, 'Error saving course: $e');
         setState(() {
           _isSaving = false;
         });
       }
+      return false;
     }
   }
 
@@ -434,6 +473,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   : _priceController.text.trim(),
             ) ??
             0,
+        'priceNote': _priceNoteController.text.trim(),
         'objectives': _objectivesController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
@@ -1380,58 +1420,148 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Price',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4B5563),
-                        fontFamily: 'Outfit',
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Price (Desired)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B5563),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        Text(
+                          'Suggested: ${_suggestedPrice ?? 0}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF20B486),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _priceController,
-                      keyboardType: TextInputType.number,
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: const Color(0xFFF1F5F9),
-                        hintText: 'Auto-calculated price',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _priceController,
+                            keyboardType: TextInputType.number,
+                            onChanged: (val) {
+                              setState(() {}); // trigger rebuild to show/hide Reason
+                            },
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.white,
+                              hintText: 'Enter desired price',
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 14,
+                                fontFamily: 'Outfit',
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF20B486),
+                                ),
+                              ),
+                            ),
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 14,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Tooltip(
+                          message: 'Re-evaluate price based on content',
+                          child: IconButton(
+                            icon: const Icon(Icons.refresh, color: Color(0xFF20B486)),
+                            onPressed: _reEvaluatePrice,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_suggestedPrice != null && (num.tryParse(_priceController.text) ?? 0) != _suggestedPrice) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Reason for price change (Required)',
+                        style: TextStyle(
                           fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFEF4444), // Red to stand out
                           fontFamily: 'Outfit',
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _priceNoteController,
+                        maxLines: 2,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please provide a reason for the custom price.';
+                          }
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          hintText: 'Why do you want to change the suggested price?',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 14,
+                            fontFamily: 'Outfit',
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFEF4444),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFEF4444), // Highlight border
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFEF4444),
+                            ),
                           ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF20B486),
-                          ),
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 14,
+                          color: Color(0xFF1E293B),
                         ),
                       ),
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -1904,7 +2034,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         ),
         const SizedBox(width: 12),
         ElevatedButton(
-          onPressed: _isSaving ? null : _saveCourse,
+          onPressed: _isSaving ? null : () => _saveCourse(),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF20B486),
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),

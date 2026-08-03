@@ -274,6 +274,8 @@ public class CourseServiceImpl implements CourseService {
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
                 .price(course.getPrice())
+                .suggestedPrice(course.getSuggestedPrice())
+                .priceNote(course.getPriceNote())
                 .version(course.getVersion())
                 .isEnrolled(isEnrolled)
                 .hasNewVersionAvailable(hasNewVersionAvailable)

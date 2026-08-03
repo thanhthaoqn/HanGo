@@ -234,6 +234,8 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 .description(course.getDescription())
                 .objectives(course.getObjectives())
                 .price(course.getPrice())
+                .suggestedPrice(course.getSuggestedPrice())
+                .priceNote(course.getPriceNote())
                 .version(course.getVersion())
                 .status(course.getStatus())
                 .thumbnailUrl(course.getThumbnailUrl())

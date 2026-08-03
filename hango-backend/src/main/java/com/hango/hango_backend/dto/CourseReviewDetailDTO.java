@@ -18,6 +18,8 @@ public class CourseReviewDetailDTO {
     private String description;
     private String objectives;
     private BigDecimal price;
+    private BigDecimal suggestedPrice;
+    private String priceNote;
     private String version;
     private String status;
     private String thumbnailUrl;

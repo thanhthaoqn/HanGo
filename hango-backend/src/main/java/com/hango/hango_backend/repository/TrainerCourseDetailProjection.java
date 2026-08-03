@@ -15,4 +15,7 @@ public interface TrainerCourseDetailProjection {
     String getVersion();
     Long getParentId();
     String getRejectionReason();
+    java.math.BigDecimal getPrice();
+    java.math.BigDecimal getSuggestedPrice();
+    String getPriceNote();
 }

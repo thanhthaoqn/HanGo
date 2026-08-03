@@ -69,6 +69,12 @@ public class Course {
     @Builder.Default
     @Column(precision = 10, scale = 2)
     private BigDecimal price = BigDecimal.ZERO;
+
+    @Column(name = "suggested_price", precision = 10, scale = 2)
+    private BigDecimal suggestedPrice;
+
+    @Column(name = "price_note", columnDefinition = "TEXT")
+    private String priceNote;
  
     @Column(name = "published_at")
     private LocalDateTime publishedAt;

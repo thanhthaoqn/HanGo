@@ -17,6 +17,7 @@ public class TrainerCreateCourseRequestDTO {
     private String difficultyKey;
     private String thumbnailUrl;
     private BigDecimal price;
+    private String priceNote;
     private String version;
     private String objectives;
     private Integer estimatedDuration;

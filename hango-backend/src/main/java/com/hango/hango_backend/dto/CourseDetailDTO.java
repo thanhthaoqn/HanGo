@@ -24,6 +24,8 @@ public class CourseDetailDTO {
     private String description;
     private String objectives;
     private BigDecimal price;
+    private BigDecimal suggestedPrice;
+    private String priceNote;
     private String version;
     private Boolean isEnrolled;
     private Boolean hasNewVersionAvailable;

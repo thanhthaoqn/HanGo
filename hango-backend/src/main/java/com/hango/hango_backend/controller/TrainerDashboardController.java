@@ -181,7 +181,22 @@ public class TrainerDashboardController {
         }
     }
 
-
+    @PostMapping("/courses/{id}/re-evaluate-price")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> reEvaluateCoursePrice(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.reEvaluateCoursePrice(id, userDetails.getUsername());
+            return ResponseEntity.ok("{\"message\": \"Course price re-evaluated successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")

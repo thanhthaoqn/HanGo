@@ -213,7 +213,81 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
           const SizedBox(height: 12),
           _buildInfoRow(Icons.bar_chart, 'Level', widget.course.difficultyName),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.payments_outlined, 'Price', _formatPrice(widget.course.price)),
+          if (widget.course.suggestedPrice != null && widget.course.suggestedPrice != widget.course.price)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: Color(0xFFEF4444)),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Price Negotiation',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF991B1B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Suggested Price',
+                            style: TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Color(0xFF7F1D1D)),
+                          ),
+                          Text(
+                            _formatPrice(widget.course.suggestedPrice!),
+                            style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7F1D1D)),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'Desired Price',
+                            style: TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Color(0xFF7F1D1D)),
+                          ),
+                          Text(
+                            _formatPrice(widget.course.price),
+                            style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF7F1D1D)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (widget.course.priceNote != null && widget.course.priceNote!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Trainer\'s Reason:',
+                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF991B1B)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.course.priceNote!,
+                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF7F1D1D)),
+                    ),
+                  ],
+                ],
+              ),
+            )
+          else
+            _buildInfoRow(Icons.payments_outlined, 'Price', _formatPrice(widget.course.price)),
           const SizedBox(height: 16),
           Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),

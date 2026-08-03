@@ -150,6 +150,8 @@ public class CourseImportService {
                     .thumbnailUrl(valueOrDefault(courseRow, "Thumbnail URL", ""))
                     .code(persistedCourseCode)
                     .price(calculatedPrice)
+                    .suggestedPrice(calculatedPrice)
+                    .priceNote("")
                     .version(valueOrDefault(courseRow, "Version", ""))
                     .objectives(valueOrDefault(courseRow, "Objectives", ""))
                     .status("DRAFT")

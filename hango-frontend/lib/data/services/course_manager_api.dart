@@ -15,6 +15,8 @@ class CourseReviewCourse {
   final String description;
   final String objectives;
   final num price;
+  final num? suggestedPrice;
+  final String? priceNote;
   final String version;
   final String status;
   final String thumbnailUrl;
@@ -33,6 +35,8 @@ class CourseReviewCourse {
     required this.description,
     required this.objectives,
     required this.price,
+    this.suggestedPrice,
+    this.priceNote,
     required this.version,
     required this.status,
     required this.thumbnailUrl,
@@ -63,6 +67,10 @@ class CourseReviewCourse {
       price: json['price'] is num
           ? json['price'] as num
           : num.tryParse(json['price']?.toString() ?? '') ?? 0,
+      suggestedPrice: json['suggestedPrice'] is num
+          ? json['suggestedPrice'] as num
+          : num.tryParse(json['suggestedPrice']?.toString() ?? ''),
+      priceNote: json['priceNote']?.toString(),
       version: json['version']?.toString() ?? 'v1.0',
       status: json['status']?.toString() ?? 'PENDING',
       thumbnailUrl: json['thumbnailUrl']?.toString() ?? '',

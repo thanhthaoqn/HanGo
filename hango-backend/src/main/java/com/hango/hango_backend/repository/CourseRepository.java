@@ -69,7 +69,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
            "(SELECT COUNT(e.id) FROM enrollments e WHERE e.course_id = c.id) AS learnersCount, " +
            "(SELECT COUNT(l.id) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id AND l.deleted_at IS NULL) AS lessonsCount, " +
            "c.thumbnail_url AS thumbnailUrl, c.created_at AS createdAt, " +
-           "c.code AS code, c.version AS version, c.parent_id AS parentId, c.rejection_reason AS rejectionReason " +
+           "c.code AS code, c.version AS version, c.parent_id AS parentId, c.rejection_reason AS rejectionReason, " +
+           "c.price AS price, c.suggested_price AS suggestedPrice, c.price_note AS priceNote " +
            "FROM courses c " +
            "WHERE c.created_by = :trainerId AND c.deleted_at IS NULL " +
            "AND (:status = 'ALL' OR c.status = :status) " +
@@ -99,6 +100,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     long countByStatusAndDeletedAtIsNull(String status);
 
     boolean existsByCodeIgnoreCase(String code);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
 
     List<Course> findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(String code);
 
