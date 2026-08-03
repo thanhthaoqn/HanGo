@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -678,36 +681,30 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
     final description = _selectedLessonData!['description']?.toString() ?? '';
     final estimatedTime = _selectedLessonData!['estimatedTime']?.toString() ?? '10';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AspectRatio(
-          aspectRatio: 16 / 9,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(12),
-              image: const DecorationImage(
-                image: NetworkImage('https://images.unsplash.com/photo-1610484826967-09c5720778c7?q=80&w=2000&auto=format&fit=crop'),
-                fit: BoxFit.cover,
-                opacity: 0.6,
+    final videoUrl = _selectedLessonData!['videoUrl']?.toString() ?? 
+                     _selectedLessonData!['content']?.toString() ?? 
+                     _selectedLessonData!['questionText']?.toString() ?? '';
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: videoUrl.isNotEmpty 
+                  ? _ReviewVideoPlayer(videoUrl: videoUrl)
+                  : Container(
+                      color: Colors.black87,
+                      child: const Center(
+                        child: Text(
+                          'No video URL provided',
+                          style: TextStyle(color: Colors.white, fontFamily: 'Outfit'),
+                        ),
+                      ),
+                    ),
               ),
             ),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF20B486),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: const Color(0xFF20B486).withValues(alpha: 0.4), blurRadius: 20, spreadRadius: 4),
-                  ],
-                ),
-                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 48),
-              ),
-            ),
-          ),
-        ),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -940,6 +937,133 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
   String _formatPrice(num price) {
     if (price <= 0) return 'Free';
     return '${price.toStringAsFixed(0)} VND';
+  }
+}
+
+class _ReviewVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+
+  const _ReviewVideoPlayer({required this.videoUrl});
+
+  @override
+  State<_ReviewVideoPlayer> createState() => _ReviewVideoPlayerState();
+}
+
+class _ReviewVideoPlayerState extends State<_ReviewVideoPlayer> {
+  YoutubePlayerController? _youtubeController;
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isYoutube = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializePlayer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReviewVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoUrl != widget.videoUrl) {
+      _disposeControllers();
+      _initializePlayer();
+    }
+  }
+
+  String? _extractYouTubeVideoId(String url) {
+    if (url.isEmpty) return null;
+    final regex = RegExp(
+      r'^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})',
+    );
+    final match = regex.firstMatch(url);
+    return match?.group(1);
+  }
+
+  Future<void> _initializePlayer() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    final ytId = _extractYouTubeVideoId(widget.videoUrl);
+    if (ytId != null) {
+      _isYoutube = true;
+      _youtubeController = YoutubePlayerController.fromVideoId(
+        videoId: ytId,
+        autoPlay: false,
+        params: const YoutubePlayerParams(
+          showControls: true,
+          mute: false,
+          showFullscreenButton: true,
+          loop: false,
+        ),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+    } else {
+      _isYoutube = false;
+      try {
+        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+        await _videoPlayerController!.initialize();
+        _chewieController = ChewieController(
+          videoPlayerController: _videoPlayerController!,
+          autoPlay: false,
+          looping: false,
+          aspectRatio: _videoPlayerController!.value.aspectRatio,
+        );
+      } catch (e) {
+        debugPrint('Error initializing video player: $e');
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  void _disposeControllers() {
+    _youtubeController?.close();
+    _youtubeController = null;
+    
+    _chewieController?.dispose();
+    _chewieController = null;
+    
+    _videoPlayerController?.dispose();
+    _videoPlayerController = null;
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF20B486)));
+    }
+    
+    if (_isYoutube && _youtubeController != null) {
+      return YoutubePlayer(controller: _youtubeController!, aspectRatio: 16 / 9);
+    }
+    
+    if (!_isYoutube && _chewieController != null) {
+      return Chewie(controller: _chewieController!);
+    }
+    
+    return Container(
+      color: Colors.black87,
+      child: const Center(
+        child: Text(
+          'Failed to load video',
+          style: TextStyle(color: Colors.white, fontFamily: 'Outfit'),
+        ),
+      ),
+    );
   }
 }
 
