@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
         String errorMessage = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .findFirst()
-                .orElse("Dữ liệu không hợp lệ");
+                .orElse("Invalid data");
                 
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()
                 .timestamp(LocalDateTime.now())
@@ -104,7 +104,7 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.FORBIDDEN.value())
                 .error(HttpStatus.FORBIDDEN.getReasonPhrase())
-                .message("Bạn không có quyền thực hiện hành động này")
+                .message("Access denied. You do not have permission to use this function or it has been deactivated by an administrator.")
                 .path(request.getRequestURI())
                 .build();
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorDTO);
@@ -119,7 +119,7 @@ public class GlobalExceptionHandler {
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())
-                .message("Đã xảy ra lỗi hệ thống nội bộ. Vui lòng thử lại sau.")
+                .message("An internal system error occurred. Please try again later.")
                 .path(request.getRequestURI())
                 .build();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorDTO);
