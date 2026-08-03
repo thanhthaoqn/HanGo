@@ -271,18 +271,23 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
                       ),
                     ],
                   ),
-                  if (widget.course.priceNote != null && widget.course.priceNote!.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Trainer\'s Reason:',
-                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF991B1B)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Trainer\'s Reason:',
+                    style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF991B1B)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    (widget.course.priceNote != null && widget.course.priceNote!.trim().isNotEmpty)
+                        ? widget.course.priceNote!
+                        : 'No reason provided by trainer (legacy course)',
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 13,
+                      fontStyle: (widget.course.priceNote != null && widget.course.priceNote!.trim().isNotEmpty) ? FontStyle.normal : FontStyle.italic,
+                      color: const Color(0xFF7F1D1D),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.course.priceNote!,
-                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF7F1D1D)),
-                    ),
-                  ],
+                  ),
                 ],
               ),
             )
