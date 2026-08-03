@@ -175,9 +175,10 @@ public class CourseRatingServiceImpl implements CourseRatingService {
             }
             average = Math.round((sum / total) * 10.0) / 10.0;
         }
+        courseRepository.updateCourseStats(course.getId(), average, total);
+        // Also update the course entity in memory so subsequent checks see the new values
         course.setAverageRating(average);
         course.setTotalRatings(total);
-        courseRepository.save(course);
     }
 
     @Override

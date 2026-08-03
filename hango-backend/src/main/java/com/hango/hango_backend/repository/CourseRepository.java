@@ -113,4 +113,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @EntityGraph(attributePaths = {"categories", "category", "difficulty", "creator"})
     @Query("SELECT c FROM Course c WHERE c.id IN :ids")
     List<Course> findAllByIdWithDetails(@Param("ids") List<Long> ids);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Course c SET c.averageRating = :average, c.totalRatings = :total WHERE c.id = :courseId")
+    void updateCourseStats(@Param("courseId") Long courseId, @Param("average") Double average, @Param("total") Integer total);
 }
