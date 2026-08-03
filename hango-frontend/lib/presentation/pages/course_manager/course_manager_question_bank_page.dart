@@ -13,7 +13,7 @@ import '../../widgets/course_manager_sidebar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import '../../../../utils/toast_helper.dart';
-
+import '../../../../utils/download_helper.dart';
 class CourseManagerQuestionBankPage extends StatefulWidget {
   const CourseManagerQuestionBankPage({Key? key}) : super(key: key);
 
@@ -29,7 +29,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
   String _errorMessage = '';
 
   // Filter States
-  String _selectedType = 'PUBLIC';
+  String _selectedType = '';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
   int _currentPage = 1;
@@ -39,11 +39,40 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
   List<CourseManagerQuestion> _displayedQuestions = [];
   Timer? _debounceTimer;
 
+  // Metadata for filters
+  List<Map<String, dynamic>>? _skills = [];
+  List<Map<String, dynamic>>? _groupTypes = [];
+  List<Map<String, dynamic>>? _difficulties = [];
+  int? _selectedSkillId;
+  int? _selectedGroupTypeId;
+  int? _selectedDifficultyId;
+
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   void initState() {
     super.initState();
+    _fetchFilters();
     _fetchQuestions();
+  }
+
+  Future<void> _fetchFilters() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+      final skills = await api.getSystemParameters('SKILL_TYPE');
+      final groupTypes = await api.getSystemParameters('GROUP_TYPE');
+      final difficulties = await api.getSystemParameters('DIFFICULTY');
+      if (mounted) {
+        setState(() {
+          _skills = skills;
+          _groupTypes = groupTypes;
+          _difficulties = difficulties;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching filters: $e');
+    }
   }
 
   @override
@@ -72,6 +101,9 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
         type: _selectedType,
         search: _searchQuery,
         sortBy: _sortBy,
+        skillId: _selectedSkillId,
+        categoryId: _selectedGroupTypeId,
+        difficultyId: _selectedDifficultyId,
       );
 
       setState(() {
@@ -132,70 +164,53 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
         if (mounted) ToastHelper.showError(context, 'Failed to read file bytes');
         return;
       }
+      
+      setState(() { _isLoading = true; });
 
-      var excel = Excel.decodeBytes(bytes);
-      var sheetName = excel.tables.keys.firstWhere((k) => k != 'Rules', orElse: () => excel.tables.keys.first);
-      var sheet = excel.tables[sheetName];
+      var excel = Excel.decodeBytes(List<int>.from(bytes));
+      var sheet = excel.tables['QUESTIONS'];
+      if (sheet == null) {
+        var sheetName = excel.tables.keys.firstWhere(
+            (k) => !k.toUpperCase().contains('RULES') && !k.toUpperCase().contains('README'), 
+            orElse: () => excel.tables.keys.last);
+        sheet = excel.tables[sheetName];
+      }
 
       if (sheet == null || sheet.maxRows < 3) {
+        setState(() { _isLoading = false; });
         if (mounted) ToastHelper.showError(context, 'File is empty or invalid format');
         return;
       }
 
       var headerRow = sheet.rows[1];
       if (headerRow.length < 12 || 
-          !headerRow[1]!.value.toString().contains('Order Index') ||
-          !headerRow[2]!.value.toString().contains('Passage Text')) {
+          !headerRow[0]!.value.toString().contains('Order Index') ||
+          !headerRow[1]!.value.toString().contains('Passage Text')) {
+        setState(() { _isLoading = false; });
         if (mounted) ToastHelper.showError(context, 'File does not match the Hango template');
         return;
       }
 
-      List<List<Data?>> firstQuestionRows = [];
-      String? targetPassage;
+      List<Map<String, dynamic>> groupsList = [];
+      Map<String, Map<String, dynamic>> groupMap = {};
 
       for (int i = 2; i < sheet.maxRows; i++) {
         var row = sheet.rows[i];
-        if (row.isEmpty || row[0] == null) continue;
+        if (row.isEmpty || row.length < 3 || row[2] == null || row[2]?.value?.toString().trim().isEmpty == true) continue;
 
-        String passage = row[2]?.value?.toString() ?? '';
-        if (firstQuestionRows.isEmpty) {
-          targetPassage = passage;
-          firstQuestionRows.add(row);
-        } else {
-          if (passage == targetPassage) {
-            firstQuestionRows.add(row);
-          } else {
-            break;
-          }
-        }
-      }
+        String passage = row[1]?.value?.toString().trim() ?? '';
+        String qText = row[2]?.value?.toString() ?? '';
+        String optA = row[3]?.value?.toString() ?? '';
+        String optB = row[4]?.value?.toString() ?? '';
+        String optC = row[5]?.value?.toString() ?? '';
+        String optD = row[6]?.value?.toString() ?? '';
+        String correctAns = row[7]?.value?.toString().trim().toUpperCase() ?? 'A';
+        String explanation = row[8]?.value?.toString() ?? '';
+        String skillName = row[9]?.value?.toString() ?? '';
+        String diffName = row[10]?.value?.toString() ?? '';
+        String groupTypeName = row[11]?.value?.toString() ?? '';
 
-      if (firstQuestionRows.isEmpty) {
-        if (mounted) ToastHelper.showError(context, 'No questions found in the file');
-        return;
-      }
-
-      bool isGroup = targetPassage != null && targetPassage.trim().isNotEmpty;
-      String groupTypeName = isGroup ? (firstQuestionRows[0][12]?.value?.toString() ?? '') : '';
-
-      List<Map<String, dynamic>> subQuestions = [];
-      for (var row in firstQuestionRows) {
-        String qText = row[3]?.value?.toString() ?? '';
-        String optA = row[4]?.value?.toString() ?? '';
-        String optB = row[5]?.value?.toString() ?? '';
-        String optC = row[6]?.value?.toString() ?? '';
-        String optD = row[7]?.value?.toString() ?? '';
-        String correctAns = row[8]?.value?.toString().trim().toUpperCase() ?? 'A';
-        String explanation = row[9]?.value?.toString() ?? '';
-        String skillName = row[10]?.value?.toString() ?? '';
-        String diffName = row[11]?.value?.toString() ?? '';
-
-        if (qText.isEmpty) {
-           if (mounted) ToastHelper.showError(context, 'Question Text is required in Excel');
-           return;
-        }
-
-        subQuestions.add({
+        Map<String, dynamic> subQ = {
           'questionText': qText,
           'explanation': explanation,
           'skillName': skillName,
@@ -206,15 +221,40 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
             {'optionText': optC, 'isCorrect': correctAns == 'C'},
             {'optionText': optD, 'isCorrect': correctAns == 'D'},
           ]
-        });
+        };
+
+        if (passage.isEmpty) {
+          groupsList.add({
+            'isGroup': false,
+            'passageText': '',
+            'groupTypeName': '',
+            'subQuestions': [subQ]
+          });
+        } else {
+          if (!groupMap.containsKey(passage)) {
+            groupMap[passage] = {
+              'isGroup': true,
+              'passageText': passage,
+              'groupTypeName': groupTypeName,
+              'subQuestions': <Map<String, dynamic>>[]
+            };
+            groupsList.add(groupMap[passage]!);
+          }
+          (groupMap[passage]!['subQuestions'] as List).add(subQ);
+        }
+      }
+
+      if (groupsList.isEmpty) {
+        setState(() { _isLoading = false; });
+        if (mounted) ToastHelper.showError(context, 'No valid questions found');
+        return;
       }
 
       Map<String, dynamic> initialData = {
-        'isGroup': isGroup,
-        'groupTypeName': groupTypeName,
-        'passageText': targetPassage ?? '',
-        'subQuestions': subQuestions,
+        'groups': groupsList,
       };
+
+      setState(() { _isLoading = false; });
 
       if (mounted) {
         Navigator.push(
@@ -228,6 +268,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
         ).then((_) => _fetchQuestions());
       }
     } catch (e) {
+      setState(() { _isLoading = false; });
       if (mounted) ToastHelper.showError(context, 'Failed to import Excel: $e');
     }
   }
@@ -279,14 +320,28 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                                 onTypeChanged: _handleTypeChanged,
                                 sortBy: _sortBy,
                                 onSortChanged: _handleSortChanged,
-                                onCreatePressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const CourseManagerCreateQuestionPage(isCourseManager: true)),
-                                  ).then((_) => _fetchQuestions());
-                                },
-                                onImportPressed: _importFromExcel,
+                                onCreatePressed: () {}, // Moved to header
+                                onImportPressed: () {}, // Moved to header
                                 onRefreshPressed: _fetchQuestions,
+                                isCourseManager: true,
+                                skills: _skills,
+                                groupTypes: _groupTypes,
+                                difficulties: _difficulties,
+                                selectedSkillId: _selectedSkillId,
+                                onSkillChanged: (val) {
+                                  setState(() { _selectedSkillId = val; _currentPage = 1; });
+                                  _fetchQuestions();
+                                },
+                                selectedGroupTypeId: _selectedGroupTypeId,
+                                onGroupTypeChanged: (val) {
+                                  setState(() { _selectedGroupTypeId = val; _currentPage = 1; });
+                                  _fetchQuestions();
+                                },
+                                selectedDifficultyId: _selectedDifficultyId,
+                                onDifficultyChanged: (val) {
+                                  setState(() { _selectedDifficultyId = val; _currentPage = 1; });
+                                  _fetchQuestions();
+                                },
                               ),
                               const SizedBox(height: 24),
                               QuestionTable(
@@ -349,6 +404,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                                     }
                                   }
                                 },
+                                isCourseManager: true,
                               ),
                             ],
                           ),
@@ -386,6 +442,68 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
               fontWeight: FontWeight.bold,
               color: Color(0xFF1E293B),
               fontFamily: 'Outfit',
+            ),
+          ),
+          const Spacer(),
+          OutlinedButton.icon(
+            onPressed: () async {
+              try {
+                final token = await _authService.getToken();
+                if (token == null) throw Exception('Authentication token not found');
+                final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+                final bytes = await api.downloadQuestionBankTemplate();
+                downloadBytes(
+                  bytes: bytes,
+                  filename: 'Hango_Question_Bank_Import_Template.xlsx',
+                  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                );
+              } catch (e) {
+                if (context.mounted) ToastHelper.showError(context, 'Could not download template: $e');
+              }
+            },
+            icon: const Icon(Icons.download_outlined, color: Color(0xFF20B486), size: 18),
+            label: const Text(
+              'Download Template',
+              style: TextStyle(color: Color(0xFF20B486), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              side: const BorderSide(color: Color(0xFF20B486)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: _importFromExcel,
+            icon: const Icon(Icons.file_upload_outlined, color: Color(0xFF1E293B), size: 18),
+            label: const Text(
+              'Import Excel',
+              style: TextStyle(color: Color(0xFF1E293B), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CourseManagerCreateQuestionPage(isCourseManager: true)),
+              ).then((_) => _fetchQuestions());
+            },
+            icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 18),
+            label: const Text(
+              'Create Question',
+              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
             ),
           ),
         ],

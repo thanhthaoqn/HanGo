@@ -28,7 +28,7 @@ public class ExamImportController {
     private final JdbcTemplate jdbcTemplate;
 
     @PostMapping("/import-excel-multiple")
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     @Transactional
     public ResponseEntity<Map<String, Object>> importExcelMultiple(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -275,7 +275,7 @@ public class ExamImportController {
     }
 
     @GetMapping("/import-excel/template")
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<byte[]> downloadTemplate() {
         try {
             String fileName = "Hango_Exam_Import_Template.xlsx";
@@ -344,15 +344,6 @@ public class ExamImportController {
         List<Long> ids = jdbcTemplate.query(
                 "SELECT id FROM system_parameters WHERE LOWER(param_value) = LOWER(?) LIMIT 1",
                 (rs, rn) -> rs.getLong("id"), searchVal);
-        return ids.isEmpty() ? null : ids.get(0);
-    }
-
-    private Long resolveCategory(String categoryName) {
-        if (categoryName == null || categoryName.isBlank())
-            return null;
-        List<Long> ids = jdbcTemplate.query(
-                "SELECT id FROM question_categories WHERE LOWER(name) = LOWER(?) LIMIT 1",
-                (rs, rn) -> rs.getLong("id"), categoryName.trim());
         return ids.isEmpty() ? null : ids.get(0);
     }
 

@@ -50,7 +50,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/courses/import/template")
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('COURSE_MANAGER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<byte[]> downloadCourseImportTemplate() {
         try {
             byte[] workbook = courseImportService.buildTemplateWorkbook();

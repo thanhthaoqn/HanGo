@@ -90,4 +90,33 @@ public class TrainerQuestionController {
         trainerQuestionService.updateQuestionStatus(userDetails.getUsername(), id, status, isGroup);
         return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
     }
+    @GetMapping("/import-excel/template")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<byte[]> downloadTemplate() {
+        try {
+            String fileName = "Hango_Question_Bank_Import_Template.xlsx";
+            List<java.nio.file.Path> candidates = List.of(
+                    java.nio.file.Paths.get("doc", "templates", fileName),
+                    java.nio.file.Paths.get("..", "doc", "templates", fileName),
+                    java.nio.file.Paths.get("doc", "specs", "templates", fileName),
+                    java.nio.file.Paths.get("..", "doc", "specs", "templates", fileName));
+            byte[] bytes = null;
+            for (java.nio.file.Path p : candidates) {
+                if (java.nio.file.Files.isRegularFile(p)) {
+                    bytes = java.nio.file.Files.readAllBytes(p);
+                    break;
+                }
+            }
+            if (bytes == null) {
+                throw new java.io.IOException("Template not found");
+            }
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=" + fileName)
+                    .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    .body(bytes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 }

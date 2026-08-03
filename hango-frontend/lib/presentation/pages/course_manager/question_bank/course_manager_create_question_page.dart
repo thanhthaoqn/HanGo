@@ -38,6 +38,16 @@ class QuestionState {
   }
 }
 
+class QuestionGroupState {
+  bool isGroup;
+  TextEditingController passageController = TextEditingController();
+  int? selectedGroupTypeId;
+  int aiQuantity = 2;
+  List<QuestionState> questions = [QuestionState()];
+  
+  QuestionGroupState({this.isGroup = false});
+}
+
 class CourseManagerCreateQuestionPage extends StatefulWidget {
   final CourseManagerQuestion? question;
   final bool isReadOnly;
@@ -64,13 +74,9 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
 
-  bool _isQuestionGroup = true;
   bool _isLoadingMetadata = true;
   bool _isSaving = false;
   bool _isGeneratingByAi = false;
-  int _aiQuantity = 2;
-  int? _globalSkillId;
-  int? _globalDifficultyId;
 
   final TrainerAiQuestionRepository _aiRepo = TrainerAiQuestionRepository();
 
@@ -78,11 +84,9 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   List<Map<String, dynamic>> _groupTypes = [];
   List<Map<String, dynamic>> _difficulties = [];
 
-  int? _selectedGroupTypeId;
   String _status = 'PRIVATE';
 
-  final TextEditingController _passageController = TextEditingController();
-  List<QuestionState> _questions = [QuestionState()];
+  List<QuestionGroupState> _groups = [];
 
   @override
   void initState() {
@@ -139,61 +143,51 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
         _difficulties = difficulties;
         _groupTypes = groupTypes;
 
-        if (widget.initialData != null || widget.question != null) {
-          final isGroup = widget.initialData != null 
-              ? (widget.initialData!['isGroup'] as bool? ?? false) 
-              : widget.question!.isGroup;
-          _isQuestionGroup = isGroup;
-          
-          if (detail != null) {
-            if (widget.initialData != null) {
-              // Resolve names to IDs for Excel Import
-              String gName = detail['groupTypeName'] ?? '';
+        if (widget.initialData != null) {
+          final groupsList = widget.initialData!['groups'] as List? ?? [];
+          _groups = [];
+
+          for (var groupData in groupsList) {
+            final isGroup = groupData['isGroup'] as bool? ?? false;
+            final gState = QuestionGroupState(isGroup: isGroup);
+            
+            if (isGroup) {
+              gState.passageController.text = groupData['passageText'] ?? '';
+              String gName = groupData['groupTypeName'] ?? '';
               if (gName.isNotEmpty) {
                 var match = _groupTypes.firstWhere(
                   (t) => t['paramValue'].toString().toLowerCase() == gName.toLowerCase(),
                   orElse: () => <String, dynamic>{},
                 );
-                _selectedGroupTypeId = match['id'] as int?;
+                gState.selectedGroupTypeId = match['id'] as int?;
               }
-            } else {
-              _selectedGroupTypeId = detail['categoryId'] as int?;
-            }
-            
-            if (isGroup) {
-              _passageController.text = detail['passageText'] ?? '';
             }
 
-            final subQList = detail['subQuestions'] as List? ?? [];
-            _questions = [];
+            final subQList = groupData['subQuestions'] as List? ?? [];
+            gState.questions = [];
             for (var subQ in subQList) {
               final qs = QuestionState();
               qs.id = subQ['id'] as int?;
               qs.questionTextController.text = subQ['questionText'] ?? '';
               qs.explanationController.text = subQ['explanation'] ?? '';
-              if (widget.initialData != null) {
-                // Resolve names to IDs for Excel Import
-                String sName = subQ['skillName'] ?? '';
-                if (sName.isNotEmpty) {
-                  var match = _skills.firstWhere(
-                    (t) => t['paramValue'].toString().toLowerCase() == sName.toLowerCase(),
-                    orElse: () => <String, dynamic>{},
-                  );
-                  qs.selectedSkillId = match['id'] as int?;
-                }
-                String dName = subQ['diffName'] ?? '';
-                if (dName.isNotEmpty) {
-                  var match = _difficulties.firstWhere(
-                    (t) => t['paramValue'].toString().toLowerCase() == dName.toLowerCase(),
-                    orElse: () => <String, dynamic>{},
-                  );
-                  qs.selectedDifficultyId = match['id'] as int?;
-                }
-              } else {
-                qs.selectedSkillId = subQ['skillParamId'] as int?;
-                qs.selectedDifficultyId = subQ['difficultyId'] as int?;
-              }
               
+              String sName = subQ['skillName'] ?? '';
+              if (sName.isNotEmpty) {
+                var match = _skills.firstWhere(
+                  (t) => t['paramValue'].toString().toLowerCase() == sName.toLowerCase(),
+                  orElse: () => <String, dynamic>{},
+                );
+                qs.selectedSkillId = match['id'] as int?;
+              }
+              String dName = subQ['diffName'] ?? '';
+              if (dName.isNotEmpty) {
+                var match = _difficulties.firstWhere(
+                  (t) => t['paramValue'].toString().toLowerCase() == dName.toLowerCase(),
+                  orElse: () => <String, dynamic>{},
+                );
+                qs.selectedDifficultyId = match['id'] as int?;
+              }
+
               final optsList = subQ['options'] as List? ?? [];
               qs.options = [];
               for (var opt in optsList) {
@@ -203,7 +197,6 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                   isCorrect: opt['isCorrect'] as bool? ?? false,
                 ));
               }
-              // Fallback if empty options
               if (qs.options.isEmpty) {
                 qs.options = [
                   OptionState(text: '', isCorrect: true),
@@ -212,15 +205,52 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                   OptionState(text: '', isCorrect: false),
                 ];
               }
-              _questions.add(qs);
+              gState.questions.add(qs);
             }
-            _status = detail['status'] ?? 'PRIVATE';
-          } else {
-            // Fallback to simple data
-            _questions = [QuestionState()];
-            _questions[0].questionTextController.text = widget.question!.questionText;
-            _status = widget.question!.status;
+            if (gState.questions.isEmpty) gState.questions.add(QuestionState());
+            _groups.add(gState);
           }
+          if (_groups.isEmpty) _groups.add(QuestionGroupState(isGroup: true));
+        } else if (widget.question != null && detail != null) {
+          final isGroup = widget.question!.isGroup;
+          final gState = QuestionGroupState(isGroup: isGroup);
+          
+          if (isGroup) {
+            gState.passageController.text = detail['passageText'] ?? '';
+            gState.selectedGroupTypeId = detail['categoryId'] as int?;
+          }
+
+          final subQList = detail['subQuestions'] as List? ?? [];
+          gState.questions = [];
+          for (var subQ in subQList) {
+            final qs = QuestionState();
+            qs.id = subQ['id'] as int?;
+            qs.questionTextController.text = subQ['questionText'] ?? '';
+            qs.explanationController.text = subQ['explanation'] ?? '';
+            qs.selectedSkillId = subQ['skillParamId'] as int?;
+            qs.selectedDifficultyId = subQ['difficultyId'] as int?;
+            
+            final optsList = subQ['options'] as List? ?? [];
+            qs.options = [];
+            for (var opt in optsList) {
+              qs.options.add(OptionState(
+                id: opt['id'] as int?,
+                text: opt['optionText'] ?? '',
+                isCorrect: opt['isCorrect'] as bool? ?? false,
+              ));
+            }
+            if (qs.options.isEmpty) {
+              qs.options = [
+                OptionState(text: '', isCorrect: true),
+                OptionState(text: '', isCorrect: false),
+                OptionState(text: '', isCorrect: false),
+                OptionState(text: '', isCorrect: false),
+              ];
+            }
+            gState.questions.add(qs);
+          }
+          if (gState.questions.isEmpty) gState.questions.add(QuestionState());
+          _groups = [gState];
         }
 
         _isLoadingMetadata = false;
@@ -234,27 +264,31 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     }
   }
 
-  Future<void> _handleGenerateByAI() async {
+  Future<void> _handleGenerateByAIForGroup(QuestionGroupState group) async {
     setState(() {
       _isGeneratingByAi = true;
     });
 
     try {
-      final String mode = _isQuestionGroup ? 'MULTIPLE' : 'SINGLE';
+      final String mode = group.isGroup ? 'MULTIPLE' : 'SINGLE';
       
       String? groupTypeName;
-      if (_isQuestionGroup && _selectedGroupTypeId != null) {
+      if (group.isGroup && group.selectedGroupTypeId != null) {
         final match = _groupTypes.firstWhere(
-          (t) => t['id'] == _selectedGroupTypeId,
+          (t) => t['id'] == group.selectedGroupTypeId,
           orElse: () => <String, dynamic>{},
         );
         groupTypeName = match['paramValue']?.toString();
       }
       
+      // We will try to infer a skill and difficulty from the first question, if any.
+      int? firstSkillId = group.questions.isNotEmpty ? group.questions.first.selectedSkillId : null;
+      int? firstDiffId = group.questions.isNotEmpty ? group.questions.first.selectedDifficultyId : null;
+
       String? skillTypeName;
-      if (_globalSkillId != null) {
+      if (firstSkillId != null) {
         final match = _skills.firstWhere(
-          (t) => t['id'] == _globalSkillId,
+          (t) => t['id'] == firstSkillId,
           orElse: () => <String, dynamic>{},
         );
         skillTypeName = match['paramValue']?.toString();
@@ -262,86 +296,70 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
 
       final resp = await _aiRepo.generate(
         mode: mode,
-        sectionId: 1, // Dummy sectionId required by backend DTO
-        topicSeed: skillTypeName ?? 'English test questions', // Dummy topic if no topic input
-        quantity: _isQuestionGroup ? _aiQuantity : 1,
-        difficultyId: _globalDifficultyId,
-        categoryId: _selectedGroupTypeId,
+        sectionId: 1, 
+        topicSeed: skillTypeName ?? 'English test questions', 
+        quantity: group.isGroup ? group.aiQuantity : 1,
+        difficultyId: firstDiffId,
+        categoryId: group.selectedGroupTypeId,
         skillType: skillTypeName,
         groupType: groupTypeName,
       );
 
-      if (_isQuestionGroup && resp.group != null) {
+      if (group.isGroup && resp.group != null) {
         if (resp.group!.passageText.isNotEmpty) {
-          _passageController.text = resp.group!.passageText;
+          group.passageController.text = resp.group!.passageText;
         }
         
         final generatedSubs = resp.group!.subQuestions;
         if (generatedSubs.isEmpty) {
-          ToastHelper.showError(context, 'AI did not return any sub-questions.');
+          if (mounted) ToastHelper.showError(context, 'AI did not return any sub-questions.');
           return;
         }
 
-        _questions.clear();
+        group.questions.clear();
         for (final q in generatedSubs) {
-          final opts = <Map<String, dynamic>>[];
-          for (final o in q.options) {
-            opts.add({
-              'optionText': o.optionText,
-              'isCorrect': o.isCorrect,
-            });
-          }
-          
           final qs = QuestionState();
           qs.questionTextController.text = q.questionText;
           qs.explanationController.text = q.explanation;
-          qs.selectedSkillId = _globalSkillId;
-          qs.selectedDifficultyId = _globalDifficultyId;
+          qs.selectedSkillId = firstSkillId;
+          qs.selectedDifficultyId = firstDiffId;
           
           qs.options = [];
-          for (var opt in opts) {
+          for (final o in q.options) {
             qs.options.add(OptionState(
-              text: opt['optionText'] ?? '',
-              isCorrect: opt['isCorrect'] as bool? ?? false,
+              text: o.optionText,
+              isCorrect: o.isCorrect,
             ));
           }
-          _questions.add(qs);
+          group.questions.add(qs);
         }
       } else {
         final generated = resp.questions ?? [];
         if (generated.isEmpty) {
-          ToastHelper.showError(context, 'AI did not return any questions.');
+          if (mounted) ToastHelper.showError(context, 'AI did not return any questions.');
           return;
         }
 
-        _questions.clear();
+        group.questions.clear();
         for (final q in generated) {
-          final opts = <Map<String, dynamic>>[];
-          for (final o in q.options) {
-            opts.add({
-              'optionText': o.optionText,
-              'isCorrect': o.isCorrect,
-            });
-          }
-          
           final qs = QuestionState();
           qs.questionTextController.text = q.questionText;
           qs.explanationController.text = q.explanation;
-          qs.selectedSkillId = _globalSkillId;
-          qs.selectedDifficultyId = _globalDifficultyId;
+          qs.selectedSkillId = firstSkillId;
+          qs.selectedDifficultyId = firstDiffId;
           
           qs.options = [];
-          for (var opt in opts) {
+          for (final o in q.options) {
             qs.options.add(OptionState(
-              text: opt['optionText'] ?? '',
-              isCorrect: opt['isCorrect'] as bool? ?? false,
+              text: o.optionText,
+              isCorrect: o.isCorrect,
             ));
           }
-          _questions.add(qs);
+          group.questions.add(qs);
         }
       }
       
-      ToastHelper.show(context, 'Questions generated successfully!');
+      if (mounted) ToastHelper.show(context, 'Questions generated successfully!');
     } catch (e) {
       if (mounted) {
         ToastHelper.showError(context, 'AI Generation Failed: $e');
@@ -356,69 +374,86 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   }
 
   Future<void> _handleSave() async {
-    // Validate
-    if (_isQuestionGroup && _passageController.text.trim().isEmpty) {
-      ToastHelper.show(context, 'Passage text cannot be empty for a Question Group.', isError: true);
-      return;
-    }
-    if (_isQuestionGroup && _selectedGroupTypeId == null) {
-      ToastHelper.show(context, 'Please select a Group Type.', isError: true);
-      return;
-    }
-    for (var i = 0; i < _questions.length; i++) {
-      if (_questions[i].selectedSkillId == null) {
-        ToastHelper.show(context, 'Please select a Skill Type for Question ${i + 1}.', isError: true);
+    for (int g = 0; g < _groups.length; g++) {
+      final group = _groups[g];
+      if (group.isGroup && group.passageController.text.trim().isEmpty) {
+        ToastHelper.show(context, 'Passage text cannot be empty for Group ${g + 1}.', isError: true);
         return;
       }
-      if (_questions[i].selectedDifficultyId == null) {
-        ToastHelper.show(context, 'Please select a Difficulty for Question ${i + 1}.', isError: true);
+      if (group.isGroup && group.selectedGroupTypeId == null) {
+        ToastHelper.show(context, 'Please select a Group Type for Group ${g + 1}.', isError: true);
         return;
       }
-      if (_questions[i].questionTextController.text.trim().isEmpty) {
-        ToastHelper.show(context, 'Question ${i + 1} text cannot be empty.', isError: true);
-        return;
-      }
-      if (!_questions[i].options.any((opt) => opt.isCorrect)) {
-        ToastHelper.show(context, 'Question ${i + 1} must have at least one correct option.', isError: true);
-        return;
+      for (var i = 0; i < group.questions.length; i++) {
+        if (group.questions[i].selectedSkillId == null) {
+          ToastHelper.show(context, 'Please select a Skill Type for Question ${i + 1} (Group ${g + 1}).', isError: true);
+          return;
+        }
+        if (group.questions[i].selectedDifficultyId == null) {
+          ToastHelper.show(context, 'Please select a Difficulty for Question ${i + 1} (Group ${g + 1}).', isError: true);
+          return;
+        }
+        if (group.questions[i].questionTextController.text.trim().isEmpty) {
+          ToastHelper.show(context, 'Question ${i + 1} text (Group ${g + 1}) cannot be empty.', isError: true);
+          return;
+        }
+        if (!group.questions[i].options.any((opt) => opt.isCorrect)) {
+          ToastHelper.show(context, 'Question ${i + 1} (Group ${g + 1}) must have at least one correct option.', isError: true);
+          return;
+        }
       }
     }
 
     setState(() => _isSaving = true);
-    try {
-      final payload = {
-        if (widget.question != null) 'id': widget.question!.id,
-        'categoryId': _selectedGroupTypeId,
-        'status': _status,
-        'passageText': _isQuestionGroup ? _passageController.text : null,
-        'subQuestions': _questions.map((q) => {
-          if (q.id != null) 'id': q.id,
-          'questionText': q.questionTextController.text,
-          'explanation': q.explanationController.text,
-          'skillParamId': q.selectedSkillId,
-          'difficultyId': q.selectedDifficultyId,
-          'options': q.options.map((o) => {
-            if (o.id != null) 'id': o.id,
-            'optionText': o.textController.text,
-            'isCorrect': o.isCorrect,
-          }).toList()
-        }).toList(),
-      };
+    int successCount = 0;
+    int errorCount = 0;
 
+    try {
       final api = await _getApi();
-      if (widget.question != null) {
-        await api.updateCourseManagerQuestionGroup(widget.question!.id, payload, isGroup: widget.question!.isGroup);
-      } else {
-        await api.createCourseManagerQuestionGroup(payload);
+
+      for (var group in _groups) {
+        final payload = {
+          if (widget.question != null) 'id': widget.question!.id,
+          'categoryId': group.selectedGroupTypeId,
+          'status': _status,
+          'passageText': group.isGroup ? group.passageController.text : null,
+          'subQuestions': group.questions.map((q) => {
+            if (q.id != null) 'id': q.id,
+            'questionText': q.questionTextController.text,
+            'explanation': q.explanationController.text,
+            'skillParamId': q.selectedSkillId,
+            'difficultyId': q.selectedDifficultyId,
+            'options': q.options.map((o) => {
+              if (o.id != null) 'id': o.id,
+              'optionText': o.textController.text,
+              'isCorrect': o.isCorrect,
+            }).toList()
+          }).toList(),
+        };
+
+        try {
+          if (widget.question != null) {
+            await api.updateCourseManagerQuestionGroup(widget.question!.id, payload, isGroup: widget.question!.isGroup);
+          } else {
+            await api.createCourseManagerQuestionGroup(payload);
+          }
+          successCount += group.questions.length;
+        } catch (e) {
+          errorCount += group.questions.length;
+        }
       }
 
       if (mounted) {
-        ToastHelper.show(context, 'Question saved successfully!');
-        Navigator.pop(context);
+        if (errorCount == 0) {
+          ToastHelper.showSuccess(context, 'Saved $successCount questions successfully!');
+          Navigator.pop(context);
+        } else {
+          ToastHelper.showError(context, 'Saved $successCount questions, failed $errorCount questions.');
+        }
       }
     } catch (e) {
       if (mounted) {
-        ToastHelper.show(context, 'Failed to save question: $e', isError: true);
+        ToastHelper.showError(context, 'Failed to save: $e');
       }
     } finally {
       if (mounted) {
@@ -473,59 +508,137 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
 
   Widget _buildMainContent() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.isReadOnly ? 'View Question' : (widget.isEdit ? 'Edit Question' : 'Create Question'),
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                flex: 12,
-                child: _buildLeftColumn(),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 10,
-                child: _buildRightColumn(),
-              ),
+              for (int i = 0; i < _groups.length; i++) ...[
+                _buildGroupBlock(i),
+                const SizedBox(height: 32),
+              ],
+              _buildAddButtons(),
+              const SizedBox(height: 24),
+              _buildBottomBar(),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildBottomBar(),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildLeftColumn() {
-    return Column(
+  Widget _buildAddButtons() {
+    if (widget.isReadOnly || widget.isEdit) return const SizedBox();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildPassageEditor(),
-        const SizedBox(height: 16),
-        _buildMetadataSection(),
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              _groups.add(QuestionGroupState(isGroup: true));
+            });
+          },
+          icon: const Icon(Icons.add_box_outlined, size: 18),
+          label: const Text('Add Question Group'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF0F766E),
+            side: const BorderSide(color: Color(0xFF0F766E)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        const SizedBox(width: 16),
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              _groups.add(QuestionGroupState(isGroup: false));
+            });
+          },
+          icon: const Icon(Icons.post_add_outlined, size: 18),
+          label: const Text('Add Single Question'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF0F766E),
+            side: const BorderSide(color: Color(0xFF0F766E)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildRightColumn() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildQuestionTypeToggle(),
-        const SizedBox(height: 16),
-        if (_isQuestionGroup) _buildQuestionGroupUI() else _buildSingleQuestionUI(),
-      ],
+  Widget _buildGroupBlock(int groupIndex) {
+    final group = _groups[groupIndex];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                group.isGroup ? 'Group ${groupIndex + 1}' : 'Single Question ${groupIndex + 1}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              if (!widget.isReadOnly)
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Color(0xFFEF4444)),
+                  onPressed: () {
+                    setState(() {
+                      _groups.removeAt(groupIndex);
+                    });
+                  },
+                ),
+            ],
+          ),
+          const Divider(height: 32, color: Color(0xFFE2E8F0)),
+          if (group.isGroup)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 12,
+                  child: Column(
+                    children: [
+                      _buildPassageEditor(group),
+                      const SizedBox(height: 16),
+                      _buildMetadataSection(group, groupIndex),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  flex: 10,
+                  child: _buildQuestionGroupUI(group),
+                ),
+              ],
+            )
+          else
+            _buildSingleQuestionUI(group),
+        ],
+      ),
     );
   }
 
@@ -563,11 +676,11 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     );
   }
 
-  Widget _buildPassageEditor() {
-    final title = _isQuestionGroup ? 'PASSAGE' : 'QUESTION';
-    final icon = _isQuestionGroup ? Icons.article_outlined : Icons.help_outline;
-    final hint = _isQuestionGroup ? 'Enter passage content here...' : 'Enter question text here...';
-    final controller = _isQuestionGroup ? _passageController : _questions[0].questionTextController;
+  Widget _buildPassageEditor(QuestionGroupState group) {
+    final title = 'PASSAGE';
+    final icon = Icons.article_outlined;
+    final hint = 'Enter passage content here...';
+    final controller = group.passageController;
 
     return Container(
       decoration: BoxDecoration(
@@ -623,7 +736,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     );
   }
 
-  Widget _buildMetadataSection() {
+  Widget _buildMetadataSection(QuestionGroupState group, int groupIndex) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -633,68 +746,20 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('SKILL TYPE'),
-                    _buildDropdown(
-                      value: _globalSkillId ?? (_questions.isNotEmpty ? _questions[0].selectedSkillId : null),
-                      items: _skills,
-                      onChanged: widget.isReadOnly ? null : (val) {
-                        setState(() {
-                          _globalSkillId = val;
-                          if (!_isQuestionGroup && _questions.isNotEmpty) {
-                            _questions[0].selectedSkillId = val;
-                          }
-                        });
-                      },
-                      displayKey: 'paramValue',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('DIFFICULTY'),
-                    _buildDropdown(
-                      value: _globalDifficultyId ?? (_questions.isNotEmpty ? _questions[0].selectedDifficultyId : null),
-                      items: _difficulties,
-                      onChanged: widget.isReadOnly ? null : (val) {
-                        setState(() {
-                          _globalDifficultyId = val;
-                          if (!_isQuestionGroup && _questions.isNotEmpty) {
-                            _questions[0].selectedDifficultyId = val;
-                          }
-                        });
-                      },
-                      displayKey: 'paramValue',
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildLabel('GROUP TYPE'),
               _buildDropdown(
-                value: _selectedGroupTypeId,
+                value: group.selectedGroupTypeId,
                 items: _groupTypes,
-                onChanged: widget.isReadOnly ? null : (val) => setState(() => _selectedGroupTypeId = val),
+                onChanged: widget.isReadOnly ? null : (val) => setState(() => group.selectedGroupTypeId = val),
                 displayKey: 'paramValue',
                 allowNone: true,
               ),
             ],
           ),
-          if (_isQuestionGroup) ...[
+          if (group.isGroup) ...[
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -720,7 +785,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                         icon: const Icon(Icons.remove, size: 16, color: Color(0xFF64748B)),
                         onPressed: widget.isReadOnly ? null : () {
                           setState(() {
-                            if (_aiQuantity > 2) _aiQuantity--;
+                            if (group.aiQuantity > 2) group.aiQuantity--;
                           });
                         },
                       ),
@@ -728,7 +793,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                         width: 40,
                         alignment: Alignment.center,
                         child: Text(
-                          '$_aiQuantity',
+                          '${group.aiQuantity}',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -741,7 +806,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                         icon: const Icon(Icons.add, size: 16, color: Color(0xFF64748B)),
                         onPressed: widget.isReadOnly ? null : () {
                           setState(() {
-                            if (_aiQuantity < 10) _aiQuantity++;
+                            if (group.aiQuantity < 10) group.aiQuantity++;
                           });
                         },
                       ),
@@ -755,12 +820,9 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: (_isGeneratingByAi ||
-                          _globalSkillId == null ||
-                          _globalDifficultyId == null ||
-                          (_isQuestionGroup && _selectedGroupTypeId == null))
+              onPressed: (_isGeneratingByAi || (group.isGroup && group.selectedGroupTypeId == null))
                   ? null
-                  : _handleGenerateByAI,
+                  : () => _handleGenerateByAIForGroup(group),
               icon: const Icon(Icons.auto_awesome, size: 18),
               label: _isGeneratingByAi
                   ? const SizedBox(
@@ -823,93 +885,15 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     );
   }
 
-  Widget _buildQuestionTypeToggle() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildLabel('QUESTION TYPE'),
-          Row(
-            children: [
-              _buildToggleButton(
-                title: 'Question Group',
-                icon: Icons.check_box_outlined,
-                isActive: _isQuestionGroup,
-                onTap: widget.isReadOnly ? () {} : () {
-                  setState(() {
-                    _isQuestionGroup = true;
-                  });
-                },
-              ),
-              const SizedBox(width: 12),
-              _buildToggleButton(
-                title: 'Single Question',
-                icon: Icons.edit_note_outlined,
-                isActive: !_isQuestionGroup,
-                onTap: widget.isReadOnly ? () {} : () {
-                  setState(() {
-                    _isQuestionGroup = false;
-                    if (_questions.length > 1) {
-                      _questions = [_questions.first]; // Keep only first question
-                    }
-                  });
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleButton({required String title, required IconData icon, required bool isActive, required VoidCallback onTap}) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive ? const Color(0xFF38C9A6) : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isActive ? const Color(0xFF38C9A6) : const Color(0xFFE2E8F0)),
-          ),
-          alignment: Alignment.center,
-          child: Column(
-            children: [
-              Icon(icon, color: isActive ? Colors.white : const Color(0xFF1E293B)),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : const Color(0xFF1E293B),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuestionGroupUI() {
+  Widget _buildQuestionGroupUI(QuestionGroupState group) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildLabel('ANSWER DETAILS'),
-        for (var i = 0; i < _questions.length; i++) ...[
-          _buildQuestionCard(i),
+        for (var i = 0; i < group.questions.length; i++) ...[
+          _buildQuestionCard(group, i),
           const SizedBox(height: 12),
         ],
-        // Add Answer Set Button
         if (!widget.isReadOnly)
           InkWell(
             onTap: () {
@@ -917,7 +901,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                 final newQ = QuestionState();
                 if (_skills.isNotEmpty) newQ.selectedSkillId = _skills.first['id'] as int;
                 if (_difficulties.isNotEmpty) newQ.selectedDifficultyId = _difficulties.first['id'] as int;
-                _questions.add(newQ);
+                group.questions.add(newQ);
               });
             },
             child: Container(
@@ -945,18 +929,18 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     );
   }
 
-  Widget _buildSingleQuestionUI() {
+  Widget _buildSingleQuestionUI(QuestionGroupState group) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildLabel('ANSWER DETAILS'),
-        _buildQuestionCard(0, showTitle: false, showQuestionText: false),
+        _buildQuestionCard(group, 0, showTitle: false, showQuestionText: true),
       ],
     );
   }
 
-  Widget _buildQuestionCard(int index, {bool showTitle = true, bool showQuestionText = true}) {
-    final qState = _questions[index];
+  Widget _buildQuestionCard(QuestionGroupState group, int index, {bool showTitle = true, bool showQuestionText = true}) {
+    final qState = group.questions[index];
     final letters = ['A', 'B', 'C', 'D', 'E', 'F'];
     
     return Container(
@@ -982,14 +966,14 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                       fontSize: 14,
                     ),
                   ),
-                  if (_questions.length > 1 && !widget.isReadOnly)
+                  if (group.questions.length > 1 && !widget.isReadOnly)
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () {
                         setState(() {
-                          _questions.removeAt(index);
+                          group.questions.removeAt(index);
                         });
                       },
                     ),
@@ -1003,7 +987,6 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (_isQuestionGroup) ...[
                   Row(
                     children: [
                       Expanded(
@@ -1038,7 +1021,6 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                     ],
                   ),
                   const SizedBox(height: 16),
-                ],
                 if (showQuestionText) ...[
                   _buildLabel('QUESTION'),
                   TextField(
