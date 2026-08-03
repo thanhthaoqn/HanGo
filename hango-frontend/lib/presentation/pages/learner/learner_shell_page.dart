@@ -76,13 +76,13 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         if (mounted) {
           ToastHelper.showSuccess(
             context,
-            '🎉 Thanh toán thành công! Khóa học đã được mở khóa.',
+            'Payment successful! Course unlocked.',
           );
         }
       } else {
         ToastHelper.showError(
           context,
-          '❌ Đã hủy thanh toán khóa học.',
+          'Course payment cancelled.',
         );
       }
 

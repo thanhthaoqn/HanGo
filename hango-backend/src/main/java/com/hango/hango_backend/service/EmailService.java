@@ -122,18 +122,18 @@ public class EmailService {
     public void sendEnrollmentSuccessEmail(String toEmail, String learnerName, String courseTitle, String priceText) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
-        message.setSubject("HanGo - XÁC NHẬN ĐĂNG KÝ HỌC THÀNH CÔNG");
-        message.setText("Xin chào " + (learnerName != null && !learnerName.trim().isEmpty() ? learnerName : "Học viên") + ",\n\n" +
-                "Chúc mừng bạn đã đăng ký / thanh toán thành công khóa học trên nền tảng HanGo!\n\n" +
-                "THÔNG TIN ĐƠN HÀNG:\n" +
-                "- Tên khóa học: " + courseTitle + "\n" +
-                "- Học phí: " + priceText + "\n" +
-                "- Trạng thái: ĐÃ MỞ KHÓA HOÀN TOÀN\n\n" +
-                "Bạn có thể truy cập ngay vào khóa học để bắt đầu hành trình học tập:\n" +
+        message.setSubject("HanGo - Course Enrollment Confirmation");
+        message.setText("Dear " + (learnerName != null && !learnerName.trim().isEmpty() ? learnerName : "Learner") + ",\n\n" +
+                "Congratulations! You have successfully enrolled in a course on the HanGo platform.\n\n" +
+                "ORDER DETAILS:\n" +
+                "- Course Title: " + courseTitle + "\n" +
+                "- Tuition Fee: " + priceText + "\n" +
+                "- Access Status: FULLY UNLOCKED\n\n" +
+                "You can access your course immediately to start learning:\n" +
                 "https://hangog92.online\n\n" +
-                "Chúc bạn có trải nghiệm học tập tuyệt vời cùng HanGo!\n\n" +
-                "Trân trọng,\n" +
-                "Đội ngũ HanGo EdTech");
+                "We wish you a wonderful learning experience with HanGo!\n\n" +
+                "Best regards,\n" +
+                "HanGo EdTech Team");
 
         try {
             if (mailSender != null) {
