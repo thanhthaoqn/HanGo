@@ -220,8 +220,8 @@ class AuthService {
 
     try {
       final googleSignIn = GoogleSignIn(
-        clientId: '814191576087-mig0a1q44o8el7iqm8bkui1g0stb5a89.apps.googleusercontent.com',
-        scopes: const ['email', 'profile'],
+        serverClientId: kIsWeb ? null : '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
+        clientId: '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
       );
       if (await googleSignIn.isSignedIn()) {
         await googleSignIn.disconnect();

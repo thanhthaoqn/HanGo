@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -20,7 +20,7 @@ class ApiFailure implements Exception {
   final int? statusCode;
 
   @override
-  String toString() => message;
+  String toString() => statusCode != null ? '$message ($statusCode)' : message;
 }
 
 class HangoApi {
@@ -411,6 +411,17 @@ class HangoApi {
   Future<Uint8List> downloadExamTemplate() async {
     final response = await http.get(
       _uri('/api/v1/trainer/exams/import-excel/template'),
+      headers: _headers,
+    );
+    if (response.statusCode >= 400) {
+      throw ApiFailure('Failed to download template', statusCode: response.statusCode);
+    }
+    return response.bodyBytes;
+  }
+
+  Future<Uint8List> downloadQuestionBankTemplate() async {
+    final response = await http.get(
+      _uri('/api/v1/trainer/question-bank/import-excel/template'),
       headers: _headers,
     );
     if (response.statusCode >= 400) {
