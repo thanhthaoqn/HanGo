@@ -5,8 +5,8 @@ import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
 import '../../widgets/shared_header.dart';
-import '../trainer/question_bank/widgets/question_search_bar.dart';
-import '../trainer/question_bank/widgets/question_table.dart';
+import 'question_bank/widgets/question_search_bar.dart';
+import 'question_bank/widgets/question_table.dart';
 import 'question_bank/course_manager_create_question_page.dart';
 import 'question_bank/models/course_manager_question.dart';
 import '../../widgets/course_manager_sidebar.dart';
@@ -68,7 +68,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
       }
 
       final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-      final questionsList = await api.getTrainerQuestions(
+      final questionsList = await api.getCourseManagerQuestions(
         type: _selectedType,
         search: _searchQuery,
         sortBy: _sortBy,
