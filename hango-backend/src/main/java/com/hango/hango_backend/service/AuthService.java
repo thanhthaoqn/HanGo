@@ -228,26 +228,14 @@ public class AuthService {
         String idTokenString = googleLoginRequest.getIdToken();
         try {
             GoogleIdToken idToken = googleIdTokenVerifier.verify(idTokenString);
-            GoogleIdToken.Payload payload = null;
-            if (idToken != null) {
-                payload = idToken.getPayload();
-            } else {
-                // Fallback parsing for Google ID Tokens (handles clock skew or audience nuances)
-                try {
-                    GoogleIdToken parsedToken = GoogleIdToken.parse(new GsonFactory(), idTokenString);
-                    if (parsedToken != null && parsedToken.getPayload() != null) {
-                        GoogleIdToken.Payload p = parsedToken.getPayload();
-                        String iss = p.getIssuer();
-                        if (p.getEmail() != null && iss != null && iss.contains("accounts.google.com")) {
-                            payload = p;
-                        }
-                    }
-                } catch (Exception parseException) {
-                    System.err.println("[GoogleAuth] Fallback token parse failed: " + parseException.getMessage());
-                }
+            
+            if (idToken == null) {
+                throw new IllegalArgumentException("Invalid ID Token");
             }
+            
+            GoogleIdToken.Payload payload = idToken.getPayload();
 
-            if (payload != null && payload.getEmail() != null) {
+            if (payload.getEmail() != null) {
                 // Get profile information from payload
                 String email = payload.getEmail();
                 String name = (String) payload.get("name");

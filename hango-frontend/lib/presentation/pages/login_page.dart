@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in_web/web_only.dart' as web;
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'register_page.dart';
@@ -38,9 +40,11 @@ class _LoginPageState extends State<LoginPage> {
   final _authService = AuthService();
 
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: kIsWeb
+        ? null
+        : '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
     clientId:
-        '814191576087-mig0a1q44o8el7iqm8bkui1g0stb5a89.apps.googleusercontent.com',
-    scopes: const ['email', 'profile'],
+        '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
   );
 
   StreamSubscription<GoogleSignInAccount?>? _googleSignInSubscription;
@@ -351,6 +355,23 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildGoogleSignInButton() {
+    if (kIsWeb) {
+      return SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: web.renderButton(
+          configuration: web.GSIButtonConfiguration(
+            type: web.GSIButtonType.standard,
+            theme: web.GSIButtonTheme.outline,
+            size: web.GSIButtonSize.large,
+            text: web.GSIButtonText.signinWith,
+            minimumWidth: 400,
+            locale: 'en',
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -361,13 +382,15 @@ class _LoginPageState extends State<LoginPage> {
               ? null
               : () async {
                   try {
-                    final GoogleSignInAccount? account = await _googleSignIn
-                        .signIn();
+                    final GoogleSignInAccount? account = await _googleSignIn.signIn();
                     if (account != null) {
                       _handleGoogleSignInSuccess(account);
                     }
                   } catch (e) {
                     debugPrint('Google Sign In Error: $e');
+                    if (mounted) {
+                      ToastHelper.showError(context, 'Google Auth Error: $e');
+                    }
                   }
                 },
           style: OutlinedButton.styleFrom(
@@ -492,7 +515,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               child: Center(
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 500),
+                  constraints: const BoxConstraints(maxWidth: 400),
                   child: Form(
                     key: _formKey,
                     child: Column(
