@@ -92,22 +92,72 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         Course primaryCourse = courses.get(0);
+        
+        // Check if user is already enrolled in all requested courses
+        boolean allEnrolled = true;
+        for (Course c : courses) {
+            if (!enrollmentRepository.existsByUserIdAndCourseId(userId, c.getId())) {
+                allEnrolled = false;
+                break;
+            }
+        }
+        if (allEnrolled) {
+            throw new RuntimeException("User is already enrolled in all selected courses.");
+        }
+
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<String> validIds = new ArrayList<>();
 
         for (Course c : courses) {
             validIds.add(c.getId().toString());
-            BigDecimal p = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
-                    ? c.getPrice()
-                    : new BigDecimal("50000");
-            totalAmount = totalAmount.add(p);
-        }
-
-        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            totalAmount = new BigDecimal("50000");
+            if (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0) {
+                totalAmount = totalAmount.add(c.getPrice());
+            }
         }
 
         String courseIdsStr = String.join(",", validIds);
+
+        // If total price is 0 (free course), auto-enroll directly without PayOS gateway
+        if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            for (Course c : courses) {
+                if (!enrollmentRepository.existsByUserIdAndCourseId(userId, c.getId())) {
+                    Enrollment enrollment = Enrollment.builder()
+                            .user(user)
+                            .course(c)
+                            .enrolledVersionId(c.getId())
+                            .status("ENROLLED")
+                            .progressPercentage(BigDecimal.ZERO)
+                            .build();
+                    enrollmentRepository.save(enrollment);
+                    cartItemRepository.deleteByUserIdAndCourseId(userId, c.getId());
+
+                    if (c.getCreator() != null) {
+                        notificationService.notifyUser(c.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
+                                "New enrollment",
+                                user.getFullName() + " enrolled in your course \"" + c.getTitle() + "\".",
+                                c);
+                    }
+
+                    try {
+                        emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), c.getTitle(), "Free");
+                    } catch (Exception e) {
+                        log.warn("Failed to send free course enrollment email to {}: {}", user.getEmail(), e.getMessage());
+                    }
+                }
+            }
+
+            String displayTitle = courses.size() > 1
+                    ? ("Enrolled " + courses.size() + " free courses")
+                    : primaryCourse.getTitle();
+
+            return PaymentResponseDTO.builder()
+                    .paymentUrl("FREE_SUCCESS")
+                    .qrCode(null)
+                    .txnRef("FREE_" + System.currentTimeMillis())
+                    .amount(BigDecimal.ZERO)
+                    .courseTitle(displayTitle)
+                    .build();
+        }
 
         // 1. Tạo payment PENDING để lấy ID làm orderCode duy nhất
         Payment payment = Payment.builder()

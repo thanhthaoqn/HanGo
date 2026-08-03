@@ -62,6 +62,11 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
         courseIds: widget.courseIds,
       );
       if (!mounted) return;
+      if (result['paymentUrl'] == 'FREE_SUCCESS') {
+        Navigator.of(context).pop();
+        widget.onPaymentSuccess();
+        return;
+      }
       setState(() {
         _paymentUrl = result['paymentUrl'] as String?;
         _qrCode = result['qrCode'] as String?;
@@ -119,7 +124,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
           if (mounted) {
             setState(() {
               _isPolling = false;
-              _errorMessage = 'Thanh toán thất bại. Vui lòng thử lại.';
+              _errorMessage = 'Payment failed. Please try again.';
             });
           }
         } else if (paymentStatus == 'EXPIRED') {
@@ -127,7 +132,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
           if (mounted) {
             setState(() {
               _isPolling = false;
-              _errorMessage = 'Mã thanh toán đã hết hạn. Vui lòng đóng popup và thử lại.';
+              _errorMessage = 'Payment code expired. Please close popup and try again.';
             });
           }
         }
