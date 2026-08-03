@@ -159,9 +159,24 @@ class CourseRepository {
       );
 
       if (response.statusCode != 200) {
+        String? errorMessage;
+        try {
+          final errorData = json.decode(utf8.decode(response.bodyBytes));
+          if (errorData['message'] != null) {
+            errorMessage = errorData['message'];
+          }
+        } catch (_) {}
+
+        if (errorMessage != null) {
+          throw Exception(errorMessage);
+        }
         throw Exception('Failed to submit review: ${response.statusCode}');
       }
     } catch (e) {
+      // Re-throw if it's already our custom Exception to avoid double "Exception: Exception:"
+      if (e.toString().startsWith('Exception: ')) {
+        throw Exception(e.toString().substring(11));
+      }
       throw Exception('Error submitting review: $e');
     }
   }

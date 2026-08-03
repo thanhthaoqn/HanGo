@@ -5,6 +5,7 @@ import com.hango.hango_backend.dto.CourseReviewRequestDTO;
 import com.hango.hango_backend.service.CourseRatingService;
 import com.hango.hango_backend.service.CourseService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -103,6 +104,7 @@ public class CourseController {
         }
     }
 
+    @PreAuthorize("hasAuthority('REVIEW_COURSE')")
     @PostMapping("/{id}/reviews")
     public ResponseEntity<?> addCourseReview(@PathVariable Long id,
                                              @RequestBody @jakarta.validation.Valid CourseReviewRequestDTO request) {
@@ -119,6 +121,7 @@ public class CourseController {
         }
     }
 
+    @PreAuthorize("hasAuthority('REVIEW_COURSE')")
     @DeleteMapping("/{id}/reviews")
     public ResponseEntity<?> deleteCourseReview(@PathVariable Long id) {
         try {

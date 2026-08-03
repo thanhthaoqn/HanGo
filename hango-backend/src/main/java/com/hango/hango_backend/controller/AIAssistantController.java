@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import lombok.extern.slf4j.Slf4j;
 import com.hango.hango_backend.repository.UserRepository;
@@ -33,6 +34,7 @@ public class AIAssistantController {
     /**
      * UC-31: gửi câu hỏi tới AI Assistant, giới hạn trong phạm vi 1 bài học cụ thể.
      */
+    @PreAuthorize("hasAuthority('USE_AI_ASSISTANT')")
     @PostMapping("/messages")
     public ResponseEntity<SendMessageResponse> sendMessage(@Valid @RequestBody SendMessageRequest request) {
         Long learnerId = getSafeUserId();
@@ -40,6 +42,7 @@ public class AIAssistantController {
     }
 
     /** Xem lại lịch sử các cuộc hội thoại với AI Assistant. */
+    @PreAuthorize("hasAuthority('USE_AI_ASSISTANT')")
     @GetMapping("/conversations")
     public ResponseEntity<List<AIConversation>> getConversations() {
         Long learnerId = getSafeUserId();

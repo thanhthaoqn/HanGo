@@ -86,6 +86,11 @@ public class SecurityConfig {
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
+        // Add exception handling to ensure 403 AccessDeniedException is returned as JSON
+        http.exceptionHandling(exception -> exception
+                .accessDeniedHandler(new CustomAccessDeniedHandler())
+        );
+
         return http.build();
     }
 
