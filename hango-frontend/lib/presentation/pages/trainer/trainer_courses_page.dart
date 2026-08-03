@@ -1331,7 +1331,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                           ),
                           _badge(
                             label:
-                                '🟡 Draft${draftVer.isNotEmpty ? ' $draftVer' : ''} Waiting Approval',
+                                '🟡 Editing Draft${draftVer.isNotEmpty ? ' $draftVer' : ''}',
                             bg: const Color(0xFFFEF9C3),
                             fg: const Color(0xFF92400E),
                             border: const Color(0xFFFDE68A),
@@ -1346,7 +1346,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                           ),
                           _badge(
                             label:
-                                '🔵 Draft${pendingVer.isNotEmpty ? ' $pendingVer' : ''} Approved',
+                                '🔵 Draft${pendingVer.isNotEmpty ? ' $pendingVer' : ''} Pending Approval',
                             bg: const Color(0xFFEFF6FF),
                             fg: const Color(0xFF1D4ED8),
                             border: const Color(0xFFBFDBFE),
@@ -1465,6 +1465,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     required String title,
     required List<dynamic> allVersions,
   }) {
+    final draftVer = (draft != null && draft['version'] != null) ? draft['version'].toString() : '';
     switch (state) {
       // ── State 1: Normal – course is live ─────────────────────────────────
       case 'LIVE_ONLY':
@@ -1512,7 +1513,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             if (_canManageCourses) ...[
               _actionChip(
                 icon: Icons.edit_note,
-                label: 'Continue Editing v2',
+                label: 'Continue Editing${draftVer.isNotEmpty ? ' $draftVer' : ''}',
                 color: const Color(0xFFD97706),
                 bg: const Color(0xFFFEF3C7),
                 onTap: () {
