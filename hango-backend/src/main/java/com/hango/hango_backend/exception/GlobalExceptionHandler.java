@@ -4,10 +4,14 @@ import com.hango.hango_backend.dto.ApiErrorDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 
@@ -41,6 +45,57 @@ public class GlobalExceptionHandler {
                 .path(request.getRequestURI())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorDTO);
+    }
+
+    // Malformed / unparsable JSON body.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorDTO> handleUnreadableBody(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        ApiErrorDTO errorDTO = ApiErrorDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message("Malformed request body.")
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorDTO);
+    }
+
+    // Missing/renamed required query or form param (e.g. a stale email link still
+    // pointing at the old ?email= verify URL instead of the current ?token=).
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiErrorDTO> handleMissingParam(MissingServletRequestParameterException ex, HttpServletRequest request) {
+        ApiErrorDTO errorDTO = ApiErrorDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message("Missing required parameter: " + ex.getParameterName())
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorDTO);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorDTO> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        ApiErrorDTO errorDTO = ApiErrorDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message("Invalid value for parameter: " + ex.getName())
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorDTO);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<ApiErrorDTO> handleUsernameNotFound(UsernameNotFoundException ex, HttpServletRequest request) {
+        ApiErrorDTO errorDTO = ApiErrorDTO.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorDTO);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

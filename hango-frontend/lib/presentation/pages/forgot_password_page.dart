@@ -38,7 +38,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
     if (mounted) {
       if (result['success']) {
-        ToastHelper.showSuccess(context, 'OTP code sent successfully! Please check your email.');
+        // Deliberately conditional wording: the backend always returns success here
+        // regardless of whether the email is registered (anti-enumeration), so this
+        // must never claim the code was "sent" for certain.
+        ToastHelper.showSuccess(context, 'If this email is registered, a password reset code has been sent to it. Please check your inbox.');
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -272,6 +275,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               borderRadius: BorderRadius.circular(8),
                               borderSide: const BorderSide(color: Colors.redAccent),
                             ),
+                            errorMaxLines: 3,
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
