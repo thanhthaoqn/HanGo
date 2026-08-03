@@ -269,9 +269,9 @@ class CourseManagerExamMatrixServiceTest {
             e.setId(500L);
             return e;
         });
-        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 3))
+        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 1L, 3))
                 .thenReturn(List.of(question(11L), question(12L), question(13L)));
-        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 2))
+        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 1L, 2))
                 .thenReturn(List.of(question(14L), question(15L)));
         Long examId = service.generateExamFromMatrix(1L, "My Custom Exam", null, null, null, null, "trainer@example.com");
 
@@ -316,7 +316,7 @@ class CourseManagerExamMatrixServiceTest {
             e.setId(500L);
             return e;
         });
-        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 5))
+        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 1L, 5))
                 .thenReturn(List.of(question(11L), question(12L)));
 
         RuntimeException ex = assertThrows(RuntimeException.class,
@@ -339,7 +339,7 @@ class CourseManagerExamMatrixServiceTest {
 
         service.generateExamFromMatrix(1L, "My Exam", null, null, null, null, "trainer@example.com");
 
-        verify(questionRepository, never()).findRandomQuestionsByCriteria(any(), any(), any(), anyInt());
+        verify(questionRepository, never()).findRandomQuestionsByCriteria(any(), any(), any(), any(), anyInt());
         verify(examQuestionRepository, never()).save(any());
     }
 }
