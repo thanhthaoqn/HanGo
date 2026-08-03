@@ -138,7 +138,7 @@ class AuthServiceTest {
         assertEquals("mock-jwt-token", response.getToken());
         assertEquals("raw-refresh-token", response.getRefreshToken());
         assertEquals("active@example.com", response.getEmail());
-        assertEquals(List.of("LEARNER"), response.getRoles());
+        assertEquals(List.of("LEARNER", "ROLE_LEARNER"), response.getRoles());
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(savedUser.capture());
@@ -539,7 +539,7 @@ class AuthServiceTest {
         assertEquals("raw-refresh-token", response.getRefreshToken());
         assertEquals("newgoogleuser@example.com", response.getEmail());
         assertEquals("Google User Name", response.getFullName());
-        assertEquals(List.of("LEARNER"), response.getRoles());
+        assertEquals(List.of("LEARNER", "ROLE_LEARNER"), response.getRoles());
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
         verify(userRepository, org.mockito.Mockito.atLeastOnce()).save(savedUser.capture());

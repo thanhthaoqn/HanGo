@@ -43,6 +43,7 @@ import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
 import com.hango.hango_backend.repository.RefreshTokenRepository;
+import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.util.JwtUtils;
@@ -175,7 +176,11 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        List<String> roles = user.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList());
+        List<String> roles = new java.util.ArrayList<>();
+        for (org.springframework.security.core.GrantedAuthority authority : UserDetailsImpl.build(user)
+                .getAuthorities()) {
+            roles.add(authority.getAuthority());
+        }
         String jwt = jwtUtils.generateJwtTokenFromUsername(user.getEmail());
         String refreshToken = issueRefreshToken(user);
 
@@ -261,7 +266,8 @@ public class AuthService {
         return mapToUserResponse(savedUser);
     }
 
-    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "COURSE_MANAGER", "ADMINISTRATOR");
+    private static final Set<String> ADMIN_CREATABLE_ROLES = Set.of("LEARNER", "TRAINER", "COURSE_MANAGER",
+            "ADMINISTRATOR");
 
     public UserResponse createUserByAdmin(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
@@ -305,7 +311,6 @@ public class AuthService {
         User savedUser = userRepository.save(user);
         return mapToUserResponse(savedUser);
     }
-
 
     private static final long MAX_AVATAR_SIZE_BYTES = 2L * 1024 * 1024;
     private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/jpg");
@@ -387,7 +392,8 @@ public class AuthService {
                 });
 
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            logAudit(user, "LOGIN_FAILURE", user.getId(), "Google login on non-active account, status=" + user.getStatus());
+            logAudit(user, "LOGIN_FAILURE", user.getId(),
+                    "Google login on non-active account, status=" + user.getStatus());
             throw new ApiException("Your account is not active. Please contact support.", HttpStatus.FORBIDDEN);
         }
 
@@ -397,14 +403,16 @@ public class AuthService {
         String jwt = jwtUtils.generateJwtTokenFromUsername(savedUser.getEmail());
         String refreshToken = issueRefreshToken(savedUser);
 
-        List<String> roles = savedUser.getRoles().stream()
-                .map(Role::getRoleName)
-                .collect(Collectors.toList());
+        List<String> userRoles = new java.util.ArrayList<>();
+        for (org.springframework.security.core.GrantedAuthority authority : UserDetailsImpl.build(savedUser)
+                .getAuthorities()) {
+            userRoles.add(authority.getAuthority());
+        }
 
         logAudit(savedUser, "LOGIN_SUCCESS", savedUser.getId(), "via Google");
 
         return new LoginResponse(jwt, refreshToken, savedUser.getId(), savedUser.getEmail(), savedUser.getFullName(),
-                roles, savedUser.getAvatarUrl());
+                userRoles, savedUser.getAvatarUrl());
     }
 
     // =================================================================
@@ -466,10 +474,12 @@ public class AuthService {
             int attempts = (otp.getAttemptCount() == null ? 0 : otp.getAttemptCount()) + 1;
             if (attempts >= MAX_OTP_ATTEMPTS) {
                 passwordResetOtpRepository.delete(otp);
-                throw new ApiException("Too many incorrect attempts. Please request a new OTP.", HttpStatus.BAD_REQUEST);
+                throw new ApiException("Too many incorrect attempts. Please request a new OTP.",
+                        HttpStatus.BAD_REQUEST);
             }
             otp.setAttemptCount(attempts);
             passwordResetOtpRepository.save(otp);
+
             throw new ApiException("Invalid OTP code.", HttpStatus.BAD_REQUEST);
         }
     }
@@ -504,10 +514,12 @@ public class AuthService {
         user.setLockedUntil(null);
         userRepository.save(user);
 
-        // Single-use: this OTP (and any stray rows for the email) can never be replayed.
+        // Single-use: this OTP (and any stray rows for the email) can never be
+        // replayed.
         passwordResetOtpRepository.deleteByEmail(email);
 
         // Force re-login everywhere else too.
+        //
         refreshTokenRepository.deleteByUser(user);
 
         logAudit(user, "PASSWORD_RESET", user.getId(), null);
@@ -623,23 +635,27 @@ public class AuthService {
 
     public UserResponse getUserById(Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with id: " + id));
         return mapToUserResponse(user);
     }
 
     public UserResponse getUserProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with email: " + email));
         return mapToUserResponse(user);
     }
 
     @org.springframework.transaction.annotation.Transactional
     public UserResponse updateProfile(String email, ProfileUpdateRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with email: " + email));
 
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName());
+
         }
         if (request.getPhoneNumber() != null) {
             user.setPhoneNumber(request.getPhoneNumber());
@@ -701,10 +717,12 @@ public class AuthService {
     public void changePassword(String email, ChangePasswordRequest request) {
         String normalizedEmail = normalizeEmail(email);
         User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException("User not found with email: " + normalizedEmail));
+                .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "User not found with email: " + normalizedEmail));
 
         if (!encoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new ApiException("Incorrect current password.", HttpStatus.BAD_REQUEST);
+
         }
 
         if (encoder.matches(request.getNewPassword(), user.getPasswordHash())) {
