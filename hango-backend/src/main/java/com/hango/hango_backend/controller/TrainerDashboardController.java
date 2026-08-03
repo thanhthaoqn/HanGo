@@ -220,7 +220,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/exams")
-    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('COURSE_MANAGER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getTrainerExams(@AuthenticationPrincipal UserDetails userDetails) {
         try {
             if (userDetails == null) {
@@ -235,7 +235,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/exams")
-    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('COURSE_MANAGER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createTrainerExam(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody com.hango.hango_backend.dto.TrainerCreateExamRequestDTO request) {
@@ -243,8 +243,8 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            trainerDashboardService.createTrainerExam(userDetails.getUsername(), request);
-            return ResponseEntity.ok("{\"message\": \"Exam created successfully in DRAFT status\"}");
+            Long newId = trainerDashboardService.createTrainerExam(userDetails.getUsername(), request);
+            return ResponseEntity.ok("{\"id\": " + newId + ", \"message\": \"Exam created successfully in DRAFT status\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -252,7 +252,7 @@ public class TrainerDashboardController {
     }
 
     @PostMapping("/exams/{id}/questions")
-    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> saveExamQuestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
@@ -270,7 +270,7 @@ public class TrainerDashboardController {
     }
 
     @GetMapping("/exams/{id}/questions")
-    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getExamQuestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -287,7 +287,7 @@ public class TrainerDashboardController {
     }
 
     @org.springframework.web.bind.annotation.PatchMapping("/exams/{id}/status")
-    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateExamStatus(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,

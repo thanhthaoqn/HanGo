@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../models/course_manager_question.dart';
 
 class QuestionTable extends StatelessWidget {

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
+import '../../widgets/shared_header.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/course_manager_api.dart';
 
@@ -526,129 +527,162 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   }
 
   Future<void> _handleSubmitForReview() async {
-    // Hiện popup xác nhận
     final isCm = widget.isCourseManager;
-    final actionName = isCm ? 'Publish Exam' : 'Submit for Review';
-    final description = isCm
-        ? 'Are you sure you want to publish the exam "${widget.examTitle}" directly?'
-        : 'Are you sure you want to submit the exam "${widget.examTitle}" for review?';
-    final infoMessage = isCm
-        ? 'After publishing, the exam will be available to assigned users immediately.'
-        : 'After submission, the exam will wait for the Course Manager\'s review before being published.';
-    final iconData = isCm ? Icons.publish : Icons.send_rounded;
-    final buttonText = isCm ? 'Confirm Publish' : 'Confirm Submission';
-    final targetStatus = isCm ? 'PUBLISHED' : 'PENDING_APPROVAL';
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(iconData, color: const Color(0xFF6366F1), size: 24),
-            const SizedBox(width: 10),
-            Text(
-              actionName,
-              style: const TextStyle(
-                fontFamily: 'Outfit',
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+    
+    if (isCm) {
+      final selectedStatus = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.publish, color: Color(0xFF6366F1), size: 24),
+              const SizedBox(width: 10),
+              const Text(
+                'Submit Exam',
+                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18),
               ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Do you want to publish the exam "${widget.examTitle}" immediately or keep it hidden?',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF475569), fontFamily: 'Outfit'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, 'HIDDEN'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              child: const Text('Keep Hidden', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, 'PUBLISHED'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF38C9A6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              child: const Text('Publish', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              description,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF475569),
-                fontFamily: 'Outfit',
+      );
+
+      if (selectedStatus == null) return;
+
+      setState(() => _isSubmitting = true);
+      try {
+        final api = await _getApi();
+        await api.updateExamStatus(widget.examId, selectedStatus);
+        if (mounted) {
+          ToastHelper.show(context, 'Exam status updated to $selectedStatus successfully!');
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ToastHelper.show(context, 'Failed to update status: $e', isError: true);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+        }
+      }
+    } else {
+      // Normal trainer flow
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.send_rounded, color: Color(0xFF6366F1), size: 24),
+              const SizedBox(width: 10),
+              const Text(
+                'Submit for Review',
+                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18),
               ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F0FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF6366F1).withOpacity(0.3),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to submit the exam "${widget.examTitle}" for review?',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF475569), fontFamily: 'Outfit'),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F0FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
                 ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Color(0xFF6366F1),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      infoMessage,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6366F1),
-                        fontFamily: 'Outfit',
+                child: Row(
+                  children: const [
+                    Icon(Icons.info_outline, size: 16, color: Color(0xFF6366F1)),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'After submission, the exam will wait for the Course Manager\'s review before being published.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF6366F1), fontFamily: 'Outfit'),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              child: const Text('Confirm Submission', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
-            ),
-            child: Text(
-              buttonText,
-              style: const TextStyle(
-                color: Colors.white,
-                fontFamily: 'Outfit',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (confirmed != true) return;
+      if (confirmed != true) return;
 
-    setState(() => _isSubmitting = true);
-    try {
-      final api = await _getApi();
-      await api.updateExamStatus(widget.examId, targetStatus);
-      if (mounted) {
-        ToastHelper.show(context, isCm ? 'Exam published successfully!' : 'Exam submitted for review successfully!');
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ToastHelper.show(context, 'Failed to update status: $e', isError: true);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
+      setState(() => _isSubmitting = true);
+      try {
+        final api = await _getApi();
+        await api.updateExamStatus(widget.examId, 'PENDING_APPROVAL');
+        if (mounted) {
+          ToastHelper.show(context, 'Exam submitted for review successfully!');
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ToastHelper.show(context, 'Failed to update status: $e', isError: true);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+        }
       }
     }
   }
@@ -660,15 +694,27 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: '/course-manager/exams')) : null,
+      appBar: widget.isCourseManager 
+          ? SharedHeader(
+              isDesktop: isDesktop,
+              activeTab: '',
+              hideNavLinks: true,
+              hideCommerceActions: true,
+              hideLanguageSwitcher: true,
+            )
+          : null,
+      drawer: !isDesktop && widget.isCourseManager 
+          ? const Drawer(child: CourseManagerSidebar(currentRoute: 'exams')) 
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 260, child: CourseManagerSidebar(currentRoute: '/course-manager/exams')),
+          if (isDesktop && widget.isCourseManager) 
+            const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                if (!widget.isCourseManager) _buildHeader(context, !isDesktop),
                 Expanded(
                   child: _isLoadingMetadata
                       ? const Center(
@@ -852,9 +898,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                                   size: 18,
                                   color: Colors.white,
                                 ),
-                          label: const Text(
-                            'Submit for Review',
-                            style: TextStyle(
+                          label: Text(
+                            widget.isCourseManager ? 'Submit' : 'Submit for Review',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Outfit',

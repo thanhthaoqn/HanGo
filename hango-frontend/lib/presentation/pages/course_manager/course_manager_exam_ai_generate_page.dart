@@ -96,7 +96,7 @@ class _CourseManagerExamAiGeneratePageState extends State<CourseManagerExamAiGen
       final token = prefs.getString('auth_token');
       if (token == null) throw Exception('No token found');
 
-      final apiBaseUrl = EnvConfig.apiBaseUrl;
+      final apiBaseUrl = EnvConfig.v1BaseUrl;
       final payload = {
         'title': response.title,
         'description': response.description,

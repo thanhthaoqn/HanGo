@@ -759,7 +759,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
               ),
             ],
           ),
-          if (group.isGroup) ...[
+          if (group.isGroup && !widget.isReadOnly) ...[
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -816,29 +816,31 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
               ],
             ),
           ],
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: (_isGeneratingByAi || (group.isGroup && group.selectedGroupTypeId == null))
-                  ? null
-                  : () => _handleGenerateByAIForGroup(group),
-              icon: const Icon(Icons.auto_awesome, size: 18),
-              label: _isGeneratingByAi
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Generate by AI', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF38C9A6),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          if (!widget.isReadOnly) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: (_isGeneratingByAi || (group.isGroup && group.selectedGroupTypeId == null))
+                    ? null
+                    : () => _handleGenerateByAIForGroup(group),
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: _isGeneratingByAi
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Generate by AI', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF38C9A6),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

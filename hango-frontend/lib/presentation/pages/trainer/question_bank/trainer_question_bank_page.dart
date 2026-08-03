@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
@@ -16,13 +16,15 @@ class CourseManagerQuestionBankPage extends StatefulWidget {
   const CourseManagerQuestionBankPage({super.key, this.isEmbedded = false});
 
   @override
-  State<CourseManagerQuestionBankPage> createState() => _CourseManagerQuestionBankPageState();
+  State<CourseManagerQuestionBankPage> createState() =>
+      _CourseManagerQuestionBankPageState();
 }
 
-class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBankPage> {
+class _CourseManagerQuestionBankPageState
+    extends State<CourseManagerQuestionBankPage> {
   final _authService = AuthService();
   final _searchController = TextEditingController();
-  
+
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
@@ -104,8 +106,6 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
     }
   }
 
-
-
   void _handleSearch(String query) {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -151,18 +151,19 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 3)) : null,
+      drawer: !isDesktop
+          ? const Drawer(child: TrainerSidebar(activeIndex: 3))
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 3)),
+          if (isDesktop)
+            const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 3)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildHeader(context, !isDesktop),
-                Expanded(
-                  child: _buildBodyContent(),
-                ),
+                Expanded(child: _buildBodyContent()),
               ],
             ),
           ),
@@ -191,12 +192,19 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                   onCreatePressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const CourseManagerCreateQuestionPage()),
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const CourseManagerCreateQuestionPage(),
+                      ),
                     ).then((_) => _fetchQuestions());
                   },
                   onImportPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Excel Import flow is under construction')),
+                      const SnackBar(
+                        content: Text(
+                          'Excel Import flow is under construction',
+                        ),
+                      ),
                     );
                   },
                   onRefreshPressed: _fetchQuestions,
@@ -216,19 +224,23 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                   onViewPressed: (q) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => CourseManagerCreateQuestionPage(
-                        question: q,
-                        isReadOnly: true,
-                      )),
+                      MaterialPageRoute(
+                        builder: (context) => CourseManagerCreateQuestionPage(
+                          question: q,
+                          isReadOnly: true,
+                        ),
+                      ),
                     );
                   },
                   onEditPressed: (q) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => CourseManagerCreateQuestionPage(
-                        question: q,
-                        isEdit: true,
-                      )),
+                      MaterialPageRoute(
+                        builder: (context) => CourseManagerCreateQuestionPage(
+                          question: q,
+                          isEdit: true,
+                        ),
+                      ),
                     ).then((_) => _fetchQuestions());
                   },
                   onStatusToggled: (q, isPublic) async {
@@ -241,7 +253,11 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                       final token = await _authService.getToken();
                       if (token != null) {
                         final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                        await api.toggleQuestionStatus(q.id, newStatus, isGroup: q.isGroup);
+                        await api.toggleQuestionStatus(
+                          q.id,
+                          newStatus,
+                          isGroup: q.isGroup,
+                        );
                       }
                     } catch (e) {
                       setState(() {
@@ -285,7 +301,11 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
+              const Icon(
+                Icons.chevron_right,
+                size: 16,
+                color: Color(0xFF94A3B8),
+              ),
               const SizedBox(width: 4),
               Text(
                 _selectedType,
@@ -304,10 +324,17 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
             alignment: Alignment.center,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_none, color: Color(0xFF4B5563)),
+                icon: const Icon(
+                  Icons.notifications_none,
+                  color: Color(0xFF4B5563),
+                ),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notifications feature is under construction')),
+                    const SnackBar(
+                      content: Text(
+                        'Notifications feature is under construction',
+                      ),
+                    ),
                   );
                 },
               ),
@@ -326,13 +353,20 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
             ],
           ),
           const SizedBox(width: 16),
-          const VerticalDivider(width: 1, indent: 20, endIndent: 20, color: Color(0xFFE2E8F0)),
+          const VerticalDivider(
+            width: 1,
+            indent: 20,
+            endIndent: 20,
+            color: Color(0xFFE2E8F0),
+          ),
           const SizedBox(width: 16),
           InkWell(
             onTap: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+                MaterialPageRoute(
+                  builder: (context) => const TrainerProfilePage(),
+                ),
               );
             },
             borderRadius: BorderRadius.circular(20),
@@ -365,15 +399,16 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                               width: 32,
                               height: 32,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Text(
-                                _trainerInitials,
-                                style: const TextStyle(
-                                  color: Color(0xFF20B486),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Text(
+                                    _trainerInitials,
+                                    style: const TextStyle(
+                                      color: Color(0xFF20B486),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
                             ),
                           )
                         : Text(

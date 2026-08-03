@@ -3,6 +3,8 @@ package com.hango.hango_backend.controller;
 
 import com.hango.hango_backend.dto.ExamMatrixDTO;
 import com.hango.hango_backend.repository.QuestionRepository;
+import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.service.CourseManagerExamMatrixService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ public class TrainerExamMatrixController {
 
     private final CourseManagerExamMatrixService matrixService;
     private final QuestionRepository questionRepository;
+    private final UserRepository userRepository;
 
     @GetMapping
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
@@ -61,11 +64,17 @@ public class TrainerExamMatrixController {
     @GetMapping("/count-available")
     @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> countAvailableQuestions(
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam Long skillId,
             @RequestParam Long diffId,
             @RequestParam Long catId) {
         try {
-            long count = questionRepository.countQuestionsByCriteria(skillId, diffId, catId);
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            User user = userRepository.findByEmail(userDetails.getUsername())
+                    .orElseThrow(() -> new RuntimeException("User not found: " + userDetails.getUsername()));
+            long count = questionRepository.countQuestionsByCriteria(skillId, diffId, catId, user.getId());
             return ResponseEntity.ok("{\"count\": " + count + "}");
         } catch (Exception e) {
             e.printStackTrace();

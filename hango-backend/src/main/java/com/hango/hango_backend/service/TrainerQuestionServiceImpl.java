@@ -38,17 +38,20 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
     private final SystemParameterRepository systemParameterRepository;
 
     @Override
-    public List<QuestionDTO> getTrainerQuestions(String email, String type, String search, String sortBy, Long skillId, Long categoryId, Long difficultyId) {
+    public List<QuestionDTO> getTrainerQuestions(String email, String type, String search, String sortBy, Long skillId,
+            Long categoryId, Long difficultyId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
         // type is now treated as status filter: ALL, PUBLIC, PRIVATE
-        String statusFilter = (type != null && !type.equalsIgnoreCase("QUIZ") && !type.equalsIgnoreCase("EXAM") && !type.equalsIgnoreCase("ALL"))
-                ? type : null;
+        String statusFilter = (type != null && !type.equalsIgnoreCase("QUIZ") && !type.equalsIgnoreCase("EXAM")
+                && !type.equalsIgnoreCase("ALL"))
+                        ? type
+                        : null;
         // If type is ALL or old values QUIZ/EXAM, show all statuses
         String statusConditionGroup = (statusFilter != null) ? "AND q.status = ? " : "";
         String statusConditionSingle = (statusFilter != null) ? "AND q.status = ? " : "";
-        
+
         String skillCondition = (skillId != null) ? "AND q.skill_param_id = ? " : "";
         String categoryCondition = (categoryId != null) ? "AND q.category_id = ? " : "";
         String difficultyCondition = (difficultyId != null) ? "AND q.difficulty_param_id = ? " : "";
@@ -67,78 +70,86 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
 
         // Group query
         sql.append("SELECT ")
-           .append("  TRUE as is_group, ")
-           .append("  qg.id as item_id, ")
-           .append("  qg.context_text as question_text, ")
-           .append("  MAX(qc.name) as category_name, ")
-           .append("  NULL as skill_name, ")
-           .append("  MAX(sp_group.param_value) as group_type_name, ")
-           .append("  NULL as difficulty_name, ")
-           .append("  MAX(q.status) as status, ")
-           .append("  MAX(u.full_name) as creator_name, ")
-           .append("  MAX(q.created_at) as created_at, ")
-           .append("  MAX(q.updated_at) as updated_at ")
-           .append("FROM question_groups qg ")
-           .append("JOIN questions q ON q.group_id = qg.id ")
-           .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
-           .append("LEFT JOIN system_parameters sp_group ON qg.group_type_param_id = sp_group.id ")
-           .append("JOIN users u ON q.created_by = u.id ")
-           .append("WHERE q.created_by = ? ")
-           .append(statusConditionGroup)
-           .append(searchConditionGroup)
-           .append(skillCondition)
-           .append(categoryCondition)
-           .append(difficultyCondition)
-           .append("GROUP BY qg.id, qg.context_text ");
-        
+                .append("  TRUE as is_group, ")
+                .append("  qg.id as item_id, ")
+                .append("  qg.context_text as question_text, ")
+                .append("  MAX(qc.name) as category_name, ")
+                .append("  NULL as skill_name, ")
+                .append("  MAX(sp_group.param_value) as group_type_name, ")
+                .append("  NULL as difficulty_name, ")
+                .append("  MAX(q.status) as status, ")
+                .append("  MAX(u.full_name) as creator_name, ")
+                .append("  MAX(q.created_at) as created_at, ")
+                .append("  MAX(q.updated_at) as updated_at ")
+                .append("FROM question_groups qg ")
+                .append("JOIN questions q ON q.group_id = qg.id ")
+                .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
+                .append("LEFT JOIN system_parameters sp_group ON qg.group_type_param_id = sp_group.id ")
+                .append("JOIN users u ON q.created_by = u.id ")
+                .append("WHERE q.created_by = ? ")
+                .append(statusConditionGroup)
+                .append(searchConditionGroup)
+                .append(skillCondition)
+                .append(categoryCondition)
+                .append(difficultyCondition)
+                .append("GROUP BY qg.id, qg.context_text ");
+
         params.add(user.getId());
-        if (statusFilter != null) params.add(statusFilter);
+        if (statusFilter != null)
+            params.add(statusFilter);
         if (search != null && !search.trim().isEmpty()) {
             String searchPattern = "%" + search.trim() + "%";
             params.add(searchPattern);
             params.add(searchPattern);
         }
-        if (skillId != null) params.add(skillId);
-        if (categoryId != null) params.add(categoryId);
-        if (difficultyId != null) params.add(difficultyId);
+        if (skillId != null)
+            params.add(skillId);
+        if (categoryId != null)
+            params.add(categoryId);
+        if (difficultyId != null)
+            params.add(difficultyId);
 
         sql.append(" UNION ALL ");
 
         // Single query
         sql.append("SELECT ")
-           .append("  FALSE as is_group, ")
-           .append("  q.id as item_id, ")
-           .append("  q.question_text as question_text, ")
-           .append("  qc.name as category_name, ")
-           .append("  sp_skill.param_value as skill_name, ")
-           .append("  NULL as group_type_name, ")
-           .append("  sp.param_value as difficulty_name, ")
-           .append("  q.status, ")
-           .append("  u.full_name as creator_name, ")
-           .append("  q.created_at, ")
-           .append("  q.updated_at ")
-           .append("FROM questions q ")
-           .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
-           .append("LEFT JOIN system_parameters sp_skill ON q.skill_param_id = sp_skill.id ")
-           .append("LEFT JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
-           .append("JOIN users u ON q.created_by = u.id ")
-           .append("WHERE q.created_by = ? AND q.group_id IS NULL ")
-           .append(statusConditionSingle)
-           .append(searchConditionSingle)
-           .append(skillCondition)
-           .append(categoryCondition)
-           .append(difficultyCondition);
-           
+                .append("  FALSE as is_group, ")
+                .append("  q.id as item_id, ")
+                .append("  q.question_text as question_text, ")
+                .append("  qc.name as category_name, ")
+                .append("  sp_skill.param_value as skill_name, ")
+                .append("  NULL as group_type_name, ")
+                .append("  sp.param_value as difficulty_name, ")
+                .append("  q.status, ")
+                .append("  u.full_name as creator_name, ")
+                .append("  q.created_at, ")
+                .append("  q.updated_at ")
+                .append("FROM questions q ")
+                .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
+                .append("LEFT JOIN system_parameters sp_skill ON q.skill_param_id = sp_skill.id ")
+                .append("LEFT JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
+                .append("JOIN users u ON q.created_by = u.id ")
+                .append("WHERE q.created_by = ? AND q.group_id IS NULL ")
+                .append(statusConditionSingle)
+                .append(searchConditionSingle)
+                .append(skillCondition)
+                .append(categoryCondition)
+                .append(difficultyCondition);
+
         params.add(user.getId());
-        if (statusFilter != null) params.add(statusFilter);
+        if (statusFilter != null)
+            params.add(statusFilter);
         if (search != null && !search.trim().isEmpty()) {
             String searchPattern = "%" + search.trim() + "%";
             params.add(searchPattern);
             params.add(searchPattern);
         }
-        if (skillId != null) params.add(skillId);
-        if (categoryId != null) params.add(categoryId);
-        if (difficultyId != null) params.add(difficultyId);
+        if (skillId != null)
+            params.add(skillId);
+        if (categoryId != null)
+            params.add(categoryId);
+        if (difficultyId != null)
+            params.add(difficultyId);
 
         sql.append(") AS combined_results ");
 
@@ -182,7 +193,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
         QuestionCategory category = null;
-        // categoryId from frontend is actually the Group Type (SystemParameter) when it's a group question.
+        // categoryId from frontend is actually the Group Type (SystemParameter) when
+        // it's a group question.
         // So we don't look it up in QuestionCategory.
 
         SystemParameter skillParam = null;
@@ -200,7 +212,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         if (request.getPassageText() != null && !request.getPassageText().trim().isEmpty()) {
             group = new QuestionGroup();
             group.setContextText(request.getPassageText());
-            
+
             SystemParameter groupType = null;
             if (request.getCategoryId() != null) {
                 groupType = systemParameterRepository.findById(request.getCategoryId()).orElse(null);
@@ -271,22 +283,23 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         if (isGroup) {
             QuestionGroup group = questionGroupRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Question Group not found"));
-            
+
             List<Question> questions = questionRepository.findByQuestionGroup(group);
             if (!questions.isEmpty() && !questions.get(0).getCreatedBy().getId().equals(user.getId())) {
                 throw new RuntimeException("You do not have permission to view this group");
             }
-            
+
             CreateGroupQuestionRequestDTO dto = new CreateGroupQuestionRequestDTO();
             dto.setId(group.getId());
             dto.setPassageText(group.getContextText());
-            
+
             if (!questions.isEmpty()) {
-                // If it's a group, the frontend expects categoryId to be the group type SystemParameter ID
+                // If it's a group, the frontend expects categoryId to be the group type
+                // SystemParameter ID
                 dto.setCategoryId(group.getGroupTypeParam() != null ? group.getGroupTypeParam().getId() : null);
                 dto.setStatus(questions.get(0).getStatus());
             }
-            
+
             List<CreateSubQuestionDTO> subDTOs = new ArrayList<>();
             for (Question q : questions) {
                 subDTOs.add(mapToSubQuestionDTO(q));
@@ -296,21 +309,21 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         } else {
             Question q = questionRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Question not found"));
-            
+
             if (!q.getCreatedBy().getId().equals(user.getId())) {
                 throw new RuntimeException("You do not have permission to view this question");
             }
-            
+
             CreateGroupQuestionRequestDTO dto = new CreateGroupQuestionRequestDTO();
             dto.setCategoryId(q.getCategory() != null ? q.getCategory().getId() : null);
             dto.setDifficultyId(q.getDifficulty() != null ? q.getDifficulty().getId() : null);
             dto.setSkillParamId(q.getSkillParam() != null ? q.getSkillParam().getId() : null);
             dto.setStatus(q.getStatus());
-            
+
             List<CreateSubQuestionDTO> subDTOs = new ArrayList<>();
             subDTOs.add(mapToSubQuestionDTO(q));
             dto.setSubQuestions(subDTOs);
-            
+
             return dto;
         }
     }
@@ -322,7 +335,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         sub.setExplanation(q.getExplanation());
         sub.setSkillParamId(q.getSkillParam() != null ? q.getSkillParam().getId() : null);
         sub.setDifficultyId(q.getDifficulty() != null ? q.getDifficulty().getId() : null);
-        
+
         List<CreateOptionDTO> optDTOs = new ArrayList<>();
         if (q.getOptions() != null) {
             for (QuestionOption opt : q.getOptions()) {
@@ -363,7 +376,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             group = questionGroupRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Question Group not found"));
             group.setContextText(request.getPassageText());
-            
+
             SystemParameter groupType = null;
             if (request.getCategoryId() != null) {
                 groupType = systemParameterRepository.findById(request.getCategoryId()).orElse(null);
@@ -372,9 +385,9 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 groupType = systemParameterRepository.findById(17L).orElse(null);
             }
             group.setGroupTypeParam(groupType);
-            
+
             questionGroupRepository.save(group);
-            
+
             // For simplicity, we just delete old questions and create new ones
             List<Question> oldQuestions = questionRepository.findByQuestionGroup(group);
             if (!oldQuestions.isEmpty() && !oldQuestions.get(0).getCreatedBy().getId().equals(user.getId())) {
@@ -382,7 +395,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             }
             questionRepository.deleteAll(oldQuestions);
         } else {
-            Question oldQ = questionRepository.findById(id).orElseThrow(() -> new RuntimeException("Question not found"));
+            Question oldQ = questionRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Question not found"));
             if (!oldQ.getCreatedBy().getId().equals(user.getId())) {
                 throw new RuntimeException("No permission");
             }
@@ -459,6 +473,5 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             questionRepository.save(question);
         }
     }
-
 
 }

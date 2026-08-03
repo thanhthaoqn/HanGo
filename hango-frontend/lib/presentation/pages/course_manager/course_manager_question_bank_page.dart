@@ -14,17 +14,20 @@ import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/download_helper.dart';
+
 class CourseManagerQuestionBankPage extends StatefulWidget {
   const CourseManagerQuestionBankPage({Key? key}) : super(key: key);
 
   @override
-  State<CourseManagerQuestionBankPage> createState() => _CourseManagerQuestionBankPageState();
+  State<CourseManagerQuestionBankPage> createState() =>
+      _CourseManagerQuestionBankPageState();
 }
 
-class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBankPage> {
+class _CourseManagerQuestionBankPageState
+    extends State<CourseManagerQuestionBankPage> {
   final _authService = AuthService();
   final _searchController = TextEditingController();
-  
+
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -82,8 +85,6 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
     super.dispose();
   }
 
-
-
   Future<void> _fetchQuestions() async {
     setState(() {
       _isLoading = true;
@@ -119,8 +120,6 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
       });
     }
   }
-
-
 
   void _handleSearch(String query) {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
@@ -161,33 +160,48 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
 
       final bytes = result.files.single.bytes;
       if (bytes == null) {
-        if (mounted) ToastHelper.showError(context, 'Failed to read file bytes');
+        if (mounted)
+          ToastHelper.showError(context, 'Failed to read file bytes');
         return;
       }
-      
-      setState(() { _isLoading = true; });
+
+      setState(() {
+        _isLoading = true;
+      });
 
       var excel = Excel.decodeBytes(List<int>.from(bytes));
       var sheet = excel.tables['QUESTIONS'];
       if (sheet == null) {
         var sheetName = excel.tables.keys.firstWhere(
-            (k) => !k.toUpperCase().contains('RULES') && !k.toUpperCase().contains('README'), 
-            orElse: () => excel.tables.keys.last);
+          (k) =>
+              !k.toUpperCase().contains('RULES') &&
+              !k.toUpperCase().contains('README'),
+          orElse: () => excel.tables.keys.last,
+        );
         sheet = excel.tables[sheetName];
       }
 
       if (sheet == null || sheet.maxRows < 3) {
-        setState(() { _isLoading = false; });
-        if (mounted) ToastHelper.showError(context, 'File is empty or invalid format');
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted)
+          ToastHelper.showError(context, 'File is empty or invalid format');
         return;
       }
 
       var headerRow = sheet.rows[1];
-      if (headerRow.length < 12 || 
+      if (headerRow.length < 12 ||
           !headerRow[0]!.value.toString().contains('Order Index') ||
           !headerRow[1]!.value.toString().contains('Passage Text')) {
-        setState(() { _isLoading = false; });
-        if (mounted) ToastHelper.showError(context, 'File does not match the Hango template');
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted)
+          ToastHelper.showError(
+            context,
+            'File does not match the Hango template',
+          );
         return;
       }
 
@@ -196,7 +210,11 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
 
       for (int i = 2; i < sheet.maxRows; i++) {
         var row = sheet.rows[i];
-        if (row.isEmpty || row.length < 3 || row[2] == null || row[2]?.value?.toString().trim().isEmpty == true) continue;
+        if (row.isEmpty ||
+            row.length < 3 ||
+            row[2] == null ||
+            row[2]?.value?.toString().trim().isEmpty == true)
+          continue;
 
         String passage = row[1]?.value?.toString().trim() ?? '';
         String qText = row[2]?.value?.toString() ?? '';
@@ -204,7 +222,8 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
         String optB = row[4]?.value?.toString() ?? '';
         String optC = row[5]?.value?.toString() ?? '';
         String optD = row[6]?.value?.toString() ?? '';
-        String correctAns = row[7]?.value?.toString().trim().toUpperCase() ?? 'A';
+        String correctAns =
+            row[7]?.value?.toString().trim().toUpperCase() ?? 'A';
         String explanation = row[8]?.value?.toString() ?? '';
         String skillName = row[9]?.value?.toString() ?? '';
         String diffName = row[10]?.value?.toString() ?? '';
@@ -220,7 +239,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
             {'optionText': optB, 'isCorrect': correctAns == 'B'},
             {'optionText': optC, 'isCorrect': correctAns == 'C'},
             {'optionText': optD, 'isCorrect': correctAns == 'D'},
-          ]
+          ],
         };
 
         if (passage.isEmpty) {
@@ -228,7 +247,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
             'isGroup': false,
             'passageText': '',
             'groupTypeName': '',
-            'subQuestions': [subQ]
+            'subQuestions': [subQ],
           });
         } else {
           if (!groupMap.containsKey(passage)) {
@@ -236,7 +255,7 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
               'isGroup': true,
               'passageText': passage,
               'groupTypeName': groupTypeName,
-              'subQuestions': <Map<String, dynamic>>[]
+              'subQuestions': <Map<String, dynamic>>[],
             };
             groupsList.add(groupMap[passage]!);
           }
@@ -245,16 +264,18 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
       }
 
       if (groupsList.isEmpty) {
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
         if (mounted) ToastHelper.showError(context, 'No valid questions found');
         return;
       }
 
-      Map<String, dynamic> initialData = {
-        'groups': groupsList,
-      };
+      Map<String, dynamic> initialData = {'groups': groupsList};
 
-      setState(() { _isLoading = false; });
+      setState(() {
+        _isLoading = false;
+      });
 
       if (mounted) {
         Navigator.push(
@@ -268,7 +289,9 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
         ).then((_) => _fetchQuestions());
       }
     } catch (e) {
-      setState(() { _isLoading = false; });
+      setState(() {
+        _isLoading = false;
+      });
       if (mounted) ToastHelper.showError(context, 'Failed to import Excel: $e');
     }
   }
@@ -294,10 +317,18 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
         hideCommerceActions: true,
         hideLanguageSwitcher: true,
       ),
-      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'question_bank')) : null,
+      drawer: !isDesktop
+          ? const Drawer(
+              child: CourseManagerSidebar(currentRoute: 'question_bank'),
+            )
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'question_bank')),
+          if (isDesktop)
+            const SizedBox(
+              width: 240,
+              child: CourseManagerSidebar(currentRoute: 'question_bank'),
+            ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -329,17 +360,26 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                                 difficulties: _difficulties,
                                 selectedSkillId: _selectedSkillId,
                                 onSkillChanged: (val) {
-                                  setState(() { _selectedSkillId = val; _currentPage = 1; });
+                                  setState(() {
+                                    _selectedSkillId = val;
+                                    _currentPage = 1;
+                                  });
                                   _fetchQuestions();
                                 },
                                 selectedGroupTypeId: _selectedGroupTypeId,
                                 onGroupTypeChanged: (val) {
-                                  setState(() { _selectedGroupTypeId = val; _currentPage = 1; });
+                                  setState(() {
+                                    _selectedGroupTypeId = val;
+                                    _currentPage = 1;
+                                  });
                                   _fetchQuestions();
                                 },
                                 selectedDifficultyId: _selectedDifficultyId,
                                 onDifficultyChanged: (val) {
-                                  setState(() { _selectedDifficultyId = val; _currentPage = 1; });
+                                  setState(() {
+                                    _selectedDifficultyId = val;
+                                    _currentPage = 1;
+                                  });
                                   _fetchQuestions();
                                 },
                               ),
@@ -358,27 +398,35 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                                 onViewPressed: (q) {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (context) => CourseManagerCreateQuestionPage(
-                                      question: q,
-                                      isReadOnly: true,
-                                      isCourseManager: true,
-                                    )),
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          CourseManagerCreateQuestionPage(
+                                            question: q,
+                                            isReadOnly: true,
+                                            isCourseManager: true,
+                                          ),
+                                    ),
                                   );
                                 },
                                 onEditPressed: (q) {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (context) => CourseManagerCreateQuestionPage(
-                                      question: q,
-                                      isEdit: true,
-                                      isCourseManager: true,
-                                    )),
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          CourseManagerCreateQuestionPage(
+                                            question: q,
+                                            isEdit: true,
+                                            isCourseManager: true,
+                                          ),
+                                    ),
                                   ).then((_) => _fetchQuestions());
                                 },
                                 onStatusToggled: (q, isPublic) async {
                                   final oldStatus = q.status;
-                                  final newStatus = isPublic ? 'PUBLIC' : 'PRIVATE';
-                                  
+                                  final newStatus = isPublic
+                                      ? 'PUBLIC'
+                                      : 'PRIVATE';
+
                                   // Optimistic UI Update
                                   setState(() {
                                     q.status = newStatus;
@@ -387,8 +435,15 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                                   try {
                                     final token = await _authService.getToken();
                                     if (token != null) {
-                                      final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                                      await api.toggleQuestionStatus(q.id, newStatus, isGroup: q.isGroup);
+                                      final api = HangoApi(
+                                        baseUrl: apiBaseUrl,
+                                        token: token,
+                                      );
+                                      await api.toggleQuestionStatus(
+                                        q.id,
+                                        newStatus,
+                                        isGroup: q.isGroup,
+                                      );
                                     } else {
                                       throw Exception('No token');
                                     }
@@ -398,8 +453,14 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
                                       q.status = oldStatus;
                                     });
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Failed to update status: $e')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Failed to update status: $e',
+                                          ),
+                                        ),
                                       );
                                     }
                                   }
@@ -420,8 +481,6 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
       ),
     );
   }
-
-
 
   Widget _buildContentHeader(BuildContext context, bool isDesktop) {
     return Padding(
@@ -449,41 +508,67 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
             onPressed: () async {
               try {
                 final token = await _authService.getToken();
-                if (token == null) throw Exception('Authentication token not found');
+                if (token == null)
+                  throw Exception('Authentication token not found');
                 final api = HangoApi(baseUrl: apiBaseUrl, token: token);
                 final bytes = await api.downloadQuestionBankTemplate();
                 downloadBytes(
                   bytes: bytes,
                   filename: 'Hango_Question_Bank_Import_Template.xlsx',
-                  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  mimeType:
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 );
               } catch (e) {
-                if (context.mounted) ToastHelper.showError(context, 'Could not download template: $e');
+                if (context.mounted)
+                  ToastHelper.showError(
+                    context,
+                    'Could not download template: $e',
+                  );
               }
             },
-            icon: const Icon(Icons.download_outlined, color: Color(0xFF20B486), size: 18),
+            icon: const Icon(
+              Icons.download_outlined,
+              color: Color(0xFF20B486),
+              size: 18,
+            ),
             label: const Text(
               'Download Template',
-              style: TextStyle(color: Color(0xFF20B486), fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Color(0xFF20B486),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               side: const BorderSide(color: Color(0xFF20B486)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
           const SizedBox(width: 12),
           OutlinedButton.icon(
             onPressed: _importFromExcel,
-            icon: const Icon(Icons.file_upload_outlined, color: Color(0xFF1E293B), size: 18),
+            icon: const Icon(
+              Icons.file_upload_outlined,
+              color: Color(0xFF1E293B),
+              size: 18,
+            ),
             label: const Text(
               'Import Excel',
-              style: TextStyle(color: Color(0xFF1E293B), fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Color(0xFF1E293B),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               side: const BorderSide(color: Color(0xFFCBD5E1)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -491,18 +576,32 @@ class _CourseManagerQuestionBankPageState extends State<CourseManagerQuestionBan
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const CourseManagerCreateQuestionPage(isCourseManager: true)),
+                MaterialPageRoute(
+                  builder: (context) => const CourseManagerCreateQuestionPage(
+                    isCourseManager: true,
+                  ),
+                ),
               ).then((_) => _fetchQuestions());
             },
-            icon: const Icon(Icons.add_circle_outline, color: Colors.white, size: 18),
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: Colors.white,
+              size: 18,
+            ),
             label: const Text(
               'Create Question',
-              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF20B486),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               elevation: 0,
             ),
           ),

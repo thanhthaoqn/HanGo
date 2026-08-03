@@ -731,7 +731,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
     @Override
     @Transactional
-    public void createTrainerExam(String email, com.hango.hango_backend.dto.TrainerCreateExamRequestDTO request) {
+    public Long createTrainerExam(String email, com.hango.hango_backend.dto.TrainerCreateExamRequestDTO request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         
@@ -747,7 +747,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         exam.setVisibility("PRIVATE");
         exam.setCreatedBy(user);
         
-        examRepository.save(exam);
+        exam = examRepository.save(exam);
+        return exam.getId();
     }
 
     @Override

@@ -189,6 +189,7 @@ public class CourseManagerExamMatrixServiceImpl implements CourseManagerExamMatr
                     detail.getSkillParam().getId(),
                     detail.getDifficultyParam().getId(),
                     detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getId() : null,
+                    user.getId(),
                     requiredQty);
 
             if (randomQuestions.size() < requiredQty) {

@@ -58,6 +58,12 @@ public class TrainerQuestionAIService {
         raw = raw.replaceAll("(?s)^```json\\s*", "")
                 .replaceAll("(?s)```\\s*$", "")
                 .trim();
+                
+        int start = raw.indexOf('{');
+        int end = raw.lastIndexOf('}');
+        if (start >= 0 && end >= 0 && end > start) {
+            raw = raw.substring(start, end + 1);
+        }
 
         try {
             return objectMapper.readValue(raw, CreateTrainerQuestionAIResponseDTO.class);
@@ -101,7 +107,7 @@ public class TrainerQuestionAIService {
 
         String systemPrompt = "You are an expert English test question generator for HanGo trainer.\n" +
                 "Based on the chat history provided, generate a COMPLETE EXAM in JSON format.\n" +
-                "Return PURE JSON only (no markdown).\n" +
+                "Return PURE JSON only (no markdown). Do NOT use unescaped control characters or literal newlines in JSON strings (use \\\\n instead).\n" +
                 "Schema:\n" +
                 "{\n" +
                 "  \"title\": \"Exam Title\",\n" +
@@ -156,12 +162,19 @@ public class TrainerQuestionAIService {
         raw = raw.replaceAll("(?s)^```json\\s*", "")
                 .replaceAll("(?s)```\\s*$", "")
                 .trim();
+                
+        int start = raw.indexOf('{');
+        int end = raw.lastIndexOf('}');
+        if (start >= 0 && end >= 0 && end > start) {
+            raw = raw.substring(start, end + 1);
+        }
 
         try {
             return objectMapper.readValue(raw, CreateTrainerExamAIResponseDTO.class);
         } catch (Exception e) {
-            log.warn("Parse AI json failed for exam generation. raw={}", raw);
-            throw new ApiException("AI returned invalid JSON payload for exam", HttpStatus.BAD_GATEWAY);
+            log.error("Parse AI json failed for exam generation. Error: ", e);
+            log.error("Raw JSON string: {}", raw);
+            throw new ApiException("AI returned invalid JSON payload for exam. Reason: " + e.getMessage(), HttpStatus.BAD_GATEWAY);
         }
     }
 

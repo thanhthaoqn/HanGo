@@ -4,13 +4,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CreateTrainerQuestionAIResponseDTO {
     private String mode;
 
@@ -24,6 +26,7 @@ public class CreateTrainerQuestionAIResponseDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SingleQuestionDTO {
         private String questionText;
         private String explanation;
@@ -36,6 +39,7 @@ public class CreateTrainerQuestionAIResponseDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MultipleGroupDTO {
         private String passageText;
         private String explanation;
@@ -48,6 +52,7 @@ public class CreateTrainerQuestionAIResponseDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SubQuestionDTO {
         private String questionText;
         private String explanation;
@@ -58,6 +63,7 @@ public class CreateTrainerQuestionAIResponseDTO {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class OptionDTO {
         private String optionText;
         private Boolean isCorrect;
