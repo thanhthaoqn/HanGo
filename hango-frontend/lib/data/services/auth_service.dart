@@ -7,6 +7,7 @@ import '../../utils/file_picker_helper.dart';
 
 import '../../utils/config.dart';
 import '../../utils/cart_manager.dart';
+import '../../utils/web_session_helper.dart';
 
 class AuthService {
   // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
@@ -65,7 +66,11 @@ class AuthService {
   }
 
   // Perform login request
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(
+    String email,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
@@ -75,6 +80,7 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        setRememberMe(rememberMe);
         await saveSession(data);
 
         // 🔥 PHÁT TÍN HIỆU NGẦM: Báo cho AppState biết để cập nhật UI ngay lập tức
@@ -202,6 +208,7 @@ class AuthService {
       }
     } catch (_) {}
 
+    setRememberMe(false);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_refreshTokenKey);

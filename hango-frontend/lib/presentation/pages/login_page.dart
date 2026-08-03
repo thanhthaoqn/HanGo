@@ -119,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    final result = await _authService.login(email, password);
+    final result = await _authService.login(email, password, rememberMe: _rememberMe);
 
     setState(() {
       _isLoading = false;
