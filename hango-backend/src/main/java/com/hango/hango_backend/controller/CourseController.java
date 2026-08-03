@@ -104,7 +104,7 @@ public class CourseController {
         }
     }
 
-    @PreAuthorize("hasAuthority('REVIEW_COURSE')")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT')")
     @PostMapping("/{id}/reviews")
     public ResponseEntity<?> addCourseReview(@PathVariable Long id,
                                              @RequestBody @jakarta.validation.Valid CourseReviewRequestDTO request) {

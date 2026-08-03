@@ -164,6 +164,8 @@ class CourseRepository {
           final errorData = json.decode(utf8.decode(response.bodyBytes));
           if (errorData['message'] != null) {
             errorMessage = errorData['message'];
+          } else if (errorData['error'] != null) {
+            errorMessage = errorData['error'];
           }
         } catch (_) {}
 
