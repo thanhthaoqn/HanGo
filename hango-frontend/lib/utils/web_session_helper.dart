@@ -20,3 +20,17 @@ void clearPaymentUrlFromAddressBar() {
     impl.clearPaymentUrlFromAddressBar();
   } catch (_) {}
 }
+
+bool isRememberMeEnabled() {
+  try {
+    return impl.isRememberMeEnabled();
+  } catch (_) {
+    return true; // Fallback to true if any issue, matching isSessionActive's fallback.
+  }
+}
+
+void setRememberMe(bool value) {
+  try {
+    impl.setRememberMe(value);
+  } catch (_) {}
+}

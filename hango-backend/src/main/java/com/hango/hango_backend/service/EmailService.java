@@ -43,8 +43,8 @@ public class EmailService {
         }
     }
 
-    public void sendVerificationEmail(String toEmail) {
-        String verifyUrl = appBaseUrl + "/api/auth/verify?email=" + URLEncoder.encode(toEmail, StandardCharsets.UTF_8);
+    public void sendVerificationEmail(String toEmail, String verificationToken) {
+        String verifyUrl = appBaseUrl + "/api/auth/verify?token=" + URLEncoder.encode(verificationToken, StandardCharsets.UTF_8);
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
         message.setSubject("HanGo - Verify Your Account");

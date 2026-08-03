@@ -4,7 +4,8 @@ import '../../utils/toast_helper.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   final String email;
-  const ResetPasswordPage({super.key, required this.email});
+  final String otpCode;
+  const ResetPasswordPage({super.key, required this.email, required this.otpCode});
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -66,7 +67,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       _isLoading = true;
     });
 
-    final result = await _authService.resetPassword(widget.email, _passwordController.text);
+    final result = await _authService.resetPassword(widget.email, widget.otpCode, _passwordController.text);
 
     setState(() {
       _isLoading = false;
@@ -75,8 +76,12 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     if (mounted) {
       if (result['success']) {
         ToastHelper.showSuccess(context, 'Password updated successfully! Please sign in with your new password.');
-        // Pop all routes and return to login page
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Always reached via Login -> ForgotPassword -> VerifyOtp -> ResetPassword,
+        // so three pops lands back on Login -- popUntil(isFirst) overshoots to the
+        // landing page instead.
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
       } else {
         ToastHelper.showError(context, result['message'] ?? 'Failed to update password. Please try again.');
       }
@@ -318,6 +323,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                               borderRadius: BorderRadius.circular(8),
                               borderSide: const BorderSide(color: Colors.redAccent),
                             ),
+                            errorMaxLines: 3,
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -376,6 +382,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                               borderRadius: BorderRadius.circular(8),
                               borderSide: const BorderSide(color: Colors.redAccent),
                             ),
+                            errorMaxLines: 3,
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -474,7 +481,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         Center(
                           child: GestureDetector(
                             onTap: () {
-                              Navigator.of(context).popUntil((route) => route.isFirst);
+                              Navigator.of(context).pop();
+                              Navigator.of(context).pop();
+                              Navigator.of(context).pop();
                             },
                             child: MouseRegion(
                               cursor: SystemMouseCursors.click,

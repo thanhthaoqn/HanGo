@@ -7,6 +7,7 @@ import '../../utils/file_picker_helper.dart';
 
 import '../../utils/config.dart';
 import '../../utils/cart_manager.dart';
+import '../../utils/web_session_helper.dart';
 
 class AuthService {
   // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
@@ -16,14 +17,60 @@ class AuthService {
   static String get baseUrl => EnvConfig.authBaseUrl;
 
   static const String _tokenKey = 'auth_token';
+  static const String _refreshTokenKey = 'refresh_token';
   static const String _userIdKey = 'user_id';
   static const String _userEmailKey = 'user_email';
   static const String _userFullNameKey = 'user_fullname';
   static const String _userRolesKey = 'user_roles';
   static const String _userAvatarUrlKey = 'user_avatar_url';
 
+  // The http call itself failed (no response at all) — e.g. CORS rejection,
+  // backend not running/unreachable, DNS failure, timeout. Always log the
+  // real exception so it's visible while debugging; only show the raw text
+  // to the user in debug builds, since in release it's not actionable for them.
+  static String _networkErrorMessage(Object error) {
+    debugPrint('[AuthService] Network error: $error');
+    if (kDebugMode) {
+      return 'Network error: $error';
+    }
+    return 'Could not reach the server. Please check your connection and try again.';
+  }
+
+  // Turn a raw HTTP error response body into a short, user-facing message.
+  // Backend errors normally arrive as JSON (`{"message": "..."}`), but a few
+  // paths still fall back to a plain "Error: ..." string or, in the worst
+  // case, an HTML/stack-trace body — this makes sure the caller never shows
+  // that raw payload directly in a toast.
+  static String _extractErrorMessage(String body) {
+    const fallback = 'Something went wrong. Please try again.';
+    if (body.trim().isEmpty) return fallback;
+
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final msg = decoded['message'] ?? decoded['error'];
+        if (msg is String && msg.trim().isNotEmpty) return msg;
+      }
+    } catch (_) {
+      // Not JSON, fall through.
+    }
+
+    String text = body.trim();
+    if (text.startsWith('Error: ')) {
+      text = text.substring(7).trim();
+    }
+    if (text.isEmpty) return fallback;
+    // Guard against dumping an HTML error page / stack trace into the UI.
+    if (text.length > 200 || text.startsWith('<')) return fallback;
+    return text;
+  }
+
   // Perform login request
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(
+    String email,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
@@ -33,6 +80,7 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        setRememberMe(rememberMe);
         await saveSession(data);
 
         // 🔥 PHÁT TÍN HIỆU NGẦM: Báo cho AppState biết để cập nhật UI ngay lập tức
@@ -42,10 +90,10 @@ class AuthService {
 
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -63,6 +111,9 @@ class AuthService {
   Future<void> saveSession(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, data['token']);
+    if (data['refreshToken'] != null) {
+      await prefs.setString(_refreshTokenKey, data['refreshToken']);
+    }
     await prefs.setInt(_userIdKey, data['id']);
     await prefs.setString(_userEmailKey, data['email']);
     await prefs.setString(_userFullNameKey, data['fullName']);
@@ -101,6 +152,39 @@ class AuthService {
     return prefs.getString(_tokenKey);
   }
 
+  // Retrieve refresh token
+  Future<String?> getRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_refreshTokenKey);
+  }
+
+  // Exchange the stored refresh token for a new access token (and a rotated
+  // refresh token). Returns false (and leaves the session as-is) on failure;
+  // callers should treat that as "session is no longer valid".
+  Future<bool> refreshAccessToken() async {
+    try {
+      final refreshToken = await getRefreshToken();
+      if (refreshToken == null) return false;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/refresh-token'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, data['token']);
+        await prefs.setString(_refreshTokenKey, data['refreshToken']);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Check if logged in
   Future<bool> isLoggedIn() async {
     if (cachedIsLoggedIn != null) return cachedIsLoggedIn!;
@@ -111,8 +195,23 @@ class AuthService {
 
   // Log out
   Future<void> logout() async {
+    // Best-effort: revoke the refresh token server-side so it can't be reused.
+    // Still clears local session below even if this call fails (e.g. offline).
+    try {
+      final refreshToken = await getRefreshToken();
+      if (refreshToken != null) {
+        await http.post(
+          Uri.parse('$baseUrl/logout'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'refreshToken': refreshToken}),
+        );
+      }
+    } catch (_) {}
+
+    setRememberMe(false);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
+    await prefs.remove(_refreshTokenKey);
     await prefs.remove(_userIdKey);
     await prefs.remove(_userEmailKey);
     await prefs.remove(_userFullNameKey);
@@ -146,8 +245,9 @@ class AuthService {
     String fullName,
     String email,
     String password,
-    String role,
-  ) async {
+    String role, {
+    String? confirmPassword,
+  }) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
@@ -155,6 +255,7 @@ class AuthService {
         body: jsonEncode({
           'email': email,
           'password': password,
+          'confirmPassword': confirmPassword ?? password,
           'fullName': fullName,
           'role': role,
         }),
@@ -164,10 +265,10 @@ class AuthService {
         final data = jsonDecode(response.body);
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -193,10 +294,10 @@ class AuthService {
 
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -212,10 +313,10 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -231,32 +332,33 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
   // Reset password to a new one
   Future<Map<String, dynamic>> resetPassword(
     String email,
+    String otpCode,
     String newPassword,
   ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/reset-password'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'newPassword': newPassword}),
+        body: jsonEncode({'email': email, 'otpCode': otpCode, 'newPassword': newPassword}),
       );
 
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -290,10 +392,10 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -331,10 +433,10 @@ class AuthService {
         }
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -373,10 +475,10 @@ class AuthService {
         }
         return {'success': true, 'data': updatedData};
       } else {
-        return {'success': false, 'message': response.body};
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -404,15 +506,10 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': 'Password updated successfully!'};
       } else {
-        try {
-          final errBody = jsonDecode(response.body);
-          return {'success': false, 'message': errBody['error'] ?? errBody['message'] ?? response.body};
-        } catch (_) {
-          return {'success': false, 'message': response.body};
-        }
+        return {'success': false, 'message': _extractErrorMessage(response.body)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 
@@ -444,15 +541,10 @@ class AuthService {
         }
         return {'success': true, 'data': updatedData};
       } else {
-        try {
-          final errBody = jsonDecode(responseBody);
-          return {'success': false, 'message': errBody['error'] ?? errBody['message'] ?? responseBody};
-        } catch (_) {
-          return {'success': false, 'message': responseBody};
-        }
+        return {'success': false, 'message': _extractErrorMessage(responseBody)};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _networkErrorMessage(e)};
     }
   }
 }

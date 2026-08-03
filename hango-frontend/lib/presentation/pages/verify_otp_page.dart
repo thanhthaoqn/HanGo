@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../data/services/auth_service.dart';
@@ -16,10 +17,48 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
+  int _resendCooldown = 60;
+  Timer? _timer;
   final _authService = AuthService();
 
   @override
+  void initState() {
+    super.initState();
+    _startCooldownTimer();
+    for (int i = 0; i < 6; i++) {
+      final index = i;
+      _focusNodes[index].addListener(() {
+        if (_focusNodes[index].hasFocus) {
+          _controllers[index].selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _controllers[index].text.length,
+          );
+        }
+      });
+    }
+  }
+
+  void _startCooldownTimer() {
+    _timer?.cancel();
+    setState(() {
+      _resendCooldown = 60;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendCooldown > 0) {
+        if (mounted) {
+          setState(() {
+            _resendCooldown--;
+          });
+        }
+      } else {
+        _timer?.cancel();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _timer?.cancel();
     for (var controller in _controllers) {
       controller.dispose();
     }
@@ -52,7 +91,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ResetPasswordPage(email: widget.email),
+            builder: (context) => ResetPasswordPage(email: widget.email, otpCode: otp),
           ),
         );
       } else {
@@ -62,8 +101,30 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   }
 
   void _handleResend() async {
-    ToastHelper.showSuccess(context, 'Resending OTP code to ${widget.email}...');
-    await _authService.forgotPassword(widget.email);
+    if (_resendCooldown > 0) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final result = await _authService.forgotPassword(widget.email);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      if (result['success']) {
+        for (var controller in _controllers) {
+          controller.clear();
+        }
+        _focusNodes[0].requestFocus();
+        ToastHelper.showSuccess(context, 'A new OTP code has been sent to ${widget.email}.');
+        _startCooldownTimer();
+      } else {
+        ToastHelper.showError(context, result['message'] ?? 'Failed to resend OTP code.');
+      }
+    }
   }
 
   @override
@@ -209,7 +270,12 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                       // Back to Login Link
                       GestureDetector(
                         onTap: () {
-                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          // This screen is always reached via Login -> ForgotPassword ->
+                          // VerifyOtp, so two pops (skipping the "enter your email" step)
+                          // lands back on Login -- popUntil(isFirst) overshoots to the
+                          // landing page instead.
+                          Navigator.of(context).pop();
+                          Navigator.of(context).pop();
                         },
                         child: MouseRegion(
                           cursor: SystemMouseCursors.click,
@@ -274,15 +340,22 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                           return SizedBox(
                             width: isDesktop ? 56 : 45,
                             height: 60,
-                            child: KeyboardListener(
-                              focusNode: FocusNode(),
-                              onKeyEvent: (event) {
+                            child: Focus(
+                              onKeyEvent: (node, event) {
                                 if (event is KeyDownEvent &&
                                     event.logicalKey == LogicalKeyboardKey.backspace) {
-                                  if (_controllers[index].text.isEmpty && index > 0) {
+                                  if (_controllers[index].text.isNotEmpty) {
+                                    _controllers[index].clear();
+                                    if (index > 0) {
+                                      _focusNodes[index - 1].requestFocus();
+                                    }
+                                    return KeyEventResult.handled;
+                                  } else if (index > 0) {
                                     _focusNodes[index - 1].requestFocus();
+                                    return KeyEventResult.handled;
                                   }
                                 }
+                                return KeyEventResult.ignored;
                               },
                               child: TextFormField(
                                 controller: _controllers[index],
@@ -297,7 +370,6 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                                 ),
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(1),
                                 ],
                                 decoration: InputDecoration(
                                   fillColor: const Color(0xFFF3F4F6),
@@ -315,13 +387,43 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                                     ),
                                   ),
                                 ),
+                                onTap: () {
+                                  _controllers[index].selection = TextSelection(
+                                    baseOffset: 0,
+                                    extentOffset: _controllers[index].text.length,
+                                  );
+                                },
                                 onChanged: (value) {
-                                  if (value.isNotEmpty) {
-                                    if (index < 5) {
-                                      _focusNodes[index + 1].requestFocus();
-                                    } else {
-                                      _focusNodes[index].unfocus();
+                                  final digits = value.replaceAll(RegExp(r'\D'), '');
+
+                                  // Handle paste of 6 digits (or full OTP string)
+                                  if (digits.length >= 6) {
+                                    for (int i = 0; i < 6; i++) {
+                                      _controllers[i].text = digits[i];
                                     }
+                                    _focusNodes[5].requestFocus();
+                                    _handleVerify();
+                                    return;
+                                  }
+
+                                  if (digits.isEmpty) {
+                                    return;
+                                  }
+
+                                  // If user typed over an existing number, keep only the latest digit
+                                  final singleDigit = digits.substring(digits.length - 1);
+                                  _controllers[index].value = TextEditingValue(
+                                    text: singleDigit,
+                                    selection: TextSelection(
+                                      baseOffset: 0,
+                                      extentOffset: singleDigit.length,
+                                    ),
+                                  );
+
+                                  if (index < 5) {
+                                    _focusNodes[index + 1].requestFocus();
+                                  } else {
+                                    _focusNodes[index].unfocus();
                                   }
                                 },
                               ),
@@ -378,13 +480,19 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                               ),
                             ),
                             GestureDetector(
-                              onTap: _handleResend,
-                              child: const MouseRegion(
-                                cursor: SystemMouseCursors.click,
+                              onTap: _resendCooldown == 0 && !_isLoading ? _handleResend : null,
+                              child: MouseRegion(
+                                cursor: _resendCooldown == 0 && !_isLoading
+                                    ? SystemMouseCursors.click
+                                    : SystemMouseCursors.basic,
                                 child: Text(
-                                  'Resend OTP',
+                                  _resendCooldown > 0
+                                      ? 'Resend OTP (${_resendCooldown}s)'
+                                      : 'Resend OTP',
                                   style: TextStyle(
-                                    color: Color(0xFF28B79B),
+                                    color: _resendCooldown > 0 || _isLoading
+                                        ? const Color(0xFF9CA3AF)
+                                        : const Color(0xFF28B79B),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
                                   ),

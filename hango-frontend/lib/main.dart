@@ -15,15 +15,16 @@ import 'presentation/pages/trainer/onboarding/trainer_onboarding_agreement_page.
 import 'presentation/pages/trainer/onboarding/trainer_payout_details_page.dart';
 import 'data/services/trainer_onboarding_service.dart';
 import 'services/secure_session_store.dart';
-import 'utils/web_session_helper.dart';
+import 'utils/web_session_helper.dart' show isSessionActive, setSessionActive, isRememberMeEnabled;
 import 'utils/toast_helper.dart';
 import 'services/app_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Clear persistent session only on a cold run or new tab (not on F5 refresh)
-  if (!isSessionActive()) {
+  // Clear persistent session only on a cold run or new tab (not on F5 refresh),
+  // unless the user checked "Remember me" at login -- then keep it across restarts.
+  if (!isSessionActive() && !isRememberMeEnabled()) {
     final sessionStore = SecureSessionStore();
     await sessionStore.clearSession();
 

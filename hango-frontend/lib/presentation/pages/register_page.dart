@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
+import 'learner/learner_home_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -57,6 +58,40 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
+  void _goBackToHome() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+      );
+    }
+  }
+
+  Widget _buildBackToHomeLink() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _goBackToHome,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.arrow_back, color: Color(0xFF4B5563), size: 16),
+            SizedBox(width: 8),
+            Text(
+              'Back to Home',
+              style: TextStyle(
+                color: Color(0xFF4B5563),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeToTerms) {
@@ -72,7 +107,15 @@ class _RegisterPageState extends State<RegisterPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    final result = await _authService.register(name, email, password, _selectedRole);
+    final confirmPassword = _confirmPasswordController.text;
+
+    final result = await _authService.register(
+      name,
+      email,
+      password,
+      _selectedRole,
+      confirmPassword: confirmPassword,
+    );
 
     setState(() {
       _isLoading = false;
@@ -311,6 +354,8 @@ class _RegisterPageState extends State<RegisterPage> {
                         if (_showCheckEmailScreen)
                           _buildCheckEmailView()
                         else ...[
+                          _buildBackToHomeLink(),
+                          const SizedBox(height: 20),
                           // Create Account Title
                           const Text(
                             'Create Account',
@@ -356,6 +401,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: const BorderSide(color: Colors.redAccent),
                               ),
+                              errorMaxLines: 6,
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -400,13 +446,15 @@ class _RegisterPageState extends State<RegisterPage> {
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: const BorderSide(color: Colors.redAccent),
                               ),
+                              errorMaxLines: 6,
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty) {
+                              if (value == null || value.trim().isEmpty) {
                                 return 'Email is required';
                               }
-                              if (!value.contains('@')) {
-                                return 'Email must contain @';
+                              final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                              if (!emailRegex.hasMatch(value.trim())) {
+                                return 'Please enter a valid email address';
                               }
                               return null;
                             },
@@ -459,6 +507,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: const BorderSide(color: Colors.redAccent),
                               ),
+                              errorMaxLines: 6,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -481,7 +530,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 missing.add('at least 1 special character');
                               }
                               if (missing.isNotEmpty) {
-                                return 'Missing: ${missing.join(", ")}';
+                                return 'Missing:\n• ${missing.join('\n• ')}';
                               }
                               return null;
                             },
@@ -534,6 +583,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: const BorderSide(color: Colors.redAccent),
                               ),
+                              errorMaxLines: 6,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {

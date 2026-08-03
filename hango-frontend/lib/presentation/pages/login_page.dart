@@ -70,6 +70,45 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  void _goBackToHome() {
+    // Login is reached both by pushing on top of whatever the user was
+    // browsing (course detail, cart, header) and by pushAndRemoveUntil/
+    // pushReplacement after a logout/session-expiry (stack cleared). Pop
+    // when there's somewhere to go back to; otherwise land on the landing
+    // page explicitly instead of doing nothing.
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+      );
+    }
+  }
+
+  Widget _buildBackToHomeLink() {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _goBackToHome,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.arrow_back, color: Color(0xFF4B5563), size: 16),
+            SizedBox(width: 8),
+            Text(
+              'Back to Home',
+              style: TextStyle(
+                color: Color(0xFF4B5563),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -80,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    final result = await _authService.login(email, password);
+    final result = await _authService.login(email, password, rememberMe: _rememberMe);
 
     setState(() {
       _isLoading = false;
@@ -105,12 +144,72 @@ class _LoginPageState extends State<LoginPage> {
         _navigateAfterSuccess(roles);
       } else {
         debugPrint('Sign in failed! Error: ${result['message']}');
-        ToastHelper.showError(
-          context,
-          result['message'] ?? 'Sign in failed. Please try again.',
-        );
+        final message = result['message'] ?? 'Sign in failed. Please try again.';
+        if (message.toString().toLowerCase().contains('verify your email')) {
+          // No other screen is guaranteed to still be open for this account
+          // (e.g. the original 12h-valid link expired long after the
+          // post-registration "check your email" screen was closed) -- login
+          // is the one place a returning, unverified user always lands, so it
+          // must offer a way to get a fresh link.
+          _showResendVerificationDialog(email);
+        } else {
+          ToastHelper.showError(context, message);
+        }
       }
     }
+  }
+
+  void _showResendVerificationDialog(String email) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        bool isResending = false;
+        return StatefulBuilder(
+          builder: (_, setDialogState) {
+            return AlertDialog(
+              title: const Text('Email Not Verified'),
+              content: Text(
+                'Your account for $email has not been verified yet, or your verification link may have expired. '
+                'Would you like us to send a new verification link?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isResending ? null : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: isResending
+                      ? null
+                      : () async {
+                          setDialogState(() => isResending = true);
+                          final result = await _authService.resendVerificationEmail(email);
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                          if (mounted) {
+                            if (result['success']) {
+                              ToastHelper.showSuccess(context,
+                                  'A new verification link has been sent to $email. Please check your inbox.');
+                            } else {
+                              ToastHelper.showError(context,
+                                  result['message'] ?? 'Failed to resend verification link.');
+                            }
+                          }
+                        },
+                  child: isResending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Resend Link'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _navigateAfterSuccess(List<String> roles) async {
@@ -571,7 +670,9 @@ class _LoginPageState extends State<LoginPage> {
                             );
                           },
                         ),
-                        const SizedBox(height: 48),
+                        const SizedBox(height: 20),
+                        _buildBackToHomeLink(),
+                        const SizedBox(height: 28),
 
                         // Sign In Title
                         const Text(
@@ -637,6 +738,7 @@ class _LoginPageState extends State<LoginPage> {
                                 color: Colors.redAccent,
                               ),
                             ),
+                            errorMaxLines: 3,
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -718,6 +820,7 @@ class _LoginPageState extends State<LoginPage> {
                                 color: Colors.redAccent,
                               ),
                             ),
+                            errorMaxLines: 3,
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -881,7 +984,9 @@ class _LoginPageState extends State<LoginPage> {
                                     cursor: SystemMouseCursors.click,
                                     child: GestureDetector(
                                       onTap: () {
-                                        Navigator.pushReplacement(
+                                        // push (not pushReplacement) so Register's
+                                        // "Sign In" link can pop back here correctly.
+                                        Navigator.push(
                                           context,
                                           MaterialPageRoute(
                                             builder: (context) =>

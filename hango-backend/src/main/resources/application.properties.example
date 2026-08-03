@@ -15,6 +15,7 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
 # JWT Configuration
 hango.jwt.secret=YOUR_JWT_SECRET_HERE
 hango.jwt.expirationMs=86400000
+hango.jwt.refreshExpirationMs=2592000000
 
 # Cloudinary Configuration
 cloudinary.cloud-name=YOUR_CLOUD_NAME

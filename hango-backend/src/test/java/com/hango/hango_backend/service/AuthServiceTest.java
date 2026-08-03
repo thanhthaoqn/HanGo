@@ -11,9 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,13 +25,14 @@ import org.mockito.Mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,15 +47,18 @@ import com.hango.hango_backend.dto.LoginResponse;
 import com.hango.hango_backend.dto.ProfileUpdateRequest;
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.ResetPasswordRequest;
+import com.hango.hango_backend.dto.TokenRefreshResponse;
 import com.hango.hango_backend.dto.UserResponse;
 import com.hango.hango_backend.dto.VerifyOtpRequest;
 import com.hango.hango_backend.entity.PasswordResetOtp;
+import com.hango.hango_backend.entity.RefreshToken;
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.PasswordResetOtpRepository;
+import com.hango.hango_backend.repository.RefreshTokenRepository;
 import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
-import com.hango.hango_backend.security.UserDetailsImpl;
 import com.hango.hango_backend.util.JwtUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -79,6 +83,10 @@ class AuthServiceTest {
     @Mock
     private EmailService emailService;
     @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+    @Mock
+    private AuditLogService auditLogService;
+    @Mock
     private Authentication authentication;
 
     @InjectMocks
@@ -91,7 +99,7 @@ class AuthServiceTest {
         return req;
     }
 
-    private User activeUser(String email, String status) {
+    private User activeVerifiedUser(String email, String status) {
         return User.builder()
                 .id(1L)
                 .email(email)
@@ -99,167 +107,257 @@ class AuthServiceTest {
                 .fullName("Active User")
                 .status(status)
                 .isVerified(true)
+                .failedLoginAttempts(0)
                 .roles(new HashSet<>(Set.of(Role.builder().id(1L).roleName("LEARNER").build())))
                 .build();
+    }
+
+    private ApiException assertApiException(HttpStatus expectedStatus, Runnable action) {
+        ApiException ex = assertThrows(ApiException.class, action::run);
+        assertEquals(expectedStatus, ex.getStatus());
+        return ex;
     }
 
     // =================================================================
     // authenticateUser
     // =================================================================
-
     @Test
-    void authenticateUserShouldReturnTokenAndUpdateLastLoginWhenCredentialsValidAndAccountActive() {
-        User user = activeUser("active@example.com", "ACTIVE");
-        UserDetailsImpl principal = new UserDetailsImpl(1L, "active@example.com", "Active User", "hashed",
-                List.of(new SimpleGrantedAuthority("ROLE_LEARNER")));
+    void authenticateUserShouldReturnTokensAndUpdateLastLoginWhenCredentialsValidAndAccountActiveAndVerified() {
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
 
-        when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(principal);
         when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
-        when(jwtUtils.generateJwtToken(authentication)).thenReturn("mock-jwt-token");
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(jwtUtils.generateJwtTokenFromUsername("active@example.com")).thenReturn("mock-jwt-token");
+        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
+        when(jwtUtils.hashToken("raw-refresh-token")).thenReturn("hashed-refresh-token");
+        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         LoginResponse response = authService.authenticateUser(loginRequest("active@example.com", "correct-password"));
 
         assertEquals("mock-jwt-token", response.getToken());
+        assertEquals("raw-refresh-token", response.getRefreshToken());
         assertEquals("active@example.com", response.getEmail());
-        assertEquals(List.of("ROLE_LEARNER"), response.getRoles());
+        assertEquals(List.of("LEARNER"), response.getRoles());
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(savedUser.capture());
         assertNotNull(savedUser.getValue().getLastLoginAt());
+        assertEquals(0, savedUser.getValue().getFailedLoginAttempts());
+
+        verify(refreshTokenRepository).save(any(RefreshToken.class));
+        verify(auditLogService, times(1)).log(any(), anyString(), any(), any());
     }
 
     @Test
-    void authenticateUserShouldPropagateBadCredentialsExceptionOnWrongPassword() {
+    void authenticateUserShouldNormalizeEmailCasingAndWhitespace() {
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(jwtUtils.generateJwtTokenFromUsername(anyString())).thenReturn("mock-jwt-token");
+        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
+        when(jwtUtils.hashToken(anyString())).thenReturn("hashed");
+        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.authenticateUser(loginRequest("  Active@Example.com  ", "correct-password"));
+
+        verify(userRepository).findByEmail("active@example.com");
+    }
+
+    @Test
+    void authenticateUserShouldRejectUnknownEmailWithGenericMessage() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        assertApiException(HttpStatus.UNAUTHORIZED,
+                () -> authService.authenticateUser(loginRequest("ghost@example.com", "any-password")));
+
+        verify(authenticationManager, never()).authenticate(any());
+        verify(auditLogService).log(any(), anyString(), any(), any());
+    }
+
+    @Test
+    void authenticateUserShouldStillRejectUnknownEmailWhenAuditLoggingItselfFails() {
+        // Regression test: a failure inside the REQUIRES_NEW audit-log transaction
+        // must never surface as (or replace) the caller's real error -- see the
+        // comment on AuthService.logAudit().
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+        doThrow(new org.springframework.transaction.UnexpectedRollbackException("Transaction silently rolled back"))
+                .when(auditLogService).log(any(), anyString(), any(), any());
+
+        ApiException ex = assertApiException(HttpStatus.UNAUTHORIZED,
+                () -> authService.authenticateUser(loginRequest("ghost@example.com", "any-password")));
+        assertEquals("Invalid email or password.", ex.getMessage());
+    }
+
+    @Test
+    void authenticateUserShouldRejectBadCredentialsAndIncrementFailedAttempts() {
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        user.setFailedLoginAttempts(2);
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
 
-        LoginRequest req = new LoginRequest();
-        req.setEmail("active@example.com");
-        req.setPassword("wrong-password");
+        assertApiException(HttpStatus.UNAUTHORIZED,
+                () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
 
-        assertThrows(BadCredentialsException.class, () -> authService.authenticateUser(req));
-        verify(userRepository, never()).save(any());
+        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(savedUser.capture());
+        assertEquals(3, savedUser.getValue().getFailedLoginAttempts());
+        assertNull(savedUser.getValue().getLockedUntil());
+        verify(jwtUtils, never()).generateJwtTokenFromUsername(anyString());
+    }
+
+    @Test
+    void authenticateUserShouldLockAccountAfterFifthFailedAttempt() {
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        user.setFailedLoginAttempts(4);
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
+
+        assertApiException(HttpStatus.UNAUTHORIZED,
+                () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
+
+        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(savedUser.capture());
+        assertEquals(0, savedUser.getValue().getFailedLoginAttempts());
+        assertNotNull(savedUser.getValue().getLockedUntil());
+        assertTrue(savedUser.getValue().getLockedUntil().isAfter(LocalDateTime.now().plusMinutes(14)));
+    }
+
+    @Test
+    void authenticateUserShouldRejectLoginWhileAccountIsLockedWithoutCallingAuthenticationManager() {
+        User user = activeVerifiedUser("locked@example.com", "ACTIVE");
+        user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+        when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
+
+        assertApiException(HttpStatus.LOCKED,
+                () -> authService.authenticateUser(loginRequest("locked@example.com", "correct-password")));
+
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    void authenticateUserShouldAllowLoginAfterLockExpires() {
+        User user = activeVerifiedUser("locked@example.com", "ACTIVE");
+        user.setLockedUntil(LocalDateTime.now().minusMinutes(1));
+        when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(jwtUtils.generateJwtTokenFromUsername(anyString())).thenReturn("mock-jwt-token");
+        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
+        when(jwtUtils.hashToken(anyString())).thenReturn("hashed");
+        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertDoesNotThrow(() -> authService.authenticateUser(loginRequest("locked@example.com", "correct-password")));
+    }
+
+    @Test
+    void authenticateUserShouldRejectAccountThatIsNotActiveStatus() {
+        User user = activeVerifiedUser("locked-status@example.com", "LOCKED");
+        when(userRepository.findByEmail("locked-status@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+
+        assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("locked-status@example.com", "correct-password")));
+
+        verify(jwtUtils, never()).generateJwtTokenFromUsername(anyString());
     }
 
     @Test
     void authenticateUserShouldRejectInactiveAccount() {
-        User user = activeUser("inactive@example.com", "INACTIVE");
-        UserDetailsImpl principal = new UserDetailsImpl(1L, "inactive@example.com", "Inactive User", "hashed",
-                List.of(new SimpleGrantedAuthority("ROLE_LEARNER")));
-
-        when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(principal);
+        User user = activeVerifiedUser("inactive@example.com", "INACTIVE");
         when(userRepository.findByEmail("inactive@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
 
-        LoginRequest req = new LoginRequest();
-        req.setEmail("inactive@example.com");
-        req.setPassword("correct-password");
+        assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("inactive@example.com", "correct-password")));
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.authenticateUser(req));
-        assertTrue(ex.getMessage().contains("deactivated"));
-        verify(jwtUtils, never()).generateJwtToken(any());
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    void authenticateUserShouldRejectInactiveAccountCaseInsensitively() {
-        User user = activeUser("inactive2@example.com", "inactive");
-        UserDetailsImpl principal = new UserDetailsImpl(1L, "inactive2@example.com", "Inactive User", "hashed",
-                List.of(new SimpleGrantedAuthority("ROLE_LEARNER")));
-
+    void authenticateUserShouldRejectUnverifiedAccountEvenWithCorrectPassword() {
+        User user = activeVerifiedUser("unverified@example.com", "ACTIVE");
+        user.setIsVerified(false);
+        when(userRepository.findByEmail("unverified@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(principal);
-        when(userRepository.findByEmail("inactive2@example.com")).thenReturn(Optional.of(user));
 
-        LoginRequest req = new LoginRequest();
-        req.setEmail("inactive2@example.com");
-        req.setPassword("correct-password");
+        assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("unverified@example.com", "correct-password")));
 
-        assertThrows(IllegalArgumentException.class, () -> authService.authenticateUser(req));
-    }
-
-    @Test
-    void authenticateUserShouldCurrentlyAllowLoginForNonInactiveStatusSuchAsLocked() {
-        User user = activeUser("locked@example.com", "LOCKED");
-        UserDetailsImpl principal = new UserDetailsImpl(1L, "locked@example.com", "Locked User", "hashed",
-                List.of(new SimpleGrantedAuthority("ROLE_LEARNER")));
-
-        when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(principal);
-        when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
-        when(jwtUtils.generateJwtToken(authentication)).thenReturn("mock-jwt-token");
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        LoginRequest req = new LoginRequest();
-        req.setEmail("locked@example.com");
-        req.setPassword("correct-password");
-
-        LoginResponse response = assertDoesNotThrow(() -> authService.authenticateUser(req));
-        assertEquals("mock-jwt-token", response.getToken());
-    }
-
-    @Test
-    void authenticateUserShouldThrowUsernameNotFoundWhenUserMissingAfterAuthentication() {
-        UserDetailsImpl principal = new UserDetailsImpl(1L, "ghost@example.com", "Ghost", "hashed",
-                List.of(new SimpleGrantedAuthority("ROLE_LEARNER")));
-
-        when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(principal);
-        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
-
-        LoginRequest req = new LoginRequest();
-        req.setEmail("ghost@example.com");
-        req.setPassword("any-password");
-
-        assertThrows(UsernameNotFoundException.class, () -> authService.authenticateUser(req));
+        verify(jwtUtils, never()).generateJwtTokenFromUsername(anyString());
+        verify(refreshTokenRepository, never()).save(any());
     }
 
     // =================================================================
     // registerUser
     // =================================================================
-
     private RegisterRequest registerRequest(String email, String password, String requestedRole) {
         RegisterRequest req = new RegisterRequest();
         req.setEmail(email);
         req.setPassword(password);
+        req.setConfirmPassword(password);
         req.setFullName("New User");
         req.setRole(requestedRole);
         return req;
     }
 
     @Test
-    void registerUserShouldCreateLearnerAccountAndSendVerificationEmailOnHappyPath() {
+    void registerUserShouldCreateUnverifiedLearnerAccountAndSendVerificationEmailWithTokenOnHappyPath() {
         when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
         when(roleRepository.findByRoleName("LEARNER"))
                 .thenReturn(Optional.of(Role.builder().id(1L).roleName("LEARNER").build()));
-        when(encoder.encode("pass1234")).thenReturn("ENCODED_HASH");
+        when(encoder.encode("Pass1234!")).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             u.setId(42L);
             return u;
         });
 
-        UserResponse response = authService.registerUser(registerRequest("new@example.com", "pass1234", null));
+        UserResponse response = authService.registerUser(registerRequest("new@example.com", "Pass1234!", null));
 
         assertEquals("new@example.com", response.getEmail());
         assertEquals(List.of("LEARNER"), response.getRoles());
-        verify(emailService).sendVerificationEmail("new@example.com");
+        verify(emailService).sendVerificationEmail(eq("new@example.com"), anyString());
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(savedUser.capture());
         assertEquals("ENCODED_HASH", savedUser.getValue().getPasswordHash());
-        assertNotEquals("pass1234", savedUser.getValue().getPasswordHash());
+        assertNotEquals("Pass1234!", savedUser.getValue().getPasswordHash());
+        assertFalse(savedUser.getValue().getIsVerified());
+        assertNotNull(savedUser.getValue().getVerificationToken());
+        assertNotNull(savedUser.getValue().getVerificationTokenExpiry());
     }
 
     @Test
-    void registerUserShouldRejectDuplicateEmail() {
+    void registerUserShouldNormalizeEmailToLowercaseTrimmed() {
+        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(roleRepository.findByRoleName("LEARNER"))
+                .thenReturn(Optional.of(Role.builder().id(1L).roleName("LEARNER").build()));
+        when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.registerUser(registerRequest("  New@Example.com  ", "Pass1234!", null));
+
+        verify(userRepository).existsByEmail("new@example.com");
+    }
+
+    @Test
+    void registerUserShouldRejectConfirmPasswordMismatch() {
+        RegisterRequest req = registerRequest("mismatch@example.com", "Pass1234!", null);
+        req.setConfirmPassword("Different1!");
+
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST, () -> authService.registerUser(req));
+        assertTrue(ex.getMessage().contains("do not match"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void registerUserShouldRejectDuplicateEmailWithConflictStatus() {
         when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.registerUser(registerRequest("existing@example.com", "pass1234", null)));
-        assertTrue(ex.getMessage().contains("already in use"));
+        assertApiException(HttpStatus.CONFLICT,
+                () -> authService.registerUser(registerRequest("existing@example.com", "Pass1234!", null)));
         verify(roleRepository, never()).findByRoleName(anyString());
         verify(userRepository, never()).save(any());
     }
@@ -272,7 +370,7 @@ class AuthServiceTest {
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        authService.registerUser(registerRequest("new2@example.com", "pass1234", null));
+        authService.registerUser(registerRequest("new2@example.com", "Pass1234!", null));
 
         ArgumentCaptor<Role> savedRole = ArgumentCaptor.forClass(Role.class);
         verify(roleRepository).save(savedRole.capture());
@@ -287,7 +385,7 @@ class AuthServiceTest {
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UserResponse response = authService.registerUser(registerRequest("new3@example.com", "pass1234", "TRAINER"));
+        UserResponse response = authService.registerUser(registerRequest("new3@example.com", "Pass1234!", "TRAINER"));
 
         assertEquals(List.of("TRAINER"), response.getRoles());
         verify(roleRepository, never()).findByRoleName("LEARNER");
@@ -297,8 +395,8 @@ class AuthServiceTest {
     void registerUserShouldRejectRoleOutsideLearnerTrainerWhitelist() {
         when(userRepository.existsByEmail("new5@example.com")).thenReturn(false);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.registerUser(registerRequest("new5@example.com", "pass1234", "ADMINISTRATOR")));
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST,
+                () -> authService.registerUser(registerRequest("new5@example.com", "Pass1234!", "ADMINISTRATOR")));
         assertTrue(ex.getMessage().contains("Invalid registration role"));
         verify(userRepository, never()).save(any());
     }
@@ -310,23 +408,22 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(Role.builder().id(1L).roleName("LEARNER").build()));
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-        doThrow(new RuntimeException("SMTP down")).when(emailService).sendVerificationEmail("new4@example.com");
+        doThrow(new RuntimeException("SMTP down")).when(emailService).sendVerificationEmail(eq("new4@example.com"), anyString());
 
         UserResponse response = assertDoesNotThrow(
-                () -> authService.registerUser(registerRequest("new4@example.com", "pass1234", null)));
+                () -> authService.registerUser(registerRequest("new4@example.com", "Pass1234!", null)));
         assertEquals("new4@example.com", response.getEmail());
     }
 
     // =================================================================
     // createUserByAdmin
     // =================================================================
-
     @Test
     void createUserByAdminShouldRejectDuplicateEmail() {
         when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.createUserByAdmin(registerRequest("existing@example.com", "pass1234", "TRAINER")));
+                () -> authService.createUserByAdmin(registerRequest("existing@example.com", "Pass1234!", "TRAINER")));
         assertTrue(ex.getMessage().contains("already in use"));
         verify(userRepository, never()).save(any());
     }
@@ -339,7 +436,7 @@ class AuthServiceTest {
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UserResponse response = authService.createUserByAdmin(registerRequest("cm1@example.com", "pass1234", null));
+        UserResponse response = authService.createUserByAdmin(registerRequest("cm1@example.com", "Pass1234!", null));
 
         assertEquals(List.of("TRAINER"), response.getRoles());
     }
@@ -365,19 +462,17 @@ class AuthServiceTest {
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UserResponse response = authService.createUserByAdmin(registerRequest("admin2@example.com", "pass1234", "admin"));
+        UserResponse response = authService.createUserByAdmin(registerRequest("admin2@example.com", "Pass1234!", "admin"));
 
         assertEquals(List.of("ADMINISTRATOR"), response.getRoles());
     }
 
     @Test
     void createUserByAdminShouldRejectRoleOutsideWhitelistInsteadOfSilentlyCreatingGarbageRole() {
-        // Regression test: previously any non-empty string was accepted and, if the role didn't already
-        // exist, silently auto-created a new garbage row in the roles table (e.g. a typo'd role name).
         when(userRepository.existsByEmail("typo@example.com")).thenReturn(false);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.createUserByAdmin(registerRequest("typo@example.com", "pass1234", "TRANIER")));
+                () -> authService.createUserByAdmin(registerRequest("typo@example.com", "Pass1234!", "TRANIER")));
         assertTrue(ex.getMessage().contains("Invalid role"));
         verify(roleRepository, never()).findByRoleName(anyString());
         verify(roleRepository, never()).save(any());
@@ -392,7 +487,7 @@ class AuthServiceTest {
         when(encoder.encode(anyString())).thenReturn("ENCODED_HASH");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        authService.createUserByAdmin(registerRequest("cm3@example.com", "pass1234", "TRAINER"));
+        authService.createUserByAdmin(registerRequest("cm3@example.com", "Pass1234!", "TRAINER"));
 
         ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(savedUser.capture());
@@ -403,7 +498,6 @@ class AuthServiceTest {
     // =================================================================
     // googleLogin
     // =================================================================
-
     private GoogleIdToken mockGoogleIdToken(String email, String name, String picture) {
         GoogleIdToken.Payload payload = new GoogleIdToken.Payload();
         payload.setEmail(email);
@@ -418,7 +512,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void googleLoginShouldJitProvisionLearnerAccountOnFirstSignIn() throws Exception {
+    void googleLoginShouldJitProvisionVerifiedLearnerAccountOnFirstSignIn() throws Exception {
         when(googleIdTokenVerifier.verify("valid-google-token"))
                 .thenReturn(mockGoogleIdToken("newgoogleuser@example.com", "Google User Name", "https://google.example/pic.png"));
         when(userRepository.findByEmail("newgoogleuser@example.com")).thenReturn(Optional.empty());
@@ -433,12 +527,16 @@ class AuthServiceTest {
             return u;
         });
         when(jwtUtils.generateJwtTokenFromUsername("newgoogleuser@example.com")).thenReturn("google-jwt-token");
+        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
+        when(jwtUtils.hashToken(anyString())).thenReturn("hashed");
+        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
 
         GoogleLoginRequest req = new GoogleLoginRequest();
         req.setIdToken("valid-google-token");
         LoginResponse response = authService.googleLogin(req);
 
         assertEquals("google-jwt-token", response.getToken());
+        assertEquals("raw-refresh-token", response.getRefreshToken());
         assertEquals("newgoogleuser@example.com", response.getEmail());
         assertEquals("Google User Name", response.getFullName());
         assertEquals(List.of("LEARNER"), response.getRoles());
@@ -450,12 +548,15 @@ class AuthServiceTest {
 
     @Test
     void googleLoginShouldReuseExistingAccountWithoutCreatingDuplicateRole() throws Exception {
-        User existing = activeUser("existinggoogleuser@example.com", "ACTIVE");
+        User existing = activeVerifiedUser("existinggoogleuser@example.com", "ACTIVE");
         when(googleIdTokenVerifier.verify("valid-google-token"))
                 .thenReturn(mockGoogleIdToken("existinggoogleuser@example.com", "Existing User", null));
         when(userRepository.findByEmail("existinggoogleuser@example.com")).thenReturn(Optional.of(existing));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(jwtUtils.generateJwtTokenFromUsername("existinggoogleuser@example.com")).thenReturn("google-jwt-token");
+        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
+        when(jwtUtils.hashToken(anyString())).thenReturn("hashed");
+        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
 
         GoogleLoginRequest req = new GoogleLoginRequest();
         req.setIdToken("valid-google-token");
@@ -466,8 +567,8 @@ class AuthServiceTest {
     }
 
     @Test
-    void googleLoginShouldRejectInactiveAccount() throws Exception {
-        User inactive = activeUser("inactivegoogleuser@example.com", "INACTIVE");
+    void googleLoginShouldRejectAccountThatIsNotActive() throws Exception {
+        User inactive = activeVerifiedUser("inactivegoogleuser@example.com", "INACTIVE");
         when(googleIdTokenVerifier.verify("valid-google-token"))
                 .thenReturn(mockGoogleIdToken("inactivegoogleuser@example.com", "Inactive User", null));
         when(userRepository.findByEmail("inactivegoogleuser@example.com")).thenReturn(Optional.of(inactive));
@@ -475,41 +576,54 @@ class AuthServiceTest {
         GoogleLoginRequest req = new GoogleLoginRequest();
         req.setIdToken("valid-google-token");
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.googleLogin(req));
-        assertTrue(ex.getMessage().contains("Google authentication failed"));
+        assertApiException(HttpStatus.FORBIDDEN, () -> authService.googleLogin(req));
         verify(jwtUtils, never()).generateJwtTokenFromUsername(anyString());
     }
 
     @Test
-    void googleLoginShouldWrapVerificationFailureAsIllegalArgumentExceptionForMalformedToken() throws Exception {
+    void googleLoginShouldRejectWhenVerifierReturnsNullInsteadOfFallingBackToUnsafeParsing() throws Exception {
+        // Regression test: this used to fall back to parsing the token without checking its
+        // signature, which let an attacker forge a login as literally any email address.
         when(googleIdTokenVerifier.verify("not-a-real-jwt")).thenReturn(null);
 
         GoogleLoginRequest req = new GoogleLoginRequest();
         req.setIdToken("not-a-real-jwt");
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.googleLogin(req));
-        assertTrue(ex.getMessage().startsWith("Google authentication failed"));
+        assertApiException(HttpStatus.UNAUTHORIZED, () -> authService.googleLogin(req));
         verify(userRepository, never()).save(any());
+        verify(userRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
+    void googleLoginShouldRejectWhenVerifierThrows() throws Exception {
+        when(googleIdTokenVerifier.verify("broken-token")).thenThrow(new java.security.GeneralSecurityException("boom"));
+
+        GoogleLoginRequest req = new GoogleLoginRequest();
+        req.setIdToken("broken-token");
+
+        assertApiException(HttpStatus.UNAUTHORIZED, () -> authService.googleLogin(req));
     }
 
     // =================================================================
     // forgotPassword
     // =================================================================
-
     @Test
-    void forgotPasswordShouldRejectUnregisteredEmail() {
-        when(userRepository.existsByEmail("unknown@example.com")).thenReturn(false);
+    void forgotPasswordShouldSilentlySucceedForUnregisteredEmailWithoutSendingAnything() {
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
         ForgotPasswordRequest req = new ForgotPasswordRequest();
         req.setEmail("unknown@example.com");
 
-        assertThrows(IllegalArgumentException.class, () -> authService.forgotPassword(req));
+        assertDoesNotThrow(() -> authService.forgotPassword(req));
         verify(passwordResetOtpRepository, never()).save(any());
+        verify(emailService, never()).sendOtpEmail(anyString(), anyString());
     }
 
     @Test
     void forgotPasswordShouldReplaceExistingOtpAndSendSixDigitCodeByEmail() {
-        when(userRepository.existsByEmail("known@example.com")).thenReturn(true);
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com")).thenReturn(Optional.empty());
         when(passwordResetOtpRepository.save(any(PasswordResetOtp.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ForgotPasswordRequest req = new ForgotPasswordRequest();
@@ -529,20 +643,38 @@ class AuthServiceTest {
         verify(emailService).sendOtpEmail(eq("known@example.com"), eq(otpCode));
     }
 
+    @Test
+    void forgotPasswordShouldNoOpWhenResendCooldownStillActive() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        PasswordResetOtp recent = PasswordResetOtp.builder()
+                .id(1L).email("known@example.com").otpCode("111111")
+                .expiryTime(LocalDateTime.now().plusMinutes(4))
+                .lastSentAt(LocalDateTime.now().minusSeconds(10))
+                .build();
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com")).thenReturn(Optional.of(recent));
+
+        ForgotPasswordRequest req = new ForgotPasswordRequest();
+        req.setEmail("known@example.com");
+        authService.forgotPassword(req);
+
+        verify(passwordResetOtpRepository, never()).save(any());
+        verify(emailService, never()).sendOtpEmail(anyString(), anyString());
+    }
+
     // =================================================================
     // verifyOtp
     // =================================================================
-
     @Test
-    void verifyOtpShouldRejectWhenNoMatchingOtpExists() {
-        when(passwordResetOtpRepository.findByEmailAndOtpCode("known@example.com", "000000"))
+    void verifyOtpShouldRejectWhenNoOtpExistsForEmail() {
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
                 .thenReturn(Optional.empty());
 
         VerifyOtpRequest req = new VerifyOtpRequest();
         req.setEmail("known@example.com");
         req.setOtpCode("000000");
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.verifyOtp(req));
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyOtp(req));
         assertTrue(ex.getMessage().contains("Invalid OTP"));
     }
 
@@ -552,25 +684,25 @@ class AuthServiceTest {
                 .id(1L).email("known@example.com").otpCode("123456")
                 .expiryTime(LocalDateTime.now().minusMinutes(1))
                 .build();
-        when(passwordResetOtpRepository.findByEmailAndOtpCode("known@example.com", "123456"))
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
                 .thenReturn(Optional.of(expired));
 
         VerifyOtpRequest req = new VerifyOtpRequest();
         req.setEmail("known@example.com");
         req.setOtpCode("123456");
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.verifyOtp(req));
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyOtp(req));
         assertTrue(ex.getMessage().contains("expired"));
         verify(passwordResetOtpRepository).delete(expired);
     }
 
     @Test
-    void verifyOtpShouldAcceptValidUnexpiredOtpWithoutDeletingIt() {
+    void verifyOtpShouldAcceptValidUnexpiredOtpWithoutConsumingIt() {
         PasswordResetOtp valid = PasswordResetOtp.builder()
                 .id(1L).email("known@example.com").otpCode("123456")
                 .expiryTime(LocalDateTime.now().plusMinutes(3))
                 .build();
-        when(passwordResetOtpRepository.findByEmailAndOtpCode("known@example.com", "123456"))
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
                 .thenReturn(Optional.of(valid));
 
         VerifyOtpRequest req = new VerifyOtpRequest();
@@ -579,65 +711,210 @@ class AuthServiceTest {
 
         assertDoesNotThrow(() -> authService.verifyOtp(req));
         verify(passwordResetOtpRepository, never()).delete(any());
+        verify(passwordResetOtpRepository, never()).save(any());
+    }
+
+    @Test
+    void verifyOtpShouldRejectAlreadyConsumedOtp() {
+        PasswordResetOtp consumed = PasswordResetOtp.builder()
+                .id(1L).email("known@example.com").otpCode("123456")
+                .expiryTime(LocalDateTime.now().plusMinutes(3))
+                .consumed(true)
+                .build();
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
+                .thenReturn(Optional.of(consumed));
+
+        VerifyOtpRequest req = new VerifyOtpRequest();
+        req.setEmail("known@example.com");
+        req.setOtpCode("123456");
+
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyOtp(req));
+        assertTrue(ex.getMessage().contains("already been used"));
+    }
+
+    @Test
+    void verifyOtpShouldIncrementAttemptCountOnWrongCode() {
+        PasswordResetOtp otp = PasswordResetOtp.builder()
+                .id(1L).email("known@example.com").otpCode("123456")
+                .expiryTime(LocalDateTime.now().plusMinutes(3))
+                .attemptCount(1)
+                .build();
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
+                .thenReturn(Optional.of(otp));
+
+        VerifyOtpRequest req = new VerifyOtpRequest();
+        req.setEmail("known@example.com");
+        req.setOtpCode("000000");
+
+        assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyOtp(req));
+
+        ArgumentCaptor<PasswordResetOtp> savedOtp = ArgumentCaptor.forClass(PasswordResetOtp.class);
+        verify(passwordResetOtpRepository).save(savedOtp.capture());
+        assertEquals(2, savedOtp.getValue().getAttemptCount());
+    }
+
+    @Test
+    void verifyOtpShouldDeleteOtpAfterTooManyWrongAttempts() {
+        PasswordResetOtp otp = PasswordResetOtp.builder()
+                .id(1L).email("known@example.com").otpCode("123456")
+                .expiryTime(LocalDateTime.now().plusMinutes(3))
+                .attemptCount(4)
+                .build();
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
+                .thenReturn(Optional.of(otp));
+
+        VerifyOtpRequest req = new VerifyOtpRequest();
+        req.setEmail("known@example.com");
+        req.setOtpCode("000000");
+
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyOtp(req));
+        assertTrue(ex.getMessage().contains("Too many"));
+        verify(passwordResetOtpRepository).delete(otp);
+        verify(passwordResetOtpRepository, never()).save(any());
     }
 
     // =================================================================
     // resetPassword
     // =================================================================
+    private PasswordResetOtp validOtpFor(String email, String code) {
+        return PasswordResetOtp.builder()
+                .id(1L).email(email).otpCode(code)
+                .expiryTime(LocalDateTime.now().plusMinutes(3))
+                .build();
+    }
 
     @Test
-    void resetPasswordShouldThrowWhenUserNotFound() {
+    void resetPasswordShouldRejectWhenNoOtpExists() {
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("unknown@example.com"))
+                .thenReturn(Optional.empty());
+
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setEmail("unknown@example.com");
+        req.setOtpCode("123456");
+        req.setNewPassword("NewPass123!");
+
+        assertApiException(HttpStatus.BAD_REQUEST, () -> authService.resetPassword(req));
+        verify(userRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
+    void resetPasswordShouldRejectMismatchedOtpCode() {
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
+                .thenReturn(Optional.of(validOtpFor("known@example.com", "123456")));
+
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setEmail("known@example.com");
+        req.setOtpCode("999999");
+        req.setNewPassword("NewPass123!");
+
+        assertApiException(HttpStatus.BAD_REQUEST, () -> authService.resetPassword(req));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resetPasswordShouldThrowWhenUserNotFoundDespiteValidOtp() {
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("unknown@example.com"))
+                .thenReturn(Optional.of(validOtpFor("unknown@example.com", "123456")));
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
         ResetPasswordRequest req = new ResetPasswordRequest();
         req.setEmail("unknown@example.com");
-        req.setNewPassword("newPass123");
+        req.setOtpCode("123456");
+        req.setNewPassword("NewPass123!");
 
         assertThrows(UsernameNotFoundException.class, () -> authService.resetPassword(req));
     }
 
     @Test
-    void resetPasswordShouldEncodeNewPasswordAndClearOtpsOnSuccess() {
-        User user = activeUser("known@example.com", "ACTIVE");
+    void resetPasswordShouldRejectNewPasswordEqualToCurrentPassword() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
+                .thenReturn(Optional.of(validOtpFor("known@example.com", "123456")));
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
-        when(encoder.encode("newPass123")).thenReturn("NEW_ENCODED_HASH");
+        when(encoder.matches("SamePass123!", "hashed")).thenReturn(true);
 
         ResetPasswordRequest req = new ResetPasswordRequest();
         req.setEmail("known@example.com");
-        req.setNewPassword("newPass123");
+        req.setOtpCode("123456");
+        req.setNewPassword("SamePass123!");
+
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST, () -> authService.resetPassword(req));
+        assertTrue(ex.getMessage().contains("different"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resetPasswordShouldEncodeNewPasswordConsumeOtpAndRevokeRefreshTokensOnSuccess() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        when(passwordResetOtpRepository.findTopByEmailOrderByIdDesc("known@example.com"))
+                .thenReturn(Optional.of(validOtpFor("known@example.com", "123456")));
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        when(encoder.matches("NewPass123!", "hashed")).thenReturn(false);
+        when(encoder.encode("NewPass123!")).thenReturn("NEW_ENCODED_HASH");
+
+        ResetPasswordRequest req = new ResetPasswordRequest();
+        req.setEmail("known@example.com");
+        req.setOtpCode("123456");
+        req.setNewPassword("NewPass123!");
         authService.resetPassword(req);
 
         assertEquals("NEW_ENCODED_HASH", user.getPasswordHash());
         verify(userRepository).save(user);
         verify(passwordResetOtpRepository).deleteByEmail("known@example.com");
+        verify(refreshTokenRepository).deleteByUser(user);
     }
 
     // =================================================================
-    // verifyAccount
+    // verifyAccountByToken
     // =================================================================
-
     @Test
-    void verifyAccountShouldThrowWhenUserNotFound() {
-        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
-        assertThrows(UsernameNotFoundException.class, () -> authService.verifyAccount("unknown@example.com"));
+    void verifyAccountByTokenShouldRejectUnknownToken() {
+        when(userRepository.findByVerificationToken("bad-token")).thenReturn(Optional.empty());
+
+        assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyAccountByToken("bad-token"));
     }
 
     @Test
-    void verifyAccountShouldMarkUserVerified() {
-        User user = activeUser("pending@example.com", "ACTIVE");
+    void verifyAccountByTokenShouldRejectAlreadyVerifiedAccount() {
+        User user = activeVerifiedUser("pending@example.com", "ACTIVE");
+        user.setIsVerified(true);
+        user.setVerificationToken("token-1");
+        when(userRepository.findByVerificationToken("token-1")).thenReturn(Optional.of(user));
+
+        assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyAccountByToken("token-1"));
+    }
+
+    @Test
+    void verifyAccountByTokenShouldRejectExpiredToken() {
+        User user = activeVerifiedUser("pending@example.com", "ACTIVE");
         user.setIsVerified(false);
-        when(userRepository.findByEmail("pending@example.com")).thenReturn(Optional.of(user));
+        user.setVerificationToken("token-1");
+        user.setVerificationTokenExpiry(LocalDateTime.now().minusHours(1));
+        when(userRepository.findByVerificationToken("token-1")).thenReturn(Optional.of(user));
 
-        authService.verifyAccount("pending@example.com");
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyAccountByToken("token-1"));
+        assertTrue(ex.getMessage().contains("expired"));
+    }
+
+    @Test
+    void verifyAccountByTokenShouldMarkUserVerifiedAndClearToken() {
+        User user = activeVerifiedUser("pending@example.com", "ACTIVE");
+        user.setIsVerified(false);
+        user.setVerificationToken("token-1");
+        user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(1));
+        when(userRepository.findByVerificationToken("token-1")).thenReturn(Optional.of(user));
+
+        authService.verifyAccountByToken("token-1");
 
         assertTrue(user.getIsVerified());
+        assertNull(user.getVerificationToken());
+        assertNull(user.getVerificationTokenExpiry());
         verify(userRepository).save(user);
     }
 
     // =================================================================
     // resendVerificationEmail
     // =================================================================
-
     @Test
     void resendVerificationEmailShouldThrowWhenUserNotFound() {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
@@ -647,31 +924,64 @@ class AuthServiceTest {
 
     @Test
     void resendVerificationEmailShouldRejectAlreadyVerifiedAccount() {
-        User user = activeUser("verified@example.com", "ACTIVE");
+        User user = activeVerifiedUser("verified@example.com", "ACTIVE");
         user.setIsVerified(true);
         when(userRepository.findByEmail("verified@example.com")).thenReturn(Optional.of(user));
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST,
                 () -> authService.resendVerificationEmail("verified@example.com"));
         assertTrue(ex.getMessage().contains("already verified"));
     }
 
     @Test
-    void resendVerificationEmailShouldDispatchEmailForUnverifiedAccount() {
-        User user = activeUser("pending2@example.com", "ACTIVE");
+    void resendVerificationEmailShouldRotateTokenAndDispatchEmailForUnverifiedAccount() {
+        User user = activeVerifiedUser("pending2@example.com", "ACTIVE");
         user.setIsVerified(false);
         when(userRepository.findByEmail("pending2@example.com")).thenReturn(Optional.of(user));
 
         assertDoesNotThrow(() -> authService.resendVerificationEmail("pending2@example.com"));
-        verify(emailService).sendVerificationEmail("pending2@example.com");
+        verify(emailService).sendVerificationEmail(eq("pending2@example.com"), anyString());
+        assertNotNull(user.getVerificationToken());
+    }
+
+    @Test
+    void resendVerificationEmailShouldInvalidateThePreviouslyIssuedLink() {
+        User user = activeVerifiedUser("pending5@example.com", "ACTIVE");
+        user.setIsVerified(false);
+        user.setVerificationToken("old-token");
+        // Issued 5 minutes ago (encoded as expiry - 12h): past the 60s resend cooldown.
+        user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(12).minusMinutes(5));
+        when(userRepository.findByEmail("pending5@example.com")).thenReturn(Optional.of(user));
+
+        authService.resendVerificationEmail("pending5@example.com");
+
+        assertNotEquals("old-token", user.getVerificationToken());
+
+        // The stale link is now unresolvable by the repository lookup that
+        // verifyAccountByToken relies on -- clicking it must show an error page,
+        // not silently re-verify or crash.
+        when(userRepository.findByVerificationToken("old-token")).thenReturn(Optional.empty());
+        assertApiException(HttpStatus.BAD_REQUEST, () -> authService.verifyAccountByToken("old-token"));
+    }
+
+    @Test
+    void resendVerificationEmailShouldRejectWhenCooldownStillActive() {
+        User user = activeVerifiedUser("pending4@example.com", "ACTIVE");
+        user.setIsVerified(false);
+        user.setVerificationTokenExpiry(LocalDateTime.now().plusHours(12).minusSeconds(5));
+        when(userRepository.findByEmail("pending4@example.com")).thenReturn(Optional.of(user));
+
+        assertApiException(HttpStatus.TOO_MANY_REQUESTS,
+                () -> authService.resendVerificationEmail("pending4@example.com"));
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
     }
 
     @Test
     void resendVerificationEmailShouldRethrowWhenEmailDispatchFails() {
-        User user = activeUser("pending3@example.com", "ACTIVE");
+        User user = activeVerifiedUser("pending3@example.com", "ACTIVE");
         user.setIsVerified(false);
         when(userRepository.findByEmail("pending3@example.com")).thenReturn(Optional.of(user));
-        doThrow(new RuntimeException("SMTP down")).when(emailService).sendVerificationEmail("pending3@example.com");
+        doThrow(new RuntimeException("SMTP down")).when(emailService).sendVerificationEmail(eq("pending3@example.com"), anyString());
 
         assertThrows(RuntimeException.class, () -> authService.resendVerificationEmail("pending3@example.com"));
     }
@@ -679,7 +989,6 @@ class AuthServiceTest {
     // =================================================================
     // isAccountVerified
     // =================================================================
-
     @Test
     void isAccountVerifiedShouldReturnFalseWhenUserNotFound() {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
@@ -688,7 +997,7 @@ class AuthServiceTest {
 
     @Test
     void isAccountVerifiedShouldReturnTrueWhenUserVerified() {
-        User user = activeUser("verified@example.com", "ACTIVE");
+        User user = activeVerifiedUser("verified@example.com", "ACTIVE");
         user.setIsVerified(true);
         when(userRepository.findByEmail("verified@example.com")).thenReturn(Optional.of(user));
         assertTrue(authService.isAccountVerified("verified@example.com"));
@@ -696,16 +1005,112 @@ class AuthServiceTest {
 
     @Test
     void isAccountVerifiedShouldReturnFalseWhenFlagIsNull() {
-        User user = activeUser("nullflag@example.com", "ACTIVE");
+        User user = activeVerifiedUser("nullflag@example.com", "ACTIVE");
         user.setIsVerified(null);
         when(userRepository.findByEmail("nullflag@example.com")).thenReturn(Optional.of(user));
         assertFalse(authService.isAccountVerified("nullflag@example.com"));
     }
 
     // =================================================================
+    // refreshAccessToken
+    // =================================================================
+    @Test
+    void refreshAccessTokenShouldRejectUnknownToken() {
+        when(jwtUtils.hashToken("raw-token")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.empty());
+
+        assertApiException(HttpStatus.UNAUTHORIZED, () -> authService.refreshAccessToken("raw-token"));
+    }
+
+    @Test
+    void refreshAccessTokenShouldRejectRevokedToken() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        RefreshToken stored = RefreshToken.builder().id(1L).user(user).tokenHash("hashed-token")
+                .expiresAt(LocalDateTime.now().plusDays(1)).revoked(true).build();
+        when(jwtUtils.hashToken("raw-token")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(stored));
+
+        assertApiException(HttpStatus.UNAUTHORIZED, () -> authService.refreshAccessToken("raw-token"));
+    }
+
+    @Test
+    void refreshAccessTokenShouldRejectExpiredToken() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        RefreshToken stored = RefreshToken.builder().id(1L).user(user).tokenHash("hashed-token")
+                .expiresAt(LocalDateTime.now().minusMinutes(1)).revoked(false).build();
+        when(jwtUtils.hashToken("raw-token")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(stored));
+
+        assertApiException(HttpStatus.UNAUTHORIZED, () -> authService.refreshAccessToken("raw-token"));
+    }
+
+    @Test
+    void refreshAccessTokenShouldRejectWhenAccountNoLongerEligible() {
+        User user = activeVerifiedUser("known@example.com", "INACTIVE");
+        RefreshToken stored = RefreshToken.builder().id(1L).user(user).tokenHash("hashed-token")
+                .expiresAt(LocalDateTime.now().plusDays(1)).revoked(false).build();
+        when(jwtUtils.hashToken("raw-token")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(stored));
+
+        assertApiException(HttpStatus.FORBIDDEN, () -> authService.refreshAccessToken("raw-token"));
+    }
+
+    @Test
+    void refreshAccessTokenShouldRotateTokenAndIssueNewAccessTokenOnSuccess() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        RefreshToken stored = RefreshToken.builder().id(1L).user(user).tokenHash("old-hash")
+                .expiresAt(LocalDateTime.now().plusDays(1)).revoked(false).build();
+        when(jwtUtils.hashToken("old-raw-token")).thenReturn("old-hash");
+        when(refreshTokenRepository.findByTokenHash("old-hash")).thenReturn(Optional.of(stored));
+        when(jwtUtils.generateJwtTokenFromUsername("known@example.com")).thenReturn("new-jwt");
+        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("new-raw-token");
+        when(jwtUtils.hashToken("new-raw-token")).thenReturn("new-hash");
+        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
+
+        TokenRefreshResponse response = authService.refreshAccessToken("old-raw-token");
+
+        assertEquals("new-jwt", response.getToken());
+        assertEquals("new-raw-token", response.getRefreshToken());
+        assertTrue(stored.getRevoked());
+        verify(refreshTokenRepository).save(stored);
+        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
+    }
+
+    // =================================================================
+    // logout
+    // =================================================================
+    @Test
+    void logoutShouldNoOpWhenTokenIsBlank() {
+        assertDoesNotThrow(() -> authService.logout(""));
+        assertDoesNotThrow(() -> authService.logout(null));
+        verify(refreshTokenRepository, never()).findByTokenHash(anyString());
+    }
+
+    @Test
+    void logoutShouldNoOpWhenTokenIsUnknown() {
+        when(jwtUtils.hashToken("raw-token")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> authService.logout("raw-token"));
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void logoutShouldRevokeMatchingRefreshToken() {
+        RefreshToken stored = RefreshToken.builder().id(1L).tokenHash("hashed-token")
+                .expiresAt(LocalDateTime.now().plusDays(1)).revoked(false).build();
+        when(jwtUtils.hashToken("raw-token")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(stored));
+
+        authService.logout("raw-token");
+
+        assertTrue(stored.getRevoked());
+        verify(refreshTokenRepository).save(stored);
+    }
+
+    // =================================================================
     // getUserProfile
     // =================================================================
-
     @Test
     void getUserProfileShouldThrowWhenUserNotFound() {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
@@ -714,7 +1119,7 @@ class AuthServiceTest {
 
     @Test
     void getUserProfileShouldReturnMappedUserResponse() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
 
         UserResponse response = authService.getUserProfile("known@example.com");
@@ -726,7 +1131,6 @@ class AuthServiceTest {
     // =================================================================
     // getUserById
     // =================================================================
-
     @Test
     void getUserByIdShouldThrowWhenUserNotFound() {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
@@ -735,7 +1139,7 @@ class AuthServiceTest {
 
     @Test
     void getUserByIdShouldReturnMappedUserResponse() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
         UserResponse response = authService.getUserById(1L);
@@ -747,7 +1151,6 @@ class AuthServiceTest {
     // =================================================================
     // updateProfile
     // =================================================================
-
     @Test
     void updateProfileShouldThrowWhenUserNotFound() {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
@@ -757,7 +1160,7 @@ class AuthServiceTest {
 
     @Test
     void updateProfileShouldOnlyChangeFieldsPresentOnRequest() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         user.setPhoneNumber("0000000000");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -773,7 +1176,7 @@ class AuthServiceTest {
 
     @Test
     void updateProfileShouldResetIsVerifiedWhenEmailChanges() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         user.setIsVerified(true);
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
@@ -789,7 +1192,7 @@ class AuthServiceTest {
 
     @Test
     void updateProfileShouldRejectUsernameAlreadyTaken() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         user.setUsername("olduser");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(userRepository.existsByUsername("takenuser")).thenReturn(true);
@@ -805,7 +1208,7 @@ class AuthServiceTest {
 
     @Test
     void updateProfileShouldNotCheckUsernameUniquenessWhenUnchanged() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         user.setUsername("sameuser");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -819,7 +1222,7 @@ class AuthServiceTest {
 
     @Test
     void updateProfileShouldRejectEmailAlreadyTaken() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
 
@@ -835,7 +1238,6 @@ class AuthServiceTest {
     // =================================================================
     // changePassword
     // =================================================================
-
     @Test
     void changePasswordShouldThrowWhenUserNotFound() {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
@@ -845,40 +1247,56 @@ class AuthServiceTest {
 
     @Test
     void changePasswordShouldRejectIncorrectCurrentPassword() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(encoder.matches("wrongCurrent", "hashed")).thenReturn(false);
 
         ChangePasswordRequest req = new ChangePasswordRequest();
         req.setCurrentPassword("wrongCurrent");
-        req.setNewPassword("newPass123");
+        req.setNewPassword("NewPass123!");
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST,
                 () -> authService.changePassword("known@example.com", req));
         assertTrue(ex.getMessage().contains("Incorrect current password"));
         verify(userRepository, never()).save(any());
     }
 
     @Test
-    void changePasswordShouldEncodeAndSaveNewPasswordWhenCurrentPasswordMatches() {
-        User user = activeUser("known@example.com", "ACTIVE");
+    void changePasswordShouldRejectNewPasswordEqualToCurrentPassword() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        when(encoder.matches("SamePass123!", "hashed")).thenReturn(true);
+
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setCurrentPassword("SamePass123!");
+        req.setNewPassword("SamePass123!");
+
+        ApiException ex = assertApiException(HttpStatus.BAD_REQUEST,
+                () -> authService.changePassword("known@example.com", req));
+        assertTrue(ex.getMessage().contains("different"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void changePasswordShouldEncodeSaveAndRevokeRefreshTokensWhenCurrentPasswordMatches() {
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(encoder.matches("correctCurrent", "hashed")).thenReturn(true);
-        when(encoder.encode("newPass123")).thenReturn("NEW_ENCODED_HASH");
+        when(encoder.encode("NewPass123!")).thenReturn("NEW_ENCODED_HASH");
 
         ChangePasswordRequest req = new ChangePasswordRequest();
         req.setCurrentPassword("correctCurrent");
-        req.setNewPassword("newPass123");
+        req.setNewPassword("NewPass123!");
         authService.changePassword("known@example.com", req);
 
         assertEquals("NEW_ENCODED_HASH", user.getPasswordHash());
         verify(userRepository).save(user);
+        verify(refreshTokenRepository).deleteByUser(user);
     }
 
     // =================================================================
     // updateAvatar
     // =================================================================
-
     private MultipartFile validAvatarFile() {
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
@@ -896,7 +1314,7 @@ class AuthServiceTest {
 
     @Test
     void updateAvatarShouldRejectEmptyFile() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(true);
@@ -909,7 +1327,7 @@ class AuthServiceTest {
 
     @Test
     void updateAvatarShouldUploadToCloudinaryAndSaveReturnedUrl() throws Exception {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         MultipartFile file = validAvatarFile();
         when(cloudinaryService.uploadImage(file)).thenReturn("https://cloudinary.example/avatar.png");
@@ -923,7 +1341,7 @@ class AuthServiceTest {
 
     @Test
     void updateAvatarShouldPropagateIOExceptionFromCloudinaryUpload() throws Exception {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         MultipartFile file = validAvatarFile();
         when(cloudinaryService.uploadImage(file)).thenThrow(new java.io.IOException("Cloudinary unreachable"));
@@ -934,7 +1352,7 @@ class AuthServiceTest {
 
     @Test
     void updateAvatarShouldRejectFileLargerThan2MB() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
@@ -948,7 +1366,7 @@ class AuthServiceTest {
 
     @Test
     void updateAvatarShouldRejectUnsupportedContentType() {
-        User user = activeUser("known@example.com", "ACTIVE");
+        User user = activeVerifiedUser("known@example.com", "ACTIVE");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);

@@ -24,4 +24,15 @@ public class PasswordResetOtp {
 
     @Column(name = "expiry_time", nullable = false)
     private LocalDateTime expiryTime;
+
+    @Column(name = "attempt_count")
+    @Builder.Default
+    private Integer attemptCount = 0;
+
+    @Column(name = "consumed")
+    @Builder.Default
+    private Boolean consumed = false;
+
+    @Column(name = "last_sent_at")
+    private LocalDateTime lastSentAt;
 }
