@@ -316,6 +316,60 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   }
 
   void _publishExamAsManager() async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Approve Exam',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Outfit',
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to approve and publish the exam "${widget.examTitle}"?',
+          style: const TextStyle(
+            color: Color(0xFF475569),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Approve',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     try {
       await CourseManagerApi().publishExam(widget.examId);
       if (mounted) {
@@ -961,9 +1015,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                         ),
                         backgroundColor: Colors.white,
                       ),
-                      child: const Text(
-                        'Back',
-                        style: TextStyle(
+                      child: Text(
+                        (widget.isCourseManager && widget.courseManagerActionStatus == 'SUBMITTED') ? 'Cancel' : 'Back',
+                        style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Outfit',
                         ),

@@ -48,11 +48,11 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
 
   int _getStatusPriority(String status) {
     status = status.toUpperCase();
-    if (status == 'DRAFT') return 1;
-    if (status == 'SUBMITTED') return 2;
+    if (status == 'SUBMITTED') return 1;
+    if (status == 'DRAFT') return 2;
     if (status == 'PUBLISHED' || status == 'APPROVED') return 3;
-    if (status == 'HIDDEN') return 4;
-    if (status == 'REJECTED') return 5;
+    if (status == 'REJECTED') return 4;
+    if (status == 'HIDDEN') return 5;
     return 6;
   }
 
@@ -248,7 +248,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                         examId: _editingExamData!['id'] as int,
                         examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
                         examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
-                        isReadOnly: (_editingExamData!['status']?.toString().toUpperCase() == 'APPROVED' || _editingExamData!['status']?.toString().toUpperCase() == 'PUBLISHED'),
+                        isReadOnly: (_editingExamData!['status']?.toString().toUpperCase() != 'DRAFT'),
                         courseManagerActionStatus: _editingExamData!['status']?.toString().toUpperCase(),
                         isCourseManager: true,
                         isEmbedded: true,
@@ -849,7 +849,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           ),
           const SizedBox(width: 6),
           Text(
-            status.length > 1 ? status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase() : status,
+            status == 'SUBMITTED' ? 'Pending' : (status.length > 1 ? status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase() : status),
             style: TextStyle(
               color: textColor,
               fontWeight: FontWeight.w600,
