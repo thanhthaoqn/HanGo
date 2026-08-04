@@ -25,6 +25,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   int? _currentUserId;
   List<dynamic> _examsList = [];
   bool _isCreatingExam = false;
+  Map<String, dynamic>? _editingExamData;
   
   int _currentPage = 1;
   final int _itemsPerPage = 10;
@@ -38,11 +39,22 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
   int _publishedCount = 0;
   int _hiddenCount = 0;
   int _pendingCount = 0;
+  int _rejectedCount = 0;
 
   // Filter values
   final TextEditingController _searchController = TextEditingController();
-  String _selectedSortBy = 'NEWEST';
+  String _selectedSortBy = 'STATUS';
   String _selectedTimePeriod = 'ALL';
+
+  int _getStatusPriority(String status) {
+    status = status.toUpperCase();
+    if (status == 'DRAFT') return 1;
+    if (status == 'SUBMITTED') return 2;
+    if (status == 'PUBLISHED' || status == 'APPROVED') return 3;
+    if (status == 'HIDDEN') return 4;
+    if (status == 'REJECTED') return 5;
+    return 6;
+  }
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
@@ -115,7 +127,17 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
 
       // 3. Sorting
       filteredData.sort((a, b) {
-        if (_selectedSortBy == 'NEWEST') {
+        if (_selectedSortBy == 'STATUS') {
+          final statusA = a['status']?.toString().toUpperCase() ?? '';
+          final statusB = b['status']?.toString().toUpperCase() ?? '';
+          final priorityA = _getStatusPriority(statusA);
+          final priorityB = _getStatusPriority(statusB);
+          if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+          
+          final dateA = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
+          final dateB = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
+          return dateB.compareTo(dateA);
+        } else if (_selectedSortBy == 'NEWEST') {
           final dateA = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
           final dateB = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
           return dateB.compareTo(dateA);
@@ -141,7 +163,8 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
             _draftCount = baseData.where((e) => e['status'] == 'DRAFT').length;
             _publishedCount = baseData.where((e) => e['status'] == 'PUBLISHED').length;
             _hiddenCount = baseData.where((e) => e['status'] == 'HIDDEN').length;
-            _pendingCount = baseData.where((e) => e['status'] == 'PENDING_APPROVAL' || e['status'] == 'SUBMITTED').length;
+            _pendingCount = baseData.where((e) => e['status'] == 'SUBMITTED').length;
+            _rejectedCount = baseData.where((e) => e['status'] == 'REJECTED').length;
           }
           _isLoading = false;
         });
@@ -165,6 +188,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       _publishedCount = 1;
       _hiddenCount = 0;
       _pendingCount = 0;
+      _rejectedCount = 0;
       _examsList = [
         {
           'id': 1,
@@ -219,7 +243,23 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                       });
                     },
                   )
-                : Column(
+                : _editingExamData != null
+                    ? CourseManagerEditExamPage(
+                        examId: _editingExamData!['id'] as int,
+                        examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
+                        examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
+                        isReadOnly: (_editingExamData!['status']?.toString().toUpperCase() == 'APPROVED' || _editingExamData!['status']?.toString().toUpperCase() == 'PUBLISHED'),
+                        courseManagerActionStatus: _editingExamData!['status']?.toString().toUpperCase(),
+                        isCourseManager: true,
+                        isEmbedded: true,
+                        onBack: () {
+                          setState(() {
+                            _editingExamData = null;
+                            _fetchExamsData();
+                          });
+                        },
+                      )
+                    : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildContentHeader(context, isDesktop),
@@ -267,11 +307,13 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                 const SizedBox(width: 8),
                 _buildStatusTab('Draft', 'DRAFT', _draftCount),
                 const SizedBox(width: 8),
+                _buildStatusTab('Pending', 'SUBMITTED', _pendingCount),
+                const SizedBox(width: 8),
                 _buildStatusTab('Published', 'PUBLISHED', _publishedCount),
                 const SizedBox(width: 8),
-                _buildStatusTab('Hidden', 'HIDDEN', _hiddenCount),
+                _buildStatusTab('Rejected', 'REJECTED', _rejectedCount),
                 const SizedBox(width: 8),
-                _buildStatusTab('Pending', 'PENDING_APPROVAL', _pendingCount),
+                _buildStatusTab('Hidden', 'HIDDEN', _hiddenCount),
               ],
             ),
           ),
@@ -318,6 +360,10 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               final sortByDropdown = _buildDropdown(
                 value: _selectedSortBy,
                 items: const [
+                  DropdownMenuItem(
+                    value: 'STATUS',
+                    child: Text('Sort by: Status'),
+                  ),
                   DropdownMenuItem(
                     value: 'NEWEST',
                     child: Text('Sort by: Newest'),
@@ -730,16 +776,10 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                       if (isCreator && status == 'DRAFT')
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => CourseManagerEditExamPage(
-                                examId: exam['id'],
-                                examTitle: exam['title'] ?? 'Untitled',
-                                examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
-                              )),
-                            );
-                            _fetchExamsData();
+                          onPressed: () {
+                            setState(() {
+                              _editingExamData = exam as Map<String, dynamic>;
+                            });
                           },
                           splashRadius: 20,
                           constraints: const BoxConstraints(),
@@ -750,18 +790,10 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                       if (!isCreator || status != 'DRAFT')
                         IconButton(
                           icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF20B486), size: 20),
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => CourseManagerEditExamPage(
-                                examId: exam['id'],
-                                examTitle: exam['title'] ?? 'Untitled',
-                                examExpectedCount: (exam['expectedQuestionCount'] ?? exam['questionCount'] ?? 10) as int,
-                                isReadOnly: true,
-                                courseManagerActionStatus: status,
-                              )),
-                            );
-                            _fetchExamsData();
+                          onPressed: () {
+                            setState(() {
+                              _editingExamData = exam as Map<String, dynamic>;
+                            });
                           },
                           splashRadius: 20,
                           constraints: const BoxConstraints(),
@@ -787,7 +819,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     if (status == 'APPROVED') {
       bgColor = const Color(0xFFE6FFFA);
       textColor = const Color(0xFF20B486);
-    } else if (status == 'PENDING_APPROVAL' || status == 'PENDING' || status == 'SUBMITTED') {
+    } else if (status == 'SUBMITTED') {
       bgColor = const Color(0xFFFEF3C7);
       textColor = const Color(0xFFD97706);
     } else if (status == 'REJECTED') {

@@ -10,7 +10,9 @@ import '../../../utils/config.dart';
 class CourseManagerExamMatrixPage extends StatefulWidget {
   final VoidCallback onBack;
   final bool isCourseManager;
-  const CourseManagerExamMatrixPage({super.key, required this.onBack, this.isCourseManager = false});
+  final List<Map<String, dynamic>>? preloadedMatrices;
+  final bool? isMatricesLoading;
+  const CourseManagerExamMatrixPage({super.key, required this.onBack, this.isCourseManager = false, this.preloadedMatrices, this.isMatricesLoading});
 
   @override
   State<CourseManagerExamMatrixPage> createState() => _CourseManagerExamMatrixPageState();
@@ -28,7 +30,34 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
   @override
   void initState() {
     super.initState();
-    _initApi();
+    if (widget.preloadedMatrices != null) {
+      _matrices = widget.preloadedMatrices!;
+      _isLoading = widget.isMatricesLoading ?? false;
+      _initApiWithoutFetch();
+    } else {
+      _initApi();
+    }
+  }
+
+  Future<void> _initApiWithoutFetch() async {
+    final token = await _authService.getToken();
+    _api = HangoApi(baseUrl: apiBaseUrl, token: token);
+  }
+
+  @override
+  void didUpdateWidget(covariant CourseManagerExamMatrixPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.preloadedMatrices != null && widget.preloadedMatrices != oldWidget.preloadedMatrices) {
+      setState(() {
+        _matrices = widget.preloadedMatrices!;
+        _isLoading = widget.isMatricesLoading ?? false;
+      });
+    }
+    if (widget.isMatricesLoading != null && widget.isMatricesLoading != oldWidget.isMatricesLoading) {
+      setState(() {
+        _isLoading = widget.isMatricesLoading!;
+      });
+    }
   }
 
   Future<void> _initApi() async {
@@ -61,6 +90,164 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
         ToastHelper.show(context, 'Failed to load matrices: $e', isError: true);
       }
     }
+  }
+
+  void _showMatrixDetails(Map<String, dynamic> matrix) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final List<dynamic> details = matrix['details'] ?? [];
+        int currentQuestionIndex = 1;
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFFF8FAFC),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(matrix['title'] ?? 'Matrix Details', style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFF1E293B))),
+              const SizedBox(height: 8),
+              Text(matrix['description'] ?? 'No description provided.', style: const TextStyle(color: Color(0xFF64748B), fontSize: 14, fontWeight: FontWeight.normal)),
+            ],
+          ),
+          content: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (details.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No detailed rules found.', style: TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF64748B))),
+                    )
+                  else
+                    ...details.map((d) {
+                      final skill = d['skillParamName'] ?? 'Any Skill';
+                      final difficulty = d['difficultyParamName'] ?? 'Any Difficulty';
+                      final type = d['groupTypeName'] ?? 'Any Type';
+                      final count = (d['quantity'] ?? 0) as int;
+                      
+                      final startIdx = currentQuestionIndex;
+                      final endIdx = currentQuestionIndex + count - 1;
+                      final questionLabel = count > 1 ? 'Questions $startIdx - $endIdx' : 'Question $startIdx';
+                      
+                      currentQuestionIndex += count;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12.0),
+                        padding: const EdgeInsets.all(16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEEF2FF),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    questionLabel,
+                                    style: const TextStyle(
+                                      color: Color(0xFF4F46E5),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '$count Item${count > 1 ? 's' : ''}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF64748B),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                _buildDetailChip(Icons.psychology, skill, const Color(0xFFF0FDF4), const Color(0xFF16A34A)),
+                                const SizedBox(width: 8),
+                                _buildDetailChip(Icons.bar_chart, difficulty, const Color(0xFFFFF7ED), const Color(0xFFEA580C)),
+                                const SizedBox(width: 8),
+                                _buildDetailChip(Icons.category, type, const Color(0xFFF5F3FF), const Color(0xFF7C3AED)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailChip(IconData icon, String label, Color bgColor, Color iconColor) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: iconColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: iconColor.withOpacity(0.8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -223,10 +410,30 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                 value: _selectedMatrixId,
                                 hint: const Text('Choose a matrix...'),
                                 isExpanded: true,
+                                selectedItemBuilder: (BuildContext context) {
+                                  return _matrices.map<Widget>((e) {
+                                    return Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit'), overflow: TextOverflow.ellipsis),
+                                    );
+                                  }).toList();
+                                },
                                 items: _matrices
                                     .map((e) => DropdownMenuItem(
                                           value: e['id'].toString(),
-                                          child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit')),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit'))),
+                                              IconButton(
+                                                icon: const Icon(Icons.remove_red_eye, color: Color(0xFF38C9A6)),
+                                                onPressed: () {
+                                                  _showMatrixDetails(e);
+                                                },
+                                                tooltip: 'View Matrix Details',
+                                              ),
+                                            ],
+                                          ),
                                         ))
                                     .toList(),
                                 onChanged: (val) {

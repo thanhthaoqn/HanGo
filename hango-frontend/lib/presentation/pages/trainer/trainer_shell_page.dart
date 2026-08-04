@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
@@ -216,7 +216,7 @@ class TrainerShellPageState extends State<TrainerShellPage> {
                       TrainerDashboardPage(isEmbedded: true),
                       TrainerCoursesPage(isEmbedded: true),
                       TrainerExamsPage(isEmbedded: true),
-                      CourseManagerQuestionBankPage(isEmbedded: true),
+                      TrainerQuestionBankPage(isEmbedded: true),
                       TrainerRevenuePage(isEmbedded: true),
                       TrainerProfilePage(isEmbedded: true),
                       TrainerTicketsPage(isEmbedded: true),

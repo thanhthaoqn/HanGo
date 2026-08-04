@@ -24,15 +24,17 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   String _trainerAvatarUrl = '';
 
   bool _isCourseManager = false;
+  bool _isCreatingExam = false;
+  Map<String, dynamic>? _editingExamData;
 
   bool _isLoading = true;
   List<dynamic> _examsList = [];
-  
+
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
   // Tab Status Filters
-  String _selectedStatus = 'ALL'; 
+  String _selectedStatus = 'ALL';
 
   // Status Counts
   int _allCount = 0;
@@ -40,11 +42,22 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   int _publishedCount = 0;
   int _hiddenCount = 0;
   int _pendingCount = 0;
+  int _rejectedCount = 0;
 
   // Filter values
   final TextEditingController _searchController = TextEditingController();
-  String _selectedSortBy = 'NEWEST';
+  String _selectedSortBy = 'STATUS';
   String _selectedTimePeriod = 'ALL';
+
+  int _getStatusPriority(String status) {
+    status = status.toUpperCase();
+    if (status == 'DRAFT') return 1;
+    if (status == 'SUBMITTED') return 2;
+    if (status == 'PUBLISHED' || status == 'APPROVED') return 3;
+    if (status == 'HIDDEN') return 4;
+    if (status == 'REJECTED') return 5;
+    return 6;
+  }
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
@@ -83,7 +96,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         queryParams['search'] = searchVal;
       }
 
-      final uri = Uri.parse('$apiBaseUrl/trainer/exams').replace(queryParameters: queryParams);
+      final uri = Uri.parse(
+        '$apiBaseUrl/trainer/exams',
+      ).replace(queryParameters: queryParams);
       final response = await http.get(
         uri,
         headers: {
@@ -104,12 +119,115 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               _pendingCount = (data['pendingCount'] ?? 0) as int;
               _examsList = data['exams'] ?? [];
             } else if (data is List) {
-              _examsList = data;
-              _allCount = data.length;
-              _draftCount = 0;
-              _publishedCount = 0;
-              _hiddenCount = 0;
-              _pendingCount = 0;
+              final allData = data;
+              _allCount = allData.length;
+              _draftCount = allData.where((e) {
+                final s = e['status']?.toString().toUpperCase() ?? '';
+                return s == 'DRAFT';
+              }).length;
+              _publishedCount = allData.where((e) {
+                final s = e['status']?.toString().toUpperCase() ?? '';
+                return s == 'PUBLISHED' || s == 'APPROVED' || s == 'PUBLIC';
+              }).length;
+              _hiddenCount = allData.where((e) {
+                final s = e['status']?.toString().toUpperCase() ?? '';
+                return s == 'HIDDEN';
+              }).length;
+              _pendingCount = allData.where((e) {
+                final s = e['status']?.toString().toUpperCase() ?? '';
+                return s == 'SUBMITTED';
+              }).length;
+              _rejectedCount = allData.where((e) {
+                final s = e['status']?.toString().toUpperCase() ?? '';
+                return s == 'REJECTED';
+              }).length;
+
+              var filtered = allData;
+              if (_selectedStatus != 'ALL') {
+                filtered = filtered.where((e) {
+                  final s = e['status']?.toString().toUpperCase() ?? '';
+                  if (_selectedStatus == 'PUBLISHED') {
+                    return s == 'PUBLISHED' || s == 'APPROVED' || s == 'PUBLIC';
+                  } else if (_selectedStatus == 'SUBMITTED') {
+                    return s == 'SUBMITTED';
+                  } else if (_selectedStatus == 'DRAFT') {
+                    return s == 'DRAFT';
+                  } else if (_selectedStatus == 'HIDDEN') {
+                    return s == 'HIDDEN';
+                  } else if (_selectedStatus == 'REJECTED') {
+                    return s == 'REJECTED';
+                  }
+                  return s == _selectedStatus;
+                }).toList();
+              }
+
+              final searchVal = _searchController.text.trim().toLowerCase();
+              if (searchVal.isNotEmpty) {
+                filtered = filtered
+                    .where(
+                      (e) => (e['title']?.toString().toLowerCase() ?? '')
+                          .contains(searchVal),
+                    )
+                    .toList();
+              }
+
+              if (_selectedTimePeriod == 'THIS_WEEK') {
+                final now = DateTime.now();
+                final startOfWeek = now.subtract(
+                  Duration(days: now.weekday - 1),
+                );
+                filtered = filtered.where((e) {
+                  DateTime d =
+                      DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
+                  return d.isAfter(startOfWeek);
+                }).toList();
+              } else if (_selectedTimePeriod == 'THIS_MONTH') {
+                final now = DateTime.now();
+                filtered = filtered.where((e) {
+                  DateTime d =
+                      DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
+                  return d.year == now.year && d.month == now.month;
+                }).toList();
+              }
+
+              filtered.sort((a, b) {
+                if (_selectedSortBy == 'STATUS') {
+                  final statusA = a['status']?.toString().toUpperCase() ?? '';
+                  final statusB = b['status']?.toString().toUpperCase() ?? '';
+                  final priorityA = _getStatusPriority(statusA);
+                  final priorityB = _getStatusPriority(statusB);
+                  if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+                  
+                  DateTime d1 = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
+                  DateTime d2 = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
+                  return d2.compareTo(d1);
+                } else if (_selectedSortBy == 'NEWEST') {
+                  DateTime d1 =
+                      DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
+                  DateTime d2 =
+                      DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
+                  return d2.compareTo(d1);
+                } else if (_selectedSortBy == 'OLDEST') {
+                  DateTime d1 =
+                      DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
+                  DateTime d2 =
+                      DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
+                  return d1.compareTo(d2);
+                } else if (_selectedSortBy == 'ALPHABETICAL') {
+                  String t1 = a['title']?.toString() ?? '';
+                  String t2 = b['title']?.toString() ?? '';
+                  return t1.compareTo(t2);
+                }
+                return 0;
+              });
+
+              _examsList = filtered;
             }
             _isLoading = false;
           });
@@ -127,6 +245,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       }
     }
   }
+
   Future<void> _updateExamVisibility(int examId, String newVisibility) async {
     try {
       final token = await _authService.getToken();
@@ -142,10 +261,16 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       );
       if (!mounted) return;
       if (response.statusCode == 200) {
-        ToastHelper.showSuccess(context, 'Exam visibility updated successfully');
+        ToastHelper.showSuccess(
+          context,
+          'Exam visibility updated successfully',
+        );
         _fetchExamsData();
       } else {
-        ToastHelper.showError(context, 'Failed to update visibility: ${response.statusCode}');
+        ToastHelper.showError(
+          context,
+          'Failed to update visibility: ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error updating exam visibility: $e');
@@ -170,7 +295,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         ToastHelper.showSuccess(context, 'Exam status updated successfully');
         _fetchExamsData();
       } else {
-        ToastHelper.showError(context, 'Failed to update status: ${response.statusCode}');
+        ToastHelper.showError(
+          context,
+          'Failed to update status: ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error updating exam status: $e');
@@ -184,11 +312,13 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       _publishedCount = 1;
       _hiddenCount = 0;
       _pendingCount = 0;
+      _rejectedCount = 0;
       _examsList = [
         {
           'id': 1,
-          'title': 'Thi Thử Tốt Nghiệp THPT Tiếng anh năm 2025 - THPT Chuyên Phan Bội Châu (Mock)',
-          'createdAt': '2025-05-20', 
+          'title':
+              'Thi Thử Tốt Nghiệp THPT Tiếng anh năm 2025 - THPT Chuyên Phan Bội Châu (Mock)',
+          'createdAt': '2025-05-20',
           'questionCount': 50,
           'durationMinutes': 60,
           'status': 'public',
@@ -215,7 +345,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
 
     final roles = prefs.getStringList('user_roles') ?? [];
-    
+
     String initials = 'T';
     if (fullName.trim().isNotEmpty) {
       final parts = fullName.trim().split(' ');
@@ -229,7 +359,13 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         _trainerInitials = initials;
         _trainerAvatarUrl = avatarUrl;
 
-        _isCourseManager = roles.any((r) => r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMINISTRATOR' || r.toUpperCase() == 'COURSE_MANAGER' || r.toUpperCase() == 'ADMIN');
+        _isCourseManager = roles.any(
+          (r) =>
+              r.toUpperCase() == 'COURSE_MANAGER' ||
+              r.toUpperCase() == 'ADMINISTRATOR' ||
+              r.toUpperCase() == 'COURSE_MANAGER' ||
+              r.toUpperCase() == 'ADMIN',
+        );
       });
     }
   }
@@ -240,22 +376,77 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     final isDesktop = size.width > 1024;
 
     if (widget.isEmbedded) {
-      return _buildBodyContent();
+      return _isCreatingExam
+          ? CourseManagerCreateExamPage(
+              isEmbedded: true,
+              isCourseManager: false,
+              onBack: () {
+                setState(() {
+                  _isCreatingExam = false;
+                  _fetchExamsData();
+                });
+              },
+            )
+          : _editingExamData != null
+              ? CourseManagerEditExamPage(
+                  examId: _editingExamData!['id'] as int,
+                  examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
+                  examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
+                  isReadOnly: !['DRAFT', 'REJECTED'].contains(_editingExamData!['status']?.toString().toUpperCase()),
+                  isCourseManager: false,
+                  isEmbedded: true,
+                  onBack: () {
+                    setState(() {
+                      _editingExamData = null;
+                      _fetchExamsData();
+                    });
+                  },
+                )
+              : _buildBodyContent();
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 2)) : null,
+      drawer: !isDesktop
+          ? const Drawer(child: TrainerSidebar(activeIndex: 2))
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
+          if (isDesktop)
+            const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildHeader(context, !isDesktop),
                 Expanded(
-                  child: _buildBodyContent(),
+                  child: _isCreatingExam
+                      ? CourseManagerCreateExamPage(
+                          isEmbedded: true,
+                          isCourseManager: false,
+                          onBack: () {
+                            setState(() {
+                              _isCreatingExam = false;
+                              _fetchExamsData();
+                            });
+                          },
+                        )
+                      : _editingExamData != null
+                          ? CourseManagerEditExamPage(
+                              examId: _editingExamData!['id'] as int,
+                              examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
+                              examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
+                              isReadOnly: !['DRAFT', 'REJECTED'].contains(_editingExamData!['status']?.toString().toUpperCase()),
+                              isCourseManager: false,
+                              isEmbedded: true,
+                              onBack: () {
+                                setState(() {
+                                  _editingExamData = null;
+                                  _fetchExamsData();
+                                });
+                              },
+                            )
+                          : _buildBodyContent(),
                 ),
               ],
             ),
@@ -303,12 +494,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           ),
         ),
         ElevatedButton.icon(
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const CourseManagerCreateExamPage(isEmbedded: true)),
-            );
-            _fetchExamsData();
+          onPressed: () {
+            setState(() {
+              _isCreatingExam = true;
+            });
           },
           icon: const Icon(Icons.add, color: Colors.white, size: 18),
           label: const Text(
@@ -351,11 +540,13 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 const SizedBox(width: 8),
                 _buildStatusTab('Draft', 'DRAFT', _draftCount),
                 const SizedBox(width: 8),
+                _buildStatusTab('Submitted', 'SUBMITTED', _pendingCount),
+                const SizedBox(width: 8),
                 _buildStatusTab('Published', 'PUBLISHED', _publishedCount),
                 const SizedBox(width: 8),
-                _buildStatusTab('Hidden', 'HIDDEN', _hiddenCount),
+                _buildStatusTab('Rejected', 'REJECTED', _rejectedCount),
                 const SizedBox(width: 8),
-                _buildStatusTab('Pending', 'PENDING', _pendingCount),
+                _buildStatusTab('Hidden', 'HIDDEN', _hiddenCount),
               ],
             ),
           ),
@@ -402,6 +593,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               final sortByDropdown = _buildDropdown(
                 value: _selectedSortBy,
                 items: const [
+                  DropdownMenuItem(
+                    value: 'STATUS',
+                    child: Text('Sort by: Status'),
+                  ),
                   DropdownMenuItem(
                     value: 'NEWEST',
                     child: Text('Sort by: Newest'),
@@ -577,7 +772,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     int endIndex = startIndex + _itemsPerPage;
     if (endIndex > totalItems) endIndex = totalItems;
 
-    List<dynamic> currentExams = _examsList.isEmpty ? [] : _examsList.sublist(startIndex, endIndex);
+    List<dynamic> currentExams = _examsList.isEmpty
+        ? []
+        : _examsList.sublist(startIndex, endIndex);
 
     return Container(
       decoration: BoxDecoration(
@@ -602,7 +799,13 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 Expanded(flex: 1, child: _buildTableHeaderText('Questions')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Duration')),
                 Expanded(flex: 1, child: _buildTableHeaderText('Status')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Actions', align: TextAlign.center)),
+                Expanded(
+                  flex: 1,
+                  child: _buildTableHeaderText(
+                    'Actions',
+                    align: TextAlign.center,
+                  ),
+                ),
               ],
             ),
           ),
@@ -614,7 +817,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   child: Center(
                     child: Text(
                       'No exams found.',
-                      style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                   ),
                 )
@@ -622,7 +828,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: currentExams.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
                   itemBuilder: (context, index) {
                     final exam = currentExams[index];
                     return _buildExamRow(exam);
@@ -647,7 +854,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   children: [
                     _buildPaginationButton(
                       Icons.chevron_left,
-                      onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+                      onPressed: _currentPage > 1
+                          ? () => setState(() => _currentPage--)
+                          : null,
                     ),
                     const SizedBox(width: 8),
                     ...List.generate(totalPages, (index) {
@@ -657,13 +866,16 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                         child: _buildPaginationNumber(
                           pageNum.toString(),
                           isActive: pageNum == _currentPage,
-                          onPressed: () => setState(() => _currentPage = pageNum),
+                          onPressed: () =>
+                              setState(() => _currentPage = pageNum),
                         ),
                       );
                     }),
                     _buildPaginationButton(
                       Icons.chevron_right,
-                      onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
+                      onPressed: _currentPage < totalPages
+                          ? () => setState(() => _currentPage++)
+                          : null,
                     ),
                   ],
                 ),
@@ -675,7 +887,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     );
   }
 
-  Widget _buildTableHeaderText(String text, {TextAlign align = TextAlign.left}) {
+  Widget _buildTableHeaderText(
+    String text, {
+    TextAlign align = TextAlign.left,
+  }) {
     return Text(
       text,
       textAlign: align,
@@ -701,24 +916,33 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: exam['thumbnailUrl'] != null && exam['thumbnailUrl'].toString().isNotEmpty
+                  child:
+                      exam['thumbnailUrl'] != null &&
+                          exam['thumbnailUrl'].toString().isNotEmpty
                       ? Image.network(
                           exam['thumbnailUrl'],
                           width: 48,
                           height: 48,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: 48,
-                            height: 48,
-                            color: const Color(0xFFE2E8F0),
-                            child: const Icon(Icons.image_not_supported, color: Color(0xFF94A3B8)),
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                width: 48,
+                                height: 48,
+                                color: const Color(0xFFE2E8F0),
+                                child: const Icon(
+                                  Icons.image_not_supported,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
                         )
                       : Container(
                           width: 48,
                           height: 48,
                           color: const Color(0xFFE2E8F0),
-                          child: const Icon(Icons.assignment, color: Color(0xFF94A3B8)),
+                          child: const Icon(
+                            Icons.assignment,
+                            color: Color(0xFF94A3B8),
+                          ),
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -744,7 +968,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE6FFFA),
                   borderRadius: BorderRadius.circular(4),
@@ -799,7 +1026,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               children: [
                 if (_isCourseManager)
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, color: Color(0xFF64748B), size: 20),
+                    icon: const Icon(
+                      Icons.more_vert,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
                     onSelected: (value) {
                       if (value == 'HIDE') {
                         _updateExamStatus(exam['id'], 'HIDDEN');
@@ -814,7 +1045,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                             value: 'HIDE',
                             child: Row(
                               children: [
-                                Icon(Icons.visibility_off, color: Colors.orange, size: 18),
+                                Icon(
+                                  Icons.visibility_off,
+                                  color: Colors.orange,
+                                  size: 18,
+                                ),
                                 SizedBox(width: 8),
                                 Text('Hide Exam'),
                               ],
@@ -825,7 +1060,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                             value: 'PUBLISH',
                             child: Row(
                               children: [
-                                Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 18,
+                                ),
                                 SizedBox(width: 8),
                                 Text('Publish Exam'),
                               ],
@@ -835,19 +1074,19 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                     },
                   ),
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B), size: 20),
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => CourseManagerEditExamPage(
-                        examId: exam['id'] as int,
-                        examTitle: exam['title'] ?? 'Untitled Exam',
-                        examExpectedCount: exam['expectedQuestionCount'] as int? ?? 10,
-                        isReadOnly: status == 'APPROVED' || status == 'PUBLISHED',
-                        isCourseManager: false,
-                      )),
-                    );
-                    _fetchExamsData();
+                  icon: Icon(
+                    (status == 'DRAFT' || status == 'REJECTED') 
+                        ? Icons.edit_outlined 
+                        : Icons.remove_red_eye_outlined,
+                    color: (status == 'DRAFT' || status == 'REJECTED')
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFF20B486),
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _editingExamData = exam as Map<String, dynamic>;
+                    });
                   },
                   splashRadius: 20,
                   constraints: const BoxConstraints(),
@@ -868,7 +1107,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     if (status == 'APPROVED' || status == 'PUBLISHED') {
       bgColor = const Color(0xFFE6FFFA);
       textColor = const Color(0xFF20B486);
-    } else if (status == 'SUBMITTED' || status == 'PENDING') {
+    } else if (status == 'SUBMITTED') {
       bgColor = const Color(0xFFFEF3C7);
       textColor = const Color(0xFFD97706);
     } else if (status == 'REJECTED') {
@@ -877,11 +1116,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     } else if (status == 'HIDDEN') {
       bgColor = const Color(0xFFF1F5F9);
       textColor = const Color(0xFF94A3B8);
-    } else { // DRAFT
+    } else {
+      // DRAFT
       bgColor = const Color(0xFFF1F5F9);
       textColor = const Color(0xFF64748B);
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -894,14 +1134,14 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: textColor,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: textColor, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
           Text(
-            status.length > 1 ? status.substring(0, 1).toUpperCase() + status.substring(1).toLowerCase() : status,
+            status.length > 1
+                ? status.substring(0, 1).toUpperCase() +
+                      status.substring(1).toLowerCase()
+                : status,
             style: TextStyle(
               color: textColor,
               fontWeight: FontWeight.w600,
@@ -926,12 +1166,22 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           border: Border.all(color: const Color(0xFFE2E8F0)),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Icon(icon, size: 18, color: onPressed == null ? const Color(0xFFCBD5E1) : const Color(0xFF64748B)),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onPressed == null
+              ? const Color(0xFFCBD5E1)
+              : const Color(0xFF64748B),
+        ),
       ),
     );
   }
 
-  Widget _buildPaginationNumber(String text, {bool isActive = false, VoidCallback? onPressed}) {
+  Widget _buildPaginationNumber(
+    String text, {
+    bool isActive = false,
+    VoidCallback? onPressed,
+  }) {
     return InkWell(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(6),
@@ -940,7 +1190,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         height: 32,
         decoration: BoxDecoration(
           color: isActive ? const Color(0xFF0F766E) : Colors.white,
-          border: Border.all(color: isActive ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0)),
+          border: Border.all(
+            color: isActive ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+          ),
           borderRadius: BorderRadius.circular(6),
         ),
         alignment: Alignment.center,

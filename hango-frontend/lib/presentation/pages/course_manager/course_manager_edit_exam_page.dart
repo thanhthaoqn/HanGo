@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
+import '../../widgets/trainer/trainer_sidebar.dart';
 import '../../widgets/shared_header.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/course_manager_api.dart';
@@ -55,6 +56,9 @@ class CourseManagerEditExamPage extends StatefulWidget {
   final String? courseManagerActionStatus;
   final bool isCourseManager;
   final TrainerAiExamGenerateResponse? initialAiData;
+  final bool isEmbedded;
+  final VoidCallback? onBack;
+
   const CourseManagerEditExamPage({
     Key? key,
     required this.examId,
@@ -64,10 +68,13 @@ class CourseManagerEditExamPage extends StatefulWidget {
     this.courseManagerActionStatus,
     this.isCourseManager = true,
     this.initialAiData,
+    this.isEmbedded = false,
+    this.onBack,
   }) : super(key: key);
 
   @override
-  State<CourseManagerEditExamPage> createState() => _CourseManagerEditExamPageState();
+  State<CourseManagerEditExamPage> createState() =>
+      _CourseManagerEditExamPageState();
 }
 
 class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
@@ -93,15 +100,23 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     _loadData();
   }
 
+  void _goBack() {
+    if (widget.isEmbedded && widget.onBack != null) {
+      widget.onBack!();
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
   Future<void> _loadData() async {
     await _loadMetadata();
-    
+
     if (widget.initialAiData != null) {
       _loadDataFromAi(widget.initialAiData!);
     } else {
       await _loadQuestions();
     }
-    
+
     if (mounted) {
       setState(() {
         _isLoadingMetadata = false;
@@ -115,7 +130,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       final block = QuestionBlockState();
       block.isQuestionGroup = aiBlock.isQuestionGroup;
       block.passageController.text = aiBlock.passageText;
-      block.selectedGroupTypeId = aiBlock.isQuestionGroup ? aiBlock.categoryId : null; // Mapping groupType to categoryId
+      block.selectedGroupTypeId = aiBlock.isQuestionGroup
+          ? aiBlock.categoryId
+          : null; // Mapping groupType to categoryId
       block.selectedSkillId = aiBlock.skillParamId;
       block.selectedDifficultyId = aiBlock.difficultyId;
       block.questions = aiBlock.questions.map((aiQ) {
@@ -124,10 +141,14 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
         q.explanationController.text = aiQ.explanation;
         q.selectedSkillId = aiBlock.skillParamId; // Use block\'s skill
         q.selectedDifficultyId = aiQ.difficultyId;
-        q.options = aiQ.options.map((aiOpt) => OptionState(
-          text: aiOpt.optionText,
-          isCorrect: aiOpt.isCorrect,
-        )).toList();
+        q.options = aiQ.options
+            .map(
+              (aiOpt) => OptionState(
+                text: aiOpt.optionText,
+                isCorrect: aiOpt.isCorrect,
+              ),
+            )
+            .toList();
         // Ensure 4 options
         while (q.options.length < 4) {
           q.options.add(OptionState());
@@ -142,9 +163,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
-      
+
       final String apiBaseUrl = EnvConfig.v1BaseUrl;
-          
+
       final response = await http.patch(
         Uri.parse('$apiBaseUrl/trainer/exams/${widget.examId}/status'),
         headers: {
@@ -153,11 +174,11 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
         },
         body: jsonEncode({'status': newStatus}),
       );
-      
+
       if (response.statusCode == 200) {
         if (mounted) {
           ToastHelper.show(context, 'Thành công!');
-          Navigator.pop(context);
+          _goBack();
         }
       } else {
         if (mounted) {
@@ -169,17 +190,33 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     }
   }
 
-  void _showActionDialog(String actionName, String newStatus, Color confirmColor) {
+  void _showActionDialog(
+    String actionName,
+    String newStatus,
+    Color confirmColor,
+  ) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('$actionName Exam', style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
-          content: Text('Are you sure you want to $actionName this exam?', style: const TextStyle(fontFamily: 'Outfit')),
+          title: Text(
+            '$actionName Exam',
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to $actionName this exam?',
+            style: const TextStyle(fontFamily: 'Outfit'),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -187,7 +224,10 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                 _updateExamStatus(newStatus);
               },
               style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
-              child: const Text('Confirm', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -201,11 +241,17 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Reject Exam', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+          title: const Text(
+            'Reject Exam',
+            style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Please provide a reason for rejecting this exam:', style: TextStyle(fontFamily: 'Outfit')),
+              const Text(
+                'Please provide a reason for rejecting this exam:',
+                style: TextStyle(fontFamily: 'Outfit'),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: reasonController,
@@ -220,29 +266,48 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
                 if (reasonController.text.trim().isEmpty) {
-                  ToastHelper.show(context, 'Reason is required', isError: true);
+                  ToastHelper.show(
+                    context,
+                    'Reason is required',
+                    isError: true,
+                  );
                   return;
                 }
                 Navigator.pop(context);
                 try {
-                  await CourseManagerApi().rejectExam(widget.examId, reason: reasonController.text.trim());
+                  await CourseManagerApi().rejectExam(
+                    widget.examId,
+                    reason: reasonController.text.trim(),
+                  );
                   if (mounted) {
                     ToastHelper.show(context, 'Exam rejected successfully!');
-                    Navigator.pop(context); // Go back to list
+                    _goBack(); // Go back to list
                   }
                 } catch (e) {
                   if (mounted) {
-                    ToastHelper.show(context, 'Error rejecting exam: $e', isError: true);
+                    ToastHelper.show(
+                      context,
+                      'Error rejecting exam: $e',
+                      isError: true,
+                    );
                   }
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
-              child: const Text('Reject', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+              ),
+              child: const Text(
+                'Reject',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -255,7 +320,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       await CourseManagerApi().publishExam(widget.examId);
       if (mounted) {
         ToastHelper.show(context, 'Exam approved and published successfully!');
-        Navigator.pop(context); // Go back to list
+        _goBack(); // Go back to list
       }
     } catch (e) {
       if (mounted) {
@@ -420,13 +485,10 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     }
   }
 
-
-
   Future<void> _handleSave() async {
     // Basic validation
     for (var i = 0; i < _blocks.length; i++) {
       final block = _blocks[i];
-
 
       if (block.isQuestionGroup &&
           block.passageController.text.trim().isEmpty) {
@@ -513,7 +575,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
 
       if (mounted) {
         ToastHelper.show(context, 'All questions saved successfully!');
-        Navigator.pop(context);
+        _goBack();
       }
     } catch (e) {
       if (mounted) {
@@ -528,19 +590,25 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
 
   Future<void> _handleSubmitForReview() async {
     final isCm = widget.isCourseManager;
-    
+
     if (isCm) {
       final selectedStatus = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               const Icon(Icons.publish, color: Color(0xFF6366F1), size: 24),
               const SizedBox(width: 10),
               const Text(
                 'Submit Exam',
-                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
             ],
           ),
@@ -549,33 +617,43 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Do you want to publish the exam "${widget.examTitle}" immediately or keep it hidden?',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF475569), fontFamily: 'Outfit'),
+                'Do you want to publish the exam "${widget.examTitle}"?',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF475569),
+                  fontFamily: 'Outfit',
+                ),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, null),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, 'HIDDEN'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                ),
               ),
-              child: const Text('Keep Hidden', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, 'PUBLISHED'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF38C9A6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 elevation: 0,
               ),
-              child: const Text('Publish', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Publish',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -588,12 +666,19 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
         final api = await _getApi();
         await api.updateExamStatus(widget.examId, selectedStatus);
         if (mounted) {
-          ToastHelper.show(context, 'Exam status updated to $selectedStatus successfully!');
+          ToastHelper.show(
+            context,
+            'Exam status updated to $selectedStatus successfully!',
+          );
           Navigator.pop(context);
         }
       } catch (e) {
         if (mounted) {
-          ToastHelper.show(context, 'Failed to update status: $e', isError: true);
+          ToastHelper.show(
+            context,
+            'Failed to update status: $e',
+            isError: true,
+          );
         }
       } finally {
         if (mounted) {
@@ -605,14 +690,24 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
-              const Icon(Icons.send_rounded, color: Color(0xFF6366F1), size: 24),
+              const Icon(
+                Icons.send_rounded,
+                color: Color(0xFF6366F1),
+                size: 24,
+              ),
               const SizedBox(width: 10),
               const Text(
                 'Submit for Review',
-                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
               ),
             ],
           ),
@@ -622,7 +717,11 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             children: [
               Text(
                 'Are you sure you want to submit the exam "${widget.examTitle}" for review?',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF475569), fontFamily: 'Outfit'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF475569),
+                  fontFamily: 'Outfit',
+                ),
               ),
               const SizedBox(height: 12),
               Container(
@@ -630,16 +729,26 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0F0FF),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                  border: Border.all(
+                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                  ),
                 ),
                 child: Row(
                   children: const [
-                    Icon(Icons.info_outline, size: 16, color: Color(0xFF6366F1)),
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Color(0xFF6366F1),
+                    ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'After submission, the exam will wait for the Course Manager\'s review before being published.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF6366F1), fontFamily: 'Outfit'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6366F1),
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ),
                   ],
@@ -650,16 +759,31 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6366F1),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 elevation: 0,
               ),
-              child: const Text('Confirm Submission', style: TextStyle(color: Colors.white, fontFamily: 'Outfit', fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Confirm Submission',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -670,14 +794,18 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       setState(() => _isSubmitting = true);
       try {
         final api = await _getApi();
-        await api.updateExamStatus(widget.examId, 'PENDING_APPROVAL');
+        await api.updateExamStatus(widget.examId, 'SUBMITTED');
         if (mounted) {
           ToastHelper.show(context, 'Exam submitted for review successfully!');
-          Navigator.pop(context);
+          _goBack();
         }
       } catch (e) {
         if (mounted) {
-          ToastHelper.show(context, 'Failed to update status: $e', isError: true);
+          ToastHelper.show(
+            context,
+            'Failed to update status: $e',
+            isError: true,
+          );
         }
       } finally {
         if (mounted) {
@@ -692,9 +820,52 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    Widget content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!widget.isCourseManager && !widget.isEmbedded) _buildHeader(context, !isDesktop),
+        if (widget.isEmbedded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+            child: Row(
+              children: [
+                if (widget.onBack != null)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Color(0xFF4B5563)),
+                    onPressed: widget.onBack,
+                  ),
+                if (widget.onBack != null) const SizedBox(width: 8),
+                Text(
+                  '${widget.examTitle} (${widget.isReadOnly ? 'View Mode' : 'Edit Mode'})',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: _isLoadingMetadata
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF38C9A6),
+                  ),
+                )
+              : _buildMainContent(),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return content;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: widget.isCourseManager 
+      appBar: widget.isCourseManager
           ? SharedHeader(
               isDesktop: isDesktop,
               activeTab: '',
@@ -703,29 +874,24 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
               hideLanguageSwitcher: true,
             )
           : null,
-      drawer: !isDesktop && widget.isCourseManager 
-          ? const Drawer(child: CourseManagerSidebar(currentRoute: 'exams')) 
+      drawer: !isDesktop
+          ? Drawer(
+              child: widget.isCourseManager
+                  ? const CourseManagerSidebar(currentRoute: 'exams')
+                  : const TrainerSidebar(activeIndex: 2),
+            )
           : null,
       body: Row(
         children: [
-          if (isDesktop && widget.isCourseManager) 
-            const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!widget.isCourseManager) _buildHeader(context, !isDesktop),
-                Expanded(
-                  child: _isLoadingMetadata
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFF38C9A6),
-                          ),
-                        )
-                      : _buildMainContent(),
-                ),
-              ],
+          if (isDesktop)
+            SizedBox(
+              width: widget.isCourseManager ? 240 : 260,
+              child: widget.isCourseManager
+                  ? const CourseManagerSidebar(currentRoute: 'exams')
+                  : const TrainerSidebar(activeIndex: 2),
             ),
+          Expanded(
+            child: content,
           ),
         ],
       ),
@@ -735,79 +901,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   Widget _buildMainContent() {
     return Column(
       children: [
-        // Sticky Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          decoration: const BoxDecoration(
-            color: Color(0xFFF8FAFC),
-            border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-          ),
-          child: Row(
-            children: [
-              Text(
-                '${widget.examTitle} (Edit mode)',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'OVERALL COMPLETION PROGRESS',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        width: 120,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: widget.examExpectedCount > 0
-                              ? (_completedQuestions /
-                                        widget.examExpectedCount.toDouble())
-                                    .clamp(0.0, 1.0)
-                              : 0.0,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF38C9A6),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${widget.examExpectedCount > 0 ? ((_completedQuestions / widget.examExpectedCount.toDouble()) * 100).toInt().clamp(0, 100) : 0}%',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F766E),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
         // Scrollable Content
         Expanded(
           child: SingleChildScrollView(
@@ -855,7 +948,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _goBack,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF64748B),
                         side: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -899,7 +992,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                                   color: Colors.white,
                                 ),
                           label: Text(
-                            widget.isCourseManager ? 'Submit' : 'Submit for Review',
+                            widget.isCourseManager
+                                ? 'Submit'
+                                : 'Submit for Review',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -952,53 +1047,128 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                               ),
                       ),
                     ] else if (widget.courseManagerActionStatus != null) ...[
-                      if (widget.courseManagerActionStatus == 'PENDING_APPROVAL' || widget.courseManagerActionStatus == 'PENDING' || widget.courseManagerActionStatus == 'SUBMITTED') ...[
+                      if (widget.courseManagerActionStatus ==
+                              'PENDING_APPROVAL' ||
+                          widget.courseManagerActionStatus == 'PENDING' ||
+                          widget.courseManagerActionStatus == 'SUBMITTED') ...[
                         ElevatedButton.icon(
                           onPressed: _showRejectDialog,
-                          icon: const Icon(Icons.close, color: Colors.white, size: 18),
-                          label: const Text('Reject', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Reject',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFEF4444),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             elevation: 0,
                           ),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
                           onPressed: _publishExamAsManager,
-                          icon: const Icon(Icons.check, color: Colors.white, size: 18),
-                          label: const Text('Approve', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          icon: const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Approve',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF38C9A6),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             elevation: 0,
                           ),
                         ),
                       ],
                       if (widget.courseManagerActionStatus == 'PUBLISHED') ...[
                         ElevatedButton.icon(
-                          onPressed: () => _showActionDialog('Hide', 'HIDDEN', Colors.orange),
-                          icon: const Icon(Icons.visibility_off, color: Colors.white, size: 18),
-                          label: const Text('Hide Exam', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          onPressed: () => _showActionDialog(
+                            'Hide',
+                            'HIDDEN',
+                            Colors.orange,
+                          ),
+                          icon: const Icon(
+                            Icons.visibility_off,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Hide Exam',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             elevation: 0,
                           ),
                         ),
                       ],
                       if (widget.courseManagerActionStatus == 'HIDDEN') ...[
                         ElevatedButton.icon(
-                          onPressed: () => _showActionDialog('Publish', 'PUBLISHED', const Color(0xFF38C9A6)),
-                          icon: const Icon(Icons.visibility, color: Colors.white, size: 18),
-                          label: const Text('Publish Exam', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                          onPressed: () => _showActionDialog(
+                            'Publish',
+                            'PUBLISHED',
+                            const Color(0xFF38C9A6),
+                          ),
+                          icon: const Icon(
+                            Icons.visibility,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Publish Exam',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF38C9A6),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             elevation: 0,
                           ),
                         ),
@@ -1329,7 +1499,8 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     required String displayKey,
   }) {
     // Fix Dropdown crash: verify if the value actually exists in the items list
-    bool valueExists = value != null && items.any((item) => (item['id'] as int) == value);
+    bool valueExists =
+        value != null && items.any((item) => (item['id'] as int) == value);
     final int? safeValue = valueExists ? value : null;
 
     return Container(

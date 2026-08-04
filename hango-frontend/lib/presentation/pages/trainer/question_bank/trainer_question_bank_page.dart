@@ -1,34 +1,41 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
+import '../../../../utils/toast_helper.dart';
+import '../../../../utils/download_helper.dart';
 import '../../course_manager/question_bank/course_manager_create_question_page.dart';
-import '../trainer_profile_page.dart';
 import '../../course_manager/question_bank/models/course_manager_question.dart';
 import '../../course_manager/question_bank/widgets/question_search_bar.dart';
 import '../../course_manager/question_bank/widgets/question_table.dart';
 import '../../../widgets/trainer/trainer_sidebar.dart';
+import '../trainer_profile_page.dart';
+import '../trainer_dashboard_page.dart';
 
-class CourseManagerQuestionBankPage extends StatefulWidget {
+class TrainerQuestionBankPage extends StatefulWidget {
   final bool isEmbedded;
-  const CourseManagerQuestionBankPage({super.key, this.isEmbedded = false});
+  const TrainerQuestionBankPage({super.key, this.isEmbedded = false});
 
   @override
-  State<CourseManagerQuestionBankPage> createState() =>
-      _CourseManagerQuestionBankPageState();
+  State<TrainerQuestionBankPage> createState() =>
+      _TrainerQuestionBankPageState();
 }
 
-class _CourseManagerQuestionBankPageState
-    extends State<CourseManagerQuestionBankPage> {
+class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   final _authService = AuthService();
   final _searchController = TextEditingController();
 
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
+  
   bool _isLoading = true;
+  String _errorMessage = '';
 
   // Filter States
   String _selectedType = 'PUBLIC';
@@ -41,12 +48,21 @@ class _CourseManagerQuestionBankPageState
   List<CourseManagerQuestion> _displayedQuestions = [];
   Timer? _debounceTimer;
 
+  // Metadata for filters
+  List<Map<String, dynamic>>? _skills = [];
+  List<Map<String, dynamic>>? _groupTypes = [];
+  List<Map<String, dynamic>>? _difficulties = [];
+  int? _selectedSkillId;
+  int? _selectedGroupTypeId;
+  int? _selectedDifficultyId;
+
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   @override
   void initState() {
     super.initState();
     _loadTrainerInfo();
+    _fetchFilters();
     _fetchQuestions();
   }
 
@@ -75,9 +91,30 @@ class _CourseManagerQuestionBankPageState
     });
   }
 
+  Future<void> _fetchFilters() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+      final skills = await api.getSystemParameters('SKILL_TYPE');
+      final groupTypes = await api.getSystemParameters('GROUP_TYPE');
+      final difficulties = await api.getSystemParameters('DIFFICULTY');
+      if (mounted) {
+        setState(() {
+          _skills = skills;
+          _groupTypes = groupTypes;
+          _difficulties = difficulties;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching filters: $e');
+    }
+  }
+
   Future<void> _fetchQuestions() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = '';
     });
 
     try {
@@ -91,6 +128,9 @@ class _CourseManagerQuestionBankPageState
         type: _selectedType,
         search: _searchQuery,
         sortBy: _sortBy,
+        skillId: _selectedSkillId,
+        categoryId: _selectedGroupTypeId,
+        difficultyId: _selectedDifficultyId,
       );
 
       setState(() {
@@ -102,6 +142,7 @@ class _CourseManagerQuestionBankPageState
       setState(() {
         _allQuestions = [];
         _isLoading = false;
+        _errorMessage = 'Failed to load questions. Please try again.';
       });
     }
   }
@@ -133,6 +174,154 @@ class _CourseManagerQuestionBankPageState
     _fetchQuestions();
   }
 
+  Future<void> _importFromExcel() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.single.bytes;
+      if (bytes == null) {
+        if (mounted)
+          ToastHelper.showError(context, 'Failed to read file bytes');
+        return;
+      }
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      var excel = Excel.decodeBytes(List<int>.from(bytes));
+      var sheet = excel.tables['QUESTIONS'];
+      if (sheet == null) {
+        var sheetName = excel.tables.keys.firstWhere(
+          (k) =>
+              !k.toUpperCase().contains('RULES') &&
+              !k.toUpperCase().contains('README'),
+          orElse: () => excel.tables.keys.last,
+        );
+        sheet = excel.tables[sheetName];
+      }
+
+      if (sheet == null || sheet.maxRows < 3) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted)
+          ToastHelper.showError(context, 'File is empty or invalid format');
+        return;
+      }
+
+      var headerRow = sheet.rows[1];
+      if (headerRow.length < 12 ||
+          !headerRow[0]!.value.toString().contains('Order Index') ||
+          !headerRow[1]!.value.toString().contains('Passage Text')) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted)
+          ToastHelper.showError(
+            context,
+            'File does not match the Hango template',
+          );
+        return;
+      }
+
+      List<Map<String, dynamic>> groupsList = [];
+      Map<String, Map<String, dynamic>> groupMap = {};
+
+      for (int i = 2; i < sheet.maxRows; i++) {
+        var row = sheet.rows[i];
+        if (row.isEmpty ||
+            row.length < 3 ||
+            row[2] == null ||
+            row[2]?.value?.toString().trim().isEmpty == true)
+          continue;
+
+        String passage = row[1]?.value?.toString().trim() ?? '';
+        String qText = row[2]?.value?.toString() ?? '';
+        String optA = row[3]?.value?.toString() ?? '';
+        String optB = row[4]?.value?.toString() ?? '';
+        String optC = row[5]?.value?.toString() ?? '';
+        String optD = row[6]?.value?.toString() ?? '';
+        String correctAns =
+            row[7]?.value?.toString().trim().toUpperCase() ?? 'A';
+        String explanation = row[8]?.value?.toString() ?? '';
+        String skillName = row[9]?.value?.toString() ?? '';
+        String diffName = row[10]?.value?.toString() ?? '';
+        String groupTypeName = row[11]?.value?.toString() ?? '';
+
+        Map<String, dynamic> subQ = {
+          'questionText': qText,
+          'explanation': explanation,
+          'skillName': skillName,
+          'diffName': diffName,
+          'options': [
+            {'optionText': optA, 'isCorrect': correctAns == 'A'},
+            {'optionText': optB, 'isCorrect': correctAns == 'B'},
+            {'optionText': optC, 'isCorrect': correctAns == 'C'},
+            {'optionText': optD, 'isCorrect': correctAns == 'D'},
+          ],
+        };
+
+        if (passage.isEmpty) {
+          groupsList.add({
+            'isGroup': false,
+            'passageText': '',
+            'groupTypeName': '',
+            'subQuestions': [subQ],
+          });
+        } else {
+          if (!groupMap.containsKey(passage)) {
+            groupMap[passage] = {
+              'isGroup': true,
+              'passageText': passage,
+              'groupTypeName': groupTypeName,
+              'subQuestions': <Map<String, dynamic>>[],
+            };
+            groupsList.add(groupMap[passage]!);
+          }
+          (groupMap[passage]!['subQuestions'] as List).add(subQ);
+        }
+      }
+
+      if (groupsList.isEmpty) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) ToastHelper.showError(context, 'No valid questions found');
+        return;
+      }
+
+      Map<String, dynamic> initialData = {'groups': groupsList};
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseManagerCreateQuestionPage(
+              initialData: initialData,
+              isCourseManager: true,
+            ),
+          ),
+        ).then((_) => _fetchQuestions());
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) ToastHelper.showError(context, 'Failed to import Excel: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -146,24 +335,24 @@ class _CourseManagerQuestionBankPageState
         : _allQuestions.sublist(startIndex, endIndex);
 
     if (widget.isEmbedded) {
-      return _buildBodyContent();
+      return _buildBodyContent(isDesktop);
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop
-          ? const Drawer(child: TrainerSidebar(activeIndex: 3))
+          ? const Drawer(child: TrainerSidebar(activeIndex: 2))
           : null,
       body: Row(
         children: [
           if (isDesktop)
-            const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 3)),
+            const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildHeader(context, !isDesktop),
-                Expanded(child: _buildBodyContent()),
+                Expanded(child: _buildBodyContent(isDesktop)),
               ],
             ),
           ),
@@ -172,105 +361,242 @@ class _CourseManagerQuestionBankPageState
     );
   }
 
-  Widget _buildBodyContent() {
+  Widget _buildBodyContent(bool isDesktop) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                QuestionSearchBar(
-                  searchController: _searchController,
-                  onSearchChanged: _handleSearch,
-                  selectedType: _selectedType,
-                  onTypeChanged: _handleTypeChanged,
-                  sortBy: _sortBy,
-                  onSortChanged: _handleSortChanged,
-                  onCreatePressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            const CourseManagerCreateQuestionPage(),
-                      ),
-                    ).then((_) => _fetchQuestions());
-                  },
-                  onImportPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Excel Import flow is under construction',
-                        ),
-                      ),
-                    );
-                  },
-                  onRefreshPressed: _fetchQuestions,
+          _buildWelcomeSection(),
+          const SizedBox(height: 24),
+          QuestionSearchBar(
+            searchController: _searchController,
+            onSearchChanged: _handleSearch,
+            selectedType: _selectedType,
+            onTypeChanged: _handleTypeChanged,
+            sortBy: _sortBy,
+            onSortChanged: _handleSortChanged,
+            onCreatePressed: () {}, // Moved to welcome section
+            onImportPressed: () {}, // Moved to welcome section
+            onRefreshPressed: _fetchQuestions,
+            isCourseManager: true,
+            skills: _skills,
+            groupTypes: _groupTypes,
+            difficulties: _difficulties,
+            selectedSkillId: _selectedSkillId,
+            onSkillChanged: (val) {
+              setState(() {
+                _selectedSkillId = val;
+                _currentPage = 1;
+              });
+              _fetchQuestions();
+            },
+            selectedGroupTypeId: _selectedGroupTypeId,
+            onGroupTypeChanged: (val) {
+              setState(() {
+                _selectedGroupTypeId = val;
+                _currentPage = 1;
+              });
+              _fetchQuestions();
+            },
+            selectedDifficultyId: _selectedDifficultyId,
+            onDifficultyChanged: (val) {
+              setState(() {
+                _selectedDifficultyId = val;
+                _currentPage = 1;
+              });
+              _fetchQuestions();
+            },
+          ),
+          const SizedBox(height: 24),
+          QuestionTable(
+            questions: _displayedQuestions,
+            isLoading: _isLoading,
+            currentPage: _currentPage,
+            totalRecords: _allQuestions.length,
+            pageSize: _pageSize,
+            onPageChanged: (page) {
+              setState(() {
+                _currentPage = page;
+              });
+            },
+            onViewPressed: (q) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CourseManagerCreateQuestionPage(
+                    question: q,
+                    isReadOnly: true,
+                    isCourseManager: true,
+                  ),
                 ),
-                const SizedBox(height: 24),
-                QuestionTable(
-                  questions: _displayedQuestions,
-                  isLoading: _isLoading,
-                  currentPage: _currentPage,
-                  totalRecords: _allQuestions.length,
-                  pageSize: _pageSize,
-                  onPageChanged: (page) {
-                    setState(() {
-                      _currentPage = page;
-                    });
-                  },
-                  onViewPressed: (q) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CourseManagerCreateQuestionPage(
-                          question: q,
-                          isReadOnly: true,
-                        ),
-                      ),
-                    );
-                  },
-                  onEditPressed: (q) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CourseManagerCreateQuestionPage(
-                          question: q,
-                          isEdit: true,
-                        ),
-                      ),
-                    ).then((_) => _fetchQuestions());
-                  },
-                  onStatusToggled: (q, isPublic) async {
-                    final oldStatus = q.status;
-                    final newStatus = isPublic ? 'PUBLIC' : 'PRIVATE';
-                    setState(() {
-                      q.status = newStatus;
-                    });
-                    try {
-                      final token = await _authService.getToken();
-                      if (token != null) {
-                        final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                        await api.toggleQuestionStatus(
-                          q.id,
-                          newStatus,
-                          isGroup: q.isGroup,
-                        );
-                      }
-                    } catch (e) {
-                      setState(() {
-                        q.status = oldStatus;
-                      });
-                    }
-                  },
+              );
+            },
+            onEditPressed: (q) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CourseManagerCreateQuestionPage(
+                    question: q,
+                    isEdit: true,
+                    isCourseManager: true,
+                  ),
                 ),
-              ],
-            ),
+              ).then((_) => _fetchQuestions());
+            },
+            onStatusToggled: (q, isPublic) async {
+              final oldStatus = q.status;
+              final newStatus = isPublic ? 'PUBLIC' : 'PRIVATE';
+              setState(() {
+                q.status = newStatus;
+              });
+              try {
+                final token = await _authService.getToken();
+                if (token != null) {
+                  final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+                  await api.toggleQuestionStatus(
+                    q.id,
+                    newStatus,
+                    isGroup: q.isGroup,
+                  );
+                } else {
+                  throw Exception('No token');
+                }
+              } catch (e) {
+                setState(() {
+                  q.status = oldStatus;
+                });
+                if (context.mounted) {
+                  ToastHelper.showError(context, 'Failed to update status: $e');
+                }
+              }
+            },
+            isCourseManager: true,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWelcomeSection() {
+    return Row(
+      children: [
+        const Text(
+          'Question Bank',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const Spacer(),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  final token = await _authService.getToken();
+                  if (token == null)
+                    throw Exception('Authentication token not found');
+                  final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+                  final bytes = await api.downloadQuestionBankTemplate();
+                  downloadBytes(
+                    bytes: bytes,
+                    filename: 'Hango_Question_Bank_Import_Template.xlsx',
+                    mimeType:
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  );
+                } catch (e) {
+                  if (context.mounted)
+                    ToastHelper.showError(
+                      context,
+                      'Could not download template: $e',
+                    );
+                }
+              },
+              icon: const Icon(
+                Icons.download_outlined,
+                color: Color(0xFF20B486),
+                size: 18,
+              ),
+              label: const Text(
+                'Download Template',
+                style: TextStyle(
+                  color: Color(0xFF20B486),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                side: const BorderSide(color: Color(0xFF20B486)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: _importFromExcel,
+              icon: const Icon(
+                Icons.file_upload_outlined,
+                color: Color(0xFF1E293B),
+                size: 18,
+              ),
+              label: const Text(
+                'Import Excel',
+                style: TextStyle(
+                  color: Color(0xFF1E293B),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CourseManagerCreateQuestionPage(
+                      isCourseManager: true,
+                    ),
+                  ),
+                ).then((_) => _fetchQuestions());
+              },
+              icon: const Icon(
+                Icons.add_circle_outline,
+                color: Colors.white,
+                size: 18,
+              ),
+              label: const Text(
+                'Create Question',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF20B486),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -290,26 +616,12 @@ class _CourseManagerQuestionBankPageState
           ],
           // Breadcrumb
           Row(
-            children: [
-              const Text(
+            children: const [
+              Icon(Icons.chevron_right, size: 16, color: Color(0xFF20B486)),
+              SizedBox(width: 4),
+              Text(
                 'Question Bank',
                 style: TextStyle(
-                  color: Color(0xFF4B5563),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.chevron_right,
-                size: 16,
-                color: Color(0xFF94A3B8),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                _selectedType,
-                style: const TextStyle(
                   color: Color(0xFF20B486),
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -325,25 +637,20 @@ class _CourseManagerQuestionBankPageState
             children: [
               IconButton(
                 icon: const Icon(
-                  Icons.notifications_none,
+                  Icons.notifications_none_outlined,
                   color: Color(0xFF4B5563),
+                  size: 24,
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Notifications feature is under construction',
-                      ),
-                    ),
-                  );
+                  ToastHelper.show(context, 'No new notifications');
                 },
               ),
               Positioned(
-                right: 12,
                 top: 12,
+                right: 12,
                 child: Container(
-                  width: 8,
-                  height: 8,
+                  width: 6,
+                  height: 6,
                   decoration: const BoxDecoration(
                     color: Colors.redAccent,
                     shape: BoxShape.circle,
@@ -353,23 +660,74 @@ class _CourseManagerQuestionBankPageState
             ],
           ),
           const SizedBox(width: 16),
-          const VerticalDivider(
-            width: 1,
-            indent: 20,
-            endIndent: 20,
-            color: Color(0xFFE2E8F0),
-          ),
-          const SizedBox(width: 16),
-          InkWell(
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerProfilePage(),
-                ),
-              );
+          // User profile widget with Popup Menu
+          PopupMenuButton<String>(
+            onSelected: (val) {
+              if (val == 'dashboard') {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TrainerDashboardPage(),
+                  ),
+                );
+              } else if (val == 'profile') {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TrainerProfilePage(),
+                  ),
+                );
+              } else if (val == 'logout') {
+                _authService.logout();
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              }
             },
-            borderRadius: BorderRadius.circular(20),
+            offset: const Offset(0, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'dashboard',
+                child: Row(
+                  children: const [
+                    Icon(Icons.dashboard_outlined, size: 18, color: Color(0xFF20B486)),
+                    SizedBox(width: 10),
+                    Text(
+                      'Dashboard',
+                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: const [
+                    Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
+                    SizedBox(width: 10),
+                    Text(
+                      'My Profile',
+                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: const [
+                    Icon(Icons.logout, size: 18, color: Colors.redAccent),
+                    SizedBox(width: 10),
+                    Text(
+                      'Logout',
+                      style: TextStyle(fontFamily: 'Outfit', color: Colors.redAccent, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
@@ -377,13 +735,13 @@ class _CourseManagerQuestionBankPageState
                   Text(
                     _trainerName,
                     style: const TextStyle(
-                      fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F2937),
+                      color: Color(0xFF1E293B),
+                      fontSize: 14,
                       fontFamily: 'Outfit',
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Container(
                     width: 32,
                     height: 32,

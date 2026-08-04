@@ -309,13 +309,13 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             throw new RuntimeException("Only exams in PENDING_APPROVAL or SUBMITTED status can be returned to draft");
         }
 
-        exam.setStatus("DRAFT");
+        exam.setStatus("REJECTED");
         exam.setRejectionReason(reason);
         examRepository.save(exam);
 
         notificationService.notifyUser(exam.getCreatedBy(), NotificationService.TYPE_CONTENT_REJECTED,
-                "Exam returned to draft",
-                "Your exam \"" + exam.getTitle() + "\" was returned to draft" + (reason != null && !reason.isBlank() ? ": " + reason : "."),
+                "Exam rejected",
+                "Your exam \"" + exam.getTitle() + "\" was rejected" + (reason != null && !reason.isBlank() ? ": " + reason : "."),
                 null);
     }
 }

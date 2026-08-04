@@ -190,7 +190,7 @@ public class CourseManagerDashboardController {
                 return ResponseEntity.badRequest().body("{\"error\": \"Rejection reason is required\"}");
             }
             courseManagerDashboardService.returnExamToDraft(id, reason);
-            return ResponseEntity.ok("{\"message\": \"Exam returned to draft\"}");
+            return ResponseEntity.ok("{\"message\": \"Exam rejected\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

@@ -11,6 +11,8 @@ import '../../widgets/course_manager_sidebar.dart';
 import 'course_manager_exam_import_excel_page.dart';
 import 'course_manager_exam_ai_generate_page.dart';
 import 'course_manager_exam_matrix_page.dart';
+import '../../../services/hango_api.dart';
+import '../../../data/services/course_manager_api.dart';
 
 class CourseManagerCreateExamPage extends StatefulWidget {
   final bool isEmbedded;
@@ -54,6 +56,9 @@ class _CourseManagerCreateExamPageState
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
+  List<Map<String, dynamic>> _matrices = [];
+  bool _isMatricesLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +67,29 @@ class _CourseManagerCreateExamPageState
     _dateController.text =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     _loadUserInfo();
+    _loadMatrices();
+  }
+
+  Future<void> _loadMatrices() async {
+    try {
+      final token = await _authService.getToken();
+      final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+      final data = widget.isCourseManager
+          ? await CourseManagerApi().getExamMatrices()
+          : await api.getExamMatrices();
+      if (mounted) {
+        setState(() {
+          _matrices = data.where((m) => m['isPublic'] == true).toList();
+          _isMatricesLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isMatricesLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadUserInfo() async {
@@ -289,6 +317,8 @@ class _CourseManagerCreateExamPageState
         return CourseManagerExamMatrixPage(
           onBack: onBack,
           isCourseManager: widget.isCourseManager,
+          preloadedMatrices: _matrices,
+          isMatricesLoading: _isMatricesLoading,
         );
       case 'ai':
         return CourseManagerExamAiGeneratePage(
