@@ -86,6 +86,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (!mounted) return;
         setState(() {
           _coursesCount = (data['coursesCount'] ?? 0) as int;
           _learnersCount = (data['learnersCount'] ?? 0) as int;
@@ -102,6 +103,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
       }
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;

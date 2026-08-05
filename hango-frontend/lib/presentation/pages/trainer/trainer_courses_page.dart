@@ -130,6 +130,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (!mounted) return;
         setState(() {
           _allCount = (data['allCount'] ?? 0) as int;
           _draftCount = (data['draftCount'] ?? 0) as int;
@@ -145,6 +146,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       }
     } catch (e) {
       debugPrint('Error loading courses data: $e');
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;

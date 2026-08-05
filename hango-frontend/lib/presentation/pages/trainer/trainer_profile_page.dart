@@ -108,6 +108,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         initials = parts.last[0].toUpperCase();
       }
     }
+    if (!mounted) return;
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
@@ -117,6 +118,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final result = await _onboardingService.getTrainerProfile();
     if (result['success'] == true) {
       final p = result['data'] ?? {};
+      if (!mounted) return;
       setState(() {
         _profileData = p;
         _fullNameController.text = p['fullName'] ?? fullName;

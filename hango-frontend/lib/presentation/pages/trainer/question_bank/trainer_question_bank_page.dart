@@ -133,12 +133,14 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         difficultyId: _selectedDifficultyId,
       );
 
+      if (!mounted) return;
       setState(() {
         _allQuestions = questionsList;
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('Error fetching questions from database: $e');
+      if (!mounted) return;
       setState(() {
         _allQuestions = [];
         _isLoading = false;
