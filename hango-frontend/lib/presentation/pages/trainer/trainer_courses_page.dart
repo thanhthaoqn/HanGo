@@ -9,7 +9,6 @@ import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 
-import 'create_course_page.dart';
 import 'edit_course_page.dart';
 import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -826,31 +825,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               ),
             ),
           ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CreateCoursePage()),
-              ).then((_) => _fetchCoursesData());
-            },
-            icon: const Icon(Icons.add, color: Colors.white, size: 18),
-            label: const Text(
-              'Create New Course',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Outfit',
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20B486),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
-            ),
-          ),
+
         ],
       ],
     );
