@@ -68,19 +68,40 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
         return;
       }
 
-      // Calculate true average score
-      double totalScore = 0.0;
-      int scoredCount = 0;
+      // Calculate weighted baseline score
+      // The most recent attempt gets 50% weight, and the average of all prior attempts gets 50%.
+      // If there's only 1 attempt, it gets 100% weight.
+      double recentScore = 0.0;
+      double historicalSum = 0.0;
+      int historicalCount = 0;
+      bool hasRecent = false;
 
-      for (final attempt in allAttempts) {
-        final score = attempt['score'];
-        if (score != null) {
-          totalScore += (score is num) ? score.toDouble() : double.tryParse(score.toString()) ?? 0.0;
-          scoredCount++;
+      for (int i = 0; i < allAttempts.length; i++) {
+        final attempt = allAttempts[i];
+        final scoreRaw = attempt['score'];
+        if (scoreRaw != null) {
+          double scoreVal = (scoreRaw is num) ? scoreRaw.toDouble() : double.tryParse(scoreRaw.toString()) ?? 0.0;
+          
+          if (!hasRecent) {
+            recentScore = scoreVal;
+            hasRecent = true;
+          } else {
+            historicalSum += scoreVal;
+            historicalCount++;
+          }
         }
       }
 
-      _averageScore = scoredCount > 0 ? totalScore / scoredCount : 0.0;
+      if (hasRecent) {
+        if (historicalCount > 0) {
+          double historicalAverage = historicalSum / historicalCount;
+          _averageScore = (recentScore * 0.5) + (historicalAverage * 0.5);
+        } else {
+          _averageScore = recentScore;
+        }
+      } else {
+        _averageScore = 0.0;
+      }
 
       // Round to 1 decimal
       _averageScore = double.parse(_averageScore.toStringAsFixed(1));
@@ -88,9 +109,9 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
       // Build AI feedback using real data
       final weakSkill = widget.weakestSkill.isNotEmpty ? widget.weakestSkill : "General";
       _aiFeedback =
-          "Based on ${allAttempts.length} exam attempt${allAttempts.length > 1 ? 's' : ''}, "
-          "your average score is ${_averageScore.toStringAsFixed(1)}/10. "
-          "Your weakest area is $weakSkill — focusing here will boost your score the fastest.";
+          "Based on your overall history, your baseline score is ${_averageScore.toStringAsFixed(1)}/10. "
+          "However, in your recent exam, you struggled with $weakSkill. "
+          "This new pathway will prioritize $weakSkill while keeping you on track to reach your goal.";
 
       setState(() {
         _isLoadingAverage = false;

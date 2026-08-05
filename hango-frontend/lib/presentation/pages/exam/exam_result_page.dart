@@ -573,7 +573,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               Icon(Icons.auto_awesome, color: Color(0xFFF59E0B), size: 20),
               SizedBox(width: 8),
               Text(
-                'Recommended Courses to Improve',
+                'Quick Fixes for this Exam',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -808,7 +808,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
                           );
                         },
                         icon: const Icon(Icons.timeline_outlined),
-                        label: const Text('Create/View Learning Pathway'),
+                        label: const Text('Update Master Pathway'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color.fromARGB(
                             255,
