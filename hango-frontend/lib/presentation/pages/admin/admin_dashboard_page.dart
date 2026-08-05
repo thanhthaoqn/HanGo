@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'comment_management_page.dart';
+import '../learner/learner_home_page.dart';
 import 'admin_trainer_reviews_page.dart';
 import '../ticket/management_tickets_page.dart';
 import '../../../utils/toast_helper.dart';
@@ -1122,44 +1123,53 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             const SizedBox(width: 8),
           ],
           
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.network(
-                'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                height: 36,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE6FFFA),
-                          shape: BoxShape.circle,
+          InkWell(
+            onTap: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+                (route) => false,
+              );
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.network(
+                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                  height: 36,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE6FFFA),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.school,
+                            size: 18,
+                            color: Color(0xFF28B79B),
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.school,
-                          size: 18,
-                          color: Color(0xFF28B79B),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'HanGo',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'HanGo',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
 
           if (isDesktop && _selectedMenuIndex == 1) ...[

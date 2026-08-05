@@ -15,7 +15,7 @@ import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/course_manager/course_manager_dashboard_page.dart';
 import '../pages/learner/my_learning_page.dart';
 import '../pages/admin/admin_dashboard_page.dart';
-import '../pages/trainer/trainer_dashboard_page.dart';
+
 import '../pages/trainer/trainer_shell_page.dart';
 import '../pages/ticket/management_tickets_page.dart';
 import '../../../domain/model/course.dart';
@@ -1004,11 +1004,19 @@ class _SharedHeaderState extends State<SharedHeader> {
                 onSelected: (val) {
                   if (val == 'dashboard') {
                     final isTrainer = _userRoles.any((r) => r.toUpperCase().contains('TRAINER'));
-                    if (isTrainer) {
+                    final isAdmin = _userRoles.any((r) => r.toUpperCase().contains('ADMIN'));
+                    if (isAdmin) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TrainerDashboardPage(),
+                          builder: (context) => const AdminDashboardPage(),
+                        ),
+                      );
+                    } else if (isTrainer) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TrainerShellPage(),
                         ),
                       );
                     } else {
