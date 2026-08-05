@@ -66,7 +66,7 @@ class ExamCourseRecommendationAIServiceTest {
 
     @Test
     void recommendCoursesAIShouldThrowBadRequestWhenExamAttemptIdIsNull() {
-        ApiException ex = assertThrows(ApiException.class, () -> service.recommendCoursesAI(null));
+        ApiException ex = assertThrows(ApiException.class, () -> service.recommendCoursesAI(null, null));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
     }
@@ -75,7 +75,7 @@ class ExamCourseRecommendationAIServiceTest {
     void recommendCoursesAIShouldThrowNotFoundWhenExamAttemptDoesNotExist() {
         when(examAttemptRepository.findById(99L)).thenReturn(Optional.empty());
 
-        ApiException ex = assertThrows(ApiException.class, () -> service.recommendCoursesAI(99L));
+        ApiException ex = assertThrows(ApiException.class, () -> service.recommendCoursesAI(99L, null));
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
     }
@@ -90,7 +90,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "\"recommendedCourses\":[{\"courseId\":10,\"reasonWhy\":\"Matches your grammar gaps.\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals(1L, result.getExamAttemptId());
         assertEquals("You're doing well overall.", result.getWeaknessSummary());
@@ -110,7 +110,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "\"recommendedCourses\":[{\"courseId\":10,\"reasonWhy\":\"Keep it up.\"}]}\n```";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(fencedJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals("Great job!", result.getWeaknessSummary());
         assertEquals(1, result.getRecommendedCourses().size());
@@ -130,7 +130,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "{\"courseId\":3,\"reasonWhy\":\"r3\"},{\"courseId\":4,\"reasonWhy\":\"r4\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals(3, result.getRecommendedCourses().size());
     }
@@ -142,7 +142,7 @@ class ExamCourseRecommendationAIServiceTest {
         when(courseRepository.findAll()).thenReturn(List.of());
         when(geminiClientService.generateChatResponse(any(), any())).thenThrow(new RuntimeException("Gemini timeout"));
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals(1L, result.getExamAttemptId());
         assertEquals("", result.getWeaknessSummary());
@@ -156,7 +156,7 @@ class ExamCourseRecommendationAIServiceTest {
         when(courseRepository.findAll()).thenReturn(List.of());
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn("not valid json at all");
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertTrue(result.getRecommendedCourses().isEmpty());
     }
@@ -174,7 +174,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "\"recommendedCourses\":[{\"courseId\":20,\"reasonWhy\":\"Deepens grammar skills.\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals("Advanced Grammar", result.getRecommendedCourses().get(0).getTitle());
         assertEquals("Grammar", result.getRecommendedCourses().get(0).getCategory());
@@ -190,7 +190,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "\"recommendedCourses\":[{\"courseId\":55,\"reasonWhy\":\"Unknown course.\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals(55L, result.getRecommendedCourses().get(0).getCourseId());
         assertEquals("", result.getRecommendedCourses().get(0).getTitle());
@@ -208,7 +208,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "\"recommendedCourses\":[{\"courseId\":99,\"reasonWhy\":\"Stale reference.\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals("", result.getRecommendedCourses().get(0).getTitle());
     }
@@ -222,7 +222,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "\"recommendedCourses\":[{\"courseId\":\"10\",\"reasonWhy\":\"String id.\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals(10L, result.getRecommendedCourses().get(0).getCourseId());
         assertEquals("Grammar Basics", result.getRecommendedCourses().get(0).getTitle());
@@ -236,7 +236,7 @@ class ExamCourseRecommendationAIServiceTest {
         String aiJson = "{\"weaknessSummary\":\"Good job overall.\"}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals("Good job overall.", result.getWeaknessSummary());
         assertTrue(result.getRecommendedCourses().isEmpty());
@@ -250,7 +250,7 @@ class ExamCourseRecommendationAIServiceTest {
         String aiJson = "{\"recommendedCourses\":[{\"courseId\":10,\"reasonWhy\":\"Solid pick.\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals("", result.getWeaknessSummary());
         assertEquals(1, result.getRecommendedCourses().size());
@@ -265,7 +265,7 @@ class ExamCourseRecommendationAIServiceTest {
                 + "{\"courseId\":10,\"reasonWhy\":\"r1\"},{\"courseId\":null,\"reasonWhy\":\"r2\"}]}";
         when(geminiClientService.generateChatResponse(any(), any())).thenReturn(aiJson);
 
-        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L);
+        ExamCourseRecommendationAIResponseDTO result = service.recommendCoursesAI(1L, null);
 
         assertEquals("", result.getWeaknessSummary());
         assertTrue(result.getRecommendedCourses().isEmpty());
