@@ -81,6 +81,102 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
     }
   }
 
+  void _rejectStatement(int id) async {
+    final isVi = LanguageManager.isVi;
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isVi ? 'Từ chối Báo cáo Doanh thu' : 'Reject Revenue Statement'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isVi ? 'Vui lòng nhập lý do từ chối để Quản lý khóa học xử lý lại:' : 'Please enter a reason for rejection:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                hintText: isVi ? 'Lý do từ chối...' : 'Rejection reason...',
+                border: const OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isVi ? 'Hủy' : 'Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                ToastHelper.showError(context, isVi ? 'Vui lòng nhập lý do.' : 'Please enter a reason.');
+                return;
+              }
+              Navigator.pop(context);
+              final success = await _revenueService.rejectStatement(id, reason);
+              if (mounted) {
+                if (success) {
+                  ToastHelper.showSuccess(
+                    context,
+                    isVi ? 'Đã phản hồi từ chối báo cáo thành công.' : 'Statement rejected successfully.',
+                  );
+                  _fetchRevenueData();
+                } else {
+                  ToastHelper.showError(
+                    context,
+                    isVi ? 'Không thể phản hồi từ chối. Vui lòng thử lại.' : 'Failed to reject statement.',
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: Text(isVi ? 'Từ chối' : 'Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openImagePreview(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Container(
+                    padding: const EdgeInsets.all(20),
+                    color: Colors.white,
+                    child: Text(
+                      LanguageManager.isVi ? 'Không thể tải ảnh bill chứng từ' : 'Cannot load receipt image',
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 28),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _formatVND(dynamic amount) {
     if (amount == null) return '0 VNĐ';
     final val = (amount as num).toDouble();
@@ -545,20 +641,51 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                       DataCell(_buildStatusBadge(status, isVi)),
                       DataCell(
                         status == 'PENDING_TRAINER_CONFIRM'
-                            ? ElevatedButton(
-                                onPressed: () => _confirmStatement(id),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF28B79B),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                child: Text(
-                                  isVi ? 'Xác nhận' : 'Confirm',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ElevatedButton(
+                                    onPressed: () => _confirmStatement(id),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF28B79B),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    ),
+                                    child: Text(
+                                      isVi ? 'Xác nhận' : 'Confirm',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  OutlinedButton(
+                                    onPressed: () => _rejectStatement(id),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.redAccent,
+                                      side: const BorderSide(color: Colors.redAccent),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    ),
+                                    child: Text(
+                                      isVi ? 'Từ chối' : 'Reject',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
                               )
-                            : const Text('-', style: TextStyle(color: Color(0xFF94A3B8))),
+                            : (status == 'PAID' && s['payoutReceiptUrl'] != null && s['payoutReceiptUrl'].toString().isNotEmpty)
+                                ? OutlinedButton.icon(
+                                    onPressed: () => _openImagePreview(s['payoutReceiptUrl'].toString()),
+                                    icon: const Icon(Icons.receipt_long, size: 14),
+                                    label: Text(isVi ? 'Xem Bill chuyển tiền' : 'View Receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF28B79B),
+                                      side: const BorderSide(color: Color(0xFF28B79B)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    ),
+                                  )
+                                : const Text('-', style: TextStyle(color: Color(0xFF94A3B8))),
                       ),
                     ],
                   );
@@ -594,6 +721,14 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
       text = isVi ? 'Đã thanh toán' : 'Paid';
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF15803D);
+    } else if (status == 'REJECTED') {
+      text = isVi ? 'Đã từ chối' : 'Rejected';
+      bg = const Color(0xFFFEE2E2);
+      fg = const Color(0xFFB91C1C);
+    } else if (status == 'CANCELLED') {
+      text = isVi ? 'Đã hủy' : 'Cancelled';
+      bg = const Color(0xFFF1F5F9);
+      fg = const Color(0xFF64748B);
     }
 
     return Container(

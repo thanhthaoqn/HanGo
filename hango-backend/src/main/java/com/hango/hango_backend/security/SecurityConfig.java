@@ -112,7 +112,7 @@ public class SecurityConfig {
                 "Cache-Control",
                 "x-goog-api-key"));
 
-        configuration.setExposedHeaders(Arrays.asList("x-auth-token", "Authorization"));
+        configuration.setExposedHeaders(Arrays.asList("x-auth-token", "Authorization", "Content-Disposition"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
