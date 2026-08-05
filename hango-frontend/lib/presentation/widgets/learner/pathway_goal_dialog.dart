@@ -240,7 +240,16 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
 
     try {
       final pathwayRepo = PathwayRepository();
-      await pathwayRepo.generatePathway(examAttemptId: widget.examAttemptId);
+      
+      final goalName = "Target Score: $_selectedScore";
+      final targetDate = DateTime.now().add(Duration(days: _selectedWeeks! * 7)).toIso8601String().substring(0, 10);
+      
+      await pathwayRepo.generatePathway(
+        examAttemptId: widget.examAttemptId,
+        goalName: goalName,
+        targetDate: targetDate,
+        hoursPerWeek: 5, // Defaulting to 5 as there is no UI for hours per week in this dialog
+      );
 
       if (!mounted) return;
       Navigator.pop(context);
