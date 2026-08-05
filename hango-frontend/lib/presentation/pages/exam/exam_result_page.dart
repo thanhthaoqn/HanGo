@@ -99,16 +99,23 @@ class _ExamResultPageState extends State<ExamResultPage> {
     double lowestAccuracy = 1.1;
     String weakest = "General";
 
+    Map<String, double> tempAccuracies = {};
     totalPerSkill.forEach((skill, total) {
       int correct = correctPerSkill[skill] ?? 0;
       double accuracy = total > 0 ? (correct / total) : 0.0;
-      _skillAccuracies[skill] = accuracy;
+      tempAccuracies[skill] = accuracy;
 
       if (accuracy < lowestAccuracy) {
         lowestAccuracy = accuracy;
         weakest = skill;
       }
     });
+
+    // Sort by accuracy ascending (weakest first)
+    final sortedEntries = tempAccuracies.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+
+    _skillAccuracies = Map.fromEntries(sortedEntries);
 
     setState(() {
       _weakestSkill = weakest;
@@ -139,6 +146,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
       final repo = ExamAIRecommendationRepository();
       final aiResp = await repo.recommendCoursesAI(
         examAttemptId: latestAttemptId,
+        weakestSkill: _weakestSkill,
       );
 
       final weakness = (aiResp['weaknessSummary'] ?? '')?.toString() ?? '';

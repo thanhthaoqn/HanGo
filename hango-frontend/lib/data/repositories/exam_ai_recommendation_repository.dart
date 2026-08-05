@@ -10,6 +10,7 @@ class ExamAIRecommendationRepository {
 
   Future<Map<String, dynamic>> recommendCoursesAI({
     required int examAttemptId,
+    required String weakestSkill,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -22,7 +23,10 @@ class ExamAIRecommendationRepository {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({'examAttemptId': examAttemptId}),
+      body: jsonEncode({
+        'examAttemptId': examAttemptId,
+        'weakestSkill': weakestSkill,
+      }),
     );
 
     if (response.statusCode != 200) {

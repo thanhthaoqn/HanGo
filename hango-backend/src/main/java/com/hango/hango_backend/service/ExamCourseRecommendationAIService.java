@@ -36,7 +36,7 @@ public class ExamCourseRecommendationAIService {
      * Gợi ý khóa học bằng AI dựa trên examAttempt.answersJson/score.
      * Fallback: nếu AI fail => trả weaknessSummary rỗng + list rỗng để FE quay về rule-based.
      */
-    public ExamCourseRecommendationAIResponseDTO recommendCoursesAI(Long examAttemptId) {
+    public ExamCourseRecommendationAIResponseDTO recommendCoursesAI(Long examAttemptId, String weakestSkill) {
         if (examAttemptId == null) {
             throw new ApiException("examAttemptId is required", HttpStatus.BAD_REQUEST);
         }
@@ -85,6 +85,7 @@ public class ExamCourseRecommendationAIService {
                 TOOL INPUT (EXAM ANALYSIS):
                 - score_avg_hint: %s
                 - knowledge_gaps_json: %s
+                - explicit_weakest_skill: %s (Chú trọng đề xuất khóa học cải thiện kỹ năng này nhất)
 
                 JSON OUTPUT SCHEMA:
                 {
@@ -99,7 +100,8 @@ public class ExamCourseRecommendationAIService {
 
                 courseList,
                 analysis.getHints() != null && analysis.getHints().get("score_avg") != null ? analysis.getHints().get("score_avg").toString() : "0",
-                analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson()
+                analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson(),
+                weakestSkill != null ? weakestSkill : "N/A"
         );
 
 

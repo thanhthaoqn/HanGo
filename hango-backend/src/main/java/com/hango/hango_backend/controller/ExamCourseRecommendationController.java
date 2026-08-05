@@ -43,7 +43,7 @@ public class ExamCourseRecommendationController {
 
         // (MVP) Không validate ownership ở đây vì aiService mới lấy attempt theo id.
         // Có thể bổ sung kiểm tra attempt.student.id == userId trong aiService sau.
-        ExamCourseRecommendationAIResponseDTO resp = aiService.recommendCoursesAI(request.getExamAttemptId());
+        ExamCourseRecommendationAIResponseDTO resp = aiService.recommendCoursesAI(request.getExamAttemptId(), request.getWeakestSkill());
         return ResponseEntity.ok(resp);
     }
 }
