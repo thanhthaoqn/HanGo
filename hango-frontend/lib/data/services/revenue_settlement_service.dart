@@ -144,6 +144,60 @@ class RevenueSettlementService {
     return false;
   }
 
+  Future<bool> regenerateStatement(int statementId) async {
+    try {
+      final token = await _getToken();
+      final response = await http.post(
+        Uri.parse('${EnvConfig.v1BaseUrl}/course-manager/statements/$statementId/regenerate'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error regenerating statement: $e');
+    }
+    return false;
+  }
+
+  Future<bool> rejectStatement(int statementId, String reason) async {
+    try {
+      final token = await _getToken();
+      final response = await http.post(
+        Uri.parse('${EnvConfig.v1BaseUrl}/trainer/statements/$statementId/reject'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'reason': reason,
+        }),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error rejecting statement: $e');
+    }
+    return false;
+  }
+
+  Future<bool> cancelStatement(int statementId) async {
+    try {
+      final token = await _getToken();
+      final response = await http.post(
+        Uri.parse('${EnvConfig.v1BaseUrl}/course-manager/statements/$statementId/cancel'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error cancelling statement: $e');
+    }
+    return false;
+  }
+
   Future<List<dynamic>> getStatementPayments(int statementId) async {
     try {
       final token = await _getToken();
@@ -247,6 +301,8 @@ class RevenueSettlementService {
 
       if (response.statusCode == 200) {
         return response.bodyBytes;
+      } else {
+        debugPrint('exportPaymentsExcel failed with status ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('Error exporting payments excel: $e');

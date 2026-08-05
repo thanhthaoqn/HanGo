@@ -49,6 +49,17 @@ public class MonthlyStatementController {
         return ResponseEntity.ok(updated);
     }
 
+    @PostMapping("/trainer/statements/{id}/reject")
+    @PreAuthorize("hasAuthority('VIEW_OWN_REVENUE') or hasAuthority('VIEW_PLATFORM_DASHBOARD')")
+    public ResponseEntity<MonthlyStatementDTO> rejectTrainerStatement(
+            @PathVariable("id") Long id,
+            @RequestBody(required = false) RejectRequestDTO request,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        String reason = request != null ? request.getReason() : null;
+        MonthlyStatementDTO updated = statementService.rejectTrainerStatement(id, currentUser.getId(), reason);
+        return ResponseEntity.ok(updated);
+    }
+
     // --- Course Manager / Admin Endpoints ---
 
     @GetMapping("/course-manager/statements")
@@ -80,6 +91,22 @@ public class MonthlyStatementController {
         return ResponseEntity.ok(settled);
     }
 
+    @PostMapping("/course-manager/statements/{id}/cancel")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<MonthlyStatementDTO> cancelStatement(
+            @PathVariable("id") Long id) {
+        MonthlyStatementDTO cancelled = statementService.cancelStatement(id);
+        return ResponseEntity.ok(cancelled);
+    }
+
+    @PostMapping("/course-manager/statements/{id}/regenerate")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<MonthlyStatementDTO> regenerateStatement(
+            @PathVariable("id") Long id) {
+        MonthlyStatementDTO regenerated = statementService.regenerateStatement(id);
+        return ResponseEntity.ok(regenerated);
+    }
+
     @GetMapping("/course-manager/statements/{id}/items")
     @PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR', 'TRAINER', 'ROLE_TRAINER', 'TEACHER', 'ROLE_TEACHER')")
     public ResponseEntity<List<com.hango.hango_backend.dto.ManagerPaymentDTO>> getStatementPayments(
@@ -106,6 +133,11 @@ public class MonthlyStatementController {
         private String bankTxnRef;
         private String notes;
         private String payoutReceiptUrl;
+    }
+
+    @Data
+    public static class RejectRequestDTO {
+        private String reason;
     }
 }
 

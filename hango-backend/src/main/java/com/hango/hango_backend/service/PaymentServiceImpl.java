@@ -51,6 +51,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final EnrollmentRepository enrollmentRepository;
     private final TrainerProfileRepository trainerProfileRepository;
     private final CartItemRepository cartItemRepository;
+    private final com.hango.hango_backend.repository.MonthlyStatementRepository monthlyStatementRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
 
@@ -466,19 +467,40 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    @Transactional
+    public void syncAllPaymentSettlementStatuses() {
+        try {
+            paymentRepository.syncSettledPaymentsForPaidStatements();
+        } catch (Exception e) {
+            log.warn("Could not sync payment settlement statuses: {}", e.getMessage());
+        }
+    }
+
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<com.hango.hango_backend.dto.ManagerPaymentDTO> getAllPaymentsForManager(
             String status, String settlementStatus, String search, int page, int size) {
+        syncAllPaymentSettlementStatuses();
+
+        String cleanStatus = (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status.trim())) ? "" : status.trim();
+        String cleanSettlementStatus = (settlementStatus == null || settlementStatus.trim().isEmpty() || "ALL".equalsIgnoreCase(settlementStatus.trim())) ? "" : settlementStatus.trim();
+        String cleanSearch = (search == null || search.trim().isEmpty()) ? "" : "%" + search.trim().toLowerCase() + "%";
+
         Pageable pageable = PageRequest.of(page, size);
-        Page<Payment> paymentPage = paymentRepository.findAllForManager(status, settlementStatus, search, pageable);
+        Page<Payment> paymentPage = paymentRepository.findAllForManager(cleanStatus, cleanSettlementStatus, cleanSearch, pageable);
         return paymentPage.map(this::mapToManagerDTO);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public byte[] exportPaymentsToExcel(String status, String settlementStatus, String search) {
-        List<Payment> payments = paymentRepository.findAllForManagerList(status, settlementStatus, search);
+        syncAllPaymentSettlementStatuses();
+
+        String cleanStatus = (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status.trim())) ? "" : status.trim();
+        String cleanSettlementStatus = (settlementStatus == null || settlementStatus.trim().isEmpty() || "ALL".equalsIgnoreCase(settlementStatus.trim())) ? "" : settlementStatus.trim();
+        String cleanSearch = (search == null || search.trim().isEmpty()) ? "" : "%" + search.trim().toLowerCase() + "%";
+
+        List<Payment> payments = paymentRepository.findAllForManagerList(cleanStatus, cleanSettlementStatus, cleanSearch);
         List<com.hango.hango_backend.dto.ManagerPaymentDTO> dtos = payments.stream()
                 .map(this::mapToManagerDTO)
                 .collect(Collectors.toList());
@@ -532,7 +554,11 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             for (int i = 0; i < columns.length; i++) {
-                sheet.autoSizeColumn(i);
+                try {
+                    sheet.autoSizeColumn(i);
+                } catch (Exception e) {
+                    log.warn("Could not auto-size column {}: {}", i, e.getMessage());
+                }
             }
 
             workbook.write(out);
@@ -545,14 +571,18 @@ public class PaymentServiceImpl implements PaymentService {
 
     private com.hango.hango_backend.dto.ManagerPaymentDTO mapToManagerDTO(Payment p) {
         String title = null;
-        if (p.getCourseIds() != null && !p.getCourseIds().trim().isEmpty()) {
-            String[] ids = p.getCourseIds().split(",");
-            if (ids.length > 1) {
-                title = "Cart Payment (" + ids.length + " courses)";
+        try {
+            if (p.getCourseIds() != null && !p.getCourseIds().trim().isEmpty()) {
+                String[] ids = p.getCourseIds().split(",");
+                if (ids.length > 1) {
+                    title = "Cart Payment (" + ids.length + " courses)";
+                }
             }
-        }
-        if (title == null && p.getCourse() != null) {
-            title = p.getCourse().getTitle();
+            if (title == null && p.getCourse() != null) {
+                title = p.getCourse().getTitle();
+            }
+        } catch (Exception e) {
+            title = "Course (Deleted)";
         }
         if (title == null) {
             title = "HanGo Course";
@@ -560,18 +590,50 @@ public class PaymentServiceImpl implements PaymentService {
 
         String trainerName = "N/A";
         Long trainerId = null;
-        if (p.getCourse() != null && p.getCourse().getCreator() != null) {
-            trainerName = p.getCourse().getCreator().getFullName();
-            trainerId = p.getCourse().getCreator().getId();
+        try {
+            if (p.getCourse() != null && p.getCourse().getCreator() != null) {
+                User courseCreator = p.getCourse().getCreator();
+                if (courseCreator.getFullName() != null) {
+                    trainerName = courseCreator.getFullName();
+                }
+                trainerId = courseCreator.getId();
+            }
+        } catch (Exception e) {
+            log.debug("Could not resolve trainer for payment id={}: {}", p.getId(), e.getMessage());
+            trainerName = "Trainer (Deleted)";
+        }
+
+        Long learnerId = null;
+        String learnerName = "N/A";
+        String learnerEmail = "N/A";
+        try {
+            if (p.getUser() != null) {
+                learnerId = p.getUser().getId();
+                learnerName = p.getUser().getFullName();
+                learnerEmail = p.getUser().getEmail();
+            }
+        } catch (Exception e) {
+            log.debug("Could not resolve learner for payment id={}: {}", p.getId(), e.getMessage());
+            learnerName = "User (Deleted)";
+            learnerEmail = "deleted_user@hango.edu.vn";
+        }
+
+        Long courseId = null;
+        try {
+            if (p.getCourse() != null) {
+                courseId = p.getCourse().getId();
+            }
+        } catch (Exception e) {
+            // Ignore deleted course
         }
 
         return com.hango.hango_backend.dto.ManagerPaymentDTO.builder()
                 .id(p.getId())
                 .txnRef(p.getTxnRef())
-                .learnerId(p.getUser() != null ? p.getUser().getId() : null)
-                .learnerName(p.getUser() != null ? p.getUser().getFullName() : "N/A")
-                .learnerEmail(p.getUser() != null ? p.getUser().getEmail() : "N/A")
-                .courseId(p.getCourse() != null ? p.getCourse().getId() : null)
+                .learnerId(learnerId)
+                .learnerName(learnerName != null ? learnerName : "N/A")
+                .learnerEmail(learnerEmail != null ? learnerEmail : "N/A")
+                .courseId(courseId)
                 .courseTitle(title)
                 .trainerId(trainerId)
                 .trainerName(trainerName)

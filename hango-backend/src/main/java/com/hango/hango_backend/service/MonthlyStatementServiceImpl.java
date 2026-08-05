@@ -121,13 +121,37 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
     }
 
     @Override
+    @Transactional
+    public MonthlyStatementDTO rejectTrainerStatement(Long statementId, Long trainerId, String rejectReason) {
+        MonthlyStatement statement = statementRepository.findById(statementId)
+                .orElseThrow(() -> new RuntimeException("Statement not found with ID: " + statementId));
+
+        if (!statement.getTrainer().getId().equals(trainerId)) {
+            throw new RuntimeException("Unauthorized statement access");
+        }
+
+        statement.setStatus("REJECTED");
+        if (rejectReason != null && !rejectReason.trim().isEmpty()) {
+            String note = "Rejected by Trainer: " + rejectReason;
+            statement.setAdminNotes(statement.getAdminNotes() != null ? (statement.getAdminNotes() + "\n" + note) : note);
+        }
+        MonthlyStatement saved = statementRepository.save(statement);
+        return mapToDTO(saved);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<MonthlyStatementDTO> getCourseManagerStatements(String periodMonth, String status) {
         List<MonthlyStatement> list;
-        if (periodMonth != null && !periodMonth.isEmpty() && status != null && !status.isEmpty()) {
-            list = statementRepository.findByPeriodMonthAndStatus(periodMonth, status);
-        } else if (periodMonth != null && !periodMonth.isEmpty()) {
-            list = statementRepository.findByPeriodMonth(periodMonth);
+        boolean hasPeriod = periodMonth != null && !periodMonth.trim().isEmpty() && !"ALL".equalsIgnoreCase(periodMonth.trim());
+        boolean hasStatus = status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim());
+
+        if (hasPeriod && hasStatus) {
+            list = statementRepository.findByPeriodMonthAndStatus(periodMonth.trim(), status.trim());
+        } else if (hasPeriod) {
+            list = statementRepository.findByPeriodMonth(periodMonth.trim());
+        } else if (hasStatus) {
+            list = statementRepository.findByStatus(status.trim());
         } else {
             list = statementRepository.findAll();
         }
@@ -186,7 +210,11 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 trainerGrossSum = trainerGrossSum.add(tEarn);
             }
 
-            BigDecimal pitTax = trainerGrossSum.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
+            // Theo Khoản 1 Điều 25 Thông tư 111/2013/TT-BTC: Chỉ khấu trừ 10% Thuế TNCN khi tổng thu nhập từ 2.000.000 VNĐ trở lên
+            BigDecimal pitTax = BigDecimal.ZERO;
+            if (trainerGrossSum.compareTo(new BigDecimal("2000000")) >= 0) {
+                pitTax = trainerGrossSum.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
+            }
             BigDecimal netPayout = trainerGrossSum.subtract(pitTax);
 
             String finalPeriodMonth = periodMonth;
@@ -246,33 +274,156 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
         MonthlyStatement statement = statementRepository.findById(statementId)
                 .orElseThrow(() -> new RuntimeException("Statement not found with ID: " + statementId));
 
+        if (bankTxnRef == null || bankTxnRef.trim().isEmpty()) {
+            throw new IllegalArgumentException("Bank transaction reference code is required.");
+        }
+        if (bankTxnRef.trim().length() < 4) {
+            throw new IllegalArgumentException("Bank transaction reference code must be at least 4 characters.");
+        }
+        if (payoutReceiptUrl == null || payoutReceiptUrl.trim().isEmpty()) {
+            throw new IllegalArgumentException("Payout receipt proof image URL is required.");
+        }
+
+        String trimmedUrl = payoutReceiptUrl.trim();
+        if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) {
+            throw new IllegalArgumentException("Payout receipt URL must start with http:// or https://");
+        }
+        String lowerUrl = trimmedUrl.toLowerCase();
+        if (!lowerUrl.contains(".jpg") && !lowerUrl.contains(".jpeg") && !lowerUrl.contains(".png")) {
+            throw new IllegalArgumentException("Invalid receipt file format. Only JPG, JPEG, and PNG images are allowed (WEBP is excluded).");
+        }
+        statement.setPayoutReceiptUrl(trimmedUrl);
+
         statement.setStatus("PAID");
         statement.setPaidAt(LocalDateTime.now());
-        statement.setBankTxnRef(bankTxnRef);
+        statement.setBankTxnRef(bankTxnRef.trim());
         if (notes != null && !notes.trim().isEmpty()) {
-            statement.setAdminNotes(notes);
-        }
-        if (payoutReceiptUrl != null && !payoutReceiptUrl.trim().isEmpty()) {
-            statement.setPayoutReceiptUrl(payoutReceiptUrl);
+            statement.setAdminNotes(notes.trim());
         }
 
         MonthlyStatement saved = statementRepository.save(statement);
 
+        // Update all linked payments' settlementStatus to "SETTLED"
+        List<Payment> linkedPayments = paymentRepository.findByStatementId(statementId);
+        for (Payment p : linkedPayments) {
+            p.setSettlementStatus("SETTLED");
+            paymentRepository.save(p);
+        }
+
         // Send email notification to Trainer
         try {
             if (statement.getTrainer() != null && statement.getTrainer().getEmail() != null) {
-                emailService.sendTrainerStatusNotificationEmail(
+                String netPayoutText = String.format("%,.0fđ", statement.getNetPayoutAmount() != null ? statement.getNetPayoutAmount() : BigDecimal.ZERO);
+                emailService.sendSettlementPaidEmail(
                         statement.getTrainer().getEmail(),
-                        "SETTLEMENT_PAID",
-                        "Your monthly revenue payout for period " + statement.getPeriodMonth() +
-                                " (Net Payout: " + String.format("%,.0f", statement.getNetPayoutAmount()) + " VND) has been successfully transferred." +
-                                (bankTxnRef != null ? " Bank Txn Ref: " + bankTxnRef : "")
+                        statement.getTrainer().getFullName(),
+                        statement.getPeriodMonth(),
+                        netPayoutText,
+                        bankTxnRef,
+                        payoutReceiptUrl
                 );
             }
         } catch (Exception e) {
             log.warn("Could not send settlement paid email: {}", e.getMessage());
         }
 
+        return mapToDTO(saved);
+    }
+
+    @Override
+    @Transactional
+    public MonthlyStatementDTO cancelStatement(Long statementId) {
+        MonthlyStatement statement = statementRepository.findById(statementId)
+                .orElseThrow(() -> new RuntimeException("Statement not found with ID: " + statementId));
+
+        statement.setStatus("CANCELLED");
+        MonthlyStatement saved = statementRepository.save(statement);
+
+        // Release all linked payments back to PENDING settlement status
+        List<Payment> linkedPayments = paymentRepository.findByStatementId(statementId);
+        for (Payment p : linkedPayments) {
+            p.setStatementId(null);
+            p.setSettlementStatus("PENDING");
+            paymentRepository.save(p);
+        }
+        log.info("Cancelled statement ID={} and released {} payments back to PENDING settlement status.", statementId, linkedPayments.size());
+
+        return mapToDTO(saved);
+    }
+
+    @Override
+    @Transactional
+    public MonthlyStatementDTO regenerateStatement(Long statementId) {
+        MonthlyStatement statement = statementRepository.findById(statementId)
+                .orElseThrow(() -> new RuntimeException("Statement not found with ID: " + statementId));
+
+        if (!"REJECTED".equalsIgnoreCase(statement.getStatus()) && !"CANCELLED".equalsIgnoreCase(statement.getStatus())) {
+            throw new IllegalStateException("Only REJECTED or CANCELLED statements can be recalculated & regenerated.");
+        }
+
+        User trainer = statement.getTrainer();
+        String periodMonth = statement.getPeriodMonth();
+
+        // Find payments for this statement (or trainer's pending payments)
+        List<Payment> linkedPayments = paymentRepository.findByStatementId(statementId);
+        if (linkedPayments.isEmpty() && trainer != null) {
+            linkedPayments = paymentRepository.findByCourseCreatorIdAndStatus(trainer.getId(), "SUCCESS")
+                    .stream()
+                    .filter(p -> "IN_STATEMENT".equalsIgnoreCase(p.getSettlementStatus()) || "PENDING".equalsIgnoreCase(p.getSettlementStatus()) || p.getSettlementStatus() == null)
+                    .collect(Collectors.toList());
+        }
+
+        TrainerProfile profile = trainerProfileRepository.findById(trainer.getId()).orElse(null);
+        String trainerType = profile != null && profile.getTrainerType() != null ? profile.getTrainerType() : "PROFESSIONAL";
+        double platformRate = "PEER_TUTOR".equalsIgnoreCase(trainerType) ? 0.40 : 0.30;
+
+        int totalOrders = linkedPayments.size();
+        BigDecimal grossSum = BigDecimal.ZERO;
+        BigDecimal platformSum = BigDecimal.ZERO;
+        BigDecimal trainerGrossSum = BigDecimal.ZERO;
+
+        for (Payment p : linkedPayments) {
+            BigDecimal gross = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
+            BigDecimal pFee = gross.multiply(BigDecimal.valueOf(platformRate)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal tEarn = gross.subtract(pFee);
+
+            grossSum = grossSum.add(gross);
+            platformSum = platformSum.add(pFee);
+            trainerGrossSum = trainerGrossSum.add(tEarn);
+
+            p.setSettlementStatus("IN_STATEMENT");
+            p.setStatementId(statement.getId());
+            paymentRepository.save(p);
+        }
+
+        BigDecimal pitTax = BigDecimal.ZERO;
+        if (trainerGrossSum.compareTo(new BigDecimal("2000000")) >= 0) {
+            pitTax = trainerGrossSum.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal netPayout = trainerGrossSum.subtract(pitTax);
+
+        statement.setTotalOrders(totalOrders);
+        statement.setTotalGrossAmount(grossSum);
+        statement.setTotalPlatformFee(platformSum);
+        statement.setTotalTrainerGross(trainerGrossSum);
+        statement.setPitTaxAmount(pitTax);
+        statement.setNetPayoutAmount(netPayout);
+        statement.setStatus("PENDING_TRAINER_CONFIRM"); // Reset back to PENDING_TRAINER_CONFIRM
+
+        String auditNote = "\n[System] Recalculated & regenerated by Course Manager at " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        statement.setAdminNotes(statement.getAdminNotes() != null ? (statement.getAdminNotes() + auditNote) : auditNote);
+
+        MonthlyStatement saved = statementRepository.save(statement);
+
+        if (trainer != null) {
+            notificationService.notifyUser(trainer, NotificationService.TYPE_STATEMENT_READY,
+                    "Revenue statement recalculated",
+                    "Your revenue statement for " + periodMonth + " (Net: "
+                            + String.format("%,.0f", netPayout) + " VND) has been recalculated and is ready to review again.",
+                    null);
+        }
+
+        log.info("Regenerated statement ID={} for period {}. New Status=PENDING_TRAINER_CONFIRM", statementId, periodMonth);
         return mapToDTO(saved);
     }
 
@@ -370,7 +521,11 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
             }
 
             for (int i = 0; i < columns.length; i++) {
-                sheet.autoSizeColumn(i);
+                try {
+                    sheet.autoSizeColumn(i);
+                } catch (Exception e) {
+                    log.warn("Could not auto-size column {}: {}", i, e.getMessage());
+                }
             }
 
             workbook.write(out);

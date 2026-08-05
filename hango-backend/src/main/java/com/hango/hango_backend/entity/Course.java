@@ -26,6 +26,7 @@ public class Course {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "created_by", nullable = false)
     private User creator;
 
