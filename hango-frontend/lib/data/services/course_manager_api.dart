@@ -89,15 +89,29 @@ class CourseReviewCourse {
 class CourseManagerApi {
   static String get baseUrl => '${EnvConfig.apiBaseUrl}/api/v1/course-manager';
 
-  Future<CourseManagerDashboardSummary> getDashboardSummary() async {
+  // Every request needs an auth token to mean anything against the backend's
+  // @PreAuthorize checks. Silently sending the request without one used to
+  // just come back as a generic 403 "Access denied" from Spring Security's
+  // AccessDeniedHandler (indistinguishable from a real permission gap) —
+  // fail fast client-side instead, with a message that says what's actually
+  // wrong, so callers can prompt the user to log in again.
+  Future<String> _requireToken() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
+    if (token == null || token.isEmpty) {
+      throw Exception('Not signed in (no auth token found). Please log in again.');
+    }
+    return token;
+  }
+
+  Future<CourseManagerDashboardSummary> getDashboardSummary() async {
+    final token = await _requireToken();
 
     final response = await http.get(
       Uri.parse('$baseUrl/dashboard'),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
     );
 
@@ -250,8 +264,7 @@ class CourseManagerApi {
 
   Future<dynamic> getExamDetails(int examId) async {
     // Note: uses trainer endpoint because COURSE_MANAGER role is allowed to call it to view full exam details
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await _requireToken();
 
     final uri = Uri.parse(
       '${EnvConfig.apiBaseUrl}/api/v1/trainer/exams/$examId/questions',
@@ -260,7 +273,7 @@ class CourseManagerApi {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
     );
 
@@ -338,8 +351,7 @@ class CourseManagerApi {
   }
 
   Future<List<Map<String, dynamic>>> getCategories() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await _requireToken();
 
     final metadataUrl = baseUrl.replaceAll(
       '/course-manager',
@@ -350,7 +362,7 @@ class CourseManagerApi {
       Uri.parse(metadataUrl),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
     );
 
@@ -363,8 +375,7 @@ class CourseManagerApi {
   }
 
   Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await _requireToken();
 
     // The backend uses /api/v1/metadata/parameters
     final metadataUrl = baseUrl.replaceAll(
@@ -376,7 +387,7 @@ class CourseManagerApi {
       Uri.parse('$metadataUrl?type=$type'),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
     );
 
@@ -394,8 +405,7 @@ class CourseManagerApi {
     String path, {
     Map<String, String>? queryParameters,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await _requireToken();
     final uri = Uri.parse(
       '$baseUrl$path',
     ).replace(queryParameters: queryParameters);
@@ -404,34 +414,32 @@ class CourseManagerApi {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
     );
   }
 
   Future<http.Response> _post(String path, {Object? body}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await _requireToken();
 
     return http.post(
       Uri.parse('$baseUrl$path'),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
       body: body,
     );
   }
 
   Future<http.Response> _put(String path, {Object? body}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await _requireToken();
 
     return http.put(
       Uri.parse('$baseUrl$path'),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
       body: body,
     );

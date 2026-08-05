@@ -81,11 +81,15 @@ class TrainerAiMultipleGroup {
 class TrainerAiSubQuestion {
   final String questionText;
   final String explanation;
+  final int? skillParamId;
+  final int? difficultyId;
   final List<TrainerAiOption> options;
 
   TrainerAiSubQuestion({
     required this.questionText,
     required this.explanation,
+    this.skillParamId,
+    this.difficultyId,
     required this.options,
   });
 
@@ -93,6 +97,8 @@ class TrainerAiSubQuestion {
     return TrainerAiSubQuestion(
       questionText: json['questionText'] as String,
       explanation: (json['explanation'] ?? '') as String,
+      skillParamId: (json['skillParamId'] as num?)?.toInt(),
+      difficultyId: (json['difficultyId'] as num?)?.toInt(),
       options: (json['options'] as List)
           .map((e) => TrainerAiOption.fromJson(e as Map<String, dynamic>))
           .toList(),

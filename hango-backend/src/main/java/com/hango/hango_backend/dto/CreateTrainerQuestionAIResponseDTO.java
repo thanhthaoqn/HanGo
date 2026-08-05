@@ -56,6 +56,8 @@ public class CreateTrainerQuestionAIResponseDTO {
     public static class SubQuestionDTO {
         private String questionText;
         private String explanation;
+        private Long skillParamId;
+        private Long difficultyId;
         private List<OptionDTO> options;
     }
 

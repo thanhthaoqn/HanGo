@@ -12,7 +12,9 @@ import '../../widgets/course_manager_sidebar.dart';
 import '../../../data/services/course_manager_api.dart';
 
 class CourseManagerExamsPage extends StatefulWidget {
-  const CourseManagerExamsPage({super.key});
+  final bool isEmbedded;
+
+  const CourseManagerExamsPage({super.key, this.isEmbedded = false});
 
   @override
   State<CourseManagerExamsPage> createState() => _CourseManagerExamsPageState();
@@ -219,6 +221,58 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    final Widget bodyContent = _isCreatingExam
+        ? CourseManagerCreateExamPage(
+            isEmbedded: true,
+            onBack: () {
+              setState(() {
+                _isCreatingExam = false;
+                _fetchExamsData();
+              });
+            },
+          )
+        : _editingExamData != null
+            ? CourseManagerEditExamPage(
+                examId: _editingExamData!['id'] as int,
+                examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
+                examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
+                isReadOnly: (_editingExamData!['status']?.toString().toUpperCase() != 'DRAFT'),
+                courseManagerActionStatus: _editingExamData!['status']?.toString().toUpperCase(),
+                isCourseManager: true,
+                isEmbedded: true,
+                onBack: () {
+                  setState(() {
+                    _editingExamData = null;
+                    _fetchExamsData();
+                  });
+                },
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildContentHeader(context, isDesktop),
+                  Expanded(
+                    child: ClipRect(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildFilterContainer(),
+                            const SizedBox(height: 24),
+                            _buildExamsTable(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
@@ -226,55 +280,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       body: Row(
         children: [
           if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'exams')),
-          Expanded(
-            child: _isCreatingExam
-                ? CourseManagerCreateExamPage(
-                    isEmbedded: true,
-                    onBack: () {
-                      setState(() {
-                        _isCreatingExam = false;
-                        _fetchExamsData();
-                      });
-                    },
-                  )
-                : _editingExamData != null
-                    ? CourseManagerEditExamPage(
-                        examId: _editingExamData!['id'] as int,
-                        examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
-                        examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
-                        isReadOnly: (_editingExamData!['status']?.toString().toUpperCase() != 'DRAFT'),
-                        courseManagerActionStatus: _editingExamData!['status']?.toString().toUpperCase(),
-                        isCourseManager: true,
-                        isEmbedded: true,
-                        onBack: () {
-                          setState(() {
-                            _editingExamData = null;
-                            _fetchExamsData();
-                          });
-                        },
-                      )
-                    : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildContentHeader(context, isDesktop),
-                      Expanded(
-                        child: ClipRect(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildFilterContainer(),
-                                const SizedBox(height: 24),
-                                _buildExamsTable(),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
+          Expanded(child: bodyContent),
         ],
       ),
     );
@@ -595,8 +601,11 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           // Pagination Footer
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 Text(
                   'Showing ${totalItems == 0 ? 0 : startIndex + 1} to $endIndex of $totalItems entries',
@@ -606,29 +615,32 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                     fontFamily: 'Outfit',
                   ),
                 ),
-                Row(
-                  children: [
-                    _buildPaginationButton(
-                      Icons.chevron_left,
-                      onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
-                    ),
-                    const SizedBox(width: 8),
-                    ...List.generate(totalPages, (index) {
-                      int pageNum = index + 1;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: _buildPaginationNumber(
-                          pageNum.toString(),
-                          isActive: pageNum == _currentPage,
-                          onPressed: () => setState(() => _currentPage = pageNum),
-                        ),
-                      );
-                    }),
-                    _buildPaginationButton(
-                      Icons.chevron_right,
-                      onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
-                    ),
-                  ],
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildPaginationButton(
+                        Icons.chevron_left,
+                        onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+                      ),
+                      const SizedBox(width: 8),
+                      ...List.generate(totalPages, (index) {
+                        int pageNum = index + 1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: _buildPaginationNumber(
+                            pageNum.toString(),
+                            isActive: pageNum == _currentPage,
+                            onPressed: () => setState(() => _currentPage = pageNum),
+                          ),
+                        );
+                      }),
+                      _buildPaginationButton(
+                        Icons.chevron_right,
+                        onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -998,16 +1010,20 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
             ),
             const SizedBox(width: 12),
           ],
-          const Text(
-            'Exam Management',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-              fontFamily: 'Outfit',
+          const Expanded(
+            child: Text(
+              'Exam Management',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Outfit',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           ElevatedButton.icon(
             onPressed: () {
               setState(() {

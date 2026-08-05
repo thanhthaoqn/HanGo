@@ -10,7 +10,9 @@ import '../../widgets/course_manager_sidebar.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 
 class CourseManagerSettlementPage extends StatefulWidget {
-  const CourseManagerSettlementPage({super.key});
+  final bool isEmbedded;
+
+  const CourseManagerSettlementPage({super.key, this.isEmbedded = false});
 
   @override
   State<CourseManagerSettlementPage> createState() => _CourseManagerSettlementPageState();
@@ -1151,6 +1153,38 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     final isDesktop = size.width > 1024;
     final isVi = LanguageManager.isVi;
 
+    final Widget bodyContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildContentHeader(context, isDesktop),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTopBar(isVi),
+                const SizedBox(height: 20),
+                _buildTabBar(isVi),
+                const SizedBox(height: 20),
+                IndexedStack(
+                  index: _tabController.index,
+                  children: [
+                    _buildStatementsTab(isVi),
+                    _buildPaymentsTab(isVi),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
@@ -1159,35 +1193,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
         children: [
           if (isDesktop)
             const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'settlement')),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildContentHeader(context, isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildTopBar(isVi),
-                        const SizedBox(height: 20),
-                        _buildTabBar(isVi),
-                        const SizedBox(height: 20),
-                        IndexedStack(
-                          index: _tabController.index,
-                          children: [
-                            _buildStatementsTab(isVi),
-                            _buildPaymentsTab(isVi),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: bodyContent),
         ],
       ),
     );

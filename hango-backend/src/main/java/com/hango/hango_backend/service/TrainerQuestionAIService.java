@@ -7,13 +7,16 @@ import com.hango.hango_backend.dto.CreateTrainerQuestionAIResponseDTO;
 import com.hango.hango_backend.dto.CreateTrainerExamAIResponseDTO;
 import com.hango.hango_backend.dto.TrainerExamChatRequestDTO;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
+import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.exception.ApiException;
+import com.hango.hango_backend.repository.SystemParameterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,6 +26,7 @@ public class TrainerQuestionAIService {
 
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
+    private final SystemParameterRepository systemParameterRepository;
 
     public CreateTrainerQuestionAIResponseDTO generatePayload(CreateTrainerQuestionAIRequestDTO req) {
         if (req == null) {
@@ -42,7 +46,15 @@ public class TrainerQuestionAIService {
         long categoryId = req.getCategoryId() != null ? req.getCategoryId() : 1L;
         long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
 
-        String systemPrompt = buildSystemPrompt(req, mode, quantity);
+        boolean isMultipleBranch = !"SINGLE".equals(mode);
+        List<SystemParameter> activeSkills = isMultipleBranch
+                ? systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE")
+                : List.of();
+        List<SystemParameter> activeDifficulties = isMultipleBranch
+                ? systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY")
+                : List.of();
+
+        String systemPrompt = buildSystemPrompt(req, mode, quantity, activeSkills, activeDifficulties);
 
         String raw = geminiClientService.generateChatResponse(
                 systemPrompt,
@@ -65,11 +77,48 @@ public class TrainerQuestionAIService {
             raw = raw.substring(start, end + 1);
         }
 
+        CreateTrainerQuestionAIResponseDTO response;
         try {
-            return objectMapper.readValue(raw, CreateTrainerQuestionAIResponseDTO.class);
+            response = objectMapper.readValue(raw, CreateTrainerQuestionAIResponseDTO.class);
         } catch (Exception e) {
             log.warn("Parse AI json failed. raw={}", raw);
             throw new ApiException("AI returned invalid JSON payload", HttpStatus.BAD_GATEWAY);
+        }
+
+        if (isMultipleBranch && response.getGroup() != null) {
+            fillSubQuestionSkillAndDifficulty(response.getGroup(), activeSkills, activeDifficulties);
+        }
+
+        return response;
+    }
+
+    /**
+     * The AI is asked to pick a skillParamId/difficultyId per subQuestion (see buildSystemPrompt),
+     * but it may omit them or hallucinate an id outside the valid set. Fall back to the first
+     * valid option so sub-questions never reach the FE with a blank skill/difficulty.
+     */
+    private void fillSubQuestionSkillAndDifficulty(
+            CreateTrainerQuestionAIResponseDTO.MultipleGroupDTO group,
+            List<SystemParameter> activeSkills,
+            List<SystemParameter> activeDifficulties
+    ) {
+        if (group.getSubQuestions() == null) return;
+
+        Set<Long> validSkillIds = activeSkills.stream().map(SystemParameter::getId).collect(Collectors.toSet());
+        Set<Long> validDifficultyIds = activeDifficulties.stream().map(SystemParameter::getId).collect(Collectors.toSet());
+
+        Long fallbackSkillId = activeSkills.isEmpty() ? null : activeSkills.get(0).getId();
+        Long fallbackDifficultyId = group.getDifficultyId() != null && validDifficultyIds.contains(group.getDifficultyId())
+                ? group.getDifficultyId()
+                : (activeDifficulties.isEmpty() ? null : activeDifficulties.get(0).getId());
+
+        for (CreateTrainerQuestionAIResponseDTO.SubQuestionDTO sub : group.getSubQuestions()) {
+            if (sub.getSkillParamId() == null || !validSkillIds.contains(sub.getSkillParamId())) {
+                sub.setSkillParamId(fallbackSkillId);
+            }
+            if (sub.getDifficultyId() == null || !validDifficultyIds.contains(sub.getDifficultyId())) {
+                sub.setDifficultyId(fallbackDifficultyId);
+            }
         }
     }
 
@@ -194,7 +243,13 @@ public class TrainerQuestionAIService {
         return sb.toString();
     }
 
-    private String buildSystemPrompt(CreateTrainerQuestionAIRequestDTO req, String mode, int quantity) {
+    private String buildSystemPrompt(
+            CreateTrainerQuestionAIRequestDTO req,
+            String mode,
+            int quantity,
+            List<SystemParameter> activeSkills,
+            List<SystemParameter> activeDifficulties
+    ) {
         // Yêu cầu JSON thuần theo schema mà FE parse
         Long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
         Long categoryId = req.getCategoryId() != null ? req.getCategoryId() : 1L;
@@ -228,15 +283,29 @@ public class TrainerQuestionAIService {
         }
 
         // MULTIPLE
-        String skillReqMulti = (req.getSkillType() != null && !req.getSkillType().isBlank()) 
-                ? " The questions MUST specifically test the skill: " + req.getSkillType() + "." 
+        String skillReqMulti = (req.getSkillType() != null && !req.getSkillType().isBlank())
+                ? " The questions MUST specifically test the skill: " + req.getSkillType() + "."
                 : "";
         String groupReq = (req.getGroupType() != null && !req.getGroupType().isBlank())
                 ? " The format and passage MUST follow the structure of group type: " + req.getGroupType() + "."
                 : "";
+
+        String skillOptionsText = activeSkills.isEmpty() ? "" : activeSkills.stream()
+                .map(s -> s.getId() + "=" + s.getParamValue())
+                .collect(Collectors.joining(", "));
+        String difficultyOptionsText = activeDifficulties.isEmpty() ? "" : activeDifficulties.stream()
+                .map(d -> d.getId() + "=" + d.getParamValue())
+                .collect(Collectors.joining(", "));
+        String perSubQuestionSkillReq = skillOptionsText.isEmpty() ? "" :
+                "\nEach subQuestion tests its own specific skill (they do NOT need to share the same skill). " +
+                "For every subQuestion, pick the single most relevant skillParamId from this list: [" + skillOptionsText + "].";
+        String perSubQuestionDifficultyReq = difficultyOptionsText.isEmpty() ? "" :
+                "\nFor every subQuestion, pick the most appropriate difficultyId from this list: [" + difficultyOptionsText + "].";
+
         return "You are an expert English reading comprehension test question generator for HanGo trainer.\n" +
                 "Create a group question. passageText + subQuestions[]." + groupReq + "\n" +
-                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti + "\n" +
+                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti +
+                perSubQuestionSkillReq + perSubQuestionDifficultyReq + "\n" +
                 "Return PURE JSON only (no markdown).\n" +
                 "Schema:\n" +
                 "{\n" +
@@ -251,6 +320,8 @@ public class TrainerQuestionAIService {
                 "      {\n" +
                 "        \"questionText\": \"...\",\n" +
                 "        \"explanation\": \"...\",\n" +
+                "        \"skillParamId\": <id from the skill list above, or null if none given>,\n" +
+                "        \"difficultyId\": <id from the difficulty list above, or null if none given>,\n" +
                 "        \"options\": [\n" +
                 "          {\"optionText\": \"...\", \"isCorrect\": true},\n" +
                 "          {\"optionText\": \"...\", \"isCorrect\": false},\n" +

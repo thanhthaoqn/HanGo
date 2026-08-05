@@ -111,7 +111,9 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
             ],
           ),
           content: SizedBox(
-            width: 600,
+            width: MediaQuery.of(context).size.width < 650
+                ? MediaQuery.of(context).size.width * 0.8
+                : 600,
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,13 +268,17 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                   onPressed: widget.onBack,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Create Exam by Matrix',
-                  style: TextStyle(
-                    fontSize: 24,
-                    color: Color(0xFF1E293B),
-                    fontFamily: 'Outfit',
-                    fontWeight: FontWeight.bold,
+                const Flexible(
+                  child: Text(
+                    'Create Exam by Matrix',
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: Color(0xFF1E293B),
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

@@ -12,7 +12,7 @@ import 'learner/learner_home_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'trainer/trainer_dashboard_page.dart';
 import 'trainer/trainer_shell_page.dart';
-import 'course_manager/course_manager_dashboard_page.dart';
+import 'course_manager/course_manager_shell_page.dart';
 import 'trainer/onboarding/trainer_type_selection_page.dart';
 import 'trainer/onboarding/trainer_onboarding_status_page.dart';
 import 'trainer/onboarding/trainer_onboarding_details_page.dart';
@@ -256,7 +256,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const CourseManagerDashboardPage(),
+            builder: (context) => const CourseManagerShellPage(),
           ),
         );
       }

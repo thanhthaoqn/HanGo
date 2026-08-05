@@ -9,10 +9,6 @@ import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../login_page.dart';
-import 'course_manager_dashboard_page.dart';
-import 'course_manager_exams_page.dart';
-import 'course_manager_question_bank_page.dart';
-import 'course_manager_matrix_management_page.dart';
 
 class CourseManagerMyInformationPage extends StatefulWidget {
   const CourseManagerMyInformationPage({super.key});
@@ -173,88 +169,6 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCourseManagerSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSidebarItem(Icons.dashboard, 'Dashboard', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CourseManagerDashboardPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.book_outlined, 'Courses', onTap: () {}),
-          _buildSidebarItem(Icons.assignment_outlined, 'Exam', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CourseManagerExamsPage()),
-            );
-          }),
-          _buildSidebarItem(Icons.grid_on, 'Exam Matrix', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseManagerMatrixManagementPage(onBack: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CourseManagerMyInformationPage()),
-                  );
-                }),
-              ),
-            );
-          }),
-          _buildSidebarItem(Icons.question_answer_outlined, 'Question Bank', onTap: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CourseManagerQuestionBankPage()),
-            );
-          }),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, Color? color, VoidCallback? onTap}) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: onTap ?? () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : (color ?? const Color(0xFF4B5563)),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive ? Colors.white : (color ?? const Color(0xFF1F2937)),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

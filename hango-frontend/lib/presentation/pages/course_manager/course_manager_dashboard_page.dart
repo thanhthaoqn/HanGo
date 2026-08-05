@@ -144,7 +144,9 @@ class _ElegantBouncyButtonState extends State<ElegantBouncyButton>
 }
 
 class CourseManagerDashboardPage extends StatefulWidget {
-  const CourseManagerDashboardPage({super.key});
+  final bool isEmbedded;
+
+  const CourseManagerDashboardPage({super.key, this.isEmbedded = false});
 
   @override
   State<CourseManagerDashboardPage> createState() =>
@@ -211,6 +213,39 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    final Widget bodyContent = _isLoading
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D9488)))
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildWelcomeHeader(context, isDesktop),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildMetricCards(
+                        constraints: BoxConstraints(maxWidth: size.width),
+                      ),
+                      const SizedBox(height: 24),
+                      _buildCourseDistributionBar(),
+                      const SizedBox(height: 24),
+                      _buildQuickActions(context, useRow: size.width > 768),
+                      const SizedBox(height: 24),
+                      _buildRecentPendingCourses(context),
+                      const SizedBox(height: 48),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Clean, light background
       appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
@@ -224,36 +259,7 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
               width: 240,
               child: CourseManagerSidebar(currentRoute: 'dashboard'),
             ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D9488)))
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildWelcomeHeader(context, isDesktop),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildMetricCards(
-                                constraints: BoxConstraints(maxWidth: size.width),
-                              ),
-                              const SizedBox(height: 24),
-                              _buildCourseDistributionBar(),
-                              const SizedBox(height: 24),
-                              _buildQuickActions(context, useRow: size.width > 768),
-                              const SizedBox(height: 24),
-                              _buildRecentPendingCourses(context),
-                              const SizedBox(height: 48),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
+          Expanded(child: bodyContent),
         ],
       ),
     );

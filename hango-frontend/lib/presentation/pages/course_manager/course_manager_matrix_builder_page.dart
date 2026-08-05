@@ -336,13 +336,17 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
             ),
             const SizedBox(width: 12),
           ],
-          const Text(
-            'Exam Matrix Builder',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-              fontFamily: 'Outfit',
+          const Flexible(
+            child: Text(
+              'Exam Matrix Builder',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Outfit',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -400,12 +404,16 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Exam Structure',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Outfit', color: Color(0xFF0F172A)),
+            const Expanded(
+              child: Text(
+                'Exam Structure',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Outfit', color: Color(0xFF0F172A)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
+            const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -471,9 +479,13 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                       children: [
                         Icon(Icons.add, color: Color(0xFF20B486), size: 20),
                         SizedBox(width: 8),
-                        Text(
-                          'Add Single Question',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit'),
+                        Flexible(
+                          child: Text(
+                            'Add Single Question',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit'),
+                          ),
                         ),
                       ],
                     ),
@@ -496,9 +508,13 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                       children: [
                         Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
                         SizedBox(width: 8),
-                        Text(
-                          'Add Reading Passage Group',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
+                        Flexible(
+                          child: Text(
+                            'Add Reading Passage Group',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
+                          ),
                         ),
                       ],
                     ),
@@ -533,36 +549,41 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isGroup ? const Color(0xFFFDF2F8) : const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _getQuestionLabel(index),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isGroup ? const Color(0xFFDB2777) : const Color(0xFF16A34A),
-                        fontFamily: 'Outfit',
-                        fontSize: 16,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isGroup ? const Color(0xFFFDF2F8) : const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _getQuestionLabel(index),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isGroup ? const Color(0xFFDB2777) : const Color(0xFF16A34A),
+                          fontFamily: 'Outfit',
+                          fontSize: 16,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    isGroup ? 'Reading Passage Group' : 'Single Question',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
-                      fontFamily: 'Outfit',
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        isGroup ? 'Reading Passage Group' : 'Single Question',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF64748B),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (widget.mode != MatrixMode.view)
                 IconButton(

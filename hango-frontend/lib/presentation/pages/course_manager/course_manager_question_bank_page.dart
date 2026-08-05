@@ -16,7 +16,9 @@ import '../../../../utils/toast_helper.dart';
 import '../../../../utils/download_helper.dart';
 
 class CourseManagerQuestionBankPage extends StatefulWidget {
-  const CourseManagerQuestionBankPage({Key? key}) : super(key: key);
+  final bool isEmbedded;
+
+  const CourseManagerQuestionBankPage({Key? key, this.isEmbedded = false}) : super(key: key);
 
   @override
   State<CourseManagerQuestionBankPage> createState() =>
@@ -308,23 +310,7 @@ class _CourseManagerQuestionBankPageState
         ? []
         : _allQuestions.sublist(startIndex, endIndex);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
-      drawer: !isDesktop
-          ? const Drawer(
-              child: CourseManagerSidebar(currentRoute: 'question_bank'),
-            )
-          : null,
-      body: Row(
-        children: [
-          if (isDesktop)
-            const SizedBox(
-              width: 240,
-              child: CourseManagerSidebar(currentRoute: 'question_bank'),
-            ),
-          Expanded(
-            child: Column(
+    final Widget bodyContent = Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildContentHeader(context, isDesktop),
@@ -469,26 +455,45 @@ class _CourseManagerQuestionBankPageState
                   ),
                 ),
               ],
+            );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
+      drawer: !isDesktop
+          ? const Drawer(
+              child: CourseManagerSidebar(currentRoute: 'question_bank'),
+            )
+          : null,
+      body: Row(
+        children: [
+          if (isDesktop)
+            const SizedBox(
+              width: 240,
+              child: CourseManagerSidebar(currentRoute: 'question_bank'),
             ),
-          ),
+          Expanded(child: bodyContent),
         ],
       ),
     );
   }
 
   Widget _buildContentHeader(BuildContext context, bool isDesktop) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-      child: Row(
-        children: [
-          if (!isDesktop) ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-            const SizedBox(width: 12),
-          ],
-          const Text(
+    final titleRow = Row(
+      children: [
+        if (!isDesktop) ...[
+          IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+          const SizedBox(width: 12),
+        ],
+        const Expanded(
+          child: Text(
             'Question Bank',
             style: TextStyle(
               fontSize: 28,
@@ -496,8 +501,18 @@ class _CourseManagerQuestionBankPageState
               color: Color(0xFF1E293B),
               fontFamily: 'Outfit',
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const Spacer(),
+        ),
+      ],
+    );
+
+    final actionButtons = Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
           OutlinedButton.icon(
             onPressed: () async {
               try {
@@ -599,8 +614,29 @@ class _CourseManagerQuestionBankPageState
               elevation: 0,
             ),
           ),
-        ],
-      ),
+      ],
+    );
+
+    final isCompact = MediaQuery.of(context).size.width < 820;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      child: isCompact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                titleRow,
+                const SizedBox(height: 16),
+                actionButtons,
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: titleRow),
+                const SizedBox(width: 12),
+                actionButtons,
+              ],
+            ),
     );
   }
 }

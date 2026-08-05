@@ -16,7 +16,9 @@ import 'course_review_dashboard_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CourseManagerCoursesPage extends StatefulWidget {
-  const CourseManagerCoursesPage({super.key});
+  final bool isEmbedded;
+
+  const CourseManagerCoursesPage({super.key, this.isEmbedded = false});
 
   @override
   State<CourseManagerCoursesPage> createState() =>
@@ -434,6 +436,20 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    final Widget bodyContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildContentHeader(context, isDesktop),
+        Expanded(
+          child: _buildContent(),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
@@ -442,17 +458,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         children: [
           if (isDesktop)
             const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'courses')),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildContentHeader(context, isDesktop),
-                Expanded(
-                  child: _buildContent(),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: bodyContent),
         ],
       ),
     );

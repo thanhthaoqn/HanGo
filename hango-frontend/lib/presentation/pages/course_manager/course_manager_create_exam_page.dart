@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'course_manager_exam_import_excel_page.dart';
 import 'course_manager_exam_ai_generate_page.dart';
 import 'course_manager_exam_matrix_page.dart';
@@ -35,9 +35,6 @@ class _CourseManagerCreateExamPageState
     extends State<CourseManagerCreateExamPage> {
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
-  String _trainerName = 'Thảo';
-  String _trainerInitials = 'T';
-  String _trainerAvatarUrl = '';
 
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -66,7 +63,6 @@ class _CourseManagerCreateExamPageState
     final now = DateTime.now();
     _dateController.text =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    _loadUserInfo();
     _loadMatrices();
   }
 
@@ -90,24 +86,6 @@ class _CourseManagerCreateExamPageState
         });
       }
     }
-  }
-
-  Future<void> _loadUserInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Thảo';
-    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
-    });
   }
 
   @override
@@ -276,10 +254,11 @@ class _CourseManagerCreateExamPageState
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      appBar: InternalAppHeader(isMobile: !isDesktop),
       drawer: !isDesktop
           ? const Drawer(
               child: CourseManagerSidebar(
-                currentRoute: '/course-manager/exams',
+                currentRoute: 'exams',
               ),
             )
           : null,
@@ -287,9 +266,9 @@ class _CourseManagerCreateExamPageState
         children: [
           if (isDesktop)
             const SizedBox(
-              width: 260,
+              width: 240,
               child: CourseManagerSidebar(
-                currentRoute: '/course-manager/exams',
+                currentRoute: 'exams',
               ),
             ),
           Expanded(child: content),
@@ -488,31 +467,30 @@ class _CourseManagerCreateExamPageState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Color(0xFF64748B),
-                      ),
-                      onPressed: () =>
-                          setState(() => _currentView = 'selection'),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Color(0xFF64748B),
+                  ),
+                  onPressed: () =>
+                      setState(() => _currentView = 'selection'),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Text(
+                    'Select Creation Method',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                      fontFamily: 'Outfit',
                     ),
-                    const SizedBox(width: 16),
-                    const Text(
-                      'Select Creation Method',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Color(0xFF64748B)),
@@ -831,9 +809,11 @@ class _CourseManagerCreateExamPageState
     if (currentView == 'ai') subTitle = ' > Generate with AI';
     if (currentView == 'form') subTitle = ' > Manual Create';
 
+    // The real global header (logo, notifications, avatar menu) is now rendered by
+    // InternalAppHeader as the Scaffold's appBar; this is just the page breadcrumb below it.
     return Container(
       color: Colors.white,
-      height: 70,
+      height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
@@ -844,131 +824,49 @@ class _CourseManagerCreateExamPageState
             ),
             const SizedBox(width: 12),
           ],
-          Row(
-            children: [
-              const Icon(
-                Icons.chevron_right,
-                size: 16,
-                color: Color(0xFF38C9A6),
-              ),
-              const SizedBox(width: 4),
-              RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                    color: Color(0xFF38C9A6),
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                  children: [
-                    const TextSpan(
-                      text: 'Exam > ',
-                      style: TextStyle(fontWeight: FontWeight.normal),
-                    ),
-                    TextSpan(
-                      text: 'Create New Exam',
-                      style: TextStyle(
-                        fontWeight: subTitle.isEmpty
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: Color(0xFF38C9A6),
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: RichText(
+                    overflow: TextOverflow.ellipsis,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        color: Color(0xFF38C9A6),
+                        fontSize: 14,
+                        fontFamily: 'Outfit',
                       ),
-                    ),
-                    if (subTitle.isNotEmpty)
-                      TextSpan(
-                        text: subTitle,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_none_outlined,
-                  color: Color(0xFF4B5563),
-                  size: 24,
-                ),
-                onPressed: () {
-                  ToastHelper.show(context, 'No new notifications');
-                },
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: Colors.redAccent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Row(
-            children: [
-              Text(
-                _trainerName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE2F9F3),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: _trainerAvatarUrl.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          _trainerAvatarUrl,
-                          width: 32,
-                          height: 32,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            _trainerInitials,
-                            style: const TextStyle(
-                              color: Color(0xFF38C9A6),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Outfit',
-                            ),
+                      children: [
+                        const TextSpan(
+                          text: 'Exam > ',
+                          style: TextStyle(fontWeight: FontWeight.normal),
+                        ),
+                        TextSpan(
+                          text: 'Create New Exam',
+                          style: TextStyle(
+                            fontWeight: subTitle.isEmpty
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
-                      )
-                    : Text(
-                        _trainerInitials,
-                        style: const TextStyle(
-                          color: Color(0xFF38C9A6),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF38C9A6),
-                  shape: BoxShape.circle,
+                        if (subTitle.isNotEmpty)
+                          TextSpan(
+                            text: subTitle,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

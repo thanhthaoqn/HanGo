@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'presentation/pages/learner/learner_home_page.dart';
 import 'presentation/pages/learner/learner_shell_page.dart';
-import 'presentation/pages/course_manager/course_manager_dashboard_page.dart';
+import 'presentation/pages/course_manager/course_manager_shell_page.dart';
 import 'presentation/pages/admin/admin_dashboard_page.dart';
 import 'presentation/pages/trainer/trainer_dashboard_page.dart';
 import 'presentation/pages/trainer/trainer_shell_page.dart';
@@ -75,9 +75,7 @@ class MyApp extends StatelessWidget {
               if (role == 'ADMIN') {
                 return const AdminDashboardPage();
               } else if (role == 'COURSE_MANAGER') {
-                return const CourseManagerDashboardPage();
-              } else if (role == 'COURSE_MANAGER') {
-                return const CourseManagerDashboardPage();
+                return const CourseManagerShellPage();
               } else if (role == 'TRAINER') {
                 return const TrainerRouteGate();
               }

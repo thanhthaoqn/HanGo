@@ -96,351 +96,387 @@ class QuestionTable extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Table Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 60,
-                  child: Text(
-                    'NO.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
-                    ),
+          // Table Header + Rows: scroll horizontally on narrow widths instead of
+          // squeezing the columns into an unreadable / overflowing layout.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const double minTableWidth = 760;
+              final double contentWidth = constraints.maxWidth > minTableWidth
+                  ? constraints.maxWidth
+                  : minTableWidth;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: contentWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildTableHeaderRow(),
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      _buildTableBody(),
+                    ],
                   ),
-                ),
-                Expanded(
-                  flex: 5,
-                  child: Text(
-                    'Question',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Date\nCreated',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Last\nUpdated',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-                if (!isCourseManager)
-                  const Expanded(
-                    flex: 2,
-                    child: Text(
-                      'Status',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ),
-                const SizedBox(
-                  width: 120,
-                  child: Text(
-                    'Actions',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF64748B),
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          // Table Rows
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: questions.length,
-            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            itemBuilder: (context, index) {
-              final q = questions[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // NO.
-                    SizedBox(
-                      width: 60,
-                      child: Text(
-                        q.displayNo ?? q.id.toString(),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                    // Question text
-                    Expanded(
-                      flex: 5,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            q.questionText,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF1E293B),
-                              height: 1.5,
-                            ),
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              if (q.categoryName.isNotEmpty && q.categoryName != 'Chưa phân loại')
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    q.categoryName,
-                                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              if (q.skillName != null && q.skillName!.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE0E7FF),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    q.skillName!,
-                                    style: const TextStyle(fontSize: 10, color: Color(0xFF4338CA), fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              if (q.groupTypeName != null && q.groupTypeName!.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFCE7F3),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    q.groupTypeName!,
-                                    style: const TextStyle(fontSize: 10, color: Color(0xFFBE185D), fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              if (!q.isGroup && q.difficultyName.isNotEmpty && q.difficultyName != 'null')
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: _getDifficultyColor(q.difficultyName).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    q.difficultyName,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: _getDifficultyColor(q.difficultyName),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Date Created
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _formatTime(q.createdAt),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF334155),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _formatDate(q.createdAt),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Last Updated
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _formatTime(q.updatedAt),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF334155),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _formatDate(q.updatedAt),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Status (Toggle)
-                    if (!isCourseManager)
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Switch(
-                                value: q.status == 'PUBLIC',
-                                activeColor: const Color(0xFF20B486),
-                                onChanged: (val) {
-                                  onStatusToggled(q, val);
-                                },
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                q.status == 'PUBLIC' ? 'Public' : 'Private',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: q.status == 'PUBLIC' ? const Color(0xFF20B486) : const Color(0xFF64748B),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    // Actions
-                    SizedBox(
-                      width: 120,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.visibility_outlined, size: 18),
-                            color: const Color(0xFF64748B),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => onViewPressed(q),
-                            tooltip: 'View Question',
-                          ),
-                          const SizedBox(width: 12),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            color: const Color(0xFF64748B),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => onEditPressed(q),
-                            tooltip: 'Edit Question',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               );
             },
           ),
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          // Pagination and Footer
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Showing $startRecord to $endRecord of $totalRecords records',
+          _buildPaginationFooter(startRecord, endRecord, totalPages),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableHeaderRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 60,
+            child: Text(
+              'NO.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const Expanded(
+            flex: 5,
+            child: Text(
+              'Question',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const Expanded(
+            flex: 2,
+            child: Text(
+              'Date\nCreated',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+          const Expanded(
+            flex: 2,
+            child: Text(
+              'Last\nUpdated',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+          if (!isCourseManager)
+            const Expanded(
+              flex: 2,
+              child: Text(
+                'Status',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ),
+          const SizedBox(
+            width: 120,
+            child: Text(
+              'Actions',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableBody() {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: questions.length,
+      separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+      itemBuilder: (context, index) {
+        final q = questions[index];
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // NO.
+              SizedBox(
+                width: 60,
+                child: Text(
+                  q.displayNo ?? q.id.toString(),
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: Color(0xFF64748B),
                   ),
                 ),
-                Row(
+              ),
+              // Question text
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Back button
-                    _buildPageButton(
-                      icon: Icons.chevron_left,
-                      onTap: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+                    Text(
+                      q.questionText,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF1E293B),
+                        height: 1.5,
+                      ),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 4),
-                    // Number buttons
-                    ..._getPageNumbers(currentPage, totalPages).map((p) {
-                      if (p == null) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text('...', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-                        );
-                      }
-                      final isSelected = p == currentPage;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                        child: _buildPageNumberButton(
-                          pageNumber: p,
-                          isSelected: isSelected,
-                          onTap: () => onPageChanged(p),
-                        ),
-                      );
-                    }).toList(),
-                    const SizedBox(width: 4),
-                    // Next button
-                    _buildPageButton(
-                      icon: Icons.chevron_right,
-                      onTap: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (q.categoryName.isNotEmpty && q.categoryName != 'Chưa phân loại')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              q.categoryName,
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        if (q.skillName != null && q.skillName!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0E7FF),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              q.skillName!,
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF4338CA), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        if (q.groupTypeName != null && q.groupTypeName!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFCE7F3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              q.groupTypeName!,
+                              style: const TextStyle(fontSize: 10, color: Color(0xFFBE185D), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        if (!q.isGroup && q.difficultyName.isNotEmpty && q.difficultyName != 'null')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _getDifficultyColor(q.difficultyName).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              q.difficultyName,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _getDifficultyColor(q.difficultyName),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
+                ),
+              ),
+              // Date Created
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatTime(q.createdAt),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatDate(q.createdAt),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Last Updated
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatTime(q.updatedAt),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatDate(q.updatedAt),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Status (Toggle)
+              if (!isCourseManager)
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Switch(
+                          value: q.status == 'PUBLIC',
+                          activeColor: const Color(0xFF20B486),
+                          onChanged: (val) {
+                            onStatusToggled(q, val);
+                          },
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          q.status == 'PUBLIC' ? 'Public' : 'Private',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: q.status == 'PUBLIC' ? const Color(0xFF20B486) : const Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              // Actions
+              SizedBox(
+                width: 120,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.visibility_outlined, size: 18),
+                      color: const Color(0xFF64748B),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => onViewPressed(q),
+                      tooltip: 'View Question',
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      color: const Color(0xFF64748B),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => onEditPressed(q),
+                      tooltip: 'Edit Question',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPaginationFooter(int startRecord, int endRecord, int totalPages) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          Text(
+            'Showing $startRecord to $endRecord of $totalRecords records',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Back button
+                _buildPageButton(
+                  icon: Icons.chevron_left,
+                  onTap: currentPage > 1 ? () => onPageChanged(currentPage - 1) : null,
+                ),
+                const SizedBox(width: 4),
+                // Number buttons
+                ..._getPageNumbers(currentPage, totalPages).map((p) {
+                  if (p == null) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text('...', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                    );
+                  }
+                  final isSelected = p == currentPage;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                    child: _buildPageNumberButton(
+                      pageNumber: p,
+                      isSelected: isSelected,
+                      onTap: () => onPageChanged(p),
+                    ),
+                  );
+                }),
+                const SizedBox(width: 4),
+                // Next button
+                _buildPageButton(
+                  icon: Icons.chevron_right,
+                  onTap: currentPage < totalPages ? () => onPageChanged(currentPage + 1) : null,
                 ),
               ],
             ),
@@ -519,15 +555,15 @@ class QuestionTable extends StatelessWidget {
     if (totalPages <= 7) {
       return List.generate(totalPages, (index) => index + 1);
     }
-    
+
     if (currentPage <= 4) {
       return [1, 2, 3, 4, 5, null, totalPages];
     }
-    
+
     if (currentPage >= totalPages - 3) {
       return [1, null, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
     }
-    
+
     return [1, null, currentPage - 1, currentPage, currentPage + 1, null, totalPages];
   }
 }

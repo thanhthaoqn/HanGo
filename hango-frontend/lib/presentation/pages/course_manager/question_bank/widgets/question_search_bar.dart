@@ -46,77 +46,156 @@ class QuestionSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isCourseManager) {
-      return Row(
-        children: [
-          // Search box
-          Expanded(flex: 3, child: _buildSearchBox()),
-          const SizedBox(width: 12),
-          // Skill Type filter
-          if (skills != null)
-            Expanded(
-              flex: 2,
-              child: _buildFilterDropdown(
-                'Skill Type',
-                skills!,
-                selectedSkillId,
-                onSkillChanged,
-              ),
-            ),
-          if (skills != null) const SizedBox(width: 12),
-          // Group Type filter
-          if (groupTypes != null)
-            Expanded(
-              flex: 2,
-              child: _buildFilterDropdown(
-                'Group Type',
-                groupTypes!,
-                selectedGroupTypeId,
-                onGroupTypeChanged,
-              ),
-            ),
-          if (groupTypes != null) const SizedBox(width: 12),
-          // Difficulty filter
-          if (difficulties != null)
-            Expanded(
-              flex: 2,
-              child: _buildFilterDropdown(
-                'Difficulty',
-                difficulties!,
-                selectedDifficultyId,
-                onDifficultyChanged,
-              ),
-            ),
-          if (difficulties != null) const SizedBox(width: 12),
-          // Sort Dropdown
-          _buildSortDropdown(),
-          const SizedBox(width: 12),
-          // Refresh Button
-          _buildRefreshButton(),
-        ],
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 900;
 
-    return Row(
-      children: [
-        // Status Filter Dropdown
-        _buildStatusDropdown(),
-        const SizedBox(width: 12),
-        // Search box
-        Expanded(flex: 4, child: _buildSearchBox()),
-        const SizedBox(width: 12),
-        // Create New Question Button
-        _buildCreateButton(),
-        const SizedBox(width: 12),
-        // Import from Excel Button
-        _buildImportButton(),
-        const SizedBox(width: 12),
-        // Sort Dropdown
-        _buildSortDropdown(),
-        const SizedBox(width: 12),
-        // Refresh Button
-        _buildRefreshButton(),
-      ],
+        if (isCourseManager) {
+          if (!isNarrow) {
+            return Row(
+              children: [
+                // Search box
+                Expanded(flex: 3, child: _buildSearchBox()),
+                const SizedBox(width: 12),
+                // Skill Type filter
+                if (skills != null)
+                  Expanded(
+                    flex: 2,
+                    child: _buildFilterDropdown(
+                      'Skill Type',
+                      skills!,
+                      selectedSkillId,
+                      onSkillChanged,
+                    ),
+                  ),
+                if (skills != null) const SizedBox(width: 12),
+                // Group Type filter
+                if (groupTypes != null)
+                  Expanded(
+                    flex: 2,
+                    child: _buildFilterDropdown(
+                      'Group Type',
+                      groupTypes!,
+                      selectedGroupTypeId,
+                      onGroupTypeChanged,
+                    ),
+                  ),
+                if (groupTypes != null) const SizedBox(width: 12),
+                // Difficulty filter
+                if (difficulties != null)
+                  Expanded(
+                    flex: 2,
+                    child: _buildFilterDropdown(
+                      'Difficulty',
+                      difficulties!,
+                      selectedDifficultyId,
+                      onDifficultyChanged,
+                    ),
+                  ),
+                if (difficulties != null) const SizedBox(width: 12),
+                // Sort Dropdown
+                _buildSortDropdown(),
+                const SizedBox(width: 12),
+                // Refresh Button
+                _buildRefreshButton(),
+              ],
+            );
+          }
+
+          // Narrow layout: search box on its own row, filters/sort/refresh wrap below.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildSearchBox(),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (skills != null)
+                    SizedBox(
+                      width: 170,
+                      child: _buildFilterDropdown(
+                        'Skill Type',
+                        skills!,
+                        selectedSkillId,
+                        onSkillChanged,
+                      ),
+                    ),
+                  if (groupTypes != null)
+                    SizedBox(
+                      width: 170,
+                      child: _buildFilterDropdown(
+                        'Group Type',
+                        groupTypes!,
+                        selectedGroupTypeId,
+                        onGroupTypeChanged,
+                      ),
+                    ),
+                  if (difficulties != null)
+                    SizedBox(
+                      width: 170,
+                      child: _buildFilterDropdown(
+                        'Difficulty',
+                        difficulties!,
+                        selectedDifficultyId,
+                        onDifficultyChanged,
+                      ),
+                    ),
+                  _buildSortDropdown(),
+                  _buildRefreshButton(),
+                ],
+              ),
+            ],
+          );
+        }
+
+        if (!isNarrow) {
+          return Row(
+            children: [
+              // Status Filter Dropdown
+              _buildStatusDropdown(),
+              const SizedBox(width: 12),
+              // Search box
+              Expanded(flex: 4, child: _buildSearchBox()),
+              const SizedBox(width: 12),
+              // Create New Question Button
+              _buildCreateButton(),
+              const SizedBox(width: 12),
+              // Import from Excel Button
+              _buildImportButton(),
+              const SizedBox(width: 12),
+              // Sort Dropdown
+              _buildSortDropdown(),
+              const SizedBox(width: 12),
+              // Refresh Button
+              _buildRefreshButton(),
+            ],
+          );
+        }
+
+        // Narrow layout: search box on its own row, remaining controls wrap below.
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildSearchBox(),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _buildStatusDropdown(),
+                _buildCreateButton(),
+                _buildImportButton(),
+                _buildSortDropdown(),
+                _buildRefreshButton(),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -36,7 +36,12 @@ class AppState extends ChangeNotifier {
 
   Future<void> restoreSession() async {
     try {
-      final savedSession = await _sessionStore.readSession();
+      // Read from AuthService's SharedPreferences-backed store (the same one
+      // every real API call reads its token from) rather than SecureSessionStore,
+      // so AppState can never restore a "successful" session that the rest of
+      // the app's API calls disagree with (e.g. after AuthService.logout()
+      // clears SharedPreferences but SecureSessionStore was never told).
+      final savedSession = await AuthService().getStoredSession();
       if (savedSession != null) {
         _session = savedSession;
         debugPrint(
@@ -82,8 +87,10 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _acceptSession(AuthSession nextSession) async {
+    // AuthService.login() already persisted this session to SharedPreferences
+    // (awaited, before firing onLoginSuccess) — nothing left to persist here,
+    // just reflect it in memory so isAuthenticated/session update immediately.
     _session = nextSession;
-    await _sessionStore.saveSession(nextSession);
     notifyListeners();
   }
 

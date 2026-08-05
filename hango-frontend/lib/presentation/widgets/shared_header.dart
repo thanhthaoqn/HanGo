@@ -12,12 +12,11 @@ import '../pages/learner/learner_shell_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
-import '../pages/course_manager/course_manager_dashboard_page.dart';
+import '../pages/course_manager/course_manager_shell_page.dart';
 import '../pages/learner/my_learning_page.dart';
 import '../pages/admin/admin_dashboard_page.dart';
 
 import '../pages/trainer/trainer_shell_page.dart';
-import '../pages/ticket/management_tickets_page.dart';
 import '../../../domain/model/course.dart';
 import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
@@ -1023,7 +1022,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const CourseManagerDashboardPage(),
+                          builder: (context) => const CourseManagerShellPage(),
                         ),
                       );
                     }
@@ -1051,7 +1050,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const ManagementTicketsPage(),
+                          builder: (context) => const CourseManagerShellPage(initialIndex: 6),
                         ),
                       );
                     } else if (_userRoles.contains('ROLE_TRAINER')) {

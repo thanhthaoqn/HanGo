@@ -8,6 +8,7 @@ import '../../utils/file_picker_helper.dart';
 import '../../utils/config.dart';
 import '../../utils/cart_manager.dart';
 import '../../utils/web_session_helper.dart';
+import '../../domain/model/auth_session.dart';
 
 class AuthService {
   // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
@@ -150,6 +151,33 @@ class AuthService {
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_tokenKey);
+  }
+
+  // Rebuild an AuthSession from the same SharedPreferences-backed store every
+  // actual API call reads its token from (see getToken()/CourseManagerApi/etc.),
+  // so callers like AppState never restore a session that this store disagrees
+  // with. Mirrors the role-priority logic AppState._handleExternalLoginSuccess
+  // uses right after a fresh login.
+  Future<AuthSession?> getStoredSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_tokenKey);
+    if (token == null || token.isEmpty) return null;
+
+    final roles = prefs.getStringList(_userRolesKey) ?? [];
+    final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
+    final isCourseManager = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
+    final isTrainer = roles.any((r) => r.toUpperCase().contains('TRAINER')) && !isCourseManager;
+    final primaryRole = isAdmin
+        ? 'ADMIN'
+        : (isCourseManager ? 'COURSE_MANAGER' : (isTrainer ? 'TRAINER' : 'LEARNER'));
+
+    return AuthSession(
+      token: token,
+      userId: prefs.getInt(_userIdKey) ?? 0,
+      fullName: prefs.getString(_userFullNameKey) ?? 'Learner',
+      email: prefs.getString(_userEmailKey) ?? '',
+      role: primaryRole,
+    );
   }
 
   // Retrieve refresh token

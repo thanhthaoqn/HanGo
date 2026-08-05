@@ -7,8 +7,9 @@ import 'course_manager_matrix_builder_page.dart';
 
 class CourseManagerMatrixManagementPage extends StatefulWidget {
   final VoidCallback? onBack;
+  final bool isEmbedded;
 
-  const CourseManagerMatrixManagementPage({super.key, this.onBack});
+  const CourseManagerMatrixManagementPage({super.key, this.onBack, this.isEmbedded = false});
 
   @override
   State<CourseManagerMatrixManagementPage> createState() =>
@@ -95,6 +96,42 @@ class _CourseManagerMatrixManagementPageState
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
 
+    final Widget bodyContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildContentHeader(context, isDesktop),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFilterBar(),
+                const SizedBox(height: 16),
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(80.0),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                  )
+                else if (_displayedMatrices.isEmpty)
+                  _buildEmptyState()
+                else
+                  _buildMatrixTable(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
@@ -108,39 +145,7 @@ class _CourseManagerMatrixManagementPageState
               width: 240,
               child: CourseManagerSidebar(currentRoute: 'matrix'),
             ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildContentHeader(context, isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFilterBar(),
-                        const SizedBox(height: 16),
-                        if (_isLoading)
-                          const Padding(
-                            padding: EdgeInsets.all(80.0),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF10B981),
-                              ),
-                            ),
-                          )
-                        else if (_displayedMatrices.isEmpty)
-                          _buildEmptyState()
-                        else
-                          _buildMatrixTable(),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: bodyContent),
         ],
       ),
     );
@@ -158,16 +163,20 @@ class _CourseManagerMatrixManagementPageState
             ),
             const SizedBox(width: 12),
           ],
-          const Text(
-            'Exam Matrix Management',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-              fontFamily: 'Outfit',
+          const Expanded(
+            child: Text(
+              'Exam Matrix Management',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Outfit',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           ElevatedButton.icon(
             onPressed: () {
               Navigator.push(
@@ -405,7 +414,9 @@ class _CourseManagerMatrixManagementPageState
           ),
         ],
       ),
-      child: DataTable(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
         headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
         dataRowMaxHeight: 64,
         dataRowMinHeight: 64,
@@ -691,6 +702,7 @@ class _CourseManagerMatrixManagementPageState
             ],
           );
         }).toList(),
+        ),
       ),
     );
   }

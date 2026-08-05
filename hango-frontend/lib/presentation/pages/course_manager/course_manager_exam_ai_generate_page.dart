@@ -158,23 +158,29 @@ class _CourseManagerExamAiGeneratePageState extends State<CourseManagerExamAiGen
           Padding(
             padding: const EdgeInsets.all(24.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
-                      onPressed: widget.onBack,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('Generate Exam with AI',
-                        style: TextStyle(
-                            fontSize: 24,
-                            color: Color(0xFF1E293B),
-                            fontFamily: 'Outfit',
-                            fontWeight: FontWeight.bold)),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+                        onPressed: widget.onBack,
+                      ),
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text('Generate Exam with AI',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 24,
+                                color: Color(0xFF1E293B),
+                                fontFamily: 'Outfit',
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: _isGenerating ? null : _generateExam,
                   icon: _isGenerating

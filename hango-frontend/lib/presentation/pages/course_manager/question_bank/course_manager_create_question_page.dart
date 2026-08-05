@@ -264,6 +264,20 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     }
   }
 
+  /// Picks the id to use for a generated sub-question's skill/difficulty dropdown:
+  /// prefer the AI's per-question suggestion (validated against the loaded options),
+  /// then the value the trainer had already selected, then the first available option,
+  /// so the field is never left blank after AI generation.
+  int? _resolveMetadataId(int? aiSuggestedId, int? fallbackId, List<Map<String, dynamic>> options) {
+    if (aiSuggestedId != null && options.any((o) => o['id'] == aiSuggestedId)) {
+      return aiSuggestedId;
+    }
+    if (fallbackId != null && options.any((o) => o['id'] == fallbackId)) {
+      return fallbackId;
+    }
+    return options.isNotEmpty ? options.first['id'] as int? : null;
+  }
+
   Future<void> _handleGenerateByAIForGroup(QuestionGroupState group) async {
     setState(() {
       _isGeneratingByAi = true;
@@ -273,7 +287,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       final String mode = group.isGroup ? 'MULTIPLE' : 'SINGLE';
       
       String? groupTypeName;
-      if (group.isGroup && group.selectedGroupTypeId != null) {
+      if (group.selectedGroupTypeId != null) {
         final match = _groupTypes.firstWhere(
           (t) => t['id'] == group.selectedGroupTypeId,
           orElse: () => <String, dynamic>{},
@@ -321,9 +335,9 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           final qs = QuestionState();
           qs.questionTextController.text = q.questionText;
           qs.explanationController.text = q.explanation;
-          qs.selectedSkillId = firstSkillId;
-          qs.selectedDifficultyId = firstDiffId;
-          
+          qs.selectedSkillId = _resolveMetadataId(q.skillParamId, firstSkillId, _skills);
+          qs.selectedDifficultyId = _resolveMetadataId(q.difficultyId, firstDiffId, _difficulties);
+
           qs.options = [];
           for (final o in q.options) {
             qs.options.add(OptionState(
@@ -525,8 +539,10 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
 
   Widget _buildAddButtons() {
     if (widget.isReadOnly || widget.isEdit) return const SizedBox();
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 16,
+      runSpacing: 12,
       children: [
         ElevatedButton.icon(
           onPressed: () {
@@ -544,7 +560,6 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
-        const SizedBox(width: 16),
         ElevatedButton.icon(
           onPressed: () {
             setState(() {
@@ -609,36 +624,50 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           ),
           const Divider(height: 32, color: Color(0xFFE2E8F0)),
           if (group.isGroup)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 12,
-                  child: Column(
+            MediaQuery.of(context).size.width < 700
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildPassageEditor(group),
                       const SizedBox(height: 16),
                       _buildMetadataSection(group, groupIndex),
+                      const SizedBox(height: 16),
+                      _buildQuestionGroupUI(group),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  flex: 10,
-                  child: _buildQuestionGroupUI(group),
-                ),
-              ],
-            )
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 12,
+                        child: Column(
+                          children: [
+                            _buildPassageEditor(group),
+                            const SizedBox(height: 16),
+                            _buildMetadataSection(group, groupIndex),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        flex: 10,
+                        child: _buildQuestionGroupUI(group),
+                      ),
+                    ],
+                  )
           else
-            _buildSingleQuestionUI(group),
+            _buildSingleQuestionUI(group, groupIndex),
         ],
       ),
     );
   }
 
   Widget _buildBottomBar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+    return Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 16,
+      runSpacing: 12,
       children: [
         OutlinedButton(
           onPressed: () => Navigator.pop(context),
@@ -756,17 +785,19 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           if (group.isGroup && !widget.isReadOnly) ...[
             const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Number of Questions (AI Generate)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF64748B),
-                    fontFamily: 'Outfit',
+                const Expanded(
+                  child: Text(
+                    'Number of Questions (AI Generate)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF64748B),
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                 ),
+                const SizedBox(width: 12),
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: const Color(0xFFE2E8F0)),
@@ -925,10 +956,15 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     );
   }
 
-  Widget _buildSingleQuestionUI(QuestionGroupState group) {
+  Widget _buildSingleQuestionUI(QuestionGroupState group, int groupIndex) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: _buildMetadataSection(group, groupIndex),
+        ),
+        const SizedBox(height: 16),
         _buildLabel('ANSWER DETAILS'),
         _buildQuestionCard(group, 0, showTitle: false, showQuestionText: true),
       ],
@@ -983,39 +1019,49 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('SKILL TYPE'),
-                            _buildDropdown(
-                              value: qState.selectedSkillId,
-                              items: _skills,
-                              onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedSkillId = val),
-                              displayKey: 'paramValue',
-                            ),
-                          ],
+                  Builder(builder: (context) {
+                    final skillField = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabel('SKILL TYPE'),
+                        _buildDropdown(
+                          value: qState.selectedSkillId,
+                          items: _skills,
+                          onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedSkillId = val),
+                          displayKey: 'paramValue',
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('DIFFICULTY'),
-                            _buildDropdown(
-                              value: qState.selectedDifficultyId,
-                              items: _difficulties,
-                              onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedDifficultyId = val),
-                              displayKey: 'paramValue',
-                            ),
-                          ],
+                      ],
+                    );
+                    final difficultyField = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabel('DIFFICULTY'),
+                        _buildDropdown(
+                          value: qState.selectedDifficultyId,
+                          items: _difficulties,
+                          onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedDifficultyId = val),
+                          displayKey: 'paramValue',
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    );
+                    if (MediaQuery.of(context).size.width < 420) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          skillField,
+                          const SizedBox(height: 16),
+                          difficultyField,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: skillField),
+                        const SizedBox(width: 16),
+                        Expanded(child: difficultyField),
+                      ],
+                    );
+                  }),
                   const SizedBox(height: 16),
                 if (showQuestionText) ...[
                   _buildLabel('QUESTION'),
@@ -1188,38 +1234,46 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             child: const Icon(Icons.notifications_none, size: 20, color: Color(0xFF64748B)),
           ),
           const SizedBox(width: 16),
-          Row(
-            children: [
-              if (_trainerAvatarUrl.isNotEmpty)
-                CircleAvatar(
-                  radius: 18,
-                  backgroundImage: NetworkImage(_trainerAvatarUrl),
-                )
-              else
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: const Color(0xFF38C9A6),
-                  child: Text(
-                    _trainerInitials,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_trainerAvatarUrl.isNotEmpty)
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundImage: NetworkImage(_trainerAvatarUrl),
+                  )
+                else
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: const Color(0xFF38C9A6),
+                    child: Text(
+                      _trainerInitials,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _trainerName,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Text(
+                        'Trainer',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      ),
+                    ],
                   ),
                 ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _trainerName,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                  ),
-                  const Text(
-                    'Trainer',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

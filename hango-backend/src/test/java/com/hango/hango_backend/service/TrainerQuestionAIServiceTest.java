@@ -3,7 +3,9 @@ package com.hango.hango_backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIRequestDTO;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIResponseDTO;
+import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.exception.ApiException;
+import com.hango.hango_backend.repository.SystemParameterRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,7 +13,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,11 +29,18 @@ class TrainerQuestionAIServiceTest {
     @Mock
     private GeminiClientService geminiClientService;
 
+    @Mock
+    private SystemParameterRepository systemParameterRepository;
+
     private TrainerQuestionAIService service;
 
     @BeforeEach
     void setUp() {
-        service = new TrainerQuestionAIService(geminiClientService, new ObjectMapper());
+        service = new TrainerQuestionAIService(geminiClientService, new ObjectMapper(), systemParameterRepository);
+    }
+
+    private SystemParameter param(long id, String value) {
+        return SystemParameter.builder().id(id).paramType("SKILL_TYPE").paramValue(value).isActive(true).build();
     }
 
     private CreateTrainerQuestionAIRequestDTO request(String mode, String topicSeed, Integer quantity) {
@@ -162,5 +174,114 @@ class TrainerQuestionAIServiceTest {
         org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
         assertTrue(promptCaptor.getValue().contains("reading comprehension"),
                 "mode is only validated for blank, not for a known enum value — any non-SINGLE string silently falls through to the MULTIPLE prompt branch");
+    }
+
+    // =================================================================
+    // MULTIPLE mode sub-question skillParamId / difficultyId auto-population
+    // =================================================================
+
+    @Test
+    void generatePayloadShouldFallBackToFirstActiveSkillAndDifficultyWhenAiOmitsSubQuestionIds() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea"), param(102, "Inference question")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy"), param(15, "Medium")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"p\",\"difficultyId\":14,"
+                + "\"subQuestions\":[{\"questionText\":\"Q1\",\"options\":[]}]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(request("MULTIPLE", "A short story", 1));
+
+        CreateTrainerQuestionAIResponseDTO.SubQuestionDTO sub = result.getGroup().getSubQuestions().get(0);
+        assertEquals(101L, sub.getSkillParamId());
+        assertEquals(14L, sub.getDifficultyId());
+    }
+
+    @Test
+    void generatePayloadShouldReplaceHallucinatedSubQuestionSkillIdWithFallback() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"p\","
+                + "\"subQuestions\":[{\"questionText\":\"Q1\",\"skillParamId\":9999,\"difficultyId\":9999,\"options\":[]}]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(request("MULTIPLE", "A short story", 1));
+
+        CreateTrainerQuestionAIResponseDTO.SubQuestionDTO sub = result.getGroup().getSubQuestions().get(0);
+        assertEquals(101L, sub.getSkillParamId());
+        assertEquals(14L, sub.getDifficultyId());
+    }
+
+    @Test
+    void generatePayloadShouldKeepValidPerSubQuestionSkillAndDifficultyChosenByAi() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea"), param(102, "Inference question")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy"), param(15, "Medium")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"p\","
+                + "\"subQuestions\":["
+                + "{\"questionText\":\"Q1\",\"skillParamId\":102,\"difficultyId\":15,\"options\":[]},"
+                + "{\"questionText\":\"Q2\",\"skillParamId\":101,\"difficultyId\":14,\"options\":[]}"
+                + "]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(request("MULTIPLE", "A short story", 2));
+
+        assertEquals(102L, result.getGroup().getSubQuestions().get(0).getSkillParamId());
+        assertEquals(15L, result.getGroup().getSubQuestions().get(0).getDifficultyId());
+        assertEquals(101L, result.getGroup().getSubQuestions().get(1).getSkillParamId());
+        assertEquals(14L, result.getGroup().getSubQuestions().get(1).getDifficultyId());
+    }
+
+    @Test
+    void generatePayloadShouldLeaveSkillAndDifficultyNullWhenNoActiveSystemParametersExist() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE")).thenReturn(List.of());
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY")).thenReturn(List.of());
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"p\","
+                + "\"subQuestions\":[{\"questionText\":\"Q1\",\"options\":[]}]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(request("MULTIPLE", "A short story", 1));
+
+        CreateTrainerQuestionAIResponseDTO.SubQuestionDTO sub = result.getGroup().getSubQuestions().get(0);
+        assertNull(sub.getSkillParamId());
+        assertNull(sub.getDifficultyId());
+    }
+
+    @Test
+    void generatePayloadShouldIncludeSkillAndDifficultyOptionsInMultiplePrompt() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"p\",\"subQuestions\":[]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        service.generatePayload(request("MULTIPLE", "A short story", 2));
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("101=Main idea"));
+        assertTrue(prompt.contains("14=Easy"));
+        assertTrue(prompt.contains("skillParamId"));
+    }
+
+    @Test
+    void generatePayloadShouldNotQuerySystemParametersForSingleMode() {
+        String json = "{\"mode\":\"SINGLE\",\"questions\":[]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        service.generatePayload(request("SINGLE", "Grammar tenses", 1));
+
+        org.mockito.Mockito.verify(systemParameterRepository, org.mockito.Mockito.never())
+                .findByParamTypeAndIsActiveTrue(anyString());
     }
 }

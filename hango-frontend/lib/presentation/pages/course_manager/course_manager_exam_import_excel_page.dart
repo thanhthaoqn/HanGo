@@ -115,13 +115,17 @@ class _CourseManagerExamImportExcelPageState
                   onPressed: widget.onBack,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Import Exam by rExcel',
-                  style: TextStyle(
-                    fontSize: 24,
-                    color: Color(0xFF1E293B),
-                    fontFamily: 'Outfit',
-                    fontWeight: FontWeight.bold,
+                const Flexible(
+                  child: Text(
+                    'Import Exam by rExcel',
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: Color(0xFF1E293B),
+                      fontFamily: 'Outfit',
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -411,8 +415,11 @@ class _CourseManagerExamImportExcelPageState
                           ),
                         )
                       else
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 24,
+                          runSpacing: 16,
                           children: [
                             ElevatedButton.icon(
                               onPressed: _handleDownloadTemplate,
@@ -440,7 +447,6 @@ class _CourseManagerExamImportExcelPageState
                                 elevation: 0,
                               ),
                             ),
-                            const SizedBox(width: 24),
                             ElevatedButton.icon(
                               onPressed: _agreedToTerms
                                   ? _handleImportExcel

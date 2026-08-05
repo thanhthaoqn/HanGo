@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/services/ticket_service.dart';
 import '../../widgets/course_manager_sidebar.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'process_ticket_modal.dart';
 
 class ManagementTicketsPage extends StatefulWidget {
-  const ManagementTicketsPage({super.key});
+  final bool isEmbedded;
+
+  const ManagementTicketsPage({super.key, this.isEmbedded = false});
 
   @override
   State<ManagementTicketsPage> createState() => _ManagementTicketsPageState();
@@ -273,33 +275,31 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
       ],
     );
 
+    final Widget bodyContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildContentHeader(context, isDesktop),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: content,
+          ),
+        ),
+      ],
+    );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: '',
-        hideNavLinks: true,
-        hideCommerceActions: true,
-        hideLanguageSwitcher: true,
-      ),
+      appBar: InternalAppHeader(isMobile: !isDesktop),
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'support')) : null,
       body: Row(
         children: [
           if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'support')),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildContentHeader(context, isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: content,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: bodyContent),
         ],
       ),
     );

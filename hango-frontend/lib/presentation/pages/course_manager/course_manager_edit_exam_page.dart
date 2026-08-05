@@ -889,13 +889,17 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     onPressed: widget.onBack,
                   ),
                 if (widget.onBack != null) const SizedBox(width: 8),
-                Text(
-                  '${widget.examTitle} (${widget.isReadOnly ? 'View Mode' : 'Edit Mode'})',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                    fontFamily: 'Outfit',
+                Expanded(
+                  child: Text(
+                    '${widget.examTitle} (${widget.isReadOnly ? 'View Mode' : 'Edit Mode'})',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                      fontFamily: 'Outfit',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -992,8 +996,11 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     ],
                   ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
                     OutlinedButton(
                       onPressed: _goBack,
@@ -1272,14 +1279,23 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             ],
           ),
           const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 12, child: _buildLeftColumn(blockIndex)),
-              const SizedBox(width: 16),
-              Expanded(flex: 10, child: _buildRightColumn(blockIndex)),
-            ],
-          ),
+          MediaQuery.of(context).size.width < 700
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildLeftColumn(blockIndex),
+                    const SizedBox(height: 16),
+                    _buildRightColumn(blockIndex),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 12, child: _buildLeftColumn(blockIndex)),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 10, child: _buildRightColumn(blockIndex)),
+                  ],
+                ),
         ],
       ),
     );
@@ -1791,42 +1807,52 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (block.isQuestionGroup) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('SKILL TYPE'),
-                            _buildDropdown(
-                              value: qState.selectedSkillId,
-                              items: _skills,
-                              onChanged: (val) =>
-                                  setState(() => qState.selectedSkillId = val),
-                              displayKey: 'paramValue',
-                            ),
-                          ],
+                  Builder(builder: (context) {
+                    final skillField = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabel('SKILL TYPE'),
+                        _buildDropdown(
+                          value: qState.selectedSkillId,
+                          items: _skills,
+                          onChanged: (val) =>
+                              setState(() => qState.selectedSkillId = val),
+                          displayKey: 'paramValue',
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel('DIFFICULTY'),
-                            _buildDropdown(
-                              value: qState.selectedDifficultyId,
-                              items: _difficulties,
-                              onChanged: (val) => setState(
-                                () => qState.selectedDifficultyId = val,
-                              ),
-                              displayKey: 'paramValue',
-                            ),
-                          ],
+                      ],
+                    );
+                    final difficultyField = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLabel('DIFFICULTY'),
+                        _buildDropdown(
+                          value: qState.selectedDifficultyId,
+                          items: _difficulties,
+                          onChanged: (val) => setState(
+                            () => qState.selectedDifficultyId = val,
+                          ),
+                          displayKey: 'paramValue',
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    );
+                    if (MediaQuery.of(context).size.width < 420) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          skillField,
+                          const SizedBox(height: 16),
+                          difficultyField,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: skillField),
+                        const SizedBox(width: 16),
+                        Expanded(child: difficultyField),
+                      ],
+                    );
+                  }),
                   const SizedBox(height: 16),
                 ],
                 if (showQuestionText) ...[
@@ -2038,46 +2064,54 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             ),
           ),
           const SizedBox(width: 16),
-          Row(
-            children: [
-              if (_trainerAvatarUrl.isNotEmpty)
-                CircleAvatar(
-                  radius: 18,
-                  backgroundImage: NetworkImage(_trainerAvatarUrl),
-                )
-              else
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: const Color(0xFF38C9A6),
-                  child: Text(
-                    _trainerInitials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_trainerAvatarUrl.isNotEmpty)
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundImage: NetworkImage(_trainerAvatarUrl),
+                  )
+                else
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: const Color(0xFF38C9A6),
+                    child: Text(
+                      _trainerInitials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
+                  ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _trainerName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Text(
+                        'Trainer',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      ),
+                    ],
                   ),
                 ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _trainerName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                  ),
-                  const Text(
-                    'Trainer',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
