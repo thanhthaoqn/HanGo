@@ -13,6 +13,7 @@ import '../../../utils/download_helper.dart';
 import '../trainer/create_course_page.dart';
 import '../trainer/edit_course_page.dart';
 import 'course_review_dashboard_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CourseManagerCoursesPage extends StatefulWidget {
   const CourseManagerCoursesPage({super.key});
@@ -34,13 +35,25 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
   bool _isMockPreview = false;
   bool _isDownloadingTemplate = false;
   bool _isImportingExcel = false;
+  bool _canCreateCourses = false;
   final AuthService _authService = AuthService();
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {
     super.initState();
+    _loadPermissions();
     _loadCourses();
+  }
+
+  Future<void> _loadPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final roles = prefs.getStringList('user_roles') ?? [];
+    if (mounted) {
+      setState(() {
+        _canCreateCourses = roles.contains('MANAGE_OWN_COURSES') || roles.contains('ROLE_ADMINISTRATOR');
+      });
+    }
   }
 
   @override
@@ -995,66 +1008,68 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
                   backgroundColor: const Color(0xFFE6F7F1),
                 ),
               ),
-              OutlinedButton.icon(
-                onPressed: _isDownloadingTemplate ? null : _downloadImportTemplate,
-                icon: _isDownloadingTemplate
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF20B486)),
-                      )
-                    : const Icon(Icons.download_outlined, color: Color(0xFF20B486), size: 18),
-                label: const Text(
-                  'Download Template',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+              if (_canCreateCourses) ...[
+                OutlinedButton.icon(
+                  onPressed: _isDownloadingTemplate ? null : _downloadImportTemplate,
+                  icon: _isDownloadingTemplate
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF20B486)),
+                        )
+                      : const Icon(Icons.download_outlined, color: Color(0xFF20B486), size: 18),
+                  label: const Text(
+                    'Download Template',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF20B486),
+                    side: const BorderSide(color: Color(0xFF20B486)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF20B486),
-                  side: const BorderSide(color: Color(0xFF20B486)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                OutlinedButton.icon(
+                  onPressed: _isImportingExcel ? null : _importCourseExcel,
+                  icon: _isImportingExcel
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF20B486)),
+                        )
+                      : const Icon(Icons.upload_file_outlined, color: Color(0xFF20B486), size: 18),
+                  label: const Text(
+                    'Import Excel',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF20B486),
+                    side: const BorderSide(color: Color(0xFF99F6E4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-              ),
-              OutlinedButton.icon(
-                onPressed: _isImportingExcel ? null : _importCourseExcel,
-                icon: _isImportingExcel
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF20B486)),
-                      )
-                    : const Icon(Icons.upload_file_outlined, color: Color(0xFF20B486), size: 18),
-                label: const Text(
-                  'Import Excel',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CreateCoursePage()),
+                    );
+                    _loadCourses();
+                  },
+                  icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Create Course',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF38C9A6),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF20B486),
-                  side: const BorderSide(color: Color(0xFF99F6E4)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CreateCoursePage()),
-                  );
-                  _loadCourses();
-                },
-                icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                label: const Text(
-                  'Create Course',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF38C9A6),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-              ),
+              ],
             ],
           ),
         ],
