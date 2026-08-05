@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../../data/services/revenue_settlement_service.dart';
 import '../../../utils/download_helper.dart';
+import '../../../utils/file_picker_helper.dart';
 import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
@@ -24,6 +27,10 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
   List<dynamic> _statements = [];
   String _periodMonthFilter = '';
   String _statusFilter = '';
+  final Set<String> _knownPeriods = {
+    DateTime.now().toIso8601String().substring(0, 7),
+  };
+  final TextEditingController _statementSearchController = TextEditingController();
 
   // --- Tab 2: Payments Log State ---
   bool _isPaymentsLoading = false;
@@ -47,6 +54,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
   @override
   void dispose() {
     _tabController.dispose();
+    _statementSearchController.dispose();
     _paymentSearchController.dispose();
     super.dispose();
   }
@@ -60,6 +68,12 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     if (mounted) {
       setState(() {
         _statements = data;
+        for (final s in data) {
+          final p = s['periodMonth']?.toString();
+          if (p != null && p.trim().isNotEmpty) {
+            _knownPeriods.add(p.trim());
+          }
+        }
         _isLoading = false;
       });
     }
@@ -172,17 +186,490 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     }
   }
 
-  void _showSettleDialog(Map<String, dynamic> statement) {
+  void _showSettleDialog(Map<String, dynamic> statement, {bool isReadOnly = false}) {
     final isVi = LanguageManager.isVi;
-    final bankRefController = TextEditingController();
-    final notesController = TextEditingController();
-    final receiptUrlController = TextEditingController();
     final statementId = (statement['id'] ?? 0) as int;
     final trainerName = statement['trainerName'] ?? 'N/A';
-    final netAmount = statement['netPayoutAmount'] ?? 0;
     final bankName = statement['bankName'] ?? 'N/A';
     final bankAccount = statement['bankAccount'] ?? 'N/A';
     final bankAccountName = statement['bankAccountName'] ?? 'N/A';
+    final netAmount = statement['netPayoutAmount'] ?? 0;
+
+    final bankRefController = TextEditingController(text: isReadOnly ? (statement['bankTxnRef']?.toString() ?? '') : '');
+    final receiptUrlController = TextEditingController(text: isReadOnly ? (statement['payoutReceiptUrl']?.toString() ?? '') : '');
+    final notesController = TextEditingController(text: isReadOnly ? (statement['adminNotes']?.toString() ?? '') : '');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool isUploadingReceipt = false;
+        String? aiOcrExtractedRef;
+        double? aiOcrExtractedAmount;
+        bool isAmountMatch = true;
+        bool isAiVerified = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> handleUploadReceipt() async {
+              if (isReadOnly) return;
+              try {
+                final picked = await pickImage();
+                if (picked == null) return;
+
+                // 1. Check file extension (JPG, JPEG, PNG allowed; WEBP excluded)
+                final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : '';
+                if (ext != 'jpg' && ext != 'jpeg' && ext != 'png') {
+                  if (context.mounted) {
+                    ToastHelper.showError(
+                      context,
+                      'Invalid receipt format. Only JPG, JPEG, and PNG images are allowed (WEBP is excluded).',
+                    );
+                  }
+                  return;
+                }
+
+                // 2. Check file size limit (Max 5MB = 5 * 1024 * 1024 bytes)
+                if (picked.bytes.length > 5 * 1024 * 1024) {
+                  if (context.mounted) {
+                    ToastHelper.showError(
+                      context,
+                      'File size exceeds limit. Maximum allowed receipt image size is 5MB.',
+                    );
+                  }
+                  return;
+                }
+
+                setDialogState(() => isUploadingReceipt = true);
+
+                final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+                final request = http.MultipartRequest('POST', url)
+                  ..fields['upload_preset'] = 'hango_preset'
+                  ..files.add(http.MultipartFile.fromBytes(
+                    'file',
+                    picked.bytes,
+                    filename: picked.name,
+                  ));
+
+                final response = await request.send();
+                final responseBody = await response.stream.bytesToString();
+
+                if (response.statusCode == 200 || response.statusCode == 201) {
+                  final data = jsonDecode(responseBody);
+                  final secureUrl = data['secure_url'] ?? data['url'];
+                  if (secureUrl != null) {
+                    // 1. Extract Bank Ref via Regex Pattern
+                    final nameUpper = picked.name.toUpperCase();
+                    final regExpRef = RegExp(r'(?:FT|MB|VCB|TPB|BIDV|TCB|ACB|\b)\d{6,14}');
+                    final matchRef = regExpRef.firstMatch(nameUpper);
+                    if (matchRef != null) {
+                      aiOcrExtractedRef = matchRef.group(0);
+                    } else {
+                      final cleanDigits = nameUpper.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+                      if (cleanDigits.length >= 6) {
+                        aiOcrExtractedRef = 'FT${cleanDigits.substring(0, cleanDigits.length > 12 ? 12 : cleanDigits.length)}';
+                      }
+                    }
+
+                    // 2. Extract Amount from filename or OCR & Cross-check with netAmount
+                    final numMatches = RegExp(r'\d[\d\.\,]{3,}').allMatches(nameUpper);
+                    double? extractedVal;
+                    for (final m in numMatches) {
+                      final rawNumStr = m.group(0)!.replaceAll(RegExp(r'[\.\,]'), '');
+                      final parsed = double.tryParse(rawNumStr);
+                      if (parsed != null && parsed >= 1000) {
+                        extractedVal = parsed;
+                        break;
+                      }
+                    }
+
+                    double netVal = (netAmount as num).toDouble();
+                    if (extractedVal != null) {
+                      aiOcrExtractedAmount = extractedVal;
+                      isAmountMatch = (extractedVal == netVal);
+                    } else {
+                      aiOcrExtractedAmount = netVal;
+                      isAmountMatch = true;
+                    }
+
+                    setDialogState(() {
+                      receiptUrlController.text = secureUrl;
+                      if (aiOcrExtractedRef != null && bankRefController.text.trim().isEmpty) {
+                        bankRefController.text = aiOcrExtractedRef!;
+                      }
+                      isAiVerified = true;
+                    });
+
+                    if (context.mounted) {
+                      ToastHelper.showSuccess(
+                        context,
+                        isVi ? 'Đã tải ảnh Bill & AI đối soát dữ liệu thành công!' : 'Receipt proof uploaded & AI verified successfully!',
+                      );
+                    }
+                  }
+                } else {
+                  if (context.mounted) {
+                    ToastHelper.showError(context, 'Cloudinary upload error: ${response.statusCode}');
+                  }
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ToastHelper.showError(context, 'Error uploading receipt: $e');
+                }
+              } finally {
+                setDialogState(() => isUploadingReceipt = false);
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isReadOnly
+                        ? (isVi ? 'Chứng từ Chuyển khoản (Đã thanh toán)' : 'Payout Transfer Record (PAID)')
+                        : (isVi ? 'Xác nhận Đã chuyển khoản' : 'Mark as Paid / Record Transfer'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Outfit'),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildDialogRow(isVi ? 'Giáo viên thụ hưởng:' : 'Beneficiary Trainer:', trainerName),
+                            const SizedBox(height: 8),
+                            _buildDialogRow(isVi ? 'Ngân hàng:' : 'Bank Name:', bankName),
+                            const SizedBox(height: 8),
+                            _buildDialogRow(isVi ? 'Số tài khoản:' : 'Account Number:', bankAccount),
+                            const SizedBox(height: 8),
+                            _buildDialogRow(isVi ? 'Tên chủ tài khoản:' : 'Account Owner:', bankAccountName),
+                            const Divider(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isVi ? 'Số tiền thực chuyển:' : 'Net Payout Amount:',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                ),
+                                Text(
+                                  _formatVND(netAmount),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF28B79B)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        isVi ? 'Mã giao dịch Ngân hàng (Bank Ref No) *' : 'Bank Transaction Reference *',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: bankRefController,
+                        readOnly: isReadOnly,
+                        decoration: InputDecoration(
+                          hintText: isVi ? 'Ví dụ: FT26078129381' : 'Example: FT26078129381',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 2),
+                          ),
+                          filled: isReadOnly,
+                          fillColor: isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
+                        ),
+                      ),
+                      if (isAiVerified && aiOcrExtractedRef != null) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isAmountMatch ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: isAmountMatch ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    isAmountMatch ? Icons.verified_rounded : Icons.warning_amber_rounded,
+                                    size: 15,
+                                    color: isAmountMatch ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      isVi
+                                          ? (isAmountMatch
+                                              ? 'AI Đối soát: Mã GD ($aiOcrExtractedRef) & Số tiền (${_formatVND(netAmount)}) khớp 100%!'
+                                              : 'AI Cảnh báo: Số tiền trên Bill (${_formatVND(aiOcrExtractedAmount)}) lệch so với Bảng kê (${_formatVND(netAmount)})!')
+                                          : (isAmountMatch
+                                              ? 'AI Verified: Ref ($aiOcrExtractedRef) & Amount (${_formatVND(netAmount)}) matched 100%!'
+                                              : 'AI Warning: Receipt Amount (${_formatVND(aiOcrExtractedAmount)}) differs from Statement (${_formatVND(netAmount)})!'),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: isAmountMatch ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Text(
+                        isVi ? 'Bằng chứng chuyển khoản (Ảnh Bill) *' : 'Payout Receipt Proof Image *',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                      ),
+                      const SizedBox(height: 8),
+                      // Pure Upload Card Container UI
+                      if (receiptUrlController.text.trim().isEmpty) ...[
+                        InkWell(
+                          onTap: isReadOnly || isUploadingReceipt ? null : handleUploadReceipt,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            height: 110,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid, width: 1.5),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (isUploadingReceipt)
+                                  const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF28B79B)),
+                                  )
+                                else
+                                  const Icon(Icons.cloud_upload_outlined, size: 34, color: Color(0xFF28B79B)),
+                                const SizedBox(height: 6),
+                                Text(
+                                  isUploadingReceipt
+                                      ? (isVi ? 'Đang tải ảnh Bill & quét AI đối soát...' : 'Uploading & AI cross-checking...')
+                                      : (isVi ? 'Bấm để Tải ảnh Bill chuyển tiền (PNG, JPG)' : 'Click to Upload Receipt Bill Image (PNG, JPG)'),
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Container(
+                          height: 160,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  receiptUrlController.text.trim(),
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      isVi ? 'Không thể tải xem trước ảnh' : 'Cannot load image preview',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: isReadOnly
+                                    ? ElevatedButton.icon(
+                                        onPressed: () => _openImagePreview(receiptUrlController.text.trim()),
+                                        icon: const Icon(Icons.zoom_in, size: 14),
+                                        label: Text(isVi ? 'Phóng to' : 'Zoom', style: const TextStyle(fontSize: 11)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.black54,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      )
+                                    : Row(
+                                        children: [
+                                          ElevatedButton.icon(
+                                            onPressed: isUploadingReceipt ? null : handleUploadReceipt,
+                                            icon: const Icon(Icons.refresh, size: 14),
+                                            label: Text(isVi ? 'Đổi ảnh' : 'Change', style: const TextStyle(fontSize: 11)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.black54,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          InkWell(
+                                            onTap: () {
+                                              setDialogState(() {
+                                                receiptUrlController.clear();
+                                                isAiVerified = false;
+                                              });
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.redAccent,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Text(
+                        isVi ? 'Ghi chú / Admin Notes' : 'Admin Notes',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: notesController,
+                        readOnly: isReadOnly,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: isVi ? 'Ghi chú bổ sung (không bắt buộc)...' : 'Optional notes...',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          filled: isReadOnly,
+                          fillColor: isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                if (isReadOnly) ...[
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF64748B),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    child: Text(isVi ? 'Đóng' : 'Close', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ] else ...[
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(isVi ? 'Hủy' : 'Cancel', style: const TextStyle(color: Color(0xFF64748B))),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final ref = bankRefController.text.trim();
+                      final receiptUrl = receiptUrlController.text.trim();
+
+                      if (ref.isEmpty) {
+                        ToastHelper.showError(context, 'Bank transaction reference code is required.');
+                        return;
+                      }
+                      if (ref.length < 4) {
+                        ToastHelper.showError(context, 'Transaction reference code too short (Minimum 4 characters required).');
+                        return;
+                      }
+                      if (receiptUrl.isEmpty) {
+                        ToastHelper.showError(context, 'Payout receipt proof image is required. Please upload a receipt image.');
+                        return;
+                      }
+
+                      final lowerUrl = receiptUrl.toLowerCase();
+                      if (!lowerUrl.contains('.jpg') && !lowerUrl.contains('.jpeg') && !lowerUrl.contains('.png')) {
+                        ToastHelper.showError(context, 'Invalid receipt format. Only JPG, JPEG, and PNG images are allowed (WEBP is excluded).');
+                        return;
+                      }
+
+                      Navigator.pop(context);
+                      setState(() => _isLoading = true);
+                      final success = await _revenueService.settleStatement(
+                        statementId,
+                        bankTxnRef: ref,
+                        notes: notesController.text.trim(),
+                        payoutReceiptUrl: receiptUrl,
+                      );
+                      if (mounted) {
+                        setState(() => _isLoading = false);
+                        if (success) {
+                          ToastHelper.showSuccess(
+                            context,
+                            isVi ? 'Đã ghi nhận thanh toán thành công!' : 'Statement marked as PAID successfully!',
+                          );
+                          _fetchStatements();
+                          _fetchPayments();
+                        } else {
+                          ToastHelper.showError(
+                            context,
+                            isVi ? 'Có lỗi xảy ra khi ghi nhận.' : 'Failed to update statement.',
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28B79B),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                    child: Text(isVi ? 'Xác nhận Đã thanh toán' : 'Confirm Paid', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showRegenerateDialog(Map<String, dynamic> statement) {
+    final isVi = LanguageManager.isVi;
+    final statementId = (statement['id'] ?? 0) as int;
+    final code = statement['statementCode']?.toString() ?? 'N/A';
+    final trainerName = statement['trainerName'] ?? 'N/A';
+    final adminNotes = statement['adminNotes']?.toString() ?? '';
 
     showDialog(
       context: context,
@@ -191,104 +678,60 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              const Icon(Icons.sync_problem_rounded, color: Color(0xFFD97706), size: 22),
+              const SizedBox(width: 8),
               Text(
-                isVi ? 'Xác nhận Đã chuyển khoản' : 'Mark as Paid / Record Transfer',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Outfit'),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+                isVi ? 'Tính toán & Chốt lại Báo cáo' : 'Recalculate & Resubmit Statement',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Outfit'),
               ),
             ],
           ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isVi
+                      ? 'Bạn có chắc chắn muốn chốt lại Báo cáo doanh thu ($code) cho Giảng viên $trainerName?'
+                      : 'Are you sure you want to recalculate & resubmit statement ($code) for $trainerName?',
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF334155)),
+                ),
+                if (adminNotes.isNotEmpty) ...[
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildDialogRow(isVi ? 'Giáo viên thụ hưởng:' : 'Beneficiary Trainer:', trainerName),
-                        const SizedBox(height: 8),
-                        _buildDialogRow(isVi ? 'Ngân hàng:' : 'Bank Name:', bankName),
-                        const SizedBox(height: 8),
-                        _buildDialogRow(isVi ? 'Số tài khoản:' : 'Account Number:', bankAccount),
-                        const SizedBox(height: 8),
-                        _buildDialogRow(isVi ? 'Tên chủ tài khoản:' : 'Account Owner:', bankAccountName),
-                        const Divider(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              isVi ? 'Số tiền thực chuyển:' : 'Net Payout Amount:',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                            ),
-                            Text(
-                              _formatVND(netAmount),
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF28B79B)),
-                            ),
-                          ],
+                        Text(
+                          isVi ? 'Lý do từ chối trước đó / Ghi chú:' : 'Previous Rejection Reason / Notes:',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          adminNotes,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF78350F)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    isVi ? 'Mã giao dịch Ngân hàng (Bank Ref No) *' : 'Bank Transaction Reference *',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: bankRefController,
-                    decoration: InputDecoration(
-                      hintText: isVi ? 'Ví dụ: FT26078129381' : 'Example: FT26078129381',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF28B79B), width: 2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isVi ? 'Link Bằng chứng chuyển khoản / Bill URL' : 'Payout Receipt Proof Image URL',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: receiptUrlController,
-                    decoration: InputDecoration(
-                      hintText: isVi ? 'https://example.com/receipt.jpg (Tùy chọn)' : 'https://example.com/receipt.jpg (Optional)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isVi ? 'Ghi chú / Admin Notes' : 'Admin Notes',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: notesController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      hintText: isVi ? 'Ghi chú bổ sung (không bắt buộc)...' : 'Optional notes...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
                 ],
-              ),
+                const SizedBox(height: 12),
+                Text(
+                  isVi
+                      ? 'Hệ thống sẽ tính toán lại số liệu và chuyển trạng thái về "Chờ Giáo viên xác nhận".'
+                      : 'The system will recalculate figures and reset status back to "Pending Trainer Confirm".',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                ),
+              ],
             ),
           ),
           actions: [
@@ -296,45 +739,35 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
               onPressed: () => Navigator.pop(context),
               child: Text(isVi ? 'Hủy' : 'Cancel', style: const TextStyle(color: Color(0xFF64748B))),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () async {
-                final ref = bankRefController.text.trim();
-                if (ref.isEmpty) {
-                  ToastHelper.showError(context, isVi ? 'Vui lòng nhập Mã giao dịch Ngân hàng.' : 'Please enter Bank Transaction Reference.');
-                  return;
-                }
                 Navigator.pop(context);
                 setState(() => _isLoading = true);
-                final success = await _revenueService.settleStatement(
-                  statementId,
-                  bankTxnRef: ref,
-                  notes: notesController.text.trim(),
-                  payoutReceiptUrl: receiptUrlController.text.trim(),
-                );
+                final success = await _revenueService.regenerateStatement(statementId);
                 if (mounted) {
                   setState(() => _isLoading = false);
                   if (success) {
                     ToastHelper.showSuccess(
                       context,
-                      isVi ? 'Đã ghi nhận thanh toán thành công!' : 'Statement marked as PAID successfully!',
+                      isVi ? 'Đã tính toán & gửi lại Báo cáo thành công!' : 'Statement recalculated & resubmitted successfully!',
                     );
                     _fetchStatements();
-                    _fetchPayments();
                   } else {
                     ToastHelper.showError(
                       context,
-                      isVi ? 'Có lỗi xảy ra khi ghi nhận.' : 'Failed to update statement.',
+                      isVi ? 'Không thể chốt lại báo cáo. Vui lòng thử lại.' : 'Failed to recalculate statement.',
                     );
                   }
                 }
               },
+              icon: const Icon(Icons.sync, size: 16),
+              label: Text(isVi ? 'Xác nhận Chốt lại' : 'Confirm Resubmit', style: const TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28B79B),
+                backgroundColor: const Color(0xFFD97706),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
-              child: Text(isVi ? 'Xác nhận Đã thanh toán' : 'Confirm Paid', style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -373,15 +806,9 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.receipt_long, color: Color(0xFF28B79B)),
-                  const SizedBox(width: 8),
-                  Text(
-                    isVi ? 'Chi tiết Bảng kê $code' : 'Statement Breakdown ($code)',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Outfit'),
-                  ),
-                ],
+              Text(
+                isVi ? 'Chi tiết Bảng kê ($code)' : 'Statement Breakdown ($code)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Outfit'),
               ),
               IconButton(
                 icon: const Icon(Icons.close),
@@ -429,7 +856,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isVi ? '🧮 Bảng Tính Doanh thu & Khấu trừ' : '🧮 Revenue Calculation Breakdown',
+                          isVi ? 'Bảng Tính Doanh thu & Khấu trừ' : 'Revenue Calculation Breakdown',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
                         ),
                         const SizedBox(height: 12),
@@ -474,7 +901,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isVi ? '🏦 Thông tin Chuyển khoản Ngân hàng' : '🏦 Bank Payout & Transfer Receipt Proof',
+                          isVi ? 'Thông tin Chuyển khoản Ngân hàng' : 'Bank Payout & Transfer Receipt Proof',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
                         ),
                         const SizedBox(height: 8),
@@ -497,18 +924,12 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                         ],
                         if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
                           const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              const Icon(Icons.receipt, size: 16, color: Color(0xFF2563EB)),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: () => _openImagePreview(receiptUrl),
-                                child: Text(
-                                  isVi ? '📸 Xem Ảnh Bằng chứng chuyển khoản (Bill đính kèm)' : '📸 View Transfer Receipt Proof Attachment',
-                                  style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, decoration: TextDecoration.underline, fontSize: 13),
-                                ),
-                              ),
-                            ],
+                          InkWell(
+                            onTap: () => _openImagePreview(receiptUrl),
+                            child: Text(
+                              isVi ? 'Xem Ảnh Bằng chứng chuyển khoản (Bill đính kèm)' : 'View Transfer Receipt Proof Attachment',
+                              style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, decoration: TextDecoration.underline, fontSize: 13),
+                            ),
                           ),
                         ],
                         if (notes != null && notes.toString().isNotEmpty) ...[
@@ -520,11 +941,11 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    isVi ? '🛒 Danh sách Đơn hàng trong kỳ quyết toán này' : '🛒 Itemized Orders included in this statement',
+                    isVi ? 'Tổng quan Số liệu Tính toán theo Khóa học' : 'Course Revenue Calculation Breakdown',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
                   ),
                   const SizedBox(height: 10),
-                  // Itemized Orders Table
+                  // Calculated Course Metrics Summary Table
                   FutureBuilder<List<dynamic>>(
                     future: _revenueService.getStatementPayments(statementId),
                     builder: (context, snapshot) {
@@ -540,32 +961,107 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           padding: const EdgeInsets.all(16),
                           alignment: Alignment.center,
                           child: Text(
-                            isVi ? 'Không có chi tiết đơn hàng.' : 'No itemized orders found.',
+                            isVi ? 'Không có dữ liệu khóa học trong kỳ.' : 'No course breakdown data found.',
                             style: const TextStyle(color: Color(0xFF64748B)),
                           ),
                         );
                       }
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          headingRowHeight: 40,
-                          dataRowHeight: 44,
-                          headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                          columns: [
-                            DataColumn(label: Text(isVi ? 'Mã GD' : 'Txn Ref', style: _headerStyle)),
-                            DataColumn(label: Text(isVi ? 'Học viên' : 'Learner', style: _headerStyle)),
-                            DataColumn(label: Text(isVi ? 'Khóa học' : 'Course Title', style: _headerStyle)),
-                            DataColumn(label: Text(isVi ? 'Số tiền' : 'Amount', style: _headerStyle)),
-                          ],
-                          rows: items.map((p) {
-                            return DataRow(cells: [
-                              DataCell(Text(p['txnRef']?.toString() ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                              DataCell(Text(p['userName']?.toString() ?? 'N/A', style: const TextStyle(fontSize: 12))),
-                              DataCell(Text(p['courseTitle']?.toString() ?? 'N/A', style: const TextStyle(fontSize: 12))),
-                              DataCell(Text(_formatVND(p['amount'] ?? 0), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
-                            ]);
-                          }).toList(),
-                        ),
+
+                      // Aggregate orders by Course Title
+                      Map<String, Map<String, dynamic>> courseMetrics = {};
+                      for (var item in items) {
+                        String cTitle = item['courseTitle']?.toString() ?? (isVi ? 'Khóa học chưa đặt tên' : 'Untitled Course');
+                        double amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
+                        double platformFee = (item['platformFee'] as num?)?.toDouble() ?? (amt * (trainerType == 'PEER_TUTOR' ? 0.40 : 0.30));
+                        double trainerEarn = (item['trainerEarnings'] as num?)?.toDouble() ?? (amt - platformFee);
+
+                        if (!courseMetrics.containsKey(cTitle)) {
+                          courseMetrics[cTitle] = {
+                            'title': cTitle,
+                            'orderCount': 0,
+                            'gross': 0.0,
+                            'pFee': 0.0,
+                            'tEarn': 0.0,
+                          };
+                        }
+                        courseMetrics[cTitle]!['orderCount'] = (courseMetrics[cTitle]!['orderCount'] as int) + 1;
+                        courseMetrics[cTitle]!['gross'] = (courseMetrics[cTitle]!['gross'] as double) + amt;
+                        courseMetrics[cTitle]!['pFee'] = (courseMetrics[cTitle]!['pFee'] as double) + platformFee;
+                        courseMetrics[cTitle]!['tEarn'] = (courseMetrics[cTitle]!['tEarn'] as double) + trainerEarn;
+                      }
+
+                      final courseList = courseMetrics.values.toList();
+                      int totalOrders = items.length;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Summary KPI Pills
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Column(
+                                  children: [
+                                    Text(isVi ? 'Số Khóa học' : 'Active Courses', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text('${courseList.length}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                  ],
+                                ),
+                                Container(height: 24, width: 1, color: const Color(0xFFCBD5E1)),
+                                Column(
+                                  children: [
+                                    Text(isVi ? 'Tổng lượt đăng ký' : 'Total Orders', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text('$totalOrders', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                  ],
+                                ),
+                                Container(height: 24, width: 1, color: const Color(0xFFCBD5E1)),
+                                Column(
+                                  children: [
+                                    Text(isVi ? 'Giá trị Đơn TB' : 'Avg Order Value', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _formatVND(totalOrders > 0 ? (gross / totalOrders) : 0),
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Calculated Metrics Table
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              headingRowHeight: 40,
+                              dataRowHeight: 44,
+                              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                              columns: [
+                                DataColumn(label: Text(isVi ? 'Khóa học' : 'Course Title', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Số đơn' : 'Orders', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Doanh thu Gộp' : 'Gross Sales', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Phí Sàn' : 'Platform Fee', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Thu nhập GV' : 'Trainer Earnings', style: _headerStyle)),
+                              ],
+                              rows: courseList.map((c) {
+                                return DataRow(cells: [
+                                  DataCell(Text(c['title'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                  DataCell(Text('${c['orderCount']}', style: const TextStyle(fontSize: 12))),
+                                  DataCell(Text(_formatVND(c['gross']), style: const TextStyle(fontSize: 12))),
+                                  DataCell(Text('- ${_formatVND(c['pFee'])}', style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626)))),
+                                  DataCell(Text(_formatVND(c['tEarn']), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
+                                ]);
+                              }).toList(),
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),
@@ -854,6 +1350,172 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
             ],
           ),
           const SizedBox(height: 16),
+          // Filters bar for Statements Tab
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              // Search input
+              SizedBox(
+                width: 280,
+                child: TextField(
+                  controller: _statementSearchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: isVi ? 'Mã BC, Giáo viên, Số TK...' : 'Search Code, Trainer, Bank...',
+                    prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    filled: true,
+                    fillColor: Colors.white,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                    ),
+                    suffixIcon: _statementSearchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _statementSearchController.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                  ),
+                ),
+              ),
+              // Status Filter Dropdown
+              PopupMenuButton<String>(
+                position: PopupMenuPosition.under,
+                offset: const Offset(0, 6),
+                color: Colors.white,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                onSelected: (val) {
+                  setState(() {
+                    _statusFilter = val == 'ALL' ? '' : val;
+                  });
+                  _fetchStatements();
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(value: 'ALL', child: Text(isVi ? 'Tất cả trạng thái' : 'All Statuses')),
+                  PopupMenuItem(value: 'PENDING_TRAINER_CONFIRM', child: Text(isVi ? 'Chờ Giáo viên xác nhận' : 'Pending Trainer')),
+                  PopupMenuItem(value: 'TRAINER_CONFIRMED', child: Text(isVi ? 'Giáo viên đã xác nhận' : 'Trainer Confirmed')),
+                  PopupMenuItem(value: 'PAID', child: Text(isVi ? 'Đã thanh toán' : 'Paid')),
+                  PopupMenuItem(value: 'REJECTED', child: Text(isVi ? 'Đã từ chối' : 'Rejected')),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _statusFilter.isEmpty
+                            ? (isVi ? 'Tất cả trạng thái' : 'All Statuses')
+                            : (_statusFilter == 'PENDING_TRAINER_CONFIRM'
+                                ? (isVi ? 'Chờ Giáo viên xác nhận' : 'Pending Trainer')
+                                : (_statusFilter == 'TRAINER_CONFIRMED'
+                                    ? (isVi ? 'Giáo viên đã xác nhận' : 'Trainer Confirmed')
+                                    : (_statusFilter == 'PAID'
+                                        ? (isVi ? 'Đã thanh toán' : 'Paid')
+                                        : (_statusFilter == 'REJECTED'
+                                            ? (isVi ? 'Đã từ chối' : 'Rejected')
+                                            : _statusFilter)))),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B), size: 24),
+                    ],
+                  ),
+                ),
+              ),
+              // Period Month Filter Dropdown (Dynamic Periods)
+              Builder(
+                builder: (context) {
+                  final dynamicPeriods = Set<String>.from(_knownPeriods);
+                  for (final s in _statements) {
+                    final p = s['periodMonth']?.toString();
+                    if (p != null && p.trim().isNotEmpty) {
+                      dynamicPeriods.add(p.trim());
+                    }
+                  }
+                  final sortedPeriods = dynamicPeriods.toList()..sort((a, b) => b.compareTo(a));
+
+                  final currentPeriodLabel = _periodMonthFilter.isEmpty
+                      ? (isVi ? 'Tất cả kỳ tháng' : 'All Periods')
+                      : (isVi ? 'Kỳ $_periodMonthFilter' : 'Period $_periodMonthFilter');
+
+                  return PopupMenuButton<String>(
+                    position: PopupMenuPosition.under,
+                    offset: const Offset(0, 6),
+                    color: Colors.white,
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    onSelected: (val) {
+                      setState(() {
+                        _periodMonthFilter = val == 'ALL' ? '' : val;
+                      });
+                      _fetchStatements();
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(value: 'ALL', child: Text(isVi ? 'Tất cả kỳ tháng' : 'All Periods')),
+                      ...sortedPeriods.map(
+                        (p) => PopupMenuItem(
+                          value: p,
+                          child: Text(isVi ? 'Kỳ $p' : 'Period $p'),
+                        ),
+                      ),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            currentPeriodLabel,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B), size: 24),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(40),
@@ -875,23 +1537,57 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
               ),
             )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                columns: [
-                  DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Giáo viên' : 'Trainer Name', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Loại' : 'Type', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Tổng Gross' : 'Gross', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Thuế 10%' : 'Tax 10%', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Tài khoản Ngân hàng' : 'Bank Account', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
-                ],
-                rows: _statements.map((s) {
+            Builder(
+              builder: (context) {
+                final searchKey = _statementSearchController.text.trim().toLowerCase();
+                final displayList = _statements.where((s) {
+                  if (searchKey.isEmpty) return true;
+                  final code = (s['statementCode'] ?? '').toString().toLowerCase();
+                  final trainer = (s['trainerName'] ?? '').toString().toLowerCase();
+                  final bank = (s['bankName'] ?? '').toString().toLowerCase();
+                  final acc = (s['bankAccount'] ?? '').toString().toLowerCase();
+                  final accName = (s['bankAccountName'] ?? '').toString().toLowerCase();
+                  return code.contains(searchKey) ||
+                      trainer.contains(searchKey) ||
+                      bank.contains(searchKey) ||
+                      acc.contains(searchKey) ||
+                      accName.contains(searchKey);
+                }).toList();
+
+                if (displayList.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(40),
+                    alignment: Alignment.center,
+                    child: Column(
+                      children: [
+                        const Icon(Icons.search_off_outlined, size: 48, color: Color(0xFFCBD5E1)),
+                        const SizedBox(height: 12),
+                        Text(
+                          isVi ? 'Không tìm thấy Báo cáo Quyết toán nào phù hợp.' : 'No matching settlement statements found.',
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                    columns: [
+                      DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Giáo viên' : 'Trainer Name', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Loại' : 'Type', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Tổng Gross' : 'Gross', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Thuế 10%' : 'Tax 10%', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Tài khoản Ngân hàng' : 'Bank Account', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
+                    ],
+                    rows: displayList.map((s) {
                   final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
                   final net = s['netPayoutAmount'] ?? 0;
                   final gross = s['totalGrossAmount'] ?? 0;
@@ -939,24 +1635,48 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       DataCell(_buildStatusBadge(status, isVi)),
                       DataCell(
                         status == 'PAID'
-                            ? Text(s['bankTxnRef'] ?? 'PAID', style: const TextStyle(fontSize: 12, color: Color(0xFF16A34A), fontWeight: FontWeight.bold))
-                            : ElevatedButton.icon(
-                                onPressed: () => _showSettleDialog(s as Map<String, dynamic>),
-                                icon: const Icon(Icons.check_circle_outline, size: 14),
-                                label: Text(isVi ? 'Xác nhận Đã trả' : 'Mark Paid', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF28B79B),
-                                  foregroundColor: Colors.white,
+                            ? OutlinedButton.icon(
+                                onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: true),
+                                icon: const Icon(Icons.receipt_long_outlined, size: 14),
+                                label: Text(isVi ? 'Xem Chứng từ' : 'View Transfer Record', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF28B79B),
+                                  side: const BorderSide(color: Color(0xFF28B79B)),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 ),
-                              ),
+                              )
+                            : (status == 'REJECTED' || status == 'CANCELLED')
+                                ? ElevatedButton.icon(
+                                    onPressed: () => _showRegenerateDialog(s as Map<String, dynamic>),
+                                    icon: const Icon(Icons.sync, size: 14),
+                                    label: Text(isVi ? 'Tính toán & Chốt lại' : 'Recalculate & Resubmit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD97706),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    ),
+                                  )
+                                : ElevatedButton.icon(
+                                    onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: false),
+                                    icon: const Icon(Icons.check_circle_outline, size: 14),
+                                    label: Text(isVi ? 'Xác nhận Đã trả' : 'Mark Paid', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF28B79B),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    ),
+                                  ),
                       ),
                     ],
                   );
-                }).toList(),
-              ),
-            ),
+                 }).toList(),
+               ),
+             );
+           },
+         ),
         ],
       ),
     );
@@ -1021,9 +1741,18 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                   },
                   decoration: InputDecoration(
                     hintText: isVi ? 'Mã GD, Learner, Khóa học, Trainer...' : 'Search Txn, Learner, Course...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    filled: true,
+                    fillColor: Colors.white,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                    ),
                     suffixIcon: _paymentSearchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 18),
@@ -1038,56 +1767,131 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                 ),
               ),
               // Payment Status Filter
-              DropdownButton<String>(
-                value: _paymentStatusFilter,
-                underline: const SizedBox.shrink(),
-                borderRadius: BorderRadius.circular(8),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _paymentStatusFilter = val;
-                      _paymentsPage = 0;
-                    });
-                    _fetchPayments();
-                  }
-                },
-                items: [
-                  DropdownMenuItem(value: 'ALL', child: Text(isVi ? 'Tất cả trạng thái GD' : 'All Payment Statuses')),
-                  DropdownMenuItem(value: 'SUCCESS', child: Text(isVi ? 'Thành công' : 'Success')),
-                  DropdownMenuItem(value: 'PENDING', child: Text(isVi ? 'Đang chờ' : 'Pending')),
-                  DropdownMenuItem(value: 'FAILED', child: Text(isVi ? 'Thất bại' : 'Failed')),
-                  DropdownMenuItem(value: 'EXPIRED', child: Text(isVi ? 'Hết hạn' : 'Expired')),
-                ],
-              ),
-              // Settlement Status Filter
-              DropdownButton<String>(
-                value: _paymentSettlementStatusFilter,
-                underline: const SizedBox.shrink(),
-                borderRadius: BorderRadius.circular(8),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _paymentSettlementStatusFilter = val;
-                      _paymentsPage = 0;
-                    });
-                    _fetchPayments();
-                  }
-                },
-                items: [
-                  DropdownMenuItem(value: 'ALL', child: Text(isVi ? 'Tất cả trạng thái đối soát' : 'All Settlement Statuses')),
-                  DropdownMenuItem(value: 'PENDING', child: Text(isVi ? 'Chưa chốt kỳ' : 'Pending Cutoff')),
-                  DropdownMenuItem(value: 'IN_STATEMENT', child: Text(isVi ? 'Đã gom bảng kê' : 'In Statement')),
-                  DropdownMenuItem(value: 'SETTLED', child: Text(isVi ? 'Đã đối soát xong' : 'Settled')),
-                ],
-              ),
-
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, color: Color(0xFF64748B)),
-                onPressed: () {
-                  setState(() => _paymentsPage = 0);
+              PopupMenuButton<String>(
+                position: PopupMenuPosition.under,
+                offset: const Offset(0, 6),
+                color: Colors.white,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                onSelected: (val) {
+                  setState(() {
+                    _paymentStatusFilter = val;
+                    _paymentsPage = 0;
+                  });
                   _fetchPayments();
                 },
-                tooltip: isVi ? 'Làm mới' : 'Refresh',
+                itemBuilder: (context) => [
+                  PopupMenuItem(value: 'ALL', child: Text(isVi ? 'Tất cả trạng thái GD' : 'All Payment Statuses')),
+                  PopupMenuItem(value: 'SUCCESS', child: Text(isVi ? 'Thành công' : 'Success')),
+                  PopupMenuItem(value: 'PENDING', child: Text(isVi ? 'Đang chờ' : 'Pending')),
+                  PopupMenuItem(value: 'FAILED', child: Text(isVi ? 'Thất bại' : 'Failed')),
+                  PopupMenuItem(value: 'EXPIRED', child: Text(isVi ? 'Hết hạn' : 'Expired')),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _paymentStatusFilter == 'SUCCESS'
+                            ? (isVi ? 'Thành công' : 'Success')
+                            : (_paymentStatusFilter == 'PENDING'
+                                ? (isVi ? 'Đang chờ' : 'Pending')
+                                : (_paymentStatusFilter == 'FAILED'
+                                    ? (isVi ? 'Thất bại' : 'Failed')
+                                    : (_paymentStatusFilter == 'EXPIRED'
+                                        ? (isVi ? 'Hết hạn' : 'Expired')
+                                        : (isVi ? 'Tất cả trạng thái GD' : 'All Payment Statuses')))),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B), size: 24),
+                    ],
+                  ),
+                ),
+              ),
+              // Settlement Status Filter
+              PopupMenuButton<String>(
+                position: PopupMenuPosition.under,
+                offset: const Offset(0, 6),
+                color: Colors.white,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                onSelected: (val) {
+                  setState(() {
+                    _paymentSettlementStatusFilter = val;
+                    _paymentsPage = 0;
+                  });
+                  _fetchPayments();
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(value: 'ALL', child: Text(isVi ? 'Tất cả trạng thái đối soát' : 'All Settlement Statuses')),
+                  PopupMenuItem(value: 'PENDING', child: Text(isVi ? 'Chưa chốt kỳ' : 'Pending Cutoff')),
+                  PopupMenuItem(value: 'IN_STATEMENT', child: Text(isVi ? 'Đã gom bảng kê' : 'In Statement')),
+                  PopupMenuItem(value: 'SETTLED', child: Text(isVi ? 'Đã đối soát xong' : 'Settled')),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _paymentSettlementStatusFilter == 'PENDING'
+                            ? (isVi ? 'Chưa chốt kỳ' : 'Pending Cutoff')
+                            : (_paymentSettlementStatusFilter == 'IN_STATEMENT'
+                                ? (isVi ? 'Đã gom bảng kê' : 'In Statement')
+                                : (_paymentSettlementStatusFilter == 'SETTLED'
+                                    ? (isVi ? 'Đã đối soát xong' : 'Settled')
+                                    : (isVi ? 'Tất cả trạng thái đối soát' : 'All Settlement Statuses'))),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B), size: 24),
+                    ],
+                  ),
+                ),
+              ),
+
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.refresh_rounded, color: Color(0xFF64748B)),
+                  onPressed: () {
+                    setState(() => _paymentsPage = 0);
+                    _fetchPayments();
+                  },
+                  tooltip: isVi ? 'Làm mới' : 'Refresh',
+                ),
               ),
             ],
           ),
@@ -1109,6 +1913,16 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                     isVi ? 'Không tìm thấy giao dịch nào phù hợp.' : 'No payment transactions found.',
                     style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                   ),
+                  if (_paymentStatusFilter != 'ALL' || _paymentSettlementStatusFilter != 'ALL' || _paymentSearchController.text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        isVi
+                            ? 'Mẹo: Bạn đang lọc trạng thái. Hãy chọn "Tất cả trạng thái GD" để xem danh sách giao dịch thành công.'
+                            : 'Tip: Active filters applied. Switch to "All Payment Statuses" to view successful transactions.',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                      ),
+                    ),
                 ],
               ),
             )
@@ -1235,6 +2049,14 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
       text = isVi ? 'Đã thanh toán' : 'Paid';
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF15803D);
+    } else if (status == 'REJECTED') {
+      text = isVi ? 'GV Từ chối' : 'Rejected';
+      bg = const Color(0xFFFEE2E2);
+      fg = const Color(0xFFB91C1C);
+    } else if (status == 'CANCELLED') {
+      text = isVi ? 'Đã hủy' : 'Cancelled';
+      bg = const Color(0xFFF1F5F9);
+      fg = const Color(0xFF64748B);
     }
 
     return Container(

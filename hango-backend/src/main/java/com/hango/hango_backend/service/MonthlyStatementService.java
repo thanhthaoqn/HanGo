@@ -11,12 +11,15 @@ public interface MonthlyStatementService {
     TrainerRevenueSummaryDTO getTrainerRevenueSummary(Long trainerId);
     List<MonthlyStatementDTO> getTrainerStatements(Long trainerId);
     MonthlyStatementDTO confirmTrainerStatement(Long statementId, Long trainerId);
+    MonthlyStatementDTO rejectTrainerStatement(Long statementId, Long trainerId, String rejectReason);
     
     // Course Manager & Admin APIs
     List<MonthlyStatementDTO> getCourseManagerStatements(String periodMonth, String status);
     List<MonthlyStatementDTO> generateMonthlyCutoff(String periodMonth);
     MonthlyStatementDTO settleStatement(Long statementId, String bankTxnRef, String notes);
     MonthlyStatementDTO settleStatement(Long statementId, String bankTxnRef, String notes, String payoutReceiptUrl);
+    MonthlyStatementDTO cancelStatement(Long statementId);
+    MonthlyStatementDTO regenerateStatement(Long statementId);
     List<ManagerPaymentDTO> getStatementPayments(Long statementId);
     byte[] exportStatementsToExcel(String periodMonth, String status);
 }

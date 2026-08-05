@@ -13,5 +13,6 @@ public interface MonthlyStatementRepository extends JpaRepository<MonthlyStateme
     Optional<MonthlyStatement> findByTrainerIdAndPeriodMonth(Long trainerId, String periodMonth);
     List<MonthlyStatement> findByPeriodMonth(String periodMonth);
     List<MonthlyStatement> findByPeriodMonthAndStatus(String periodMonth, String status);
+    List<MonthlyStatement> findByStatus(String status);
     Optional<MonthlyStatement> findByStatementCode(String statementCode);
 }

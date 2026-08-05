@@ -49,41 +49,54 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByCourseCreatorIdAndStatusAndSettlementStatus(Long creatorId, String status, String settlementStatus);
 
     @Query(value = "SELECT p FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +
-                   "WHERE (:status IS NULL OR :status = '' OR :status = 'ALL' OR UPPER(p.status) = UPPER(:status)) " +
-                   "AND (:settlementStatus IS NULL OR :settlementStatus = '' OR :settlementStatus = 'ALL' OR UPPER(COALESCE(p.settlementStatus, 'PENDING')) = UPPER(:settlementStatus)) " +
-                   "AND (:search IS NULL OR :search = '' OR " +
-                   "     LOWER(p.txnRef) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                   "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                   "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                   "     (p.course IS NOT NULL AND LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')))) " +
-                   "ORDER BY p.createdAt DESC",
+           "WHERE (:status IS NULL OR :status = '' OR UPPER(p.status) = UPPER(:status)) " +
+           "AND (:settlementStatus IS NULL OR :settlementStatus = '' " +
+           "     OR (:settlementStatus = 'PENDING' AND (p.statementId IS NULL OR UPPER(p.settlementStatus) = 'PENDING')) " +
+           "     OR (:settlementStatus = 'IN_STATEMENT' AND p.statementId IS NOT NULL AND UPPER(p.settlementStatus) != 'SETTLED') " +
+           "     OR (:settlementStatus = 'SETTLED' AND UPPER(p.settlementStatus) = 'SETTLED')) " +
+           "AND (:search IS NULL OR :search = '' " +
+           "     OR LOWER(p.txnRef) LIKE :search " +
+           "     OR LOWER(u.fullName) LIKE :search " +
+           "     OR LOWER(u.email) LIKE :search " +
+           "     OR LOWER(c.title) LIKE :search) " +
+           "ORDER BY p.createdAt DESC",
            countQuery = "SELECT COUNT(p) FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +
-                        "WHERE (:status IS NULL OR :status = '' OR :status = 'ALL' OR UPPER(p.status) = UPPER(:status)) " +
-                        "AND (:settlementStatus IS NULL OR :settlementStatus = '' OR :settlementStatus = 'ALL' OR UPPER(COALESCE(p.settlementStatus, 'PENDING')) = UPPER(:settlementStatus)) " +
-                        "AND (:search IS NULL OR :search = '' OR " +
-                        "     LOWER(p.txnRef) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                        "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                        "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-                        "     (p.course IS NOT NULL AND LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%'))))")
+           "WHERE (:status IS NULL OR :status = '' OR UPPER(p.status) = UPPER(:status)) " +
+           "AND (:settlementStatus IS NULL OR :settlementStatus = '' " +
+           "     OR (:settlementStatus = 'PENDING' AND (p.statementId IS NULL OR UPPER(p.settlementStatus) = 'PENDING')) " +
+           "     OR (:settlementStatus = 'IN_STATEMENT' AND p.statementId IS NOT NULL AND UPPER(p.settlementStatus) != 'SETTLED') " +
+           "     OR (:settlementStatus = 'SETTLED' AND UPPER(p.settlementStatus) = 'SETTLED')) " +
+           "AND (:search IS NULL OR :search = '' " +
+           "     OR LOWER(p.txnRef) LIKE :search " +
+           "     OR LOWER(u.fullName) LIKE :search " +
+           "     OR LOWER(u.email) LIKE :search " +
+           "     OR LOWER(c.title) LIKE :search)")
     Page<Payment> findAllForManager(@Param("status") String status,
                                      @Param("settlementStatus") String settlementStatus,
                                      @Param("search") String search,
                                      Pageable pageable);
 
     @Query("SELECT p FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +
-           "WHERE (:status IS NULL OR :status = '' OR :status = 'ALL' OR UPPER(p.status) = UPPER(:status)) " +
-           "AND (:settlementStatus IS NULL OR :settlementStatus = '' OR :settlementStatus = 'ALL' OR UPPER(COALESCE(p.settlementStatus, 'PENDING')) = UPPER(:settlementStatus)) " +
-           "AND (:search IS NULL OR :search = '' OR " +
-           "     LOWER(p.txnRef) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "     (p.course IS NOT NULL AND LOWER(c.title) LIKE LOWER(CONCAT('%', :search, '%')))) " +
+           "WHERE (:status IS NULL OR :status = '' OR UPPER(p.status) = UPPER(:status)) " +
+           "AND (:settlementStatus IS NULL OR :settlementStatus = '' " +
+           "     OR (:settlementStatus = 'PENDING' AND (p.statementId IS NULL OR UPPER(p.settlementStatus) = 'PENDING')) " +
+           "     OR (:settlementStatus = 'IN_STATEMENT' AND p.statementId IS NOT NULL AND UPPER(p.settlementStatus) != 'SETTLED') " +
+           "     OR (:settlementStatus = 'SETTLED' AND UPPER(p.settlementStatus) = 'SETTLED')) " +
+           "AND (:search IS NULL OR :search = '' " +
+           "     OR LOWER(p.txnRef) LIKE :search " +
+           "     OR LOWER(u.fullName) LIKE :search " +
+           "     OR LOWER(u.email) LIKE :search " +
+           "     OR LOWER(c.title) LIKE :search) " +
            "ORDER BY p.createdAt DESC")
     List<Payment> findAllForManagerList(@Param("status") String status,
                                          @Param("settlementStatus") String settlementStatus,
                                          @Param("search") String search);
 
     List<Payment> findByStatementId(Long statementId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Payment p SET p.settlementStatus = 'SETTLED' WHERE p.statementId IS NOT NULL AND (p.settlementStatus IS NULL OR UPPER(p.settlementStatus) != 'SETTLED') AND p.statementId IN (SELECT s.id FROM MonthlyStatement s WHERE UPPER(s.status) = 'PAID')")
+    int syncSettledPaymentsForPaidStatements();
 }
 
 

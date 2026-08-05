@@ -146,4 +146,34 @@ public class EmailService {
             System.err.println("[EMAIL WARNING] Could not send enrollment email: " + e.getMessage());
         }
     }
+
+    public void sendSettlementPaidEmail(String toEmail, String trainerName, String periodMonth, String netPayoutText, String bankTxnRef, String receiptUrl) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("HanGo - Monthly Revenue Settlement Confirmation");
+        message.setText("Dear " + (trainerName != null && !trainerName.trim().isEmpty() ? trainerName : "Educator") + ",\n\n" +
+                "Your monthly revenue payout for period " + periodMonth + " has been successfully processed and transferred to your registered bank account.\n\n" +
+                "PAYOUT DETAILS:\n" +
+                "- Statement Period: " + periodMonth + "\n" +
+                "- Net Payout Amount: " + netPayoutText + "\n" +
+                (bankTxnRef != null && !bankTxnRef.trim().isEmpty() ? "- Bank Transaction Ref: " + bankTxnRef + "\n" : "") +
+                (receiptUrl != null && !receiptUrl.trim().isEmpty() ? "- Payout Receipt URL: " + receiptUrl + "\n" : "") +
+                "- Status: PAID & COMPLETED\n\n" +
+                "You can log into your Educator Dashboard to review full transaction items and statements:\n" +
+                "https://hangog92.online/trainer/revenue\n\n" +
+                "Thank you for creating high-quality learning content with HanGo!\n\n" +
+                "Best regards,\n" +
+                "HanGo EdTech Team");
+
+        try {
+            if (mailSender != null) {
+                mailSender.send(message);
+                System.out.println("[EMAIL SUCCESS] Sent revenue settlement confirmation email to: " + toEmail);
+            } else {
+                System.out.println("[EMAIL SUCCESS LOG] Revenue Settlement Email: " + toEmail + " -> Period: " + periodMonth + " (" + netPayoutText + ")");
+            }
+        } catch (Exception e) {
+            System.err.println("[EMAIL WARNING] Could not send settlement email: " + e.getMessage());
+        }
+    }
 }
