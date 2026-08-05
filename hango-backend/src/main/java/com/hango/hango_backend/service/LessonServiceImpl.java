@@ -120,6 +120,8 @@ public class LessonServiceImpl implements LessonService {
                 .mediaSizeBytes(lesson.getMediaSizeBytes())
                 .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes())
                 .learningObjectives(lesson.getLearningObjectives())
+                .mediaFileUrl(lesson.getPdfName())
+                .mediaType(lesson.getPdfName() != null && !lesson.getPdfName().isEmpty() ? "pdf" : null)
                 .build();
     }
 

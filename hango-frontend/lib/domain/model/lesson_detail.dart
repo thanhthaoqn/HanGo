@@ -84,6 +84,8 @@ class LessonDetail {
   final int? mediaSizeBytes;
   final int? estimatedTimeMinutes;
   final String? learningObjectives;
+  final String? mediaFileUrl;
+  final String? mediaType;
 
   LessonDetail({
     required this.id,
@@ -100,6 +102,8 @@ class LessonDetail {
     this.mediaSizeBytes,
     this.estimatedTimeMinutes,
     this.learningObjectives,
+    this.mediaFileUrl,
+    this.mediaType,
   });
 
   factory LessonDetail.fromJson(Map<String, dynamic> json) {
@@ -124,6 +128,8 @@ class LessonDetail {
       mediaSizeBytes: json['mediaSizeBytes'] as int?,
       estimatedTimeMinutes: json['estimatedTimeMinutes'] as int?,
       learningObjectives: json['learningObjectives'] as String?,
+      mediaFileUrl: json['mediaFileUrl'] as String?,
+      mediaType: json['mediaType'] as String?,
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:flutter/foundation.dart';
@@ -160,22 +162,53 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       _isUploadingPdf = true;
       _uploadedPdfName = file.name;
       _pdfFileSizeStr = '${sizeInMb.toStringAsFixed(2)} MB';
-      _pdfUploadProgress = 0.0;
+      _pdfUploadProgress = 0.3; // Start progress
     });
 
-    const int totalSteps = 20;
-    for (int i = 1; i <= totalSteps; i++) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (!mounted) return;
+    try {
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/raw/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'hango_preset'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          file.bytes,
+          filename: file.name,
+        ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(responseBody);
+        final uploadedUrl = data['secure_url'] ?? data['url'];
+
+        setState(() {
+          _uploadedPdfName = uploadedUrl;
+          _pdfUploadProgress = 1.0;
+        });
+
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'PDF document uploaded successfully.');
+        }
+      } else {
+        throw Exception('Failed to upload PDF. Status: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Cloudinary upload error: $e');
+      if (mounted) {
+        ToastHelper.showError(context, 'Failed to upload PDF file.');
+      }
       setState(() {
-        _pdfUploadProgress = i / totalSteps;
+        _uploadedPdfName = null;
+        _pdfFileSizeStr = null;
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingPdf = false;
+        });
+      }
     }
-
-    setState(() {
-      _isUploadingPdf = false;
-    });
-    ToastHelper.showSuccess(context, 'PDF document uploaded successfully.');
   }
 
   void _pickAndUploadPdf() async {

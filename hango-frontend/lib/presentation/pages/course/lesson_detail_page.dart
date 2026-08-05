@@ -4,6 +4,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../../data/repositories/pathway_repository.dart';
@@ -1461,7 +1462,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       );
     }
 
-    return lesson.content.isEmpty
+    final Widget htmlContent = lesson.content.isEmpty
         ? const Center(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
@@ -1521,6 +1522,101 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             },
           );
+
+    final bool hasPdf = lesson.mediaType == 'pdf' && 
+                        lesson.mediaFileUrl != null && 
+                        lesson.mediaFileUrl!.isNotEmpty;
+
+    if (!hasPdf) {
+      return htmlContent;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        htmlContent,
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: Color(0xFFEF4444),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Attached Material',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      lesson.mediaFileUrl!.split('/').last,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final url = Uri.parse(lesson.mediaFileUrl!);
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } else {
+                    if (context.mounted) {
+                      ToastHelper.showError(context, 'Could not open PDF file.');
+                    }
+                  }
+                },
+                icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
+                label: const Text(
+                  'Download',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28B79B),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildQuizContent(

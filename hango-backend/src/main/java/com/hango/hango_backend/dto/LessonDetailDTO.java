@@ -28,4 +28,7 @@ public class LessonDetailDTO {
     private Long mediaSizeBytes;
     private Integer estimatedTimeMinutes;
     private String learningObjectives;
+    
+    private String mediaFileUrl;
+    private String mediaType;
 }
