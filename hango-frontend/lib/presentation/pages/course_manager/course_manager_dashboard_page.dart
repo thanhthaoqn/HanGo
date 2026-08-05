@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../utils/toast_helper.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../data/models/course_manager_dashboard_summary.dart';
@@ -213,13 +213,7 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Clean, light background
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: '',
-        hideNavLinks: true,
-        hideCommerceActions: true,
-        hideLanguageSwitcher: true,
-      ),
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
       drawer: !isDesktop
           ? const Drawer(child: CourseManagerSidebar(currentRoute: 'dashboard'))
           : null,

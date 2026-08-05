@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../pages/learner/learner_home_page.dart';
+
 import '../../pages/login_page.dart';
 import '../../pages/trainer/trainer_shell_page.dart';
 import '../../../data/services/auth_service.dart';
@@ -91,46 +91,7 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo Row -> Clicking navigates to LearnerHomePage()
-          InkWell(
-            onTap: () => Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-              (route) => false,
-            ),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-              child: Row(
-                children: [
-                  Image.network(
-                    'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                    height: 36,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF159971)]),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.school, size: 20, color: Colors.white),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'HanGo',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 8),
           _buildItem(context, 0, Icons.dashboard_outlined, 'Dashboard'),
           if (_canManageCourses)
             _buildItem(context, 1, Icons.book_outlined, 'Courses'),

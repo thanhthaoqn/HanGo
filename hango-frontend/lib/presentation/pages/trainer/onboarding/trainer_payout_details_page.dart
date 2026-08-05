@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
@@ -227,7 +228,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop),
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
@@ -606,7 +607,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       color: Colors.white,
       height: 70,

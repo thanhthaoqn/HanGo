@@ -8,7 +8,7 @@ import '../../../widgets/trainer/trainer_sidebar.dart';
 import '../../../../services/hango_api.dart';
 import 'models/course_manager_question.dart';
 import '../../../widgets/course_manager_sidebar.dart';
-import '../../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../../../data/repositories/trainer_ai_recommendation_repository.dart';
 
 class OptionState {
@@ -470,13 +470,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: widget.isCourseManager
-          ? SharedHeader(
-              isDesktop: isDesktop,
-              activeTab: '',
-              hideNavLinks: true,
-              hideCommerceActions: true,
-              hideLanguageSwitcher: true,
-            )
+          ? InternalAppHeader(isMobile: !(isDesktop), activeTab: '',)
           : null,
       drawer: !isDesktop 
           ? (widget.isCourseManager ? const Drawer(child: CourseManagerSidebar(currentRoute: 'question_bank')) : const Drawer(child: TrainerSidebar(activeIndex: 3)))

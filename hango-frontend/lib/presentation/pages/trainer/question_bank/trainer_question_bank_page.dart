@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
@@ -353,7 +354,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop),
                 Expanded(child: _buildBodyContent(isDesktop)),
               ],
             ),
@@ -602,7 +603,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       color: Colors.white,
       height: 70,

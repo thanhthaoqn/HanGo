@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../utils/language_manager.dart';
 import '../../../../utils/toast_helper.dart';
@@ -331,7 +332,7 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop),
                 Expanded(
                   child: SingleChildScrollView(
                     child: Padding(
@@ -583,7 +584,7 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       color: Colors.white,
       height: 70,

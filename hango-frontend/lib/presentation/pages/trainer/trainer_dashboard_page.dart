@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -171,7 +172,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop),
                 Expanded(child: _buildBodyContent(context, isDesktop, size)),
               ],
             ),
@@ -210,7 +211,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       height: 72,
       padding: const EdgeInsets.symmetric(horizontal: 24),

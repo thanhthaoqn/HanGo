@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'question_bank/widgets/question_search_bar.dart';
 import 'question_bank/widgets/question_table.dart';
 import 'question_bank/course_manager_create_question_page.dart';
@@ -310,13 +310,7 @@ class _CourseManagerQuestionBankPageState
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: '',
-        hideNavLinks: true,
-        hideCommerceActions: true,
-        hideLanguageSwitcher: true,
-      ),
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
       drawer: !isDesktop
           ? const Drawer(
               child: CourseManagerSidebar(currentRoute: 'question_bank'),

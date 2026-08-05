@@ -7,7 +7,7 @@ import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import 'course_manager_create_exam_page.dart';
 import 'course_manager_edit_exam_page.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../../data/services/course_manager_api.dart';
 
@@ -221,13 +221,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: '',
-        hideNavLinks: true,
-        hideCommerceActions: true,
-        hideLanguageSwitcher: true,
-      ),
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'exams')) : null,
       body: Row(
         children: [

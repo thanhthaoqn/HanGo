@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
@@ -278,7 +279,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(context, false),
+          InternalAppHeader(isMobile: false),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
@@ -319,7 +320,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       color: Colors.white,
       height: 70,

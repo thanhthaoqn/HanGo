@@ -1049,6 +1049,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(70),
+        child: SafeArea(child: _buildHeader(context, isDesktop)),
+      ),
       drawer: isDesktop
           ? null
           : Drawer(child: _buildSidebarContent(context, isMobileDrawer: true)),
@@ -1071,9 +1075,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Expanded(
             child: Column(
               children: [
-                // Top Header Row
-                _buildHeader(context, isDesktop),
-
                 // Content Views
                 Expanded(
                   child: SingleChildScrollView(
@@ -1109,17 +1110,60 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Left: Hamburger menu for mobile drawer trigger
-          if (!isDesktop)
+          if (!isDesktop) ...[
             Builder(
               builder: (context) => IconButton(
                 icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-            )
-          else if (_selectedMenuIndex == 1)
+            ),
+            const SizedBox(width: 8),
+          ],
+          
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.network(
+                'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                height: 36,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE6FFFA),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.school,
+                          size: 18,
+                          color: Color(0xFF28B79B),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'HanGo',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+
+          if (isDesktop && _selectedMenuIndex == 1) ...[
+            const SizedBox(width: 24),
             Row(
               children: [
                 const Icon(
@@ -1178,12 +1222,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                         : 'Trainer Account Detail'))
                             : 'Trainer Account Detail')
                       : (_showCreateNewAccountView
-                            ? 'Create New Account'
-                            : (_accountsTab == 'trainer'
-                                  ? 'Trainer'
-                                  : (_accountsTab == 'course_manager'
-                                        ? 'Course Manager'
-                                        : 'Learner'))),
+                          ? 'Create New Account'
+                          : (_accountsTab == 'trainer'
+                                ? 'Trainer'
+                                : (_accountsTab == 'course_manager'
+                                      ? 'Course Manager'
+                                      : 'Learner'))),
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF28B79B),
@@ -1193,8 +1237,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ],
             )
-          else
-            const SizedBox(), // Empty spacer on desktop
+          ],
+          
+          const Spacer(),
           // Right: Bell notification & Profile avatar
           Row(
             children: [
@@ -1639,54 +1684,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Sidebar Logo Section
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
-          child: Image.network(
-            'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-            height: 48,
-            alignment: Alignment.centerLeft,
-            errorBuilder: (context, error, stackTrace) {
-              return Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE6FFFA),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.school,
-                      size: 20,
-                      color: Color(0xFF28B79B),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  RichText(
-                    text: const TextSpan(
-                      text: 'Han',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
-                        fontFamily: 'Outfit',
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'Go',
-                          style: TextStyle(color: Color(0xFF28B79B)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-
-        const SizedBox(height: 10),
+        const SizedBox(height: 24),
 
         // Menu Items List
         Expanded(

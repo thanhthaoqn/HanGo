@@ -10,7 +10,7 @@ import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/course_manager_api.dart';
 
@@ -920,13 +920,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: widget.isCourseManager
-          ? SharedHeader(
-              isDesktop: isDesktop,
-              activeTab: '',
-              hideNavLinks: true,
-              hideCommerceActions: true,
-              hideLanguageSwitcher: true,
-            )
+          ? InternalAppHeader(isMobile: !(isDesktop), activeTab: '',)
           : null,
       drawer: !isDesktop
           ? Drawer(

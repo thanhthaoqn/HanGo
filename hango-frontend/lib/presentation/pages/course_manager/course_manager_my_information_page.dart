@@ -7,7 +7,7 @@ import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../login_page.dart';
 import 'course_manager_dashboard_page.dart';
 import 'course_manager_exams_page.dart';
@@ -118,12 +118,7 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: '',
-        hideNavLinks: true,
-        hideCommerceActions: true,
-      ),
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'profile')) : null,
       body: Row(
         children: [

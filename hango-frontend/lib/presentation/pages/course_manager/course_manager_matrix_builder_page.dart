@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
 
 enum MatrixMode { create, view, edit }
@@ -279,13 +279,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: '',
-        hideNavLinks: true,
-        hideCommerceActions: true,
-        hideLanguageSwitcher: true,
-      ),
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'matrix')) : null,
       body: Row(
         children: [

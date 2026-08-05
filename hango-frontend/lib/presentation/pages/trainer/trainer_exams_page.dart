@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
@@ -418,7 +419,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHeader(context, !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop),
                 Expanded(
                   child: _isCreatingExam
                       ? CourseManagerCreateExamPage(
@@ -1208,7 +1209,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       color: Colors.white,
       height: 70,

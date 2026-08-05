@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/revenue_settlement_service.dart';
 import '../../../utils/language_manager.dart';
@@ -106,7 +107,7 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
           Expanded(
             child: Column(
               children: [
-                _buildHeader(context, !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop),
                 Expanded(
                   child: _buildBodyContent(isVi),
                 ),
@@ -606,7 +607,7 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       color: Colors.white,
       height: 70,

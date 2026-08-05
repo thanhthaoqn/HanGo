@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
@@ -736,7 +737,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(context),
+          InternalAppHeader(isMobile: false),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -765,7 +766,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _unusedLegacyHeader([bool isMobile = false]) {
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 24),

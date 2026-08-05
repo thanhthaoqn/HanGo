@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -281,7 +282,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(context),
+          InternalAppHeader(isMobile: false),
           Expanded(
             child: isDesktop
                 ? Column(
@@ -343,7 +344,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _unusedLegacyHeader([bool isMobile = false]) {
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 24),

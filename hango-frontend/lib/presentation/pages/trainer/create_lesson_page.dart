@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../../utils/config.dart';
 import 'create_lesson_text_page.dart';
 import 'create_lesson_video_page.dart';
@@ -683,7 +684,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(context),
+          InternalAppHeader(isMobile: false),
           Expanded(
             child: isDesktop
                 ? Column(
@@ -745,7 +746,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _unusedLegacyHeader([bool isMobile = false]) {
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 24),

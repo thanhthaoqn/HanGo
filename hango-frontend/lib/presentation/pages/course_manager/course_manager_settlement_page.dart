@@ -4,7 +4,7 @@ import '../../../utils/download_helper.dart';
 import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
-import '../../widgets/shared_header.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 
 class CourseManagerSettlementPage extends StatefulWidget {
   const CourseManagerSettlementPage({super.key});
@@ -657,13 +657,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: '',
-        hideNavLinks: true,
-        hideCommerceActions: true,
-        hideLanguageSwitcher: true,
-      ),
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
       drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'settlement')) : null,
       body: Row(
         children: [

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'trainer_dashboard_page.dart';
 import 'trainer_courses_page.dart';
@@ -201,17 +202,14 @@ class TrainerShellPageState extends State<TrainerShellPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      appBar: InternalAppHeader(isMobile: !isDesktop),
       drawer: !isDesktop ? Drawer(child: TrainerSidebar(activeIndex: _currentIndex, onTabSelect: (idx) => selectTab(idx))) : null,
       body: Row(
         children: [
           if (isDesktop) SizedBox(width: 250, child: TrainerSidebar(activeIndex: _currentIndex, onTabSelect: (idx) => selectTab(idx))),
           Expanded(
-            child: Column(
-              children: [
-                _buildHeader(context, !isDesktop),
-                Expanded(
-                  child: IndexedStack(
-                    index: _currentIndex,
+            child: IndexedStack(
+              index: _currentIndex,
                     children: const [
                       TrainerDashboardPage(isEmbedded: true),
                       TrainerCoursesPage(isEmbedded: true),
@@ -222,16 +220,13 @@ class TrainerShellPageState extends State<TrainerShellPage> {
                       TrainerTicketsPage(isEmbedded: true),
                     ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isMobile) {
+  Widget _unusedLegacyHeader(bool isMobile) {
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 24),

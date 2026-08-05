@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
@@ -531,7 +532,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildHeader(context, false),
+          InternalAppHeader(isMobile: false),
           Expanded(
             child: _isLoadingCourse
                 ? const Center(
@@ -646,7 +647,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
+  Widget _unusedLegacyHeader(bool showMenuButton) {
     return Container(
       color: Colors.white,
       height: 70,
