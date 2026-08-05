@@ -124,54 +124,58 @@ class _AnimatedToastState extends State<_AnimatedToast> with SingleTickerProvide
           constraints: BoxConstraints(
             maxWidth: widget.isMobile ? widget.screenWidth - 32 : 400,
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: widget.isError ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.isError ? const Color(0xFFFCA5A5) : const Color(0xFF34D399),
-              width: 1,
-            ),
+            color: const Color(0xFF1E293B), // Dark Slate / High Contrast
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                widget.isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-                color: widget.isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                size: 20,
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: widget.isError 
+                      ? const Color(0xFFEF4444).withOpacity(0.15) 
+                      : const Color(0xFF10B981).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  widget.isError ? Icons.close_rounded : Icons.check_rounded,
+                  color: widget.isError ? const Color(0xFFF87171) : const Color(0xFF34D399),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   widget.message,
-                  style: TextStyle(
-                    color: widget.isError ? const Color(0xFF991B1B) : const Color(0xFF065F46),
-                    fontWeight: FontWeight.w600,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
                     fontSize: 14,
                     fontFamily: 'Outfit',
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
               IconButton(
                 onPressed: () {
                   ToastHelper.dismiss();
                 },
-                icon: const Icon(Icons.close),
-                iconSize: 16,
+                icon: const Icon(Icons.close_rounded),
+                iconSize: 18,
                 padding: const EdgeInsets.all(8),
                 constraints: const BoxConstraints(),
-                splashRadius: 18,
-                color: widget.isError
-                    ? const Color(0xFF991B1B).withOpacity(0.6)
-                    : const Color(0xFF065F46).withOpacity(0.6),
+                splashRadius: 24,
+                color: const Color(0xFF94A3B8), // Slate 400
               ),
             ],
           ),
