@@ -64,8 +64,28 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
 
   void _onCreateQuizPressed() async {
     final title = _titleController.text.trim();
+    final desc = _descController.text.trim();
+    final passingScore = int.tryParse(_passingScoreController.text.trim()) ?? 70;
+    final timeLimit = int.tryParse(_timeLimitController.text.trim()) ?? 60;
+
     if (title.isEmpty) {
       ToastHelper.showError(context, 'Please enter a quiz title');
+      return;
+    }
+    if (title.length > 255) {
+      ToastHelper.showError(context, 'Title cannot exceed 255 characters');
+      return;
+    }
+    if (desc.length > 500) {
+      ToastHelper.showError(context, 'Description cannot exceed 500 characters');
+      return;
+    }
+    if (passingScore < 0 || passingScore > 100) {
+      ToastHelper.showError(context, 'Passing score must be between 0 and 100');
+      return;
+    }
+    if (timeLimit <= 0) {
+      ToastHelper.showError(context, 'Time limit must be greater than 0');
       return;
     }
 
@@ -76,9 +96,9 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
         'title': title,
         'itemType': 'quiz',
         'displayOrder': lessons.length + 1,
-        'description': _descController.text.trim(),
-        'passingScore': int.tryParse(_passingScoreController.text.trim()) ?? 70,
-        'timeLimit': int.tryParse(_timeLimitController.text.trim()) ?? 60,
+        'description': desc,
+        'passingScore': passingScore,
+        'timeLimit': timeLimit,
         'version': _versionController.text.trim(),
       });
       _localSections[widget.sectionIndex]['lessons'] = lessons;

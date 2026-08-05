@@ -339,6 +339,33 @@ class _EditCoursePageState extends State<EditCoursePage> {
       return false;
     }
 
+    final title = _titleController.text.trim();
+    final code = _codeController.text.trim();
+    final desc = _descriptionController.text.trim();
+    final objectives = _objectivesController.text.trim();
+    final price = double.tryParse(_priceController.text.trim().isEmpty ? '0' : _priceController.text.trim()) ?? 0;
+
+    if (title.length > 255) {
+      if (showToast) ToastHelper.showError(context, 'Title cannot exceed 255 characters');
+      return false;
+    }
+    if (code.length > 100) {
+      if (showToast) ToastHelper.showError(context, 'Code cannot exceed 100 characters');
+      return false;
+    }
+    if (desc.length > 5000) {
+      if (showToast) ToastHelper.showError(context, 'Description cannot exceed 5000 characters');
+      return false;
+    }
+    if (objectives.length > 5000) {
+      if (showToast) ToastHelper.showError(context, 'Objectives cannot exceed 5000 characters');
+      return false;
+    }
+    if (price < 0) {
+      if (showToast) ToastHelper.showError(context, 'Price cannot be negative');
+      return false;
+    }
+
     setState(() {
       _isSaving = true;
     });

@@ -181,10 +181,26 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
       final q = _singleQuestions[i];
       final text = (q['questionTextController'] as TextEditingController).text
           .trim();
+      final explanationText = (q['hintController'] as TextEditingController).text.trim();
+
       if (text.isEmpty) {
         ToastHelper.showError(
           context,
           'Please enter question text for question ${i + 1}.',
+        );
+        return;
+      }
+      if (text.length > 2000) {
+        ToastHelper.showError(
+          context,
+          'Question ${i + 1} text cannot exceed 2000 characters.',
+        );
+        return;
+      }
+      if (explanationText.length > 2000) {
+        ToastHelper.showError(
+          context,
+          'Question ${i + 1} explanation cannot exceed 2000 characters.',
         );
         return;
       }
@@ -198,6 +214,13 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           ToastHelper.showError(
             context,
             'Please fill in all option texts for question ${i + 1}.',
+          );
+          return;
+        }
+        if (optText.length > 1000) {
+          ToastHelper.showError(
+            context,
+            'Option text for question ${i + 1} cannot exceed 1000 characters.',
           );
           return;
         }

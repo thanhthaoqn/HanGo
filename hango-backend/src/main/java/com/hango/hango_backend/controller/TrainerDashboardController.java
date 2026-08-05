@@ -96,7 +96,7 @@ public class TrainerDashboardController {
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createCourse(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody TrainerCreateCourseRequestDTO request) {
+            @RequestBody @jakarta.validation.Valid TrainerCreateCourseRequestDTO request) {
         try {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
@@ -131,7 +131,7 @@ public class TrainerDashboardController {
     public ResponseEntity<?> updateCourse(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody TrainerCreateCourseRequestDTO request) {
+            @RequestBody @jakarta.validation.Valid TrainerCreateCourseRequestDTO request) {
         try {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");

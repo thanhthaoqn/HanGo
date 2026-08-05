@@ -251,9 +251,29 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       ToastHelper.showError(context, 'Please enter a lesson title');
       return;
     }
+    if (title.length > 100) {
+      ToastHelper.showError(context, 'Lesson title cannot exceed 100 characters');
+      return;
+    }
+    if (code.length > 20) {
+      ToastHelper.showError(context, 'Lesson code cannot exceed 20 characters');
+      return;
+    }
+    if (desc.length > 500) {
+      ToastHelper.showError(context, 'Description cannot exceed 500 characters');
+      return;
+    }
+    if (objectives.length > 1000) {
+      ToastHelper.showError(context, 'Learning objectives cannot exceed 1000 characters');
+      return;
+    }
+    if (estimatedTime <= 0) {
+      ToastHelper.showError(context, 'Please enter a valid estimated time (> 0 minutes)');
+      return;
+    }
 
     if (question.isEmpty) {
-      ToastHelper.showError(context, 'Please enter the question');
+      ToastHelper.showError(context, 'Please enter the lesson content');
       return;
     }
 
