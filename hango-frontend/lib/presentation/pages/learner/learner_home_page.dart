@@ -472,7 +472,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     if (!_isLoggedIn) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('dismissed_entry_exam') == true) return;
+      final userId = prefs.getInt('user_id') ?? 0;
+      if (prefs.getBool('dismissed_entry_exam_$userId') == true) return;
 
       final attempts = await _examRepository.fetchMyExamAttempts();
       final hasCompleted = attempts.any((a) => a['examId'] == 999 || a['examId'] == '999');
@@ -531,7 +532,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       child: OutlinedButton(
                         onPressed: () async {
                           final prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool('dismissed_entry_exam', true);
+                          final userId = prefs.getInt('user_id') ?? 0;
+                          await prefs.setBool('dismissed_entry_exam_$userId', true);
                           if (!mounted) return;
                           Navigator.pop(ctx);
                         },
