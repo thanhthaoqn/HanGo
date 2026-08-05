@@ -11,6 +11,8 @@ import '../course/lesson_detail_page.dart';
 import '../course/course_completion_page.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../utils/language_manager.dart';
+import '../exam/exam_result_page.dart';
+import '../../../domain/entities/exam.dart';
 
 class MyLearningPage extends StatefulWidget {
   final bool isEmbedded;
@@ -1086,6 +1088,69 @@ class _MyLearningPageState extends State<MyLearningPage> {
                   ],
                 ),
                 child: ListTile(
+                  onTap: () async {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) => const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF28B79B),
+                          ),
+                        ),
+                      ),
+                    );
+
+                    try {
+                      final examId = attempt['examId']?.toString() ?? '1';
+                      final questions = await _examRepository.fetchExamQuestions(examId);
+
+                      // Parse user answers
+                      Map<int, int> userAnswers = {};
+                      final answersMap = attempt['answers'] as Map?;
+                      if (answersMap != null) {
+                        answersMap.forEach((key, value) {
+                          int parsedKey = int.tryParse(key.toString()) ?? 1;
+                          int parsedVal = (value is num) ? value.toInt() : int.tryParse(value.toString()) ?? -1;
+                          userAnswers[parsedKey - 1] = parsedVal;
+                        });
+                      }
+
+                      // Dummy exam
+                      final dummyExam = Exam(
+                        id: examId,
+                        title: examTitle,
+                        creatorName: 'System',
+                        questionCount: questions.length,
+                        durationMinutes: 60,
+                        rating: 5.0,
+                        learnerCountFormatted: '0',
+                      );
+
+                      if (!mounted) return;
+                      Navigator.pop(context); // Close loading dialog
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ExamResultPage(
+                            exam: dummyExam,
+                            score: scoreVal,
+                            correctCount: (scoreVal * questions.length / 10).round(),
+                            userAnswers: userAnswers,
+                            examQuestions: questions,
+                            attempt: attempt,
+                          ),
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      Navigator.pop(context); // Close loading dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to load details: $e')),
+                      );
+                    }
+                  },
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 8,

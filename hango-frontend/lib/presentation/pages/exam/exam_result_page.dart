@@ -236,14 +236,30 @@ class _ExamResultPageState extends State<ExamResultPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Result title
-                    const Text(
-                      'Exam Result',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
-                      ),
+                    // Result title & Back Button
+                    Row(
+                      children: [
+                        if (Navigator.canPop(context))
+                          Padding(
+                            padding: const EdgeInsets.only(right: 16.0),
+                            child: IconButton(
+                              icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F2937)),
+                              onPressed: () => Navigator.pop(context),
+                              tooltip: 'Go back',
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            'Exam Result: ${widget.exam.title}',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
 
