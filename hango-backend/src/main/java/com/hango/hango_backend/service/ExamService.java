@@ -151,7 +151,8 @@ public class ExamService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> toAnswerRecord(String questionNumber, Object rawValue, List<Question> examQuestions) {
         Map<String, Object> record = new LinkedHashMap<>();
-        int qIndex = parseQuestionNumber(questionNumber);
+        int parsed = parseQuestionNumber(questionNumber);
+        int qIndex = parsed > 0 ? parsed - 1 : 0;
         record.put("questionId", Long.valueOf(qIndex));
         
         Question question = null;
