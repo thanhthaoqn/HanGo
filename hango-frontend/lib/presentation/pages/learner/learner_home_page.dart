@@ -475,7 +475,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       if (prefs.getBool('dismissed_entry_exam') == true) return;
 
       final attempts = await _examRepository.fetchMyExamAttempts();
-      final hasCompleted = attempts.any((a) => a['examId'] == 60 || a['examId'] == '60');
+      final hasCompleted = attempts.any((a) => a['examId'] == 999 || a['examId'] == '999');
       
       if (!hasCompleted) {
         _showEntryExamSuggestion();
@@ -585,9 +585,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       Navigator.pop(context); // Close loading
       
       final entryExam = exams.firstWhere(
-        (e) => e.id == '60',
+        (e) => e.id == '999',
         orElse: () => exams.isNotEmpty ? exams.first : Exam(
-          id: '60',
+          id: '999',
           title: 'Entry Exam',
           description: 'Entry exam to assess your proficiency level.',
           creatorName: 'System',
