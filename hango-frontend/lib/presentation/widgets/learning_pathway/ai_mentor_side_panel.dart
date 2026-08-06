@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/entities/learning_pathway.dart';
+import '../../../utils/language_manager.dart';
 
 class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
@@ -61,8 +62,10 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
           for (var item in history.reversed) {
             if (item['reply'] != null) {
+              final rawRole = item['role'] as String?;
+              final role = (rawRole == 'USER') ? 'user' : 'mentor';
               _messages.add({
-                'role': 'mentor',
+                'role': role,
                 'content': item['reply'] as String,
               });
               if (_conversationId == null && item['conversation_id'] != null) {
@@ -79,21 +82,22 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   }
 
   Future<void> _clearChatHistory() async {
+    final isVi = LanguageManager.isVi;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xóa lịch sử chat?'),
-        content: const Text('Toàn bộ lịch sử trò chuyện với AI Mentor sẽ bị xóa. Bạn có chắc chắn không?'),
+        title: Text(isVi ? 'Xóa lịch sử chat?' : 'Clear Chat History?'),
+        content: Text(isVi ? 'Toàn bộ lịch sử trò chuyện với AI Mentor sẽ bị xóa. Bạn có chắc chắn không?' : 'All conversation history with AI Mentor will be cleared. Are you sure?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Hủy'),
+            child: Text(isVi ? 'Hủy' : 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Xóa'),
+            child: Text(isVi ? 'Xóa' : 'Clear'),
           ),
         ],
       ),
@@ -118,8 +122,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       });
     } catch (e) {
       if (!mounted) return;
+      final isVi = LanguageManager.isVi;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể xóa lịch sử chat: $e')),
+        SnackBar(content: Text(isVi ? 'Không thể xóa lịch sử chat: $e' : 'Cannot clear chat history: $e')),
       );
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -409,7 +414,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           IconButton(
             onPressed: () => _clearChatHistory(),
             icon: Icon(Icons.delete_sweep_rounded, color: dark ? const Color(0xFF8B949E) : const Color(0xFF94A3B8), size: 20),
-            tooltip: 'Xóa lịch sử chat',
+            tooltip: LanguageManager.isVi ? 'Xóa lịch sử chat' : 'Clear chat history',
             style: IconButton.styleFrom(
               hoverColor: Colors.red.withOpacity(0.1),
               highlightColor: Colors.red.withOpacity(0.2),

@@ -115,7 +115,8 @@ public class LearningPathwayService {
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
                 2. Prioritize foundations first, then harder reading or advanced skills.
                 3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó.
-                4. Return valid JSON only, without markdown fences.
+                4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT TỔNG QUAN LỘ TRÌNH (ví dụ: "Chào bạn, lộ trình của bạn gồm X khóa học tập trung vào..."). TUYỆT ĐỐI KHÔNG sinh ra bài tập, mini-quiz, hay câu hỏi trắc nghiệm trong mentor_summary.
+                5. Return valid JSON only, without markdown fences.
 
                 [AVAILABLE_COURSES]
                 %s

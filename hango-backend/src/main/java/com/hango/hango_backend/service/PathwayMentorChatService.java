@@ -109,6 +109,7 @@ public class PathwayMentorChatService {
 
         return PathwayChatResponseDTO.builder()
                 .conversationId(conversation.getId())
+                .role("ASSISTANT")
                 .reply(replyText)
                 .wasOutOfScope(outOfScope)
                 .suggestedQuestions(suggestedQuestions)
@@ -177,6 +178,7 @@ public class PathwayMentorChatService {
             for (PathwayMessage msg : conv.getMessages()) {
                 history.add(PathwayChatResponseDTO.builder()
                         .conversationId(conv.getId())
+                        .role(msg.getRole().name())
                         .reply(msg.getContent())
                         .wasOutOfScope(Boolean.TRUE.equals(msg.getWasOutOfScope()))
                         .build());

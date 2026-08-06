@@ -17,6 +17,8 @@ public class PathwayChatResponseDTO {
     @JsonProperty("conversation_id")
     private Long conversationId;
 
+    private String role; // "USER" or "ASSISTANT"
+
     private String reply;
 
     @JsonProperty("was_out_of_scope")

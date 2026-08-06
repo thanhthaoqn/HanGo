@@ -8,6 +8,7 @@ class PathwaySummaryHeader extends StatelessWidget {
   final VoidCallback? onAnalysisPressed;
   final VoidCallback? onReroutePressed;
   final VoidCallback? onThemeToggle;
+  final VoidCallback? onEditGoalPressed;
 
   const PathwaySummaryHeader({
     super.key,
@@ -16,6 +17,7 @@ class PathwaySummaryHeader extends StatelessWidget {
     this.onAnalysisPressed,
     this.onReroutePressed,
     this.onThemeToggle,
+    this.onEditGoalPressed,
   });
 
   @override
@@ -130,6 +132,15 @@ class PathwaySummaryHeader extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 8),
+                if (onEditGoalPressed != null) ...[
+                  _HeaderIconButton(
+                    tooltip: isVi ? 'Chỉnh sửa mục tiêu' : 'Edit goal',
+                    icon: Icons.edit_calendar_rounded,
+                    color: Colors.white,
+                    onPressed: onEditGoalPressed,
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 _HeaderIconButton(
                   tooltip: isVi ? 'Phân tích kỹ năng' : 'Skill analysis',
                   icon: Icons.analytics_outlined,

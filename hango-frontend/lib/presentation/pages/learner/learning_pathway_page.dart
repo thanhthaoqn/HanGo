@@ -4,8 +4,10 @@ import '../../widgets/learning_pathway/interactive_node_tree.dart';
 import '../../widgets/learning_pathway/ai_mentor_side_panel.dart';
 import '../../widgets/learning_pathway/pathway_summary_header.dart';
 import '../../widgets/learning_pathway/skill_analysis_panel.dart';
+import '../../widgets/learning_pathway/edit_goal_dialog.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
+import '../../../utils/language_manager.dart';
 
 class LearningPathwayPage extends StatefulWidget {
   final bool isEmbedded;
@@ -53,6 +55,38 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showEditGoalDialog() {
+    final pathway = _pathway;
+    if (pathway == null) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (context) => EditGoalDialog(
+        pathway: pathway,
+        isDarkMode: _isDarkMode,
+        repository: _repository,
+        onUpdated: (updatedPathway) {
+          if (!mounted) return;
+          setState(() {
+            _pathway = updatedPathway;
+            _selectedNode = updatedPathway.nodes.firstWhere(
+              (n) => n.status == NodeStatus.inProgress,
+              orElse: () => updatedPathway.nodes.first,
+            );
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(LanguageManager.isVi
+                  ? 'Đã cập nhật mục tiêu và lộ trình học!'
+                  : 'Pathway goals updated successfully!'),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _handleNodeTap(PathwayNode node) {
@@ -226,6 +260,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           pathway: _pathway!,
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
+          onEditGoalPressed: _showEditGoalDialog,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
