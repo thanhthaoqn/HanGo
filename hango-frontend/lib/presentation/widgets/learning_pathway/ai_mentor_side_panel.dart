@@ -23,7 +23,6 @@ class AIMentorSidePanel extends StatefulWidget {
 }
 
 class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
-  final TextEditingController _chatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final PathwayRepository _repository = PathwayRepository();
   final List<Map<String, String>> _messages = [];
@@ -61,7 +60,6 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
   @override
   void dispose() {
-    _chatController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -102,25 +100,25 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     }
   }
 
-  Future<void> _sendMessage() async {
-    final text = _chatController.text.trim();
-    if (text.isEmpty || _isSending) return;
+  Future<void> _sendAction(String actionType, {Map<String, dynamic>? payload, String? displayMessage}) async {
+    if (_isSending) return;
 
     setState(() {
-      _messages.add({'role': 'user', 'content': text});
-      _chatController.clear();
+      _messages.add({'role': 'user', 'content': displayMessage ?? 'Action: $actionType'});
       _isSending = true;
     });
     _scrollToBottom();
 
     try {
-      final response = await _repository.chatWithMentor(
+      final updatedPathway = await _repository.sendMentorAction(
         pathwayId: widget.pathway.pathwayId,
-        message: text,
+        actionType: actionType,
+        payload: payload,
       );
+      widget.onPathwayUpdated?.call(updatedPathway);
       if (!mounted) return;
       setState(() {
-        _messages.add({'role': 'mentor', 'content': response});
+        _messages.add({'role': 'mentor', 'content': 'Action processed successfully. Your pathway has been updated.'});
       });
     } catch (_) {
       if (!mounted) return;
@@ -128,7 +126,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
         _messages.add({
           'role': 'mentor',
           'content':
-              'AI Mentor is unavailable right now. Please try again later.',
+              'I could not process that action right now. Please try again later.',
         });
       });
     } finally {
@@ -222,7 +220,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               widget.selectedNode!.status != NodeStatus.locked)
             _buildActionArea(dark),
           Divider(height: 1, color: border),
-          _buildChatInput(dark),
+          _buildActionHub(dark),
         ],
       ),
     );
@@ -583,69 +581,76 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     );
   }
 
-  Widget _buildChatInput(bool dark) {
-    final inputBg = dark ? const Color(0xFF21262D) : const Color(0xFFF1F5F9);
+  Widget _buildActionHub(bool dark) {
+    final inputBg = dark ? const Color(0xFF161B22) : Colors.white;
+
+    final actions = widget.pathway.suggestedActions.isNotEmpty
+        ? widget.pathway.suggestedActions
+        : _getDefaultActions();
+
     return Container(
-      padding: const EdgeInsets.all(12),
-      color: dark ? const Color(0xFF161B22) : Colors.white,
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      color: inputBg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: inputBg,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: TextField(
-                controller: _chatController,
-                style: TextStyle(
-                  color: dark
-                      ? const Color(0xFFF0F6FC)
-                      : const Color(0xFF0F172A),
+          Text(
+            'Suggested Actions',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: dark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (_isSending)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                decoration: InputDecoration(
-                  hintText: 'Ask AI Mentor about this pathway...',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(
-                    color: dark
-                        ? const Color(0xFF8B949E)
-                        : const Color(0xFF94A3B8),
-                    fontSize: 14,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: actions.map((action) {
+                final isHighlight = action.toLowerCase().contains('quiz') || action.toLowerCase().contains('fast');
+                return ActionChip(
+                  label: Text(action),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isHighlight ? Colors.white : (dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155)),
                   ),
-                ),
-                onSubmitted: (_) => _sendMessage(),
-              ),
+                  backgroundColor: isHighlight
+                      ? const Color(0xFF6366F1)
+                      : (dark ? const Color(0xFF21262D) : const Color(0xFFF1F5F9)),
+                  side: BorderSide(
+                    color: isHighlight
+                        ? const Color(0xFF6366F1)
+                        : (dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0)),
+                  ),
+                  onPressed: () => _sendAction(action, displayMessage: 'Action: $action'),
+                );
+              }).toList(),
             ),
-          ),
-          const SizedBox(width: 10),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: _isSending
-                  ? const Color(0xFF94A3B8)
-                  : const Color(0xFF28B79B),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: _isSending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-              onPressed: _isSending ? null : _sendMessage,
-            ),
-          ),
         ],
       ),
     );
+  }
+
+  List<String> _getDefaultActions() {
+    final status = widget.selectedNode?.status;
+    if (status == NodeStatus.inProgress) {
+      return ['Fast-track this step', 'Take a Mini-Quiz', 'Adjust my Schedule'];
+    } else if (status == NodeStatus.completed) {
+      return ['Review this topic', 'Share progress'];
+    }
+    return ['Unlock criteria', 'What will I learn?'];
   }
 }

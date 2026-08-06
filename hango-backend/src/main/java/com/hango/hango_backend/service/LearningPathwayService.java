@@ -99,16 +99,22 @@ public class LearningPathwayService {
 
 
 
+        String goalText = (requestDTO.getGoalName() != null && !requestDTO.getGoalName().isBlank())
+                ? "MỤC TIÊU CỦA NGƯỜI HỌC: " + requestDTO.getGoalName() + "\n"
+                : "";
+
         String systemPrompt = """
 
                 .
                 Bạn là Trợ lý lập lộ trình học tập.
                 Nhiệm vụ: dựa trên JSON bài thi mới nhất của learner (answersJson) và phần phân tích do tool cung cấp để đề xuất lộ trình cá nhân hóa.
 
+                %s
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
                 2. Prioritize foundations first, then harder reading or advanced skills.
-                3. Return valid JSON only, without markdown fences.
+                3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó.
+                4. Return valid JSON only, without markdown fences.
 
                 [AVAILABLE_COURSES]
                 %s
@@ -128,6 +134,7 @@ public class LearningPathwayService {
                   ]
                 }
                 """.formatted(
+                goalText,
                 courseListBuilder,
                 examAnalysis.getExamAttemptId(),
                 examAnalysis.getScore(),

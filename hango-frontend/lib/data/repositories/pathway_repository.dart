@@ -221,56 +221,16 @@ class PathwayRepository {
     return LearningPathway.fromJson(jsonDecode(utf8.decode(response.bodyBytes)));
   }
 
-  Future<MergePreview> mergePreview(List<int> courseIds) async {
+
+
+  Future<LearningPathway> sendMentorAction({
+    required int pathwayId,
+    required String actionType,
+    Map<String, dynamic>? payload,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    final uri = Uri.parse('$baseUrl/pathways/merge-preview');
-
-    if (token == null || token.isEmpty) throw Exception('Auth missing');
-
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(courseIds),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Merge preview failed: ${response.statusCode}. ${response.body}');
-    }
-
-    return MergePreview.fromJson(jsonDecode(utf8.decode(response.bodyBytes)));
-  }
-
-  Future<LearningPathway> mergeConfirm(int pathwayId, MergePreview preview) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/merge-confirm');
-
-    if (token == null || token.isEmpty) throw Exception('Auth missing');
-
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(preview.toJson()),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Merge confirm failed: ${response.statusCode}. ${response.body}');
-    }
-
-    return LearningPathway.fromJson(jsonDecode(utf8.decode(response.bodyBytes)));
-  }
-
-  Future<String> chatWithMentor({required int pathwayId, required String message}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/chat');
+    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/mentor-action');
 
     if (token == null || token.isEmpty) {
       throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
@@ -282,14 +242,18 @@ class PathwayRepository {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({'message': message}),
+      body: jsonEncode({
+        'actionType': actionType,
+        if (payload != null) 'payload': payload,
+      }),
     );
 
     if (response.statusCode != 200) {
       final body = utf8.decode(response.bodyBytes);
-      throw Exception('Unable to chat with mentor: ${response.statusCode}. $body');
+      throw Exception('Unable to send mentor action: ${response.statusCode}. $body');
     }
 
-    return utf8.decode(response.bodyBytes);
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    return LearningPathway.fromJson(data);
   }
 }

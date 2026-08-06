@@ -4,7 +4,6 @@ import '../../widgets/learning_pathway/interactive_node_tree.dart';
 import '../../widgets/learning_pathway/ai_mentor_side_panel.dart';
 import '../../widgets/learning_pathway/pathway_summary_header.dart';
 import '../../widgets/learning_pathway/skill_analysis_panel.dart';
-import '../../widgets/learning_pathway/merge_preview_dialog.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 
@@ -122,48 +121,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
-  Future<void> _handleMergeGoals() async {
-    final pathway = _pathway;
-    if (pathway == null) return;
 
-    final uncompletedCourseIds = pathway.nodes
-        .where((n) => n.status != NodeStatus.completed)
-        .map((n) => n.courseId)
-        .toList();
-
-    if (uncompletedCourseIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No active steps available to merge.')),
-      );
-      return;
-    }
-
-    try {
-      final preview = await _repository.mergePreview(uncompletedCourseIds);
-      if (!mounted) return;
-
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => MergePreviewDialog(preview: preview),
-      );
-
-      if (confirmed == true && mounted) {
-        final updatedPathway = await _repository.mergeConfirm(pathway.pathwayId, preview);
-        setState(() {
-          _pathway = updatedPathway;
-          _selectedNode = updatedPathway.nodes.isNotEmpty ? updatedPathway.nodes.first : null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Goals merged successfully!')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not generate merge preview: $e')),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -175,12 +133,30 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
         return Scaffold(
           backgroundColor: bg,
           appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: 'Learning Pathway'),
+          endDrawer: isDesktop ? null : Drawer(
+            width: constraints.maxWidth * 0.85,
+            child: _pathway != null ? AIMentorSidePanel(
+              pathway: _pathway!,
+              selectedNode: _selectedNode,
+              onPathwayUpdated: _handlePathwayUpdated,
+              isDarkMode: _isDarkMode,
+            ) : const SizedBox(),
+          ),
+          floatingActionButton: isDesktop || _pathway == null ? null : Builder(
+            builder: (ctx) => FloatingActionButton.extended(
+              onPressed: () => Scaffold.of(ctx).openEndDrawer(),
+              icon: const Icon(Icons.auto_awesome_rounded),
+              label: const Text('AI Mentor'),
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+            ),
+          ),
           body: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: _isDarkMode
                     ? const [Color(0xFF0D1117), Color(0xFF0F172A)]
-                    : const [Color(0xFFF8FAFC), Color(0xFFEFFDF8)],
+                    : const [Color(0xFFF8FAFC), Color(0xFFEEF2FF)], // Playful indigo hint
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -207,29 +183,33 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           pathway: _pathway!,
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
-          onMergePressed: _handleMergeGoals,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Expanded(
-                flex: 64,
+              Positioned.fill(
                 child: InteractiveNodeTree(
                   nodes: _pathway!.nodes,
                   onNodeTap: _handleNodeTap,
                   selectedNode: _selectedNode,
                   isDarkMode: _isDarkMode,
+                  contentPadding: const EdgeInsets.only(right: 420), // Padding to not hide nodes under mentor
                 ),
               ),
-              Expanded(
-                flex: 36,
-                child: AIMentorSidePanel(
-                  pathway: _pathway!,
-                  selectedNode: _selectedNode,
-                  onPathwayUpdated: _handlePathwayUpdated,
-                  isDarkMode: _isDarkMode,
+              Positioned(
+                top: 24,
+                right: 24,
+                bottom: 24,
+                width: 380,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: AIMentorSidePanel(
+                    pathway: _pathway!,
+                    selectedNode: _selectedNode,
+                    onPathwayUpdated: _handlePathwayUpdated,
+                    isDarkMode: _isDarkMode,
+                  ),
                 ),
               ),
             ],
@@ -246,35 +226,15 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           pathway: _pathway!,
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
-          onMergePressed: _handleMergeGoals,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 600,
-                  child: InteractiveNodeTree(
-                    nodes: _pathway!.nodes,
-                    onNodeTap: _handleNodeTap,
-                    selectedNode: _selectedNode,
-                    isDarkMode: _isDarkMode,
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 460,
-                  child: AIMentorSidePanel(
-                    pathway: _pathway!,
-                    selectedNode: _selectedNode,
-                    onPathwayUpdated: _handlePathwayUpdated,
-                    isDarkMode: _isDarkMode,
-                  ),
-                ),
-              ),
-            ],
+          child: InteractiveNodeTree(
+            nodes: _pathway!.nodes,
+            onNodeTap: _handleNodeTap,
+            selectedNode: _selectedNode,
+            isDarkMode: _isDarkMode,
+            contentPadding: const EdgeInsets.only(bottom: 100),
           ),
         ),
       ],

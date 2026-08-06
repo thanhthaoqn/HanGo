@@ -6,6 +6,7 @@ class InteractiveNodeTree extends StatelessWidget {
   final Function(PathwayNode) onNodeTap;
   final PathwayNode? selectedNode;
   final bool isDarkMode;
+  final EdgeInsetsGeometry? contentPadding;
 
   const InteractiveNodeTree({
     super.key,
@@ -13,12 +14,13 @@ class InteractiveNodeTree extends StatelessWidget {
     required this.onNodeTap,
     this.selectedNode,
     this.isDarkMode = false,
+    this.contentPadding,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+      padding: contentPadding ?? const EdgeInsets.fromLTRB(22, 18, 22, 28),
       itemCount: nodes.length,
       itemBuilder: (context, index) {
         final node = nodes[index];
