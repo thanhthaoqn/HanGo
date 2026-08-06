@@ -99,44 +99,38 @@ public class PathwayTimeboxingScheduler {
 
     // Assign blocks to nodes backwards.
     List<NodeSchedule> reversed = new ArrayList<>();
-    int remainingIndex = calendar.size() - 1;
+    int remainingIndex = 0; // Start at NEWEST date (targetDate)
 
     for (int nodeIdx = nodeCount - 1; nodeIdx >= 0; nodeIdx--) {
       int hoursNeeded = nodeHours.get(nodeIdx);
       if (hoursNeeded <= 0) {
-        LocalDate d = targetDate;
+        LocalDate d = (remainingIndex < calendar.size()) ? calendar.get(remainingIndex).date : (calendar.isEmpty() ? targetDate : calendar.get(calendar.size() - 1).date);
         reversed.add(new NodeSchedule(d, d, 0));
         continue;
       }
 
-      int startCalIndex = remainingIndex;
+      int startCalIndex = remainingIndex; // NEWEST date for this node (deadline)
       int hoursTaken = 0;
 
       // Consume calendar working days until hoursNeeded satisfied.
-      while (remainingIndex >= 0 && hoursTaken < hoursNeeded) {
+      while (remainingIndex < calendar.size() && hoursTaken < hoursNeeded) {
         WorkingDay day = calendar.get(remainingIndex);
         hoursTaken += day.hoursCapacity;
-        remainingIndex--;
+        remainingIndex++; // Moves towards OLDEST date
       }
 
-      // deadline = last working day we used
-      if (startCalIndex < 0) {
-        // Deterministic fallback: if capacity is insufficient, pin to targetDate
-        reversed.add(new NodeSchedule(targetDate, targetDate, hoursNeeded));
-        continue;
+      // deadline = NEWEST date (first day we encountered in this chunk)
+      if (startCalIndex >= calendar.size()) {
+        startCalIndex = calendar.size() - 1;
       }
-
       LocalDate deadline = calendar.get(startCalIndex).date;
 
-      // start_date = first working day we used
-      int firstUsedIndex = remainingIndex + 1;
-      if (firstUsedIndex < 0 || firstUsedIndex >= calendar.size()) {
-        reversed.add(new NodeSchedule(targetDate, deadline, hoursNeeded));
-        continue;
-      }
+      // start_date = OLDEST date (last day we used in this chunk)
+      int lastUsedIndex = remainingIndex - 1;
+      if (lastUsedIndex < 0) lastUsedIndex = 0;
+      if (lastUsedIndex >= calendar.size()) lastUsedIndex = calendar.size() - 1;
 
-      LocalDate startDate = calendar.get(firstUsedIndex).date;
-
+      LocalDate startDate = calendar.get(lastUsedIndex).date;
 
       // estimatedHours for node = hoursNeeded (deterministic from input)
       reversed.add(new NodeSchedule(startDate, deadline, hoursNeeded));
