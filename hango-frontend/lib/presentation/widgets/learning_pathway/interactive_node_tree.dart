@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../domain/entities/learning_pathway.dart';
+import '../../pages/course/course_detail_page.dart';
 
 class InteractiveNodeTree extends StatelessWidget {
   final List<PathwayNode> nodes;
@@ -253,6 +254,34 @@ class _NodeCard extends StatelessWidget {
             status: node.status,
             isDarkMode: isDarkMode,
           ),
+          if (node.status != NodeStatus.locked && node.courseId > 0) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CourseDetailPage(courseId: node.courseId),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: const Text('Vào học'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? const Color(0xFF6366F1) : const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

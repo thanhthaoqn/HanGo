@@ -228,7 +228,7 @@ This file is the official roadmap and checklist for the HanGo platform developme
 - [x] Create Rule-based Recommendation mapping weak SkillType -> Course.
 - [x] Create `LearningPathwayService` to generate structured roadmap JSON from matrix results.
 - [x] Create API endpoints `/api/v1/pathways/generate`, `/api/v1/pathways/me`, `/api/v1/pathways/{id}/chat` for AI Mentor.
-- [ ] Add `wasOutOfScope` detection in AI Mentor Chat (system prompt and fallback logic).
+- [x] Add `wasOutOfScope` detection in AI Mentor Chat (system prompt and fallback logic) — completed 2026-08-07 with pre-LLM out-of-scope fallback and `PathwayMentorChatServiceTest`.
 
 ### 🔌 Phase 3: Integration
 - [x] Replace mock data with real pathway generator and AI Mentor Chat API calls.

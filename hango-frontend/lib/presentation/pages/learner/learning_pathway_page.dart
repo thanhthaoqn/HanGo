@@ -194,14 +194,14 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                   onNodeTap: _handleNodeTap,
                   selectedNode: _selectedNode,
                   isDarkMode: _isDarkMode,
-                  contentPadding: const EdgeInsets.only(right: 420), // Padding to not hide nodes under mentor
+                  contentPadding: const EdgeInsets.only(right: 480), // Padding to not hide nodes under mentor
                 ),
               ),
               Positioned(
                 top: 24,
                 right: 24,
                 bottom: 24,
-                width: 380,
+                width: 440,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: AIMentorSidePanel(

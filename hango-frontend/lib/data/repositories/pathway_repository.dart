@@ -256,4 +256,68 @@ class PathwayRepository {
     final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     return LearningPathway.fromJson(data);
   }
+
+  Future<Map<String, dynamic>> sendChatMessage({
+    required int pathwayId,
+    required String message,
+    int? conversationId,
+    int? selectedNodeCourseId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/chat');
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+    }
+
+    final body = {
+      'message': message,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (selectedNodeCourseId != null) 'selected_node_course_id': selectedNodeCourseId,
+    };
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode != 200) {
+      final resBody = utf8.decode(response.bodyBytes);
+      throw Exception('Unable to send chat message: ${response.statusCode}. $resBody');
+    }
+
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getChatHistory({
+    required int pathwayId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/chat/history');
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Không tìm thấy auth token.');
+    }
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to get chat history: ${response.statusCode}');
+    }
+
+    final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data.cast<Map<String, dynamic>>();
+  }
 }

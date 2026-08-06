@@ -283,26 +283,137 @@ public class LearningPathwayService {
 
         String actionType = request.getActionType();
         switch (actionType) {
-            case "FAST_TRACK":
-                pathway.setMentorSummary("Đã đề xuất loại bỏ khóa học này khỏi lộ trình theo yêu cầu của bạn.");
-                break;
-            case "ADJUST_SCHEDULE":
-                pathway.setScheduleStatus("AT_RISK");
-                pathway.setMentorSummary("Lịch trình của bạn đang có vẻ bị chậm. Bạn có muốn tăng thêm số giờ học mỗi tuần không?");
-                break;
-            case "TAKE_QUIZ":
-                pathway.setMentorSummary("Tôi đã ghi nhận yêu cầu làm bài kiểm tra ngắn (Mini-Quiz). Tính năng tạo bài kiểm tra động sẽ sớm ra mắt!");
-                break;
-            case "WHAT_WILL_I_LEARN":
-                pathway.setMentorSummary("Lộ trình này sẽ giúp bạn bao phủ toàn bộ các kỹ năng còn yếu để đạt được mục tiêu của mình một cách nhanh nhất.");
-                break;
-            default:
+            case "FAST_TRACK" -> {
+                // Find current IN_PROGRESS node and actually skip it
+                PathwayNode currentNode = findCurrentInProgressNode(pathway);
+                if (currentNode != null) {
+                    currentNode.setNodeType("FAST_TRACK_SKIPPED");
+                    currentNode.setIsOptional(true);
+                    currentNode.setSkippedAt(java.time.LocalDateTime.now());
+                    currentNode.setStatus("COMPLETED");
+                    currentNode.setRerouteReason("Skipped by learner via Fast Track action");
+
+                    // Unlock next node
+                    if (pathway.getNodes() != null) {
+                        pathway.getNodes().stream()
+                                .filter(n -> n.getStepOrder() == currentNode.getStepOrder() + 1)
+                                .findFirst()
+                                .ifPresent(next -> {
+                                    if ("LOCKED".equalsIgnoreCase(next.getStatus())) {
+                                        next.setStatus("IN_PROGRESS");
+                                    }
+                                });
+                    }
+                    pathway.setMentorSummary("✅ Đã bỏ qua khóa học '" + currentNode.getCourse().getTitle() + "' và mở khóa bước tiếp theo cho bạn.");
+                } else {
+                    pathway.setMentorSummary("Không tìm thấy khóa học nào đang học để bỏ qua.");
+                }
+            }
+            case "ADJUST_SCHEDULE" -> {
+                // Recalculate timeboxing with current data
+                Integer newHours = null;
+                if (request.getPayload() != null && request.getPayload().get("hoursPerWeek") != null) {
+                    newHours = ((Number) request.getPayload().get("hoursPerWeek")).intValue();
+                }
+                if (newHours != null && newHours > 0) {
+                    pathway.setHoursPerWeek(newHours);
+                }
+                if (pathway.getTargetDate() != null && pathway.getHoursPerWeek() != null && pathway.getHoursPerWeek() > 0) {
+                    applyTimeboxing(pathway, pathway.getTargetDate(), pathway.getHoursPerWeek(), null);
+                    pathway.setScheduleStatus("ON_TRACK");
+                    pathway.setMentorSummary("📅 Lịch trình đã được tính toán lại" +
+                            (newHours != null ? " với " + newHours + " giờ/tuần." : ".") +
+                            " Hãy cố gắng theo đúng tiến độ nhé!");
+                } else {
+                    pathway.setScheduleStatus("AT_RISK");
+                    pathway.setMentorSummary("⚠️ Lịch trình chưa thể tính lại vì chưa có ngày mục tiêu hoặc số giờ/tuần. Hãy cập nhật mục tiêu của bạn.");
+                }
+            }
+            case "TAKE_QUIZ" -> {
+                // Generate dynamic mini-quiz based on current node's course
+                PathwayNode currentNode = findCurrentInProgressNode(pathway);
+                String quizContent = generateMiniQuiz(currentNode);
+                pathway.setMentorSummary(quizContent);
+            }
+            case "WHAT_WILL_I_LEARN" -> {
+                // Build personalized overview from actual pathway data
+                StringBuilder overview = new StringBuilder("📚 **Tổng quan lộ trình của bạn:**\n\n");
+                if (pathway.getGoalName() != null) {
+                    overview.append("🎯 Mục tiêu: ").append(pathway.getGoalName()).append("\n");
+                }
+                int total = pathway.getNodes() != null ? pathway.getNodes().size() : 0;
+                long completed = pathway.getNodes() != null ?
+                        pathway.getNodes().stream().filter(n -> "COMPLETED".equalsIgnoreCase(n.getStatus())).count() : 0;
+                overview.append("📊 Tiến độ: ").append(completed).append("/").append(total).append(" bước hoàn thành\n\n");
+                overview.append("Các kỹ năng sẽ được cải thiện:\n");
+                if (pathway.getNodes() != null) {
+                    for (PathwayNode node : pathway.getNodes()) {
+                        String status = switch (node.getStatus().toUpperCase()) {
+                            case "COMPLETED" -> "✅";
+                            case "IN_PROGRESS" -> "🔄";
+                            default -> "🔒";
+                        };
+                        String skill = node.getCourse().getCategory() != null ?
+                                node.getCourse().getCategory().getParamValue() : "General";
+                        overview.append(status).append(" Bước ").append(node.getStepOrder())
+                                .append(": ").append(node.getCourse().getTitle())
+                                .append(" (").append(skill).append(")\n");
+                    }
+                }
+                pathway.setMentorSummary(overview.toString());
+            }
+            default -> {
                 pathway.setMentorSummary("Tôi đã nhận được yêu cầu của bạn (" + actionType + "), nhưng chưa biết cách xử lý nó lúc này.");
-                break;
+            }
         }
 
         LearningPathway savedPathway = learningPathwayRepository.save(pathway);
         return toResponseDto(savedPathway, studentId);
+    }
+
+    private PathwayNode findCurrentInProgressNode(LearningPathway pathway) {
+        if (pathway.getNodes() == null) return null;
+        return pathway.getNodes().stream()
+                .filter(n -> "IN_PROGRESS".equalsIgnoreCase(n.getStatus()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String generateMiniQuiz(PathwayNode currentNode) {
+        if (currentNode == null) {
+            return "📝 Không tìm thấy khóa học đang học để tạo mini-quiz. Hãy bắt đầu một khóa học trước.";
+        }
+        try {
+            String courseName = currentNode.getCourse().getTitle();
+            String category = currentNode.getCourse().getCategory() != null ?
+                    currentNode.getCourse().getCategory().getParamValue() : "General English";
+
+            String prompt = """
+                    Tạo 3 câu hỏi trắc nghiệm (mỗi câu 4 lựa chọn A/B/C/D) về chủ đề "%s" (%s) cho học sinh luyện thi THPT Quốc gia Tiếng Anh.
+                    Format mỗi câu:
+                    **Câu X:** [câu hỏi]
+                    A. [lựa chọn]
+                    B. [lựa chọn]
+                    C. [lựa chọn]
+                    D. [lựa chọn]
+                    ✅ Đáp án: [đáp án đúng]
+
+                    Chỉ trả về đúng 3 câu hỏi, không thêm gì khác.
+                    """.formatted(courseName, category);
+
+            java.util.List<com.hango.hango_backend.dto.GeminiGenerateRequest.Content> history = java.util.List.of(
+                    com.hango.hango_backend.dto.GeminiGenerateRequest.Content.builder()
+                            .role("user")
+                            .parts(java.util.List.of(com.hango.hango_backend.dto.GeminiGenerateRequest.Part.builder().text(prompt).build()))
+                            .build());
+
+            String quizText = geminiClientService.generateChatResponse(
+                    "Bạn là giáo viên Tiếng Anh THPT. Tạo câu hỏi trắc nghiệm chất lượng.", history);
+            return "📝 **Mini-Quiz: " + courseName + "**\n\n" + quizText;
+        } catch (Exception e) {
+            log.warn("Failed to generate mini-quiz: {}", e.getMessage());
+            return "📝 Tôi đang gặp sự cố khi tạo mini-quiz. Vui lòng thử lại sau.";
+        }
     }
 
     @Transactional
@@ -425,13 +536,37 @@ public class LearningPathwayService {
         }
 
         List<String> suggestedActions = new java.util.ArrayList<>();
+
+        // Context-aware suggested actions based on actual learner progress
+        PathwayNode currentNode = null;
+        if (pathway.getNodes() != null) {
+            currentNode = pathway.getNodes().stream()
+                    .filter(n -> "IN_PROGRESS".equalsIgnoreCase(n.getStatus()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (currentNode != null) {
+            int progress = calculateCourseProgressPercent(studentId, currentNode.getCourse().getId());
+            if (progress >= 80) {
+                suggestedActions.add("FAST_TRACK");
+            }
+            if (progress > 0 && progress < 50) {
+                suggestedActions.add("TAKE_QUIZ");
+            }
+        }
+
         if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus()) || "AT_RISK".equalsIgnoreCase(pathway.getScheduleStatus())) {
             suggestedActions.add("ADJUST_SCHEDULE");
-        } else {
-            suggestedActions.add("FAST_TRACK");
         }
-        suggestedActions.add("TAKE_QUIZ");
+
+        // Always offer overview
         suggestedActions.add("WHAT_WILL_I_LEARN");
+
+        // If no contextual actions were added, add quiz as a safe default
+        if (suggestedActions.size() == 1) {
+            suggestedActions.add(0, "TAKE_QUIZ");
+        }
 
         return LearningPathwayResponseDTO.builder()
                 .pathwayId(pathway.getId())
