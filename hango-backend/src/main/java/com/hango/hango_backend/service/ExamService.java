@@ -75,11 +75,13 @@ public class ExamService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<ExamAttemptResponseDTO> getMyExamAttempts(Long userId) {
         List<ExamAttempt> attempts = examAttemptRepository.findByStudentIdOrderByStartedAtDesc(userId);
         return mapToAttemptDTOList(attempts);
     }
 
+    @Transactional(readOnly = true)
     public List<ExamAttemptResponseDTO> getExamAttempts(Long examId, Long userId) {
         List<ExamAttempt> attempts = examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(examId, userId);
         return mapToAttemptDTOList(attempts);
@@ -282,8 +284,16 @@ public class ExamService {
 
         boolean isPassed = attempt.getScore() != null && attempt.getScore().doubleValue() >= 5.0;
 
-        Long examId = attempt.getExam() != null ? attempt.getExam().getId() : null;
-        String examTitle = attempt.getExam() != null ? attempt.getExam().getTitle() : "Unknown Exam";
+        Long examId = null;
+        String examTitle = "Unknown Exam";
+        try {
+            if (attempt.getExam() != null) {
+                examId = attempt.getExam().getId();
+                examTitle = attempt.getExam().getTitle();
+            }
+        } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.LazyInitializationException e) {
+            // Ignore if exam was deleted or session closed
+        }
 
         return ExamAttemptResponseDTO.builder()
                 .id(attempt.getId())
