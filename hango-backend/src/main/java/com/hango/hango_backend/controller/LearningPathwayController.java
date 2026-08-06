@@ -216,4 +216,14 @@ public class LearningPathwayController {
 
         return ResponseEntity.ok(mentorChatService.getChatHistory(id, userDetails.getId()));
     }
+
+    @DeleteMapping("/{id}/chat/history")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    public ResponseEntity<Void> clearChatHistory(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        mentorChatService.clearChatHistory(id, userDetails.getId());
+        return ResponseEntity.ok().build();
+    }
 }

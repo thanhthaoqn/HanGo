@@ -185,6 +185,21 @@ public class PathwayMentorChatService {
         return history;
     }
 
+    @Transactional
+    public void clearChatHistory(Long pathwayId, Long learnerId) {
+        LearningPathway pathway = pathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(learnerId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        List<PathwayConversation> conversations = conversationRepository
+                .findByLearnerIdAndPathwayIdOrderByStartedAtDesc(learnerId, pathwayId);
+        
+        conversationRepository.deleteAll(conversations);
+    }
+
     private PathwayConversation getOrCreateConversation(Long conversationId, Long learnerId, LearningPathway pathway, User learner) {
         if (conversationId != null && conversationId > 0) {
             return conversationRepository.findByIdAndLearnerIdWithMessages(conversationId, learnerId)

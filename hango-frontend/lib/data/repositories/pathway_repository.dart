@@ -320,4 +320,26 @@ class PathwayRepository {
     final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
     return data.cast<Map<String, dynamic>>();
   }
+
+  Future<void> clearChatHistory({required int pathwayId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/chat/history');
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Không tìm thấy auth token.');
+    }
+
+    final response = await http.delete(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to clear chat history: ${response.statusCode}');
+    }
+  }
 }

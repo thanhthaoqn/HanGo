@@ -78,6 +78,54 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     }
   }
 
+  Future<void> _clearChatHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Xóa lịch sử chat?'),
+        content: const Text('Toàn bộ lịch sử trò chuyện với AI Mentor sẽ bị xóa. Bạn có chắc chắn không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isSending = true);
+    try {
+      await _repository.clearChatHistory(pathwayId: widget.pathway.pathwayId);
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        _conversationId = null;
+        if (widget.pathway.mentorSummary.trim().isNotEmpty) {
+          _messages.add({
+            'role': 'mentor',
+            'content': widget.pathway.mentorSummary,
+          });
+        }
+        _dynamicSuggestedQuestions.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể xóa lịch sử chat: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
   @override
   void didUpdateWidget(AIMentorSidePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -356,6 +404,15 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                   ],
                 ),
               ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => _clearChatHistory(),
+            icon: Icon(Icons.delete_sweep_rounded, color: dark ? const Color(0xFF8B949E) : const Color(0xFF94A3B8), size: 20),
+            tooltip: 'Xóa lịch sử chat',
+            style: IconButton.styleFrom(
+              hoverColor: Colors.red.withOpacity(0.1),
+              highlightColor: Colors.red.withOpacity(0.2),
             ),
           ),
         ],
