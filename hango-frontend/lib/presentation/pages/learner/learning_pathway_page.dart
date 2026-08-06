@@ -217,6 +217,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           pathway: _pathway!,
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
+          onEditGoalPressed: _showEditGoalDialog,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(

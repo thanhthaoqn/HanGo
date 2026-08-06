@@ -54,6 +54,7 @@ class InteractiveNodeTree extends StatelessWidget {
     );
   }
 }
+
 class _NodeRow extends StatelessWidget {
   final PathwayNode node;
   final bool isLast;
@@ -268,16 +269,21 @@ class _NodeCard extends StatelessWidget {
                   );
                 },
                 icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                label: const Text('Vào học'),
+                label: const Text('Start learning'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? const Color(0xFF6366F1) : const Color(0xFF4F46E5),
+                  backgroundColor: isDarkMode
+                      ? const Color(0xFF6366F1)
+                      : const Color(0xFF4F46E5),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   elevation: 0,
-                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
