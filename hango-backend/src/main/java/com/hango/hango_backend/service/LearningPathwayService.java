@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
+import com.hango.hango_backend.dto.MentorActionRequestDTO;
 import com.hango.hango_backend.dto.PathwayGenerateRequestDTO;
 import com.hango.hango_backend.dto.PathwayNodeDTO;
 import com.hango.hango_backend.dto.PathwayScheduleRequestDTO;
@@ -271,7 +272,8 @@ public class LearningPathwayService {
         return toResponseDto(pathway, studentId);
     }
 
-    public String chatWithMentor(Long pathwayId, Long studentId, String message) {
+    @Transactional
+    public LearningPathwayResponseDTO processMentorAction(Long pathwayId, Long studentId, MentorActionRequestDTO request) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
                 .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
 
@@ -279,60 +281,28 @@ public class LearningPathwayService {
             throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
         }
 
-        String pathwayStepsText = pathway.getNodes().stream()
-                .map(node -> "Bước " + node.getStepOrder() + ": " + node.getCourse().getTitle() + " (status=" + node.getStatus() + ")")
-                .reduce("", (left, right) -> left.isBlank() ? right : left + "\n" + right);
-
-        // Bổ sung dữ liệu học tập gần nhất (score + knowledge gaps tổng hợp) để AI có thể trả lời câu hỏi kiểu "bài test gần nhất".
-        // Lưu ý: vẫn không cung cấp raw answersJson nhằm giảm rủi ro lộ dữ liệu.
-        List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
-        ExamResultAnalysisDTO chatExamAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
-        if (chatExamAnalysis == null) {
-            chatExamAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(pathway.getExamAttempt());
+        String actionType = request.getActionType();
+        switch (actionType) {
+            case "FAST_TRACK":
+                pathway.setMentorSummary("Đã đề xuất loại bỏ khóa học này khỏi lộ trình theo yêu cầu của bạn.");
+                break;
+            case "ADJUST_SCHEDULE":
+                pathway.setScheduleStatus("AT_RISK");
+                pathway.setMentorSummary("Lịch trình của bạn đang có vẻ bị chậm. Bạn có muốn tăng thêm số giờ học mỗi tuần không?");
+                break;
+            case "TAKE_QUIZ":
+                pathway.setMentorSummary("Tôi đã ghi nhận yêu cầu làm bài kiểm tra ngắn (Mini-Quiz). Tính năng tạo bài kiểm tra động sẽ sớm ra mắt!");
+                break;
+            case "WHAT_WILL_I_LEARN":
+                pathway.setMentorSummary("Lộ trình này sẽ giúp bạn bao phủ toàn bộ các kỹ năng còn yếu để đạt được mục tiêu của mình một cách nhanh nhất.");
+                break;
+            default:
+                pathway.setMentorSummary("Tôi đã nhận được yêu cầu của bạn (" + actionType + "), nhưng chưa biết cách xử lý nó lúc này.");
+                break;
         }
 
-        String systemPrompt = """
-                Bạn là Trợ lý học tập AI cho Learning Pathway của HanGo và hãy trả lời bằng tiếng Việt.
-                Người học đang theo lộ trình bên dưới.
-
-                QUY TẮC BẮT BUỘC (RẤT QUAN TRỌNG):
-                1) Chỉ hỗ trợ theo lộ trình hiện tại. Bạn KHÔNG trả lời các nội dung không liên quan đến roadmap này.
-                2) Luôn trả lời bằng tiếng Việt (chỉ giữ nguyên tiếng Anh khi trích dẫn trực tiếp).
-                3) Không “chat tự do”; không tự bịa thêm bước/khóa học ngoài các bước hiện có.
-                4) Nếu người học hỏi về “bài test gần nhất/điểm số/lịch sử làm bài”, bạn ĐƯỢC phép trả lời dựa trên dữ liệu phân tích đã cung cấp (TOOL INPUT) ở dưới.
-                5) Nếu câu hỏi không liên quan roadmap và không khớp dữ liệu phân tích bên dưới, hãy từ chối nhẹ nhàng + nhắc họ quay lại một Bước trong roadmap.
-
-                LỘ TRÌNH HIỆN TẠI:
-                %s
-
-                TOOL INPUT (RECENT EXAM ANALYSIS):
-                - attempts_used: %s
-                - score_avg: %s
-                - score_min: %s
-                - score_max: %s
-                - knowledge_gaps_json: %s
-
-                Nhiệm vụ:
-                - Nếu câu hỏi thuộc nội dung một bước cụ thể, bám sát tiêu đề khóa học của bước đó và gợi ý ôn tập.
-                - Nếu người học hỏi về điểm số/bài test gần nhất, hãy trả lời dựa trên TOOL INPUT và liên hệ trực tiếp đến roadmap hiện tại.
-                - Nếu không xác định được bước liên quan, hãy hỏi lại người học để chọn đúng Bước.
-                """.formatted(
-                pathwayStepsText,
-                chatExamAnalysis == null || chatExamAnalysis.getKnowledgeGapsJson() == null ? "0" : "(see knowledge_gaps_json)",
-                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_avg") != null ? chatExamAnalysis.getHints().get("score_avg").toString() : ""),
-                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_min") != null ? chatExamAnalysis.getHints().get("score_min").toString() : ""),
-                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_max") != null ? chatExamAnalysis.getHints().get("score_max").toString() : ""),
-                chatExamAnalysis == null ? "{}" : (chatExamAnalysis.getKnowledgeGapsJson() == null ? "{}" : chatExamAnalysis.getKnowledgeGapsJson())
-        );
-
-
-        List<GeminiGenerateRequest.Content> chatHistory = List.of(
-                GeminiGenerateRequest.Content.builder()
-                        .role("user")
-                        .parts(List.of(GeminiGenerateRequest.Part.builder().text(message).build()))
-                        .build());
-
-        return geminiClientService.generateChatResponse(systemPrompt, chatHistory);
+        LearningPathway savedPathway = learningPathwayRepository.save(pathway);
+        return toResponseDto(savedPathway, studentId);
     }
 
     @Transactional
@@ -454,6 +424,15 @@ public class LearningPathwayService {
             }
         }
 
+        List<String> suggestedActions = new java.util.ArrayList<>();
+        if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus()) || "AT_RISK".equalsIgnoreCase(pathway.getScheduleStatus())) {
+            suggestedActions.add("ADJUST_SCHEDULE");
+        } else {
+            suggestedActions.add("FAST_TRACK");
+        }
+        suggestedActions.add("TAKE_QUIZ");
+        suggestedActions.add("WHAT_WILL_I_LEARN");
+
         return LearningPathwayResponseDTO.builder()
                 .pathwayId(pathway.getId())
                 .roadmapId("RM_USER_" + studentId + "_" + pathway.getId())
@@ -466,6 +445,7 @@ public class LearningPathwayService {
                 .targetDate(pathway.getTargetDate() != null ? pathway.getTargetDate().toString() : null)
                 .hoursPerWeek(pathway.getHoursPerWeek())
                 .scheduleStatus(pathway.getScheduleStatus())
+                .suggestedActions(suggestedActions)
                 .build();
     }
 

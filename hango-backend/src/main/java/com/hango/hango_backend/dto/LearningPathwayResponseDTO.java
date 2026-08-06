@@ -50,5 +50,8 @@ public class LearningPathwayResponseDTO {
 
     @JsonProperty("completed_steps")
     private Integer completedSteps;
+
+    @JsonProperty("suggested_actions")
+    private List<String> suggestedActions;
 }
 
