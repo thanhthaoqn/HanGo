@@ -7,8 +7,8 @@ class PathwaySummaryHeader extends StatelessWidget {
   final bool isDarkMode;
   final VoidCallback? onAnalysisPressed;
   final VoidCallback? onReroutePressed;
-  final VoidCallback? onMergePressed;
   final VoidCallback? onThemeToggle;
+  final VoidCallback? onEditGoalPressed;
 
   const PathwaySummaryHeader({
     super.key,
@@ -16,8 +16,8 @@ class PathwaySummaryHeader extends StatelessWidget {
     this.isDarkMode = false,
     this.onAnalysisPressed,
     this.onReroutePressed,
-    this.onMergePressed,
     this.onThemeToggle,
+    this.onEditGoalPressed,
   });
 
   @override
@@ -117,6 +117,13 @@ class PathwaySummaryHeader extends StatelessWidget {
                   const SizedBox(width: 8),
                   Flexible(child: _GoalTimeChip(pathway: pathway)),
                 ],
+                if (pathway.goalName != null && pathway.goalName!.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 2,
+                    child: _GoalNameChip(goalName: pathway.goalName!),
+                  ),
+                ],
                 if (showWeakSkill) ...[
                   const SizedBox(width: 8),
                   Flexible(
@@ -125,21 +132,21 @@ class PathwaySummaryHeader extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 8),
+                if (onEditGoalPressed != null) ...[
+                  _HeaderIconButton(
+                    tooltip: isVi ? 'Chỉnh sửa mục tiêu' : 'Edit goal',
+                    icon: Icons.edit_calendar_rounded,
+                    color: Colors.white,
+                    onPressed: onEditGoalPressed,
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 _HeaderIconButton(
                   tooltip: isVi ? 'Phân tích kỹ năng' : 'Skill analysis',
                   icon: Icons.analytics_outlined,
                   color: Colors.white,
                   onPressed: onAnalysisPressed,
                 ),
-                if (onMergePressed != null) ...[
-                  const SizedBox(width: 6),
-                  _HeaderIconButton(
-                    tooltip: isVi ? 'Gộp mục tiêu' : 'Merge goals',
-                    icon: Icons.call_merge_rounded,
-                    color: Colors.white,
-                    onPressed: onMergePressed,
-                  ),
-                ],
                 const SizedBox(width: 6),
                 _HeaderIconButton(
                   tooltip: isDarkMode
@@ -236,6 +243,48 @@ class _GoalTimeChip extends StatelessWidget {
           Flexible(
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalNameChip extends StatelessWidget {
+  final String goalName;
+
+  const _GoalNameChip({required this.goalName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.flag_circle_rounded,
+            color: Colors.amberAccent.withOpacity(0.9),
+            size: 15,
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              goalName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(

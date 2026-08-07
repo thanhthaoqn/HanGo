@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/entities/learning_pathway.dart';
-import '../../pages/course/course_detail_page.dart';
+import '../../../utils/language_manager.dart';
 
 class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
@@ -23,21 +23,112 @@ class AIMentorSidePanel extends StatefulWidget {
 }
 
 class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
-  final TextEditingController _chatController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final PathwayRepository _repository = PathwayRepository();
   final List<Map<String, String>> _messages = [];
   final Set<String> _unlockAnnouncements = {};
   bool _isSending = false;
   bool _isRerouting = false;
+  int? _conversationId;
+  final TextEditingController _chatController = TextEditingController();
+  final FocusNode _chatFocusNode = FocusNode();
+  List<String> _dynamicSuggestedQuestions = [];
 
   @override
   void initState() {
     super.initState();
     if (widget.pathway.mentorSummary.trim().isNotEmpty) {
-      _messages.add({'role': 'mentor', 'content': widget.pathway.mentorSummary});
+      _messages.add({
+        'role': 'mentor',
+        'content': widget.pathway.mentorSummary,
+      });
     }
     _syncCourseUnlockMessage();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final history = await _repository.getChatHistory(
+        pathwayId: widget.pathway.pathwayId,
+      );
+      if (history.isNotEmpty && mounted) {
+        setState(() {
+          // Clear initial summary if we have real history to avoid duplicates
+          if (_messages.isNotEmpty &&
+              _messages.first['content'] == widget.pathway.mentorSummary) {
+            _messages.clear();
+          }
+
+          for (var item in history.reversed) {
+            if (item['reply'] != null) {
+              final rawRole = item['role'] as String?;
+              final role = (rawRole == 'USER') ? 'user' : 'mentor';
+              _messages.add({
+                'role': role,
+                'content': item['reply'] as String,
+              });
+              if (_conversationId == null && item['conversation_id'] != null) {
+                _conversationId = item['conversation_id'] as int;
+              }
+            }
+          }
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint('Could not load history: $e');
+    }
+  }
+
+  Future<void> _clearChatHistory() async {
+    final isVi = LanguageManager.isVi;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(isVi ? 'Xóa lịch sử chat?' : 'Clear Chat History?'),
+        content: Text(isVi ? 'Toàn bộ lịch sử trò chuyện với AI Mentor sẽ bị xóa. Bạn có chắc chắn không?' : 'All conversation history with AI Mentor will be cleared. Are you sure?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(isVi ? 'Hủy' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(isVi ? 'Xóa' : 'Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isSending = true);
+    try {
+      await _repository.clearChatHistory(pathwayId: widget.pathway.pathwayId);
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        _conversationId = null;
+        if (widget.pathway.mentorSummary.trim().isNotEmpty) {
+          _messages.add({
+            'role': 'mentor',
+            'content': widget.pathway.mentorSummary,
+          });
+        }
+        _dynamicSuggestedQuestions.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final isVi = LanguageManager.isVi;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isVi ? 'Không thể xóa lịch sử chat: $e' : 'Cannot clear chat history: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 
   @override
@@ -61,8 +152,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
   @override
   void dispose() {
-    _chatController.dispose();
     _scrollController.dispose();
+    _chatController.dispose();
+    _chatFocusNode.dispose();
     super.dispose();
   }
 
@@ -102,38 +194,56 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     }
   }
 
-  Future<void> _sendMessage() async {
-    final text = _chatController.text.trim();
-    if (text.isEmpty || _isSending) return;
+  Future<void> _sendChatMessage(String message) async {
+    if (message.trim().isEmpty || _isSending) return;
+
+    final userMsg = message.trim();
+    _chatController.clear();
 
     setState(() {
-      _messages.add({'role': 'user', 'content': text});
-      _chatController.clear();
+      _messages.add({'role': 'user', 'content': userMsg});
       _isSending = true;
     });
     _scrollToBottom();
 
     try {
-      final response = await _repository.chatWithMentor(
+      final response = await _repository.sendChatMessage(
         pathwayId: widget.pathway.pathwayId,
-        message: text,
+        message: userMsg,
+        conversationId: _conversationId,
+        selectedNodeCourseId: widget.selectedNode?.courseId,
       );
+
       if (!mounted) return;
+
       setState(() {
-        _messages.add({'role': 'mentor', 'content': response});
+        _conversationId = response['conversation_id'] as int?;
+        _messages.add({
+          'role': 'mentor',
+          'content':
+              response['reply'] as String? ??
+              'Xin lỗi, tôi không thể trả lời lúc này.',
+        });
+
+        final List<dynamic>? newSuggestions = response['suggested_questions'];
+        if (newSuggestions != null && newSuggestions.isNotEmpty) {
+          _dynamicSuggestedQuestions = newSuggestions.cast<String>();
+        } else {
+          _dynamicSuggestedQuestions.clear();
+        }
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content':
-              'AI Mentor is unavailable right now. Please try again later.',
+          'content': 'Lỗi kết nối. Vui lòng thử lại sau.',
         });
       });
     } finally {
       if (mounted) setState(() => _isSending = false);
       _scrollToBottom();
+      _chatFocusNode.requestFocus();
     }
   }
 
@@ -218,9 +328,6 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           _buildHeader(dark),
           Divider(height: 1, color: border),
           Expanded(child: _buildChatList(dark)),
-          if (widget.selectedNode != null &&
-              widget.selectedNode!.status != NodeStatus.locked)
-            _buildActionArea(dark),
           Divider(height: 1, color: border),
           _buildChatInput(dark),
         ],
@@ -304,122 +411,129 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               ],
             ),
           ),
+          IconButton(
+            onPressed: () => _clearChatHistory(),
+            icon: Icon(Icons.delete_sweep_rounded, color: dark ? const Color(0xFF8B949E) : const Color(0xFF94A3B8), size: 20),
+            tooltip: LanguageManager.isVi ? 'Xóa lịch sử chat' : 'Clear chat history',
+            style: IconButton.styleFrom(
+              hoverColor: Colors.red.withOpacity(0.1),
+              highlightColor: Colors.red.withOpacity(0.2),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildChatList(bool dark) {
+    // Only show action hub if there are dynamic suggestions OR we have a welcome summary but no history yet
+    final showActionHub =
+        _dynamicSuggestedQuestions.isNotEmpty || (_messages.length <= 1);
+    final hasPendingReroute = widget.pathway.pendingRerouteSuggestion != null;
+    final totalItems =
+        _messages.length +
+        (hasPendingReroute ? 1 : 0) +
+        (showActionHub ? 1 : 0);
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      itemCount: _messages.length,
+      itemCount: totalItems,
       itemBuilder: (context, index) {
-        final message = _messages[index];
-        final isMentor = message['role'] == 'mentor';
-        final bubbleColor = isMentor
-            ? (dark ? const Color(0xFF21262D) : const Color(0xFFF8FAFC))
-            : const Color(0xFF28B79B);
-        final textColor = isMentor
-            ? (dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155))
-            : Colors.white;
+        if (index < _messages.length) {
+          final message = _messages[index];
+          final isMentor = message['role'] == 'mentor';
+          final bubbleColor = isMentor
+              ? (dark ? const Color(0xFF21262D) : const Color(0xFFF8FAFC))
+              : const Color(0xFF28B79B);
+          final textColor = isMentor
+              ? (dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155))
+              : Colors.white;
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Row(
-            mainAxisAlignment: isMentor
-                ? MainAxisAlignment.start
-                : MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Flexible(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 15,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: bubbleColor,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(14),
-                      topRight: const Radius.circular(14),
-                      bottomLeft: Radius.circular(isMentor ? 4 : 14),
-                      bottomRight: Radius.circular(isMentor ? 14 : 4),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              mainAxisAlignment: isMentor
+                  ? MainAxisAlignment.start
+                  : MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 11,
                     ),
-                    border: isMentor
-                        ? Border.all(
-                            color: dark
-                                ? const Color(0xFF30363D)
-                                : const Color(0xFFE2E8F0),
+                    decoration: BoxDecoration(
+                      color: bubbleColor,
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(14),
+                        topRight: const Radius.circular(14),
+                        bottomLeft: Radius.circular(isMentor ? 4 : 14),
+                        bottomRight: Radius.circular(isMentor ? 14 : 4),
+                      ),
+                      border: isMentor
+                          ? Border.all(
+                              color: dark
+                                  ? const Color(0xFF30363D)
+                                  : const Color(0xFFE2E8F0),
+                            )
+                          : null,
+                    ),
+                    child: isMentor
+                        ? MarkdownBody(
+                            data: message['content'] ?? '',
+                            styleSheet:
+                                MarkdownStyleSheet.fromTheme(
+                                  Theme.of(context),
+                                ).copyWith(
+                                  p: TextStyle(
+                                    color: textColor,
+                                    fontSize: 14,
+                                    height: 1.45,
+                                  ),
+                                  strong: TextStyle(
+                                    color: textColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  code: const TextStyle(
+                                    color: Color(0xFF6366F1),
+                                    fontSize: 13,
+                                  ),
+                                ),
                           )
-                        : null,
-                  ),
-                  child: isMentor
-                      ? MarkdownBody(
-                          data: message['content'] ?? '',
-                          styleSheet:
-                              MarkdownStyleSheet.fromTheme(
-                                Theme.of(context),
-                              ).copyWith(
-                                p: TextStyle(
-                                  color: textColor,
-                                  fontSize: 14,
-                                  height: 1.45,
-                                ),
-                                strong: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                code: const TextStyle(
-                                  color: Color(0xFF6366F1),
-                                  fontSize: 13,
-                                ),
-                              ),
-                        )
-                      : Text(
-                          message['content'] ?? '',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 14,
-                            height: 1.45,
+                        : Text(
+                            message['content'] ?? '',
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 14,
+                              height: 1.45,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
+              ],
+            ),
+          );
+        } else if (hasPendingReroute && index == _messages.length) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildRerouteActionArea(dark),
+          );
+        } else {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildActionHub(dark),
+          );
+        }
       },
     );
   }
 
   Widget _buildRerouteActionArea(bool dark) {
     final suggestion = widget.pathway.pendingRerouteSuggestion;
-    if (suggestion == null) {
-      return SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: _isRerouting ? null : _confirmReroute,
-          icon: _isRerouting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.auto_awesome_rounded),
-          label: const Text('Suggest adjustment'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF6366F1),
-            side: const BorderSide(color: Color(0xFF6366F1)),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      );
-    }
+    if (suggestion == null) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -469,7 +583,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                 : () async {
                     setState(() => _isRerouting = true);
                     try {
-                      final updatedPathway = await _repository.acceptReroute(pathwayId: widget.pathway.pathwayId);
+                      final updatedPathway = await _repository.acceptReroute(
+                        pathwayId: widget.pathway.pathwayId,
+                      );
                       widget.onPathwayUpdated?.call(updatedPathway);
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -507,7 +623,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                 : () async {
                     setState(() => _isRerouting = true);
                     try {
-                      final updatedPathway = await _repository.declineReroute(pathwayId: widget.pathway.pathwayId);
+                      final updatedPathway = await _repository.declineReroute(
+                        pathwayId: widget.pathway.pathwayId,
+                      );
                       widget.onPathwayUpdated?.call(updatedPathway);
 
                       setState(() {
@@ -541,107 +659,166 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     );
   }
 
-  Widget _buildActionArea(bool dark) {
-    // Deprecated: kept for backward compatibility.
-    // FE-11 uses _buildRerouteActionArea.
+  Widget _buildActionHub(bool dark) {
+    // If we have dynamic questions, use them
+    List<String> actions = _dynamicSuggestedQuestions;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      color: dark ? const Color(0xFF0D1117) : const Color(0xFFF8FAFC),
+    // If no dynamic questions (e.g. initial load), provide some contextual starters
+    if (actions.isEmpty) {
+      final status = widget.selectedNode?.status;
+      if (status == NodeStatus.inProgress) {
+        actions = [
+          'Vì sao mình nên học phần này?',
+          'Phần này mất khoảng bao lâu?',
+          'Có thể cho mình xin lộ trình nhanh được không?',
+        ];
+      } else {
+        actions = [
+          'Tiến độ của mình đang ở mức nào?',
+          'Bạn có lời khuyên gì cho mục tiêu của mình không?',
+        ];
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                final node = widget.selectedNode;
-                if (node == null || node.courseId <= 0) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CourseDetailPage(courseId: node.courseId),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('Start learning'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28B79B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
+          Text(
+            'Gợi ý cho bạn',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: dark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
             ),
           ),
-          const SizedBox(height: 8),
-          _buildRerouteActionArea(dark),
+          const SizedBox(height: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: actions.map((action) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _sendChatMessage(action),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: dark ? const Color(0xFF21262D) : const Color(0xFFF1F5F9),
+                        border: Border.all(
+                          color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0),
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        action,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildChatInput(bool dark) {
-    final inputBg = dark ? const Color(0xFF21262D) : const Color(0xFFF1F5F9);
+    final inputBg = dark ? const Color(0xFF0D1117) : Colors.white;
+    final borderColor = dark
+        ? const Color(0xFF30363D)
+        : const Color(0xFFE2E8F0);
+
     return Container(
-      padding: const EdgeInsets.all(12),
-      color: dark ? const Color(0xFF161B22) : Colors.white,
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16),
+      decoration: BoxDecoration(
+        color: inputBg,
+        border: Border(top: BorderSide(color: borderColor, width: 1)),
+      ),
       child: Row(
         children: [
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: inputBg,
+                color: dark ? const Color(0xFF161B22) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: borderColor),
               ),
-              child: TextField(
-                controller: _chatController,
-                style: TextStyle(
-                  color: dark
-                      ? const Color(0xFFF0F6FC)
-                      : const Color(0xFF0F172A),
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Ask AI Mentor about this pathway...',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(
-                    color: dark
-                        ? const Color(0xFF8B949E)
-                        : const Color(0xFF94A3B8),
-                    fontSize: 14,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _chatController,
+                      focusNode: _chatFocusNode,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: dark
+                            ? const Color(0xFFF0F6FC)
+                            : const Color(0xFF0F172A),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Hỏi AI Mentor về lộ trình...',
+                        hintStyle: TextStyle(
+                          color: dark
+                              ? const Color(0xFF8B949E)
+                              : const Color(0xFF94A3B8),
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: _isSending ? null : _sendChatMessage,
+                    ),
                   ),
-                ),
-                onSubmitted: (_) => _sendMessage(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: _isSending
-                  ? const Color(0xFF94A3B8)
-                  : const Color(0xFF28B79B),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: _isSending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+                  if (_isSending)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 14),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF6366F1),
+                        ),
                       ),
                     )
-                  : const Icon(
-                      Icons.send_rounded,
-                      color: Colors.white,
-                      size: 20,
+                  else
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => _sendChatMessage(_chatController.text),
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF6366F1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-              onPressed: _isSending ? null : _sendMessage,
+                ],
+              ),
             ),
           ),
         ],

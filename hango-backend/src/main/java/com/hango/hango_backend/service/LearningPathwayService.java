@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
+import com.hango.hango_backend.dto.MentorActionRequestDTO;
 import com.hango.hango_backend.dto.PathwayGenerateRequestDTO;
 import com.hango.hango_backend.dto.PathwayNodeDTO;
 import com.hango.hango_backend.dto.PathwayScheduleRequestDTO;
@@ -99,16 +100,23 @@ public class LearningPathwayService {
 
 
 
+        String goalText = (requestDTO.getGoalName() != null && !requestDTO.getGoalName().isBlank())
+                ? "MỤC TIÊU CỦA NGƯỜI HỌC: " + requestDTO.getGoalName() + "\n"
+                : "";
+
         String systemPrompt = """
 
                 .
                 Bạn là Trợ lý lập lộ trình học tập.
                 Nhiệm vụ: dựa trên JSON bài thi mới nhất của learner (answersJson) và phần phân tích do tool cung cấp để đề xuất lộ trình cá nhân hóa.
 
+                %s
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
                 2. Prioritize foundations first, then harder reading or advanced skills.
-                3. Return valid JSON only, without markdown fences.
+                3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó.
+                4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT TỔNG QUAN LỘ TRÌNH (ví dụ: "Chào bạn, lộ trình của bạn gồm X khóa học tập trung vào..."). TUYỆT ĐỐI KHÔNG sinh ra bài tập, mini-quiz, hay câu hỏi trắc nghiệm trong mentor_summary.
+                5. Return valid JSON only, without markdown fences.
 
                 [AVAILABLE_COURSES]
                 %s
@@ -128,6 +136,7 @@ public class LearningPathwayService {
                   ]
                 }
                 """.formatted(
+                goalText,
                 courseListBuilder,
                 examAnalysis.getExamAttemptId(),
                 examAnalysis.getScore(),
@@ -264,7 +273,8 @@ public class LearningPathwayService {
         return toResponseDto(pathway, studentId);
     }
 
-    public String chatWithMentor(Long pathwayId, Long studentId, String message) {
+    @Transactional
+    public LearningPathwayResponseDTO processMentorAction(Long pathwayId, Long studentId, MentorActionRequestDTO request) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
                 .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
 
@@ -272,60 +282,139 @@ public class LearningPathwayService {
             throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
         }
 
-        String pathwayStepsText = pathway.getNodes().stream()
-                .map(node -> "Bước " + node.getStepOrder() + ": " + node.getCourse().getTitle() + " (status=" + node.getStatus() + ")")
-                .reduce("", (left, right) -> left.isBlank() ? right : left + "\n" + right);
+        String actionType = request.getActionType();
+        switch (actionType) {
+            case "FAST_TRACK" -> {
+                // Find current IN_PROGRESS node and actually skip it
+                PathwayNode currentNode = findCurrentInProgressNode(pathway);
+                if (currentNode != null) {
+                    currentNode.setNodeType("FAST_TRACK_SKIPPED");
+                    currentNode.setIsOptional(true);
+                    currentNode.setSkippedAt(java.time.LocalDateTime.now());
+                    currentNode.setStatus("COMPLETED");
+                    currentNode.setRerouteReason("Skipped by learner via Fast Track action");
 
-        // Bổ sung dữ liệu học tập gần nhất (score + knowledge gaps tổng hợp) để AI có thể trả lời câu hỏi kiểu "bài test gần nhất".
-        // Lưu ý: vẫn không cung cấp raw answersJson nhằm giảm rủi ro lộ dữ liệu.
-        List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
-        ExamResultAnalysisDTO chatExamAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
-        if (chatExamAnalysis == null) {
-            chatExamAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(pathway.getExamAttempt());
+                    // Unlock next node
+                    if (pathway.getNodes() != null) {
+                        pathway.getNodes().stream()
+                                .filter(n -> n.getStepOrder() == currentNode.getStepOrder() + 1)
+                                .findFirst()
+                                .ifPresent(next -> {
+                                    if ("LOCKED".equalsIgnoreCase(next.getStatus())) {
+                                        next.setStatus("IN_PROGRESS");
+                                    }
+                                });
+                    }
+                    pathway.setMentorSummary("✅ Đã bỏ qua khóa học '" + currentNode.getCourse().getTitle() + "' và mở khóa bước tiếp theo cho bạn.");
+                } else {
+                    pathway.setMentorSummary("Không tìm thấy khóa học nào đang học để bỏ qua.");
+                }
+            }
+            case "ADJUST_SCHEDULE" -> {
+                // Recalculate timeboxing with current data
+                Integer newHours = null;
+                if (request.getPayload() != null && request.getPayload().get("hoursPerWeek") != null) {
+                    newHours = ((Number) request.getPayload().get("hoursPerWeek")).intValue();
+                }
+                if (newHours != null && newHours > 0) {
+                    pathway.setHoursPerWeek(newHours);
+                }
+                if (pathway.getTargetDate() != null && pathway.getHoursPerWeek() != null && pathway.getHoursPerWeek() > 0) {
+                    applyTimeboxing(pathway, pathway.getTargetDate(), pathway.getHoursPerWeek(), null);
+                    pathway.setScheduleStatus("ON_TRACK");
+                    pathway.setMentorSummary("📅 Lịch trình đã được tính toán lại" +
+                            (newHours != null ? " với " + newHours + " giờ/tuần." : ".") +
+                            " Hãy cố gắng theo đúng tiến độ nhé!");
+                } else {
+                    pathway.setScheduleStatus("AT_RISK");
+                    pathway.setMentorSummary("⚠️ Lịch trình chưa thể tính lại vì chưa có ngày mục tiêu hoặc số giờ/tuần. Hãy cập nhật mục tiêu của bạn.");
+                }
+            }
+            case "TAKE_QUIZ" -> {
+                // Generate dynamic mini-quiz based on current node's course
+                PathwayNode currentNode = findCurrentInProgressNode(pathway);
+                String quizContent = generateMiniQuiz(currentNode);
+                pathway.setMentorSummary(quizContent);
+            }
+            case "WHAT_WILL_I_LEARN" -> {
+                // Build personalized overview from actual pathway data
+                StringBuilder overview = new StringBuilder("📚 **Tổng quan lộ trình của bạn:**\n\n");
+                if (pathway.getGoalName() != null) {
+                    overview.append("🎯 Mục tiêu: ").append(pathway.getGoalName()).append("\n");
+                }
+                int total = pathway.getNodes() != null ? pathway.getNodes().size() : 0;
+                long completed = pathway.getNodes() != null ?
+                        pathway.getNodes().stream().filter(n -> "COMPLETED".equalsIgnoreCase(n.getStatus())).count() : 0;
+                overview.append("📊 Tiến độ: ").append(completed).append("/").append(total).append(" bước hoàn thành\n\n");
+                overview.append("Các kỹ năng sẽ được cải thiện:\n");
+                if (pathway.getNodes() != null) {
+                    for (PathwayNode node : pathway.getNodes()) {
+                        String status = switch (node.getStatus().toUpperCase()) {
+                            case "COMPLETED" -> "✅";
+                            case "IN_PROGRESS" -> "🔄";
+                            default -> "🔒";
+                        };
+                        String skill = node.getCourse().getCategory() != null ?
+                                node.getCourse().getCategory().getParamValue() : "General";
+                        overview.append(status).append(" Bước ").append(node.getStepOrder())
+                                .append(": ").append(node.getCourse().getTitle())
+                                .append(" (").append(skill).append(")\n");
+                    }
+                }
+                pathway.setMentorSummary(overview.toString());
+            }
+            default -> {
+                pathway.setMentorSummary("Tôi đã nhận được yêu cầu của bạn (" + actionType + "), nhưng chưa biết cách xử lý nó lúc này.");
+            }
         }
 
-        String systemPrompt = """
-                Bạn là Trợ lý học tập AI cho Learning Pathway của HanGo và hãy trả lời bằng tiếng Việt.
-                Người học đang theo lộ trình bên dưới.
+        LearningPathway savedPathway = learningPathwayRepository.save(pathway);
+        return toResponseDto(savedPathway, studentId);
+    }
 
-                QUY TẮC BẮT BUỘC (RẤT QUAN TRỌNG):
-                1) Chỉ hỗ trợ theo lộ trình hiện tại. Bạn KHÔNG trả lời các nội dung không liên quan đến roadmap này.
-                2) Luôn trả lời bằng tiếng Việt (chỉ giữ nguyên tiếng Anh khi trích dẫn trực tiếp).
-                3) Không “chat tự do”; không tự bịa thêm bước/khóa học ngoài các bước hiện có.
-                4) Nếu người học hỏi về “bài test gần nhất/điểm số/lịch sử làm bài”, bạn ĐƯỢC phép trả lời dựa trên dữ liệu phân tích đã cung cấp (TOOL INPUT) ở dưới.
-                5) Nếu câu hỏi không liên quan roadmap và không khớp dữ liệu phân tích bên dưới, hãy từ chối nhẹ nhàng + nhắc họ quay lại một Bước trong roadmap.
+    private PathwayNode findCurrentInProgressNode(LearningPathway pathway) {
+        if (pathway.getNodes() == null) return null;
+        return pathway.getNodes().stream()
+                .filter(n -> "IN_PROGRESS".equalsIgnoreCase(n.getStatus()))
+                .findFirst()
+                .orElse(null);
+    }
 
-                LỘ TRÌNH HIỆN TẠI:
-                %s
+    private String generateMiniQuiz(PathwayNode currentNode) {
+        if (currentNode == null) {
+            return "📝 Không tìm thấy khóa học đang học để tạo mini-quiz. Hãy bắt đầu một khóa học trước.";
+        }
+        try {
+            String courseName = currentNode.getCourse().getTitle();
+            String category = currentNode.getCourse().getCategory() != null ?
+                    currentNode.getCourse().getCategory().getParamValue() : "General English";
 
-                TOOL INPUT (RECENT EXAM ANALYSIS):
-                - attempts_used: %s
-                - score_avg: %s
-                - score_min: %s
-                - score_max: %s
-                - knowledge_gaps_json: %s
+            String prompt = """
+                    Tạo 3 câu hỏi trắc nghiệm (mỗi câu 4 lựa chọn A/B/C/D) về chủ đề "%s" (%s) cho học sinh luyện thi THPT Quốc gia Tiếng Anh.
+                    Format mỗi câu:
+                    **Câu X:** [câu hỏi]
+                    A. [lựa chọn]
+                    B. [lựa chọn]
+                    C. [lựa chọn]
+                    D. [lựa chọn]
+                    ✅ Đáp án: [đáp án đúng]
 
-                Nhiệm vụ:
-                - Nếu câu hỏi thuộc nội dung một bước cụ thể, bám sát tiêu đề khóa học của bước đó và gợi ý ôn tập.
-                - Nếu người học hỏi về điểm số/bài test gần nhất, hãy trả lời dựa trên TOOL INPUT và liên hệ trực tiếp đến roadmap hiện tại.
-                - Nếu không xác định được bước liên quan, hãy hỏi lại người học để chọn đúng Bước.
-                """.formatted(
-                pathwayStepsText,
-                chatExamAnalysis == null || chatExamAnalysis.getKnowledgeGapsJson() == null ? "0" : "(see knowledge_gaps_json)",
-                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_avg") != null ? chatExamAnalysis.getHints().get("score_avg").toString() : ""),
-                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_min") != null ? chatExamAnalysis.getHints().get("score_min").toString() : ""),
-                chatExamAnalysis == null ? "" : (chatExamAnalysis.getHints() != null && chatExamAnalysis.getHints().get("score_max") != null ? chatExamAnalysis.getHints().get("score_max").toString() : ""),
-                chatExamAnalysis == null ? "{}" : (chatExamAnalysis.getKnowledgeGapsJson() == null ? "{}" : chatExamAnalysis.getKnowledgeGapsJson())
-        );
+                    Chỉ trả về đúng 3 câu hỏi, không thêm gì khác.
+                    """.formatted(courseName, category);
 
+            java.util.List<com.hango.hango_backend.dto.GeminiGenerateRequest.Content> history = java.util.List.of(
+                    com.hango.hango_backend.dto.GeminiGenerateRequest.Content.builder()
+                            .role("user")
+                            .parts(java.util.List.of(com.hango.hango_backend.dto.GeminiGenerateRequest.Part.builder().text(prompt).build()))
+                            .build());
 
-        List<GeminiGenerateRequest.Content> chatHistory = List.of(
-                GeminiGenerateRequest.Content.builder()
-                        .role("user")
-                        .parts(List.of(GeminiGenerateRequest.Part.builder().text(message).build()))
-                        .build());
-
-        return geminiClientService.generateChatResponse(systemPrompt, chatHistory);
+            String quizText = geminiClientService.generateChatResponse(
+                    "Bạn là giáo viên Tiếng Anh THPT. Tạo câu hỏi trắc nghiệm chất lượng.", history);
+            return "📝 **Mini-Quiz: " + courseName + "**\n\n" + quizText;
+        } catch (Exception e) {
+            log.warn("Failed to generate mini-quiz: {}", e.getMessage());
+            return "📝 Tôi đang gặp sự cố khi tạo mini-quiz. Vui lòng thử lại sau.";
+        }
     }
 
     @Transactional
@@ -447,6 +536,39 @@ public class LearningPathwayService {
             }
         }
 
+        List<String> suggestedActions = new java.util.ArrayList<>();
+
+        // Context-aware suggested actions based on actual learner progress
+        PathwayNode currentNode = null;
+        if (pathway.getNodes() != null) {
+            currentNode = pathway.getNodes().stream()
+                    .filter(n -> "IN_PROGRESS".equalsIgnoreCase(n.getStatus()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (currentNode != null) {
+            int progress = calculateCourseProgressPercent(studentId, currentNode.getCourse().getId());
+            if (progress >= 80) {
+                suggestedActions.add("FAST_TRACK");
+            }
+            if (progress > 0 && progress < 50) {
+                suggestedActions.add("TAKE_QUIZ");
+            }
+        }
+
+        if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus()) || "AT_RISK".equalsIgnoreCase(pathway.getScheduleStatus())) {
+            suggestedActions.add("ADJUST_SCHEDULE");
+        }
+
+        // Always offer overview
+        suggestedActions.add("WHAT_WILL_I_LEARN");
+
+        // If no contextual actions were added, add quiz as a safe default
+        if (suggestedActions.size() == 1) {
+            suggestedActions.add(0, "TAKE_QUIZ");
+        }
+
         return LearningPathwayResponseDTO.builder()
                 .pathwayId(pathway.getId())
                 .roadmapId("RM_USER_" + studentId + "_" + pathway.getId())
@@ -459,6 +581,7 @@ public class LearningPathwayService {
                 .targetDate(pathway.getTargetDate() != null ? pathway.getTargetDate().toString() : null)
                 .hoursPerWeek(pathway.getHoursPerWeek())
                 .scheduleStatus(pathway.getScheduleStatus())
+                .suggestedActions(suggestedActions)
                 .build();
     }
 

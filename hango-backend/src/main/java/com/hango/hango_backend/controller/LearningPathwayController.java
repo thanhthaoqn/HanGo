@@ -3,15 +3,16 @@ package com.hango.hango_backend.controller;
 import com.hango.hango_backend.dto.LearningPathwayResponseDTO;
 import com.hango.hango_backend.dto.PathwayGenerateRequestDTO;
 import com.hango.hango_backend.dto.PathwayScheduleRequestDTO;
+import com.hango.hango_backend.dto.PathwayChatRequestDTO;
+import com.hango.hango_backend.dto.PathwayChatResponseDTO;
 import com.hango.hango_backend.dto.ProgressSnapshotDTO;
 import com.hango.hango_backend.dto.PathwayRerouteSuggestionDTO;
-import com.hango.hango_backend.dto.MergePreviewDTO;
 import com.hango.hango_backend.entity.LearningPathway;
 import com.hango.hango_backend.service.LearningPathwayService;
 import com.hango.hango_backend.service.PathwayProgressSnapshotService;
 import com.hango.hango_backend.service.PathwayReroutePolicyService;
 import com.hango.hango_backend.service.PathwayMutationService;
-import com.hango.hango_backend.service.PathwayGoalMergeService;
+import com.hango.hango_backend.service.PathwayMentorChatService;
 import com.hango.hango_backend.repository.LearningPathwayRepository;
 import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.security.UserDetailsImpl;
@@ -31,7 +32,7 @@ public class LearningPathwayController {
     private final PathwayProgressSnapshotService progressSnapshotService;
     private final PathwayReroutePolicyService reroutePolicyService;
     private final PathwayMutationService mutationService;
-    private final PathwayGoalMergeService goalMergeService;
+    private final PathwayMentorChatService mentorChatService;
     private final LearningPathwayRepository pathwayRepository;
 
     @PostMapping("/generate")
@@ -63,7 +64,7 @@ public class LearningPathwayController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR') or hasRole('COURSE_MANAGER') or hasRole('COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
     public ResponseEntity<LearningPathwayResponseDTO> getMyPathway(
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         
@@ -92,6 +93,10 @@ public class LearningPathwayController {
         return ResponseEntity.ok(learningPathwayService.applySchedule(id, userDetails.getId(), requestDTO));
     }
 
+    /**
+     * @deprecated Use schedule_status field from GET /pathways/{id} or GET /pathways/me instead.
+     */
+    @Deprecated
     @GetMapping("/{id}/schedule-status")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
     public ResponseEntity<String> getScheduleStatus(
@@ -179,35 +184,46 @@ public class LearningPathwayController {
         return ResponseEntity.ok(learningPathwayService.getPathwayById(id, userDetails.getId()));
     }
 
-    // Feature C: Multi-goal Merging
-    @PostMapping("/merge-preview")
+    @PostMapping("/{id}/mentor-action")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
-    public ResponseEntity<MergePreviewDTO> mergePreview(
-            @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestBody java.util.List<Long> courseIds) {
-        return ResponseEntity.ok(goalMergeService.mergePreview(courseIds));
-    }
-
-    @PostMapping("/{id}/merge-confirm")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
-    public ResponseEntity<LearningPathwayResponseDTO> mergeConfirm(
+    public ResponseEntity<LearningPathwayResponseDTO> mentorAction(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @RequestBody MergePreviewDTO previewDTO) {
+            @Valid @RequestBody com.hango.hango_backend.dto.MentorActionRequestDTO requestDTO) {
         
-        goalMergeService.mergeConfirm(id, userDetails.getId(), previewDTO);
-        return ResponseEntity.ok(learningPathwayService.getPathwayById(id, userDetails.getId()));
+        LearningPathwayResponseDTO response = learningPathwayService.processMentorAction(id, userDetails.getId(), requestDTO);
+        return ResponseEntity.ok(response);
     }
 
+    // ===================== FREE-FORM AI CHAT =====================
 
     @PostMapping("/{id}/chat")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
-    public ResponseEntity<String> chatWithMentor(
+    public ResponseEntity<PathwayChatResponseDTO> chat(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
-            @Valid @RequestBody com.hango.hango_backend.dto.PathwayChatRequestDTO requestDTO) {
-        
-        String response = learningPathwayService.chatWithMentor(id, userDetails.getId(), requestDTO.getMessage());
+            @Valid @RequestBody PathwayChatRequestDTO requestDTO) {
+
+        PathwayChatResponseDTO response = mentorChatService.chat(id, userDetails.getId(), requestDTO);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/chat/history")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    public ResponseEntity<java.util.List<PathwayChatResponseDTO>> getChatHistory(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        return ResponseEntity.ok(mentorChatService.getChatHistory(id, userDetails.getId()));
+    }
+
+    @DeleteMapping("/{id}/chat/history")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    public ResponseEntity<Void> clearChatHistory(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+
+        mentorChatService.clearChatHistory(id, userDetails.getId());
+        return ResponseEntity.ok().build();
     }
 }

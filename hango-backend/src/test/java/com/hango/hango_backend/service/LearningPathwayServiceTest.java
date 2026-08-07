@@ -449,43 +449,7 @@ class LearningPathwayServiceTest {
         assertEquals("BEHIND", result);
     }
 
-    // =================================================================
-    // chatWithMentor
-    // =================================================================
 
-    @Test
-    void chatWithMentorShouldRejectOtherLearnersPathway() {
-        LearningPathway pathway = LearningPathway.builder().id(10L).student(User.builder().id(2L).build()).build();
-        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
-
-        ApiException exception = assertThrows(ApiException.class,
-                () -> learningPathwayService.chatWithMentor(10L, 1L, "What's my score?"));
-
-        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
-    }
-
-    @Test
-    void chatWithMentorShouldNotLeakRawAnswersJsonIntoThePrompt() {
-        User student = User.builder().id(1L).build();
-        LearningPathway pathway = LearningPathway.builder().id(10L).student(student).build();
-        PathwayNode nodeItem = PathwayNode.builder().stepOrder(1).course(course(1L, "Grammar Basics", "PUBLISHED")).status("IN_PROGRESS").build();
-        pathway.addNode(nodeItem);
-        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
-        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
-        when(examResultAnalyzerService.analyzeLearnerAttempts(eq(1L), any())).thenReturn(
-                com.hango.hango_backend.dto.ExamResultAnalysisDTO.builder()
-                        .knowledgeGapsJson("{\"weak_skills\":[\"Reading\"]}")
-                        .hints(java.util.Map.of("score_avg", 6.0))
-                        .build());
-        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("Mentor reply");
-
-        String reply = learningPathwayService.chatWithMentor(10L, 1L, "What's my latest score?");
-
-        assertEquals("Mentor reply", reply);
-        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
-        assertTrue(promptCaptor.getValue().contains("Grammar Basics"));
-    }
 
     // =================================================================
     // applySchedule

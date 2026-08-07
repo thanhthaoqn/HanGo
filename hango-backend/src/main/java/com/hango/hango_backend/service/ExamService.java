@@ -75,11 +75,13 @@ public class ExamService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public List<ExamAttemptResponseDTO> getMyExamAttempts(Long userId) {
         List<ExamAttempt> attempts = examAttemptRepository.findByStudentIdOrderByStartedAtDesc(userId);
         return mapToAttemptDTOList(attempts);
     }
 
+    @Transactional(readOnly = true)
     public List<ExamAttemptResponseDTO> getExamAttempts(Long examId, Long userId) {
         List<ExamAttempt> attempts = examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(examId, userId);
         return mapToAttemptDTOList(attempts);
@@ -87,8 +89,21 @@ public class ExamService {
 
     private List<ExamAttemptResponseDTO> mapToAttemptDTOList(List<ExamAttempt> attempts) {
         return attempts.stream().map(attempt -> {
-            int attemptNumber = examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(
-                    attempt.getExam().getId(), attempt.getStudent().getId(), attempt.getStartedAt());
+            int attemptNumber = 1;
+            try {
+                if (attempt.getExam() != null && attempt.getStudent() != null) {
+                    if (attempt.getStartedAt() != null) {
+                        attemptNumber = examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(
+                                attempt.getExam().getId(), attempt.getStudent().getId(), attempt.getStartedAt());
+                    } else {
+                        // If startedAt is null, just use total count or default
+                        attemptNumber = examAttemptRepository.countByExamIdAndStudentId(
+                                attempt.getExam().getId(), attempt.getStudent().getId());
+                    }
+                }
+            } catch (Exception e) {
+                // fallback if count fails
+            }
             return mapToAttemptDTO(attempt, attemptNumber);
         }).collect(Collectors.toList());
     }
@@ -269,10 +284,21 @@ public class ExamService {
 
         boolean isPassed = attempt.getScore() != null && attempt.getScore().doubleValue() >= 5.0;
 
+        Long examId = null;
+        String examTitle = "Unknown Exam";
+        try {
+            if (attempt.getExam() != null) {
+                examId = attempt.getExam().getId();
+                examTitle = attempt.getExam().getTitle();
+            }
+        } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.LazyInitializationException e) {
+            // Ignore if exam was deleted or session closed
+        }
+
         return ExamAttemptResponseDTO.builder()
                 .id(attempt.getId())
-                .examId(attempt.getExam().getId())
-                .examTitle(attempt.getExam().getTitle())
+                .examId(examId)
+                .examTitle(examTitle)
                 .score(attempt.getScore())
                 .attemptNumber(attemptNumber)
                 .date(dateStr)

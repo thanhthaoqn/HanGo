@@ -244,9 +244,6 @@ class PathwayNode {
       'reason_why': reasonWhy,
       'progress_percent': progressPercent,
       'node_type': formatNodeType(nodeType),
-      'source_goal_labels': sourceGoalLabels,
-      'merge_reason': mergeReason,
-      // Provide other fields if needed, but these are sufficient for MergePreviewDTO
     };
   }
 }
@@ -289,39 +286,7 @@ class PathwayRerouteSuggestion {
   }
 }
 
-class MergePreview {
-  final int removedDuplicates;
-  final int sharedSteps;
-  final int estimatedTimeSavedHours;
-  final List<PathwayNode> mergedNodes;
 
-  MergePreview({
-    this.removedDuplicates = 0,
-    this.sharedSteps = 0,
-    this.estimatedTimeSavedHours = 0,
-    this.mergedNodes = const [],
-  });
-
-  factory MergePreview.fromJson(Map<String, dynamic> json) {
-    return MergePreview(
-      removedDuplicates: json['removed_duplicates'] ?? json['removedDuplicates'] ?? 0,
-      sharedSteps: json['shared_steps'] ?? json['sharedSteps'] ?? 0,
-      estimatedTimeSavedHours: json['estimated_time_saved_hours'] ?? json['estimatedTimeSavedHours'] ?? 0,
-      mergedNodes: json['merged_nodes'] != null
-          ? (json['merged_nodes'] as List).map((n) => PathwayNode.fromJson(n)).toList()
-          : [],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'removed_duplicates': removedDuplicates,
-      'shared_steps': sharedSteps,
-      'estimated_time_saved_hours': estimatedTimeSavedHours,
-      'merged_nodes': mergedNodes.map((n) => n.toJson()).toList(),
-    };
-  }
-}
 
 class LearningPathway {
   final PathwayRerouteSuggestion? pendingRerouteSuggestion;
@@ -333,6 +298,7 @@ class LearningPathway {
   final List<String> weakSkills;
   final int totalSteps;
   final int completedSteps;
+  final List<String> suggestedActions; // <--- New field
 
   // Smart time-boxing metadata
   final String? goalName;
@@ -349,6 +315,7 @@ class LearningPathway {
     this.weakSkills = const [],
     this.totalSteps = 0,
     this.completedSteps = 0,
+    this.suggestedActions = const [],
     this.goalName,
     this.targetDate,
     this.hoursPerWeek,
@@ -364,6 +331,7 @@ class LearningPathway {
     List<String>? weakSkills,
     int? totalSteps,
     int? completedSteps,
+    List<String>? suggestedActions,
     String? goalName,
     String? targetDate,
     int? hoursPerWeek,
@@ -379,6 +347,7 @@ class LearningPathway {
       weakSkills: weakSkills ?? this.weakSkills,
       totalSteps: totalSteps ?? this.totalSteps,
       completedSteps: completedSteps ?? this.completedSteps,
+      suggestedActions: suggestedActions ?? this.suggestedActions,
       goalName: goalName ?? this.goalName,
       targetDate: targetDate ?? this.targetDate,
       hoursPerWeek: hoursPerWeek ?? this.hoursPerWeek,
@@ -431,6 +400,9 @@ class LearningPathway {
       ),
       totalSteps: json['total_steps'] ?? json['totalSteps'] ?? 0,
       completedSteps: json['completed_steps'] ?? json['completedSteps'] ?? 0,
+      suggestedActions: List<String>.from(
+        json['suggested_actions'] ?? json['suggestedActions'] ?? [],
+      ),
       goalName: json['goal_name'] ?? json['goalName'],
       targetDate: json['target_date'] ?? json['targetDate'],
       hoursPerWeek: json['hours_per_week'] ?? json['hoursPerWeek'],
