@@ -76,30 +76,30 @@ public class EmailService {
         String contentText;
 
         if ("VERIFIED".equalsIgnoreCase(status)) {
-            subject = "HanGo - Educator Profile Approved!";
+            subject = "HanGo - Trainer Profile Approved!";
             contentText = "Congratulations!\n\n" +
-                    "Your Educator application on HanGo has been APPROVED by our administration team. " +
-                    "You can now access your Educator Dashboard, create high-quality courses, and publish exams.\n\n" +
+                    "Your Trainer application on HanGo has been APPROVED by our administration team. " +
+                    "You can now access your Trainer Dashboard, create high-quality courses, and publish exams.\n\n" +
                     (adminNotes != null && !adminNotes.trim().isEmpty() ? "Admin Notes: " + adminNotes + "\n\n" : "") +
-                    "Access your Educator Dashboard now: https://hangog92.online/login\n\n" +
+                    "Access your Trainer Dashboard now: https://hangog92.online/login\n\n" +
                     "Thank you for joining HanGo!\n\n" +
                     "Best regards,\n" +
                     "HanGo Admin Team";
         } else if ("SUSPENDED".equalsIgnoreCase(status)) {
-            subject = "HanGo - Educator Profile Status Update (Suspended)";
+            subject = "HanGo - Trainer Profile Status Update (Suspended)";
             contentText = "Hello,\n\n" +
-                    "Your Educator application/account status on HanGo has been set to SUSPENDED / BANNED.\n\n" +
+                    "Your Trainer account status on HanGo has been set to SUSPENDED.\n\n" +
                     (adminNotes != null && !adminNotes.trim().isEmpty() ? "Reason / Notes: " + adminNotes + "\n\n" : "") +
                     "If you believe this is an error, please contact support at https://hangog92.online\n\n" +
                     "Best regards,\n" +
                     "HanGo Admin Team";
         } else {
-            subject = "HanGo - Educator Profile Requires Edits / Review Update";
+            subject = "HanGo - Trainer Profile Revisions Requested";
             contentText = "Hello,\n\n" +
-                    "Our administration team has reviewed your Educator application. Additional information or modifications are required:\n\n" +
+                    "Our administration team has reviewed your Trainer application. Additional information or modifications are required:\n\n" +
                     (adminNotes != null && !adminNotes.trim().isEmpty() ? "Admin Notes / Requested Edits: " + adminNotes + "\n\n" : "Please log into HanGo to view requested edits.\n\n") +
                     "Please click the link below to log into your account, update your profile, and resubmit:\n" +
-                    "https://hangog92.online/trainer/onboarding\n\n" +
+                    "https://hangog92.online/login\n\n" +
                     "Best regards,\n" +
                     "HanGo Admin Team";
         }
@@ -151,7 +151,7 @@ public class EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
         message.setSubject("HanGo - Monthly Revenue Settlement Confirmation");
-        message.setText("Dear " + (trainerName != null && !trainerName.trim().isEmpty() ? trainerName : "Educator") + ",\n\n" +
+        message.setText("Dear " + (trainerName != null && !trainerName.trim().isEmpty() ? trainerName : "Trainer") + ",\n\n" +
                 "Your monthly revenue payout for period " + periodMonth + " has been successfully processed and transferred to your registered bank account.\n\n" +
                 "PAYOUT DETAILS:\n" +
                 "- Statement Period: " + periodMonth + "\n" +
@@ -159,7 +159,7 @@ public class EmailService {
                 (bankTxnRef != null && !bankTxnRef.trim().isEmpty() ? "- Bank Transaction Ref: " + bankTxnRef + "\n" : "") +
                 (receiptUrl != null && !receiptUrl.trim().isEmpty() ? "- Payout Receipt URL: " + receiptUrl + "\n" : "") +
                 "- Status: PAID & COMPLETED\n\n" +
-                "You can log into your Educator Dashboard to review full transaction items and statements:\n" +
+                "You can log into your Trainer Dashboard to review full transaction items and statements:\n" +
                 "https://hangog92.online/trainer/revenue\n\n" +
                 "Thank you for creating high-quality learning content with HanGo!\n\n" +
                 "Best regards,\n" +

@@ -13,12 +13,14 @@ class InternalAppHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isMobile;
   final VoidCallback? onMenuPressed;
   final String activeTab; // Kept for compatibility if needed
+  final bool showLogo;
 
   const InternalAppHeader({
     Key? key,
     this.isMobile = false,
     this.onMenuPressed,
     this.activeTab = '',
+    this.showLogo = true,
   }) : super(key: key);
 
   @override
@@ -83,9 +85,10 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
   }
 
   String get _displayRole {
-    if (_userRoles.contains('ROLE_ADMINISTRATOR')) return 'Admin';
-    if (_userRoles.contains('ROLE_TRAINER')) return 'Trainer';
-    if (_userRoles.contains('ROLE_COURSE_MANAGER')) return 'Course Manager';
+    if (_userRoles.contains('ROLE_ADMINISTRATOR') || _userRoles.contains('ADMINISTRATOR')) return 'Admin';
+    if (_userRoles.contains('ROLE_TRAINER') || _userRoles.contains('TRAINER')) return 'Trainer';
+    if (_userRoles.contains('ROLE_COURSE_MANAGER') || _userRoles.contains('COURSE_MANAGER')) return 'Course Manager';
+    if (_userRoles.contains('ROLE_LEARNER') || _userRoles.contains('LEARNER')) return 'Learner';
     return 'Staff';
   }
 
@@ -187,13 +190,13 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
   }
 
   void _navigateToProfile() {
-    if (_userRoles.contains('ROLE_COURSE_MANAGER')) {
+    if (_userRoles.contains('ROLE_COURSE_MANAGER') || _userRoles.contains('COURSE_MANAGER')) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
             builder: (context) => const CourseManagerMyInformationPage()),
       );
-    } else if (_userRoles.contains('ROLE_TRAINER')) {
+    } else if (_userRoles.contains('ROLE_TRAINER') || _userRoles.contains('TRAINER')) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
@@ -219,54 +222,55 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
             ),
             const SizedBox(width: 8),
           ],
-          InkWell(
-            onTap: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-                (route) => false,
-              );
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.network(
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                  height: 36,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE6FFFA),
-                            shape: BoxShape.circle,
+          if (widget.showLogo)
+            InkWell(
+              onTap: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+                  (route) => false,
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.network(
+                    'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                    height: 36,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE6FFFA),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.school,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.school,
-                            size: 18,
-                            color: Color(0xFF28B79B),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'HanGo',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'HanGo',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F2937),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
           const Spacer(),
           // Notification Bell
           Stack(

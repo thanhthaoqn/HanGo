@@ -329,7 +329,7 @@ class TrainerOnboardingServiceTest {
     private TrainerProfile completeProfile(Long userId) {
         TrainerProfile p = profile(userId, "PENDING_VERIFICATION", "PROFESSIONAL");
         p.setBio("Experienced teacher");
-        p.setDegreeUrl("https://cloudinary.example/degree.pdf");
+        p.setScoreReportUrl("https://cloudinary.example/degree.pdf");
         return p;
     }
 
@@ -371,7 +371,7 @@ class TrainerOnboardingServiceTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.submitProfileForReview("known@example.com", new TrainerProfileDTO()));
-        assertTrue(ex.getMessage().contains("giới thiệu"));
+        assertTrue(ex.getMessage().toLowerCase().contains("bio"));
     }
 
     @Test
@@ -379,38 +379,43 @@ class TrainerOnboardingServiceTest {
         User user = learnerUser(1L, "known@example.com");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         TrainerProfile incomplete = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
-        incomplete.setBio("Experienced teacher");
+        incomplete.setBio("Experienced teacher with over 5 years of IELTS academic teaching history");
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(incomplete));
         when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.submitProfileForReview("known@example.com", new TrainerProfileDTO()));
-        assertTrue(ex.getMessage().contains("số điện thoại"));
+        assertTrue(ex.getMessage().toLowerCase().contains("phone"));
     }
 
     @Test
     void submitProfileForReviewShouldRejectMissingAllCertificationDocuments() {
         User user = learnerUser(1L, "known@example.com");
         user.setPhoneNumber("0909123456");
+        user.setGender("MALE");
+        user.setAvatarUrl("https://cloudinary.example/avatar.png");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         TrainerProfile incomplete = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
-        incomplete.setBio("Experienced teacher");
+        incomplete.setBio("Experienced teacher with over 5 years of IELTS academic teaching history");
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(incomplete));
         when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> service.submitProfileForReview("known@example.com", new TrainerProfileDTO()));
-        assertTrue(ex.getMessage().contains("minh chứng"));
+        assertTrue(ex.getMessage().toLowerCase().contains("proof"));
     }
 
     @Test
     void submitProfileForReviewShouldMarkAwaitingApprovalWhenAllRequiredFieldsPresent() {
         User user = learnerUser(1L, "known@example.com");
         user.setPhoneNumber("0909123456");
+        user.setGender("MALE");
+        user.setAvatarUrl("https://cloudinary.example/avatar.png");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         TrainerProfile complete = completeProfile(1L);
+        complete.setBio("Experienced teacher with over 5 years of IELTS academic teaching history");
         complete.setAdminNotes("previous rejection reason");
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(complete));
         when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));

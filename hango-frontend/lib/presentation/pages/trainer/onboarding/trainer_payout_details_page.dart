@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
-import '../../../widgets/shared_header.dart';
-import '../../../widgets/shared_footer.dart';
+import 'trainer_onboarding_shell_page.dart';
 import '../trainer_dashboard_page.dart';
 import '../../login_page.dart';
 
 class TrainerPayoutDetailsPage extends StatefulWidget {
   final Map<String, dynamic> initialProfile;
+  final bool isEmbedded;
 
-  const TrainerPayoutDetailsPage({super.key, required this.initialProfile});
+  const TrainerPayoutDetailsPage({
+    super.key,
+    required this.initialProfile,
+    this.isEmbedded = false,
+  });
 
   @override
   State<TrainerPayoutDetailsPage> createState() => _TrainerPayoutDetailsPageState();
@@ -124,21 +127,21 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
 
     setState(() {
       _bankNameError = bankName.isEmpty;
-      _bankAccountError = bankAccount.isEmpty || !numRegex.hasMatch(bankAccount);
+      _bankAccountError = bankAccount.isEmpty || bankAccount.length < 6 || bankAccount.length > 20 || !numRegex.hasMatch(bankAccount);
       _bankAccountNameError = bankAccountName.isEmpty || !nameRegex.hasMatch(bankAccountName);
-      _taxCodeError = taxCode.isEmpty || taxCode.length < 10 || !numRegex.hasMatch(taxCode);
+      _taxCodeError = taxCode.isEmpty || taxCode.length < 10 || taxCode.length > 13 || !numRegex.hasMatch(taxCode);
     });
 
     if (_bankNameError) {
-      ToastHelper.showError(context, isVi ? 'Vui lòng chọn ngân hàng thụ hưởng.' : 'Please select beneficiary bank.');
+      ToastHelper.showError(context, isVi ? 'Vui lòng chọn ngân hàng thụ hưởng.' : 'Please select a beneficiary bank.');
       return false;
     }
     if (_bankAccountError) {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Số tài khoản không hợp lệ (chỉ được phép nhập số).'
-            : 'Invalid bank account number (digits only).',
+            ? 'Số tài khoản ngân hàng không hợp lệ (Phải từ 6-20 chữ số).'
+            : 'Bank account number must be 6 to 20 digits.',
       );
       return false;
     }
@@ -146,8 +149,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Tên chủ tài khoản không hợp lệ (viết hoa không dấu, chỉ chữ cái).'
-            : 'Invalid account owner name (UPPERCASE letters & spaces only).',
+            ? 'Tên chủ tài khoản phải viết VIẾT HOA KHÔNG DẤU (Ví dụ: NGUYEN VAN A).'
+            : 'Account owner name must be UPPERCASE without accents (e.g. NGUYEN VAN A).',
       );
       return false;
     }
@@ -155,8 +158,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Mã số thuế không hợp lệ (ít nhất 10 số).'
-            : 'Invalid Tax Identification Number (digits only, at least 10 digits).',
+            ? 'Mã số thuế / Số CCCD không hợp lệ (Phải đúng 10 đến 13 chữ số).'
+            : 'Tax ID / National ID must be 10 to 13 digits.',
       );
       return false;
     }
@@ -214,91 +217,86 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 1024;
+    if (!widget.isEmbedded) {
+      return TrainerOnboardingShellPage(
+        initialBody: TrainerPayoutDetailsPage(
+          initialProfile: widget.initialProfile,
+          isEmbedded: true,
+        ),
+      );
+    }
+
     final isVi = LanguageManager.isVi;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
-      body: Row(
+    return SingleChildScrollView(
+      child: Column(
         children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InternalAppHeader(isMobile: !isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 600),
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
-                          child: Center(
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 600),
-                              padding: const EdgeInsets.all(32),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.02),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE6FDF9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: Color(0xFF28B79B),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isVi ? 'Thông tin thanh toán & CCCD' : 'Payout & Identity Info',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                  fontFamily: 'Outfit',
+                                ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE6FDF9),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.account_balance_wallet_rounded,
-                              color: Color(0xFF28B79B),
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isVi ? 'Thông tin thanh toán & CCCD' : 'Payout & Identity Info',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
-                                    fontFamily: 'Outfit',
-                                  ),
+                              const SizedBox(height: 4),
+                              Text(
+                                isVi ? 'Nhập tài khoản nhận tiền và mã định danh' : 'Enter payment bank account and identity ID',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF64748B),
+                                  fontFamily: 'Outfit',
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  isVi ? 'Nhập tài khoản nhận tiền và mã định danh' : 'Enter payment bank account and identity ID',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF64748B),
-                                    fontFamily: 'Outfit',
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      const Divider(color: Color(0xFFE2E8F0)),
-                      const SizedBox(height: 24),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    const Divider(color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 24),
 
                       // Bank Name
                       Text(
@@ -452,21 +450,14 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                                 ),
                         ),
                       ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
   }
 
   Widget _buildSidebar(BuildContext context) {

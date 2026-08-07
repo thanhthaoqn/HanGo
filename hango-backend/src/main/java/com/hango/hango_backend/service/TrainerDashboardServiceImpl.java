@@ -1054,8 +1054,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             } else if ("PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType())) {
                 price += 150000;
             }
-            if ((profile.getIeltsUrl() != null && !profile.getIeltsUrl().isBlank())
-                    || (profile.getDegreeUrl() != null && !profile.getDegreeUrl().isBlank())) {
+            if (profile.getScoreReportUrl() != null && !profile.getScoreReportUrl().isBlank()) {
                 price += 150000;
             }
         }

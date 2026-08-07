@@ -140,15 +140,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
           _certificates = (p['certificates'] as List)
               .map((item) => Map<String, String>.from(item as Map))
               .toList();
-        } else {
-          if (p['degreeUrl'] != null && p['degreeUrl'].toString().isNotEmpty) {
-            _certificates.add({'name': 'Degree / Qualification Certificate', 'url': p['degreeUrl'].toString()});
-          }
-          if (p['ieltsUrl'] != null && p['ieltsUrl'].toString().isNotEmpty) {
-            _certificates.add({'name': 'IELTS / Language Proficiency Certificate', 'url': p['ieltsUrl'].toString()});
-          }
-          if (p['scoreReportUrl'] != null && p['scoreReportUrl'].toString().isNotEmpty) {
-            final raw = p['scoreReportUrl'].toString();
+        } else if (p['scoreReportUrl'] != null && p['scoreReportUrl'].toString().isNotEmpty) {
+          final raw = p['scoreReportUrl'].toString();
             if (raw.startsWith('[')) {
               try {
                 final List parsed = jsonDecode(raw);
@@ -159,7 +152,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             } else {
               _certificates.add({'name': 'Score Report / Other Credential', 'url': raw});
             }
-          }
         }
         _isLoading = false;
       });
@@ -304,11 +296,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     payload['bankName'] = _selectedBank ?? '';
     payload['bankAccount'] = _bankAccountController.text.trim();
     payload['bankAccountName'] = _bankAccountNameController.text.trim().toUpperCase();
-    final degree = _certificates.isNotEmpty ? _certificates.first['url'] ?? '' : '';
-    final ielts = _certificates.length > 1 ? _certificates[1]['url'] ?? '' : '';
-    final score = _certificates.length > 2 ? jsonEncode(_certificates) : (_certificates.isNotEmpty ? _certificates.last['url'] ?? '' : '');
-    payload['degreeUrl'] = degree;
-    payload['ieltsUrl'] = ielts;
+    final score = _certificates.isNotEmpty ? jsonEncode(_certificates) : '';
     payload['scoreReportUrl'] = score;
     payload['certificates'] = _certificates;
     payload['citizenId'] = _citizenIdController.text.trim();
@@ -371,7 +359,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                InternalAppHeader(isMobile: !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
                 Expanded(
                   child: _buildBodyContent(isVi),
                 ),
@@ -794,7 +782,9 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 const SizedBox(height: 4),
                 Text(
                   _userEmail,
-                  style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -806,7 +796,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                   child: Text(
                     _trainerType == 'PROFESSIONAL'
                         ? (isVi ? 'Giáo viên Chuyên nghiệp' : 'Professional')
-                        : (isVi ? 'Gia sư / Trợ giảng' : 'Peer Tutor'),
+                        : (isVi ? 'Gia sư' : 'Tutor'),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF20B486), fontFamily: 'Outfit'),
                   ),
                 ),
@@ -1408,7 +1398,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     );
   }
 
-  Future<String?> _uploadFileToCloudinary() async {
+  Future<Map<String, String>?> _uploadFileToCloudinaryWithDetails() async {
     try {
       final picked = await pickImage();
       if (picked == null || picked.bytes == null) return null;
@@ -1427,12 +1417,56 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(responseBody);
-        return data['secure_url'] ?? data['url'];
+        return {
+          'url': (data['secure_url'] ?? data['url']).toString(),
+          'fileName': picked.name,
+        };
       }
     } catch (e) {
       debugPrint('Cloudinary upload error: $e');
     }
     return null;
+  }
+
+  Future<String?> _uploadFileToCloudinary() async {
+    final res = await _uploadFileToCloudinaryWithDetails();
+    return res?['url'];
+  }
+
+  String _extractSmartTitle(String filename) {
+    final lower = filename.toLowerCase().replaceAll(RegExp(r'[_-]'), ' ');
+
+    if (lower.contains('ielts')) {
+      return 'IELTS Academic Certificate';
+    } else if (lower.contains('toeic')) {
+      return 'TOEIC Official Certificate';
+    } else if (lower.contains('toefl')) {
+      return 'TOEFL iBT Certificate';
+    } else if (lower.contains('tefl')) {
+      return 'TEFL International Certification';
+    } else if (lower.contains('tesol') || lower.contains('celta')) {
+      return 'TESOL / CELTA Teaching Certificate';
+    } else if (lower.contains('su pham') || lower.contains('supham') || lower.contains('pedagog')) {
+      return 'Bachelor of English Pedagogy Degree';
+    } else if (lower.contains('giang day') || lower.contains('giangday') || lower.contains('teaching')) {
+      return 'TEFL / TESOL Teaching Certificate';
+    } else if (lower.contains('vstep') ||
+        lower.contains('proficiency') ||
+        lower.contains('ngoai ngu') ||
+        lower.contains('ngoaingu') ||
+        lower.contains('tieng anh') ||
+        lower.contains('tienganh') ||
+        lower.contains('aptis') ||
+        lower.contains('cambridge') ||
+        lower.contains('cefr')) {
+      return 'Certificate of English Language Proficiency';
+    } else if (lower.contains('hoc ba') || lower.contains('hocba') || lower.contains('transcript')) {
+      return 'High School Academic Transcript';
+    } else if (lower.contains('bang cap') || lower.contains('bangcap') || lower.contains('degree') || lower.contains('cu nhan') || lower.contains('cunhan') || lower.contains('dai hoc') || lower.contains('daihoc')) {
+      return 'Bachelor Degree Certificate';
+    }
+
+    return 'Certificate of English Language Proficiency';
   }
 
   void _showAddCertificateModal(bool isVi) {
@@ -1447,9 +1481,13 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
           builder: (context, setModalState) {
             return Dialog(
               backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              clipBehavior: Clip.antiAlias,
               child: Container(
-                color: Colors.white,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 constraints: const BoxConstraints(maxWidth: 550),
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -1479,7 +1517,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                       controller: nameController,
                       onChanged: (_) => setModalState(() {}),
                       decoration: InputDecoration(
-                        hintText: isVi ? 'Ví dụ: Bằng Cử nhân Sư phạm Anh, IELTS 8.0' : 'E.g.: Bachelor of English Pedagogy, IELTS 8.0',
+                        hintText: isVi ? 'Ví dụ: Bachelor of English Pedagogy, IELTS Academic' : 'E.g.: Bachelor of English Pedagogy, IELTS Academic',
                         fillColor: Colors.white,
                         filled: true,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -1496,10 +1534,13 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                           ? null
                           : () async {
                               setModalState(() => isUploading = true);
-                              final uploaded = await _uploadFileToCloudinary();
+                              final uploaded = await _uploadFileToCloudinaryWithDetails();
                               setModalState(() {
                                 isUploading = false;
-                                if (uploaded != null) tempUrl = uploaded;
+                                if (uploaded != null) {
+                                  tempUrl = uploaded['url'];
+                                  nameController.text = _extractSmartTitle(uploaded['fileName']!);
+                                }
                               });
                             },
                       child: Container(
@@ -1511,7 +1552,17 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                           border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
                         ),
                         child: isUploading
-                            ? const Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)))
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const CircularProgressIndicator(color: Color(0xFF28B79B)),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    isVi ? 'Đang tải ảnh...' : 'Uploading image...',
+                                    style: const TextStyle(fontSize: 12, color: Color(0xFF28B79B), fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              )
                             : (tempUrl != null
                                 ? Stack(
                                     children: [
@@ -1522,10 +1573,36 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                                       Positioned(
                                         right: 8,
                                         top: 8,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                                          child: const Icon(Icons.check, color: Colors.white, size: 16),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            InkWell(
+                                              onTap: () => setModalState(() {
+                                                tempUrl = null;
+                                                nameController.clear();
+                                              }),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(6),
+                                                decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                                                child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(color: const Color(0xFF28B79B), borderRadius: BorderRadius.circular(20)),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.refresh_rounded, color: Colors.white, size: 14),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    isVi ? 'Đổi ảnh khác' : 'Change Image',
+                                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
@@ -1536,7 +1613,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                                       const Icon(Icons.cloud_upload_outlined, color: Color(0xFF28B79B), size: 32),
                                       const SizedBox(height: 8),
                                       Text(
-                                        isVi ? 'Nhấp để chọn ảnh chứng chỉ' : 'Click to select certificate image',
+                                        isVi ? 'Nhấp để tải lên ảnh mới (JPG, PNG, PDF)' : 'Click to upload document image (JPG, PNG, PDF)',
                                         style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 13),
                                       ),
                                     ],
