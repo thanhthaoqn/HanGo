@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
-import '../../../../data/services/auth_service.dart';
-import '../../login_page.dart';
 import 'trainer_onboarding_details_page.dart';
+import 'trainer_onboarding_shell_page.dart';
 
 class TrainerTypeSelectionPage extends StatefulWidget {
-  const TrainerTypeSelectionPage({super.key});
+  final bool isEmbedded;
+  const TrainerTypeSelectionPage({super.key, this.isEmbedded = false});
 
   @override
   State<TrainerTypeSelectionPage> createState() => _TrainerTypeSelectionPageState();
@@ -17,7 +16,6 @@ class TrainerTypeSelectionPage extends StatefulWidget {
 
 class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
   final _onboardingService = TrainerOnboardingService();
-  final _authService = AuthService();
   String? _selectedType;
   bool _isSubmitting = false;
 
@@ -50,13 +48,15 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
   }
 
   void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPage()),
-        (route) => false,
-      );
+    _loadExistingType();
+  }
+
+  Future<void> _loadExistingType() async {
+    final res = await _onboardingService.getTrainerProfile();
+    if (mounted && res['success'] == true && res['data'] != null) {
+      setState(() {
+        _selectedType = res['data']['trainerType'];
+      });
     }
   }
 
@@ -87,7 +87,7 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
           context,
           LanguageManager.isVi
               ? 'Đã khởi tạo vai trò giáo viên thành công!'
-              : 'Instructor role initialized successfully!',
+              : 'Trainer role initialized successfully!',
         );
         final Map<String, dynamic> initialProfile = {};
         if (result['data'] != null && result['data']['profile'] != null) {
@@ -95,14 +95,22 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
         }
         initialProfile['trainerType'] = _selectedType;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TrainerOnboardingDetailsPage(
-              initialProfile: initialProfile,
-            ),
-          ),
+        final nextPage = TrainerOnboardingDetailsPage(
+          initialProfile: initialProfile,
+          isEmbedded: true,
         );
+
+        final shellState = TrainerOnboardingShellPage.of(context);
+        if (shellState != null) {
+          shellState.updateBody(nextPage);
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+            ),
+          );
+        }
       } else {
         ToastHelper.showError(context, result['message'] ?? 'Lỗi không xác định');
       }
@@ -111,124 +119,110 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.isEmbedded) {
+      return TrainerOnboardingShellPage(
+        initialBody: const TrainerTypeSelectionPage(isEmbedded: true),
+      );
+    }
+
     final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 1024;
     final isVi = LanguageManager.isVi;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
-      body: Row(
-        children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InternalAppHeader(isMobile: !isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
-                    child: Center(
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 800),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 48.0),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                isVi ? 'Đăng ký giảng dạy trên HanGo' : 'Teach on HanGo',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                isVi
+                    ? 'Chọn hình thức giảng dạy phù hợp nhất với chuyên môn của bạn để bắt đầu xây dựng khóa học.'
+                    : 'Choose the teaching option that best fits your credentials to start building courses.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 48),
+              // Selection Cards Grid/Row
+              size.width > 768
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildSelectionCard('PROFESSIONAL', isVi)),
+                        const SizedBox(width: 24),
+                        Expanded(child: _buildSelectionCard('PEER_TUTOR', isVi)),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _buildSelectionCard('PROFESSIONAL', isVi),
+                        const SizedBox(height: 24),
+                        _buildSelectionCard('PEER_TUTOR', isVi),
+                      ],
+                    ),
+              const SizedBox(height: 48),
+              // Action buttons
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isSubmitting ? null : _handleProceed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF28B79B),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF28B79B).withOpacity(0.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: _selectedType == null ? 0 : 4,
+                    shadowColor: const Color(0xFF28B79B).withOpacity(0.3),
+                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              isVi ? 'Đăng ký giảng dạy trên HanGo' : 'Teach on HanGo',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              isVi
-                                  ? 'Chọn hình thức giảng dạy phù hợp nhất với chuyên môn của bạn để bắt đầu xây dựng khóa học.'
-                                  : 'Choose the teaching option that best fits your credentials to start building courses.',
-                              textAlign: TextAlign.center,
+                              isVi ? 'Tiếp tục hoàn thiện hồ sơ' : 'Proceed with profile',
                               style: const TextStyle(
                                 fontSize: 16,
-                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.bold,
                                 fontFamily: 'Outfit',
-                                height: 1.5,
                               ),
                             ),
-                            const SizedBox(height: 48),
-                            // Selection Cards Grid/Row
-                            size.width > 768
-                                ? Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(child: _buildSelectionCard('PROFESSIONAL', isVi)),
-                                      const SizedBox(width: 24),
-                                      Expanded(child: _buildSelectionCard('PEER_TUTOR', isVi)),
-                                    ],
-                                  )
-                                : Column(
-                                    children: [
-                                      _buildSelectionCard('PROFESSIONAL', isVi),
-                                      const SizedBox(height: 24),
-                                      _buildSelectionCard('PEER_TUTOR', isVi),
-                                    ],
-                                  ),
-                            const SizedBox(height: 48),
-                            // Action buttons
-                            SizedBox(
-                              width: double.infinity,
-                              height: 52,
-                              child: ElevatedButton(
-                                onPressed: _isSubmitting ? null : _handleProceed,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF28B79B),
-                                  foregroundColor: Colors.white,
-                                  disabledBackgroundColor: const Color(0xFF28B79B).withOpacity(0.5),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: _selectedType == null ? 0 : 4,
-                                  shadowColor: const Color(0xFF28B79B).withOpacity(0.3),
-                                ),
-                                child: _isSubmitting
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            isVi ? 'Tiếp tục hoàn thiện hồ sơ' : 'Proceed with profile',
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              fontFamily: 'Outfit',
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Icon(Icons.arrow_forward_rounded, size: 18),
-                                        ],
-                                      ),
-                              ),
-                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_forward_rounded, size: 18),
                           ],
                         ),
-                      ),
-                    ),
-                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -239,7 +233,7 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
 
     final title = isPro
         ? (isVi ? 'Giáo viên' : 'Teacher')
-        : (isVi ? 'Gia sư / Trợ giảng' : 'Peer Tutor');
+        : (isVi ? 'Gia sư' : 'Tutor');
 
     final desc = isPro
         ? (isVi

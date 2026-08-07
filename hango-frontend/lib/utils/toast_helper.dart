@@ -9,6 +9,10 @@ class ToastHelper {
     show(context, message, isError: false);
   }
 
+  static void showInfo(BuildContext context, String message) {
+    show(context, message, isError: false);
+  }
+
   static void showError(BuildContext context, String message) {
     show(context, message, isError: true);
   }

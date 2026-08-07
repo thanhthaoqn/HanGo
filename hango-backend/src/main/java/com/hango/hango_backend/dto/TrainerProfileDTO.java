@@ -14,24 +14,10 @@ public class TrainerProfileDTO {
     private Long userId;
     private String trainerType; // PROFESSIONAL | PEER_TUTOR
     private Double revenueShare;
-    private String slogan;
     private String bio;
     private String workplace;
 
-    // targets
-    private Boolean targetLowRange;
-    private Boolean targetMidRange;
-    private Boolean targetHighRange;
-
-    // formats
-    private Boolean formatExamPrep;
-    private Boolean formatGrammarVocab;
-    private Boolean formatReading;
-    private Boolean formatLastMinute;
-
     // documents
-    private String degreeUrl;
-    private String ieltsUrl;
     private String scoreReportUrl;
 
     // payout
