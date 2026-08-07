@@ -196,8 +196,10 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                 _buildDetailChip(Icons.psychology, skill, const Color(0xFFF0FDF4), const Color(0xFF16A34A)),
                                 const SizedBox(width: 8),
                                 _buildDetailChip(Icons.bar_chart, difficulty, const Color(0xFFFFF7ED), const Color(0xFFEA580C)),
-                                const SizedBox(width: 8),
-                                _buildDetailChip(Icons.category, type, const Color(0xFFF5F3FF), const Color(0xFF7C3AED)),
+                                if (d['groupTypeId'] != null) ...[
+                                  const SizedBox(width: 8),
+                                  _buildDetailChip(Icons.category, type, const Color(0xFFF5F3FF), const Color(0xFF7C3AED)),
+                                ],
                               ],
                             ),
                           ],
