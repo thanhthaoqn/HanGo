@@ -927,16 +927,19 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("User is not authorized to update this exam");
         }
 
-        if (isManager && "SUBMITTED".equalsIgnoreCase(status) && exam.getCreatedBy().getId().equals(user.getId())) {
-            exam.setStatus("PUBLISHED");
-        } else {
-            if (!isManager && ("PUBLISHED".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status))) {
-                throw new org.springframework.security.access.AccessDeniedException(
-                        "Only managers can publish or approve exams");
-            }
-            exam.setStatus(status);
+        // A trainer may only move their own exam between DRAFT/SUBMITTED/HIDDEN-style
+        // states; publishing, approving, or rejecting is the Course Manager's call
+        // (normally made via the dedicated /course-manager/exams/{id}/publish|reject
+        // endpoints, which is why this generic status endpoint stays permissive for
+        // managers rather than routing every transition through those two).
+        boolean isPublishOrApprove = "PUBLISHED".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status);
+        boolean isReject = "REJECTED".equalsIgnoreCase(status);
+        if (!isManager && (isPublishOrApprove || isReject)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only managers can publish, approve, or reject exams");
         }
 
+        exam.setStatus(status);
         examRepository.save(exam);
     }
 

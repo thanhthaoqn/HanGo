@@ -748,16 +748,79 @@ class TrainerDashboardServiceImplTest {
     }
 
     @Test
-    void updateExamStatusShouldSetNewStatus() {
+    void updateExamStatusShouldThrowWhenTrainerTriesToPublishOwnExam() {
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
         Exam exam = new Exam();
         exam.setId(1L);
         exam.setCreatedBy(trainer(1L, "trainer@example.com"));
         when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
 
-        service.updateExamStatus(1L, "trainer@example.com", "PUBLISHED");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.updateExamStatus(1L, "trainer@example.com", "PUBLISHED"));
+        verify(examRepository, never()).save(any());
+    }
+
+    @Test
+    void updateExamStatusShouldThrowWhenTrainerTriesToRejectOwnExam() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.updateExamStatus(1L, "trainer@example.com", "REJECTED"));
+        verify(examRepository, never()).save(any());
+    }
+
+    @Test
+    void updateExamStatusShouldAllowTrainerToSubmitOwnExamForReview() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setStatus("DRAFT");
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        service.updateExamStatus(1L, "trainer@example.com", "SUBMITTED");
+
+        assertEquals("SUBMITTED", exam.getStatus());
+        verify(examRepository).save(exam);
+    }
+
+    @Test
+    void updateExamStatusShouldAllowManagerToPublishAnotherTrainersSubmittedExam() {
+        User manager = trainer(2L, "manager@example.com");
+        manager.setRoles(java.util.Set.of(Role.builder().roleName("COURSE_MANAGER").build()));
+        when(userRepository.findByEmail("manager@example.com")).thenReturn(Optional.of(manager));
+
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setStatus("SUBMITTED");
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        service.updateExamStatus(1L, "manager@example.com", "PUBLISHED");
 
         assertEquals("PUBLISHED", exam.getStatus());
+        verify(examRepository).save(exam);
+    }
+
+    @Test
+    void updateExamStatusShouldAllowManagerToRejectAnotherTrainersSubmittedExam() {
+        User manager = trainer(2L, "manager@example.com");
+        manager.setRoles(java.util.Set.of(Role.builder().roleName("COURSE_MANAGER").build()));
+        when(userRepository.findByEmail("manager@example.com")).thenReturn(Optional.of(manager));
+
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setStatus("SUBMITTED");
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        service.updateExamStatus(1L, "manager@example.com", "REJECTED");
+
+        assertEquals("REJECTED", exam.getStatus());
         verify(examRepository).save(exam);
     }
 
