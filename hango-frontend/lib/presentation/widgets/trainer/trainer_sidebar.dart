@@ -174,6 +174,10 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
             Icons.confirmation_number_outlined,
             'Support & Tickets',
           ),
+          const Spacer(),
+          const Divider(color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 12),
+          _buildLogoutItem(context),
         ],
       ),
     );
@@ -231,6 +235,39 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
                       ? const Color(0xFF94A3B8)
                       : (isActive ? Colors.white : const Color(0xFF334155)),
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 14,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoutItem(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: InkWell(
+        onTap: () => _handleLogout(context),
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: const Color(0xFFEF4444).withValues(alpha: 0.08),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.logout, color: Color(0xFFEF4444), size: 20),
+              const SizedBox(width: 14),
+              const Text(
+                'Logout',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontWeight: FontWeight.w600,
                   fontSize: 14,
                   fontFamily: 'Outfit',
                 ),
