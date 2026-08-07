@@ -159,7 +159,7 @@ public class GeminiClientService {
                                 .contents(chatHistory) // Gửi toàn bộ mảng lịch sử bao gồm cả câu hỏi mới ở cuối
                                 .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
                                                 .temperature(0.4)
-                                                .maxOutputTokens(800)
+                                                .maxOutputTokens(8192)
                                                 .build())
                                 .build();
 
