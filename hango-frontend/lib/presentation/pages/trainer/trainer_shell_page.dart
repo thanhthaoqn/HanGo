@@ -202,14 +202,18 @@ class TrainerShellPageState extends State<TrainerShellPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: InternalAppHeader(isMobile: !isDesktop),
       drawer: !isDesktop ? Drawer(child: TrainerSidebar(activeIndex: _currentIndex, onTabSelect: (idx) => selectTab(idx))) : null,
       body: Row(
         children: [
           if (isDesktop) SizedBox(width: 250, child: TrainerSidebar(activeIndex: _currentIndex, onTabSelect: (idx) => selectTab(idx))),
           Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentIndex,
                     children: const [
                       TrainerDashboardPage(isEmbedded: true),
                       TrainerCoursesPage(isEmbedded: true),
@@ -220,6 +224,9 @@ class TrainerShellPageState extends State<TrainerShellPage> {
                       TrainerTicketsPage(isEmbedded: true),
                     ],
                   ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

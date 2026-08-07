@@ -102,7 +102,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Enter feedback for the teacher:',
+                'Enter required edits & feedback for the trainer:',
                 style: TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
               ),
               const SizedBox(height: 12),
@@ -111,7 +111,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                 maxLines: 4,
                 style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Example: IELTS certificate is blurry, please re-upload...',
+                  hintText: 'Example: IELTS certificate scan is blurry, please re-upload a clear image...',
                   hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
@@ -134,7 +134,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
               onPressed: () {
                 final notes = noteController.text.trim();
                 if (notes.isEmpty) {
-                  ToastHelper.showError(context, 'Please fill revision feedback reason');
+                  ToastHelper.showError(context, 'Please enter requested edits');
                   return;
                 }
                 Navigator.pop(context);
@@ -147,7 +147,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
               child: const Text(
-                'Send Revisions Request',
+                'Request Revisions',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ),
@@ -174,7 +174,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
               Icon(Icons.check_circle_outline_rounded, color: Color(0xFF28B79B), size: 28),
               SizedBox(width: 12),
               Text(
-                'Approve Instructor',
+                'Approve Trainer',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
@@ -184,12 +184,12 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Approving account: ${isPro ? "Teacher" : "Peer Tutor"}.',
+                'Approving account: ${isPro ? "Teacher" : "Tutor"}.',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
               ),
               const SizedBox(height: 16),
               const Text(
-                'Trainer Revenue Share (0.0 - 1.0) *',
+                'Trainer Revenue Share (0.50 - 0.95) *',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
               ),
               const SizedBox(height: 8),
@@ -221,8 +221,8 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             ElevatedButton(
               onPressed: () {
                 final rate = double.tryParse(splitController.text);
-                if (rate == null || rate < 0 || rate > 1) {
-                  ToastHelper.showError(context, 'Invalid split rate (0.0 - 1.0)');
+                if (rate == null || rate < 0.50 || rate > 0.95) {
+                  ToastHelper.showError(context, 'Trainer revenue share must be between 0.50 (50%) and 0.95 (95%)');
                   return;
                 }
                 Navigator.pop(context);
@@ -335,13 +335,10 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
     final fullName = app['fullName'] ?? 'N/A';
     final email = app['email'] ?? 'N/A';
     final phone = app['phoneNumber'] ?? 'N/A';
-    final slogan = app['slogan'] ?? '';
     final bio = app['bio'] ?? '';
     final type = app['trainerType'] ?? 'PROFESSIONAL';
     final status = app['status'] ?? 'PENDING_VERIFICATION';
     
-    final degreeUrl = app['degreeUrl'] as String?;
-    final ieltsUrl = app['ieltsUrl'] as String?;
     final scoreUrl = app['scoreReportUrl'] as String?;
 
     final bankName = app['bankName'] ?? '';
@@ -437,26 +434,14 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                       final rawCerts = app['certificates'];
                       if (rawCerts != null && rawCerts is List && rawCerts.isNotEmpty) {
                         certList = (rawCerts as List).map((c) => Map<String, String>.from(c as Map)).toList();
-                      } else {
-                        Set<String> addedUrls = {};
-                        if (degreeUrl != null && degreeUrl.isNotEmpty) {
-                          certList.add({'name': 'Degree Proof', 'url': degreeUrl});
-                          addedUrls.add(degreeUrl);
-                        }
-                        if (ieltsUrl != null && ieltsUrl.isNotEmpty && !addedUrls.contains(ieltsUrl)) {
-                          certList.add({'name': 'Language Proof', 'url': ieltsUrl});
-                          addedUrls.add(ieltsUrl);
-                        }
-                        if (scoreUrl != null && scoreUrl.isNotEmpty) {
-                          if (scoreUrl.startsWith('[')) {
-                            try {
-                              final List parsed = jsonDecode(scoreUrl);
-                              certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
-                            } catch (_) {}
-                          } else if (!addedUrls.contains(scoreUrl)) {
-                            certList.add({'name': 'Other Credential', 'url': scoreUrl});
-                            addedUrls.add(scoreUrl);
-                          }
+                      } else if (scoreUrl != null && scoreUrl.isNotEmpty) {
+                        if (scoreUrl.startsWith('[')) {
+                          try {
+                            final List parsed = jsonDecode(scoreUrl);
+                            certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
+                          } catch (_) {}
+                        } else {
+                          certList.add({'name': 'Credential Proof', 'url': scoreUrl});
                         }
                       }
 
@@ -493,13 +478,13 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                         OutlinedButton.icon(
                           onPressed: () {
                             Navigator.pop(context);
-                            _showRejectProfileConfirmDialog(userId);
+                            _showRejectDialog(userId);
                           },
-                          icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.redAccent),
-                          label: const Text('Reject profile'),
+                          icon: const Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFFD97706)),
+                          label: const Text('Request Revisions'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.redAccent,
-                            side: const BorderSide(color: Colors.redAccent),
+                            foregroundColor: const Color(0xFFD97706),
+                            side: const BorderSide(color: Color(0xFFD97706)),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
@@ -510,7 +495,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                             _showApproveDialog(userId, type);
                           },
                           icon: const Icon(Icons.check_circle_rounded, size: 16),
-                          label: const Text('Approve profile'),
+                          label: const Text('Approve Application'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF28B79B),
                             foregroundColor: Colors.white,
@@ -564,7 +549,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
     }
 
     final isPro = type == 'PROFESSIONAL';
-    final typeDisplay = isPro ? 'Professional' : 'Peer Tutor';
+    final typeDisplay = isPro ? 'Teacher' : 'Tutor';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

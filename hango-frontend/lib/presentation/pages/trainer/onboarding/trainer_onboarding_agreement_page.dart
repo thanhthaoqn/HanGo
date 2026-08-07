@@ -9,16 +9,19 @@ import '../../../widgets/shared_header.dart';
 import '../../../widgets/shared_footer.dart';
 import 'trainer_onboarding_status_page.dart';
 import 'trainer_payout_details_page.dart';
+import 'trainer_onboarding_shell_page.dart';
 import '../../login_page.dart';
 
 class TrainerOnboardingAgreementPage extends StatefulWidget {
   final Map<String, dynamic> profilePayload;
   final String trainerType;
+  final bool isEmbedded;
 
   const TrainerOnboardingAgreementPage({
     super.key,
     required this.profilePayload,
     required this.trainerType,
+    this.isEmbedded = false,
   });
 
   @override
@@ -94,12 +97,22 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
               : 'Agreement signed successfully!',
         );
         
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TrainerPayoutDetailsPage(initialProfile: result['data'] ?? finalPayload),
-          ),
+        final nextPage = TrainerPayoutDetailsPage(
+          initialProfile: result['data'] ?? finalPayload,
+          isEmbedded: true,
         );
+
+        final shellState = TrainerOnboardingShellPage.of(context);
+        if (shellState != null) {
+          shellState.updateBody(nextPage);
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+            ),
+          );
+        }
       } else {
         ToastHelper.showError(context, result['message'] ?? 'Lỗi lưu thỏa thuận.');
       }
@@ -142,84 +155,80 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 1024;
+    if (!widget.isEmbedded) {
+      return TrainerOnboardingShellPage(
+        initialBody: TrainerOnboardingAgreementPage(
+          profilePayload: widget.profilePayload,
+          trainerType: widget.trainerType,
+          isEmbedded: true,
+        ),
+      );
+    }
+
     final isVi = LanguageManager.isVi;
     final isPro = widget.trainerType == 'PROFESSIONAL';
 
     final splitText = isVi
-        ? (isPro ? '70% doanh thu dành cho Giáo viên (30% phí nền tảng HanGo)' : '60% doanh thu dành cho Gia sư đồng học (40% phí nền tảng HanGo)')
-        : (isPro ? '70% revenue share for Teacher (30% HanGo platform fee)' : '60% revenue share for Peer Tutor (40% HanGo platform fee)');
+        ? (isPro ? '70% doanh thu dành cho Giáo viên (30% phí nền tảng HanGo)' : '60% doanh thu dành cho Gia sư (40% phí nền tảng HanGo)')
+        : (isPro ? '70% revenue share for Teacher (30% HanGo platform fee)' : '60% revenue share for Tutor (40% HanGo platform fee)');
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
-      body: Row(
-        children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InternalAppHeader(isMobile: !isDesktop),
-                Expanded(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isVi ? 'Bản thỏa thuận hợp tác điện tử' : 'E-Cooperation Agreement',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                isVi
+                    ? 'Vui lòng đọc kỹ các điều khoản chia sẻ doanh thu và quy định trước khi nộp hồ sơ giảng dạy.'
+                    : 'Please read the revenue split terms and compliance guidelines before signing.',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+              ),
+              const SizedBox(height: 32),
+              // Agreement Terms Box
+              Container(
+                height: 350,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Scrollbar(
+                  controller: _termsScrollController,
+                  thumbVisibility: true,
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                    child: Center(
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 800),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isVi ? 'Bản thỏa thuận hợp tác điện tử' : 'E-Cooperation Agreement',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              isVi
-                                  ? 'Vui lòng đọc kỹ các điều khoản chia sẻ doanh thu và quy định trước khi nộp hồ sơ giảng dạy.'
-                                  : 'Please read the revenue split terms and compliance guidelines before signing.',
-                              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
-                            ),
-                            const SizedBox(height: 32),
-                      // Agreement Terms Box
-                      Container(
-                        height: 350,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Scrollbar(
-                          controller: _termsScrollController,
-                          thumbVisibility: true,
-                          child: SingleChildScrollView(
-                            controller: _termsScrollController,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildTermTitle(isVi ? 'ĐIỀU 1: PHÂN CHIA DOANH THU' : 'ARTICLE 1: REVENUE SHARE'),
-                                  _buildTermText(
-                                    isVi
-                                        ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên (Chia 70/30)" : "Gia sư đồng học (Chia 60/40)"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giáo viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
-                                        : 'Based on selected profile: ${isPro ? "Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Revenue Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildTermTitle(isVi ? 'ĐIỀU 2: BẢO MẬT & BẢN QUYỀN NỘI DUNG' : 'ARTICLE 2: CONTENT COPYRIGHTS'),
-                                  _buildTermText(
-                                    isVi
-                                        ? 'Giáo viên cam kết tự biên soạn nội dung bài giảng, đề thi và câu hỏi. Không sao chép hay sử dụng các nội dung của bên thứ ba chưa được cấp phép. Mọi tranh chấp liên quan đến bản quyền nội dung, giáo viên sẽ chịu trách nhiệm hoàn toàn trước pháp luật.'
-                                        : 'Instructors guarantee original ownership of syllabus, exams, and quizzes. No unlicensed duplication of third-party assets is permitted. The instructor assumes full legal responsibility for any copyrights violations.',
-                                  ),
+                    controller: _termsScrollController,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTermTitle(isVi ? 'ĐIỀU 1: PHÂN CHIA DOANH THU' : 'ARTICLE 1: REVENUE SHARE'),
+                          _buildTermText(
+                            isVi
+                                ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên (Chia 70/30)" : "Gia sư (Chia 60/40)"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giáo viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
+                                : 'Based on selected profile: ${isPro ? "Teacher (70/30 split)" : "Tutor (60/40 split)"}.\n- Revenue Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTermTitle(isVi ? 'ĐIỀU 2: BẢO MẬT & BẢN QUYỀN NỘI DUNG' : 'ARTICLE 2: CONTENT COPYRIGHTS'),
+                          _buildTermText(
+                            isVi
+                                ? 'Giáo viên cam kết tự biên soạn nội dung bài giảng, đề thi và câu hỏi. Không sao chép hay sử dụng các nội dung của bên thứ ba chưa được cấp phép. Mọi tranh chấp liên quan đến bản quyền nội dung, giáo viên sẽ chịu trách nhiệm hoàn toàn trước pháp luật.'
+                                : 'Trainers guarantee original ownership of syllabus, exams, and quizzes. No unlicensed duplication of third-party assets is permitted. The trainer assumes full legal responsibility for any copyrights violations.',
+                          ),
                                   const SizedBox(height: 16),
                                   _buildTermTitle(isVi ? 'ĐIỀU 3: CHÍNH SÁCH HOÀN TIỀN' : 'ARTICLE 3: REFUNDS POLICY'),
                                   _buildTermText(
@@ -307,18 +316,11 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                           ),
                         ],
                       ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+              ),
+            );
   }
 
   Widget _buildSidebar(BuildContext context) {

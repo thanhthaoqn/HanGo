@@ -4,6 +4,8 @@ import '../../pages/login_page.dart';
 import '../../pages/trainer/trainer_shell_page.dart';
 import '../../../data/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../utils/toast_helper.dart';
+import '../../../utils/language_manager.dart';
 
 class TrainerSidebar extends StatefulWidget {
   final int activeIndex;
@@ -51,7 +53,16 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
   }
 
   void _handleSelectTab(BuildContext context, int index) {
-    if (!widget.isEnabled || widget.disabledIndices.contains(index)) return;
+    if (!widget.isEnabled || widget.disabledIndices.contains(index)) {
+      final isVi = LanguageManager.isVi;
+      ToastHelper.showInfo(
+        context,
+        isVi
+            ? 'Vui lòng hoàn tất nộp hồ sơ Trainer trước khi truy cập tính năng này.'
+            : 'Please complete your Trainer onboarding application first.',
+      );
+      return;
+    }
 
     if (widget.onTabSelect != null) {
       widget.onTabSelect!(index);
@@ -92,17 +103,60 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
 
   @override
   Widget build(BuildContext context) {
+    final showAllForOnboarding = widget.disabledIndices.isNotEmpty;
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0, bottom: 24.0),
+            child: Row(
+              children: [
+                Image.network(
+                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                  height: 36,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE6FFFA),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.school,
+                            size: 18,
+                            color: Color(0xFF28B79B),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'HanGo',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
           _buildItem(context, 0, Icons.dashboard_outlined, 'Dashboard'),
-          if (_canManageCourses)
+          if (_canManageCourses || showAllForOnboarding)
             _buildItem(context, 1, Icons.book_outlined, 'Courses'),
-          if (_canManageExams) ...[
+          if (_canManageExams || showAllForOnboarding) ...[
             _buildItem(context, 2, Icons.assignment_outlined, 'Exam'),
             _buildItem(
               context,
@@ -111,13 +165,8 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
               'Question Bank',
             ),
           ],
-          if (_canViewRevenue)
-            _buildItem(
-              context,
-              4,
-              Icons.account_balance_wallet_outlined,
-              'Revenue',
-            ),
+          if (_canViewRevenue || showAllForOnboarding)
+            _buildItem(context, 4, Icons.account_balance_wallet_outlined, 'Revenue'),
           _buildItem(context, 5, Icons.person_outline, 'My Profile'),
           _buildItem(
             context,
@@ -144,7 +193,7 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: InkWell(
-        onTap: itemEnabled ? () => _handleSelectTab(context, index) : null,
+        onTap: () => _handleSelectTab(context, index),
         borderRadius: BorderRadius.circular(12),
         hoverColor: itemEnabled
             ? activeColor.withValues(alpha: 0.08)

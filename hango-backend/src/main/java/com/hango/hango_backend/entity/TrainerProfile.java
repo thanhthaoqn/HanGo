@@ -28,52 +28,14 @@ public class TrainerProfile {
     @Column(name = "revenue_share")
     private Double revenueShare;
 
-    private String slogan;
-
     @Column(columnDefinition = "TEXT")
     private String bio;
 
     @Column(name = "workplace", length = 255)
     private String workplace;
 
-    // target ranges
-    @Column(name = "target_low_range")
-    @Builder.Default
-    private Boolean targetLowRange = false;
-
-    @Column(name = "target_mid_range")
-    @Builder.Default
-    private Boolean targetMidRange = false;
-
-    @Column(name = "target_high_range")
-    @Builder.Default
-    private Boolean targetHighRange = false;
-
-    // course formats
-    @Column(name = "format_exam_prep")
-    @Builder.Default
-    private Boolean formatExamPrep = false;
-
-    @Column(name = "format_grammar_vocab")
-    @Builder.Default
-    private Boolean formatGrammarVocab = false;
-
-    @Column(name = "format_reading")
-    @Builder.Default
-    private Boolean formatReading = false;
-
-    @Column(name = "format_last_minute")
-    @Builder.Default
-    private Boolean formatLastMinute = false;
-
-    // certifications (Cloudinary urls)
-    @Column(name = "degree_url", length = 500)
-    private String degreeUrl;
-
-    @Column(name = "ielts_url", length = 500)
-    private String ieltsUrl;
-
-    @Column(name = "score_report_url", length = 500)
+    // certifications (Cloudinary urls & JSON arrays)
+    @Column(name = "score_report_url", columnDefinition = "LONGTEXT")
     private String scoreReportUrl;
 
     // payout settings

@@ -33,6 +33,30 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @jakarta.annotation.PostConstruct
+    public void initSchemaFix() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE trainer_profiles MODIFY COLUMN score_report_url LONGTEXT");
+            log.info("Successfully altered trainer_profiles score_report_url to LONGTEXT.");
+
+            // Clean up redundant columns if they still exist in DB
+            String[] colsToDrop = {
+                "slogan", "target_low_range", "target_mid_range", "target_high_range",
+                "format_exam_prep", "format_grammar_vocab", "format_reading", "format_last_minute",
+                "degree_url", "ielts_url"
+            };
+            for (String col : colsToDrop) {
+                try {
+                    jdbcTemplate.execute("ALTER TABLE trainer_profiles DROP COLUMN " + col);
+                    log.info("Dropped redundant column: trainer_profiles.{}", col);
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            log.warn("Failed schema fix on trainer_profiles: {}", e.getMessage());
+        }
+    }
 
     @Override
     @Transactional
@@ -134,22 +158,10 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         }
 
         // Auto-save updating fields
-        if (dto.getSlogan() != null) profile.setSlogan(dto.getSlogan());
         if (dto.getBio() != null) profile.setBio(dto.getBio());
         if (dto.getWorkplace() != null) profile.setWorkplace(dto.getWorkplace());
         if (dto.getAgreementSigned() != null) profile.setAgreementSigned(dto.getAgreementSigned());
         
-        if (dto.getTargetLowRange() != null) profile.setTargetLowRange(dto.getTargetLowRange());
-        if (dto.getTargetMidRange() != null) profile.setTargetMidRange(dto.getTargetMidRange());
-        if (dto.getTargetHighRange() != null) profile.setTargetHighRange(dto.getTargetHighRange());
-
-        if (dto.getFormatExamPrep() != null) profile.setFormatExamPrep(dto.getFormatExamPrep());
-        if (dto.getFormatGrammarVocab() != null) profile.setFormatGrammarVocab(dto.getFormatGrammarVocab());
-        if (dto.getFormatReading() != null) profile.setFormatReading(dto.getFormatReading());
-        if (dto.getFormatLastMinute() != null) profile.setFormatLastMinute(dto.getFormatLastMinute());
-
-        if (dto.getDegreeUrl() != null) profile.setDegreeUrl(dto.getDegreeUrl());
-        if (dto.getIeltsUrl() != null) profile.setIeltsUrl(dto.getIeltsUrl());
         if (dto.getScoreReportUrl() != null) profile.setScoreReportUrl(dto.getScoreReportUrl());
 
         if (dto.getBankName() != null) profile.setBankName(dto.getBankName());
@@ -192,18 +204,29 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         saveProfileDraft(email, dto);
 
         // 2. Validate mandatory fields
-        if (isEmpty(profile.getBio())) {
-            throw new IllegalArgumentException("Vui lòng điền giới thiệu bản thân & kinh nghiệm giảng dạy.");
+        if (isEmpty(profile.getBio()) || profile.getBio().trim().length() < 50) {
+            throw new IllegalArgumentException("Teaching experience & bio must be at least 50 characters long.");
         }
-        if (user == null || isEmpty(user.getPhoneNumber())) {
-            throw new IllegalArgumentException("Vui lòng cung cấp số điện thoại liên hệ.");
+        
+        String phone = user != null ? user.getPhoneNumber() : null;
+        boolean validPhone = phone != null 
+                && phone.trim().matches("^(03|05|07|08|09)\\d{8}$") 
+                && !phone.trim().matches("^(\\d)\\1{9}$") 
+                && !"1234567890".equals(phone.trim());
+
+        if (!validPhone) {
+            throw new IllegalArgumentException("A valid 10-digit contact phone number starting with 03/05/07/08/09 is required.");
+        }
+        if (user == null || isEmpty(user.getGender())) {
+            throw new IllegalArgumentException("Please select your gender.");
+        }
+        if (user == null || isEmpty(user.getAvatarUrl())) {
+            throw new IllegalArgumentException("Please upload an avatar image.");
         }
 
         // At least one certification proof
-        if (isEmpty(profile.getDegreeUrl()) &&
-            isEmpty(profile.getIeltsUrl()) &&
-            isEmpty(profile.getScoreReportUrl())) {
-            throw new IllegalArgumentException("Vui lòng tải lên ít nhất 1 tài liệu minh chứng năng lực.");
+        if (isEmpty(profile.getScoreReportUrl())) {
+            throw new IllegalArgumentException("Please upload at least one credentials proof document.");
         }
 
         // 3. Mark submitted and freeze edits
@@ -219,8 +242,8 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
             notificationService.notifyRole(
                     NotificationService.RECIPIENT_ADMIN,
                     NotificationService.TYPE_TRAINER_APPLICATION_SUBMITTED,
-                    "Đơn đăng ký giảng viên mới",
-                    trainerName + " vừa nộp hồ sơ giảng viên chờ xét duyệt.",
+                    "New Trainer Application Submitted",
+                    trainerName + " submitted a trainer application for review.",
                     null);
         } catch (Throwable e) {
             log.warn("Could not send admin notification for trainer submission: {}", e.getMessage());
@@ -271,7 +294,7 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
     @Transactional
     public TrainerProfileDTO reviewTrainerProfile(Long userId, TrainerReviewRequest request) {
         TrainerProfile profile = trainerProfileRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hồ sơ giảng viên cho ID người dùng: " + userId));
+                .orElseThrow(() -> new IllegalArgumentException("Trainer profile not found for user ID: " + userId));
 
         String newStatus = request.getStatus().toUpperCase();
         profile.setStatus(newStatus);
@@ -281,6 +304,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         if ("VERIFIED".equalsIgnoreCase(newStatus)) {
             // Setup default split rate if not custom-ridden by the admin
             if (request.getRevenueShare() != null) {
+                if (request.getRevenueShare() < 0.50 || request.getRevenueShare() > 0.95) {
+                    throw new IllegalArgumentException("Trainer revenue share must be between 0.50 (50%) and 0.95 (95%).");
+                }
                 profile.setRevenueShare(request.getRevenueShare());
             } else {
                 double defaultShare = "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType()) ? 0.60 : 0.70;
@@ -317,16 +343,31 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         }
         if (saved.getUser() != null) {
             boolean approved = "VERIFIED".equalsIgnoreCase(newStatus);
+            boolean suspended = "SUSPENDED".equalsIgnoreCase(newStatus);
+            
+            String notifTitle;
+            String notifMsg;
+            if (approved) {
+                notifTitle = "Trainer Application Approved";
+                notifMsg = "Congratulations! Your trainer application has been approved by administration.";
+            } else if (suspended) {
+                notifTitle = "Trainer Account Suspended";
+                notifMsg = "Your trainer account status has been set to SUSPENDED." +
+                        (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()
+                                ? " Reason: " + request.getAdminNotes() : "");
+            } else {
+                notifTitle = "Trainer Application Revisions Requested";
+                notifMsg = "Your trainer application requires modifications before approval." +
+                        (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()
+                                ? " Reason: " + request.getAdminNotes() : "");
+            }
+
             try {
                 notificationService.notifyUser(
                         saved.getUser(),
                         NotificationService.TYPE_TRAINER_APPLICATION_REVIEWED,
-                        approved ? "Hồ sơ giảng viên đã được duyệt" : "Hồ sơ giảng viên bị từ chối",
-                        approved
-                                ? "Chúc mừng! Hồ sơ đăng ký giảng viên của bạn đã được phê duyệt."
-                                : "Hồ sơ đăng ký giảng viên của bạn đã bị từ chối." +
-                                    (request.getAdminNotes() != null && !request.getAdminNotes().isBlank()
-                                            ? " Lý do: " + request.getAdminNotes() : ""),
+                        notifTitle,
+                        notifMsg,
                         null);
             } catch (Exception e) {
                 log.warn("Failed to send trainer review in-app notification: {}", e.getMessage());
@@ -341,18 +382,8 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 .userId(p.getUserId())
                 .trainerType(p.getTrainerType())
                 .revenueShare(p.getRevenueShare())
-                .slogan(p.getSlogan())
                 .bio(p.getBio())
                 .workplace(p.getWorkplace())
-                .targetLowRange(p.getTargetLowRange())
-                .targetMidRange(p.getTargetMidRange())
-                .targetHighRange(p.getTargetHighRange())
-                .formatExamPrep(p.getFormatExamPrep())
-                .formatGrammarVocab(p.getFormatGrammarVocab())
-                .formatReading(p.getFormatReading())
-                .formatLastMinute(p.getFormatLastMinute())
-                .degreeUrl(p.getDegreeUrl())
-                .ieltsUrl(p.getIeltsUrl())
                 .scoreReportUrl(p.getScoreReportUrl())
                 .bankName(p.getBankName())
                 .bankAccount(p.getBankAccount())

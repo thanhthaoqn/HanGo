@@ -236,7 +236,7 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
   Widget _buildTitleSection(bool isVi) {
     final trainerType = _summaryData?['trainerType'] ?? 'PROFESSIONAL';
     final typeLabel = trainerType == 'PEER_TUTOR'
-        ? (isVi ? 'Gia sư đồng học (Chia 60/40)' : 'Peer Tutor (60/40 Split)')
+        ? (isVi ? 'Gia sư (Chia 60/40)' : 'Tutor (60/40 Split)')
         : (isVi ? 'Giáo viên (Chia 70/30)' : 'Teacher (70/30 Split)');
 
     return Row(
@@ -366,8 +366,8 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                           ? '• Loại tài khoản: Giáo viên (Teacher).\n• Tỷ lệ: 70% thuộc về Giáo viên, 30% phí nền tảng HanGo.'
                           : '• Account Type: Teacher.\n• Ratio: 70% Trainer Share / 30% HanGo Platform Fee.')
                       : (isVi
-                          ? '• Loại tài khoản: Gia sư / Sinh viên (Peer Tutor).\n• Tỷ lệ: 60% thuộc về Gia sư, 40% phí nền tảng HanGo.'
-                          : '• Account Type: Peer Tutor.\n• Ratio: 60% Trainer Share / 40% HanGo Platform Fee.'),
+                          ? '• Loại tài khoản: Gia sư (Tutor).\n• Tỷ lệ: 60% thuộc về Gia sư, 40% phí nền tảng HanGo.'
+                          : '• Account Type: Tutor.\n• Ratio: 60% Trainer Share / 40% HanGo Platform Fee.'),
                 ),
                 const SizedBox(height: 16),
                 _buildPolicyRow(

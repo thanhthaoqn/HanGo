@@ -10,12 +10,18 @@ import '../../learner/learner_home_page.dart';
 import 'trainer_onboarding_details_page.dart';
 import 'trainer_onboarding_agreement_page.dart';
 import 'trainer_payout_details_page.dart';
+import 'trainer_onboarding_shell_page.dart';
 import '../trainer_dashboard_page.dart';
 
 class TrainerOnboardingStatusPage extends StatefulWidget {
   final Map<String, dynamic> initialProfile;
+  final bool isEmbedded;
 
-  const TrainerOnboardingStatusPage({super.key, required this.initialProfile});
+  const TrainerOnboardingStatusPage({
+    super.key,
+    required this.initialProfile,
+    this.isEmbedded = false,
+  });
 
   @override
   State<TrainerOnboardingStatusPage> createState() => _TrainerOnboardingStatusPageState();
@@ -69,8 +75,6 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     final bio = widget.initialProfile['bio'] ?? '';
     final type = widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
 
-    final degree = widget.initialProfile['degreeUrl'];
-    final ielts = widget.initialProfile['ieltsUrl'];
     final score = widget.initialProfile['scoreReportUrl'];
     final avatarUrl = widget.initialProfile['avatarUrl'] ?? _trainerAvatarUrl;
 
@@ -78,31 +82,15 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     final rawCerts = widget.initialProfile['certificates'];
     if (rawCerts != null && rawCerts is List && rawCerts.isNotEmpty) {
       certList = (rawCerts as List).map((c) => Map<String, String>.from(c as Map)).toList();
-    } else {
-      Set<String> addedUrls = {};
-      if (degree != null && degree.toString().isNotEmpty) {
-        final dUrl = degree.toString();
-        certList.add({'name': isVi ? 'Bằng cấp / Chứng chỉ' : 'Degree / Qualification', 'url': dUrl});
-        addedUrls.add(dUrl);
-      }
-      if (ielts != null && ielts.toString().isNotEmpty) {
-        final iUrl = ielts.toString();
-        if (!addedUrls.contains(iUrl)) {
-          certList.add({'name': isVi ? 'Chứng chỉ Tiếng Anh' : 'Language Proficiency', 'url': iUrl});
-          addedUrls.add(iUrl);
-        }
-      }
-      if (score != null && score.toString().isNotEmpty) {
-        final sStr = score.toString();
-        if (sStr.startsWith('[')) {
-          try {
-            final List parsed = jsonDecode(sStr);
-            certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
-          } catch (_) {}
-        } else if (!addedUrls.contains(sStr)) {
-          certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': sStr});
-          addedUrls.add(sStr);
-        }
+    } else if (score != null && score.toString().isNotEmpty) {
+      final sStr = score.toString();
+      if (sStr.startsWith('[')) {
+        try {
+          final List parsed = jsonDecode(sStr);
+          certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
+        } catch (_) {}
+      } else {
+        certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': sStr});
       }
     }
 
@@ -160,7 +148,7 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                             Text(
                               type == 'PROFESSIONAL'
                                   ? (isVi ? 'Giáo viên' : 'Teacher')
-                                  : (isVi ? 'Gia sư / Trợ giảng' : 'Peer Tutor'),
+                                  : (isVi ? 'Gia sư' : 'Tutor'),
                               style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                             ),
                           ],
@@ -315,131 +303,119 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 1024;
+    if (!widget.isEmbedded) {
+      return TrainerOnboardingShellPage(
+        initialBody: TrainerOnboardingStatusPage(
+          initialProfile: widget.initialProfile,
+          isEmbedded: true,
+        ),
+      );
+    }
+
     final isVi = LanguageManager.isVi;
 
     final status = widget.initialProfile['status'] ?? 'PENDING_VERIFICATION';
     final adminNotes = widget.initialProfile['adminNotes'];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context)) : null,
-      body: Row(
-        children: [
-          if (isDesktop) SizedBox(width: 240, child: _buildSidebar(context)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InternalAppHeader(isMobile: !isDesktop),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
-                      child: Center(
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 600),
-                          padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.02),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              _buildStatusIcon(status),
-                              const SizedBox(height: 28),
-                              Text(
-                                _getStatusTitle(status, isVi),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A),
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _getStatusDescription(status, isVi),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF64748B),
-                                  height: 1.5,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-
-                              // If rejected/revision needed, show admin feedback
-                              if (adminNotes != null && adminNotes.toString().isNotEmpty) ...[
-
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFFBEB),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFFDE68A)),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.feedback_rounded, color: Color(0xFFD97706), size: 16),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            isVi ? 'Phản hồi từ Ban quản trị:' : 'Feedback from Administrator:',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
-                                              color: Color(0xFF92400E),
-                                              fontFamily: 'Outfit',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        adminNotes.toString(),
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFFB45309),
-                                          height: 1.4,
-                                          fontFamily: 'Outfit',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                              ],
-
-                              // Action Buttons
-                              _buildActionButtons(context, status, isVi),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 600),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildStatusIcon(status),
+                const SizedBox(height: 28),
+                Text(
+                  _getStatusTitle(status, isVi),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _getStatusDescription(status, isVi),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    height: 1.5,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // If rejected/revision needed, show admin feedback
+                if (adminNotes != null && adminNotes.toString().isNotEmpty) ...[
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.feedback_rounded, color: Color(0xFFD97706), size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              isVi ? 'Phản hồi từ Ban quản trị:' : 'Feedback from Administrator:',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF92400E),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          adminNotes.toString(),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFFB45309),
+                            height: 1.4,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+
+                // Action Buttons
+                _buildActionButtons(context, status, isVi),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -717,18 +693,26 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
   }
 
   String _getStatusTitle(String status, bool isVi) {
+    final adminNotes = widget.initialProfile['adminNotes'];
+    final hasEditsRequested = adminNotes != null && adminNotes.toString().trim().isNotEmpty;
+
     if (status == 'AWAITING_APPROVAL') {
       return isVi ? 'Hồ sơ đang được thẩm định' : 'Application Under Review';
     } else if (status == 'SUSPENDED') {
       return isVi ? 'Tài khoản bị tạm khóa' : 'Account Suspended';
     } else if (status == 'VERIFIED') {
       return isVi ? 'Hồ sơ đã được phê duyệt!' : 'Application Approved!';
+    } else if (hasEditsRequested) {
+      return isVi ? 'Hồ sơ cần cập nhật & bổ sung' : 'Application Revisions Requested';
     } else {
       return isVi ? 'Chưa hoàn thiện hồ sơ' : 'Incomplete Registration';
     }
   }
 
   String _getStatusDescription(String status, bool isVi) {
+    final adminNotes = widget.initialProfile['adminNotes'];
+    final hasEditsRequested = adminNotes != null && adminNotes.toString().trim().isNotEmpty;
+
     if (status == 'AWAITING_APPROVAL') {
       return isVi
           ? 'Hồ sơ của bạn đang được Ban quản trị thẩm định trong vòng 24h. Hệ thống đã tạm thời khóa sửa đổi thông tin để đối soát.'
@@ -736,15 +720,19 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     } else if (status == 'SUSPENDED') {
       return isVi
           ? 'Tài khoản giảng dạy của bạn đã bị khóa do vi phạm các chính sách dịch vụ. Vui lòng liên hệ hỗ trợ: support@hango.edu.vn.'
-          : 'Your instructor account has been suspended due to policy violations. Contact support@hango.edu.vn for assistance.';
+          : 'Your trainer account has been suspended due to policy violations. Contact support@hango.edu.vn for assistance.';
     } else if (status == 'VERIFIED') {
       return isVi
           ? 'Chúc mừng! Hồ sơ giảng dạy của bạn đã được phê duyệt thành công. Vui lòng tiếp tục ký thỏa thuận hợp tác và thiết lập tài khoản thanh toán.'
           : 'Congratulations! Your application has been approved. Please proceed to sign the agreement and configure your payout details.';
+    } else if (hasEditsRequested) {
+      return isVi
+          ? 'Đơn đăng ký của bạn đã bị từ chối phê duyệt và cần chỉnh sửa bổ sung. Vui lòng xem phản hồi từ Ban quản trị, cập nhật lại thông tin và nộp duyệt lại.'
+          : 'Your trainer application was rejected and requires edits. Please review the feedback below, update your profile, and resubmit for review.';
     } else {
       return isVi
-          ? 'Hồ sơ giáo viên của bạn chưa hoàn thiện hoặc đã bị từ chối phê duyệt. Hãy chỉnh sửa và cập nhật lại thông tin để gửi duyệt.'
-          : 'Your profile is incomplete or has been rejected. Please edit and re-submit for review.';
+          ? 'Hồ sơ giáo viên của bạn chưa hoàn thiện. Hãy chỉnh sửa và cập nhật lại thông tin để gửi duyệt.'
+          : 'Your profile is incomplete. Please edit and submit for review.';
     }
   }
 
@@ -760,6 +748,8 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
       ),
     );
 
+    final shellState = TrainerOnboardingShellPage.of(context);
+
     if (status == 'VERIFIED') {
       final agreementSigned = widget.initialProfile['agreementSigned'] ?? false;
       final bankAccount = widget.initialProfile['bankAccount'] ?? '';
@@ -772,15 +762,21 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
           if (!agreementSigned)
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TrainerOnboardingAgreementPage(
-                      profilePayload: widget.initialProfile,
-                      trainerType: trainerType,
-                    ),
-                  ),
+                final nextPage = TrainerOnboardingAgreementPage(
+                  profilePayload: widget.initialProfile,
+                  trainerType: trainerType,
+                  isEmbedded: true,
                 );
+                if (shellState != null) {
+                  shellState.updateBody(nextPage);
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+                    ),
+                  );
+                }
               },
               icon: const Icon(Icons.draw_rounded, size: 16),
               label: Text(isVi ? 'Ký thỏa thuận' : 'Sign Agreement'),
@@ -794,14 +790,20 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
           else if (bankAccount.toString().trim().isEmpty)
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TrainerPayoutDetailsPage(
-                      initialProfile: widget.initialProfile,
-                    ),
-                  ),
+                final nextPage = TrainerPayoutDetailsPage(
+                  initialProfile: widget.initialProfile,
+                  isEmbedded: true,
                 );
+                if (shellState != null) {
+                  shellState.updateBody(nextPage);
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+                    ),
+                  );
+                }
               },
               icon: const Icon(Icons.account_balance_wallet_rounded, size: 16),
               label: Text(isVi ? 'Liên kết thanh toán' : 'Setup Payout'),
@@ -840,12 +842,20 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
           viewApplicationButton,
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TrainerOnboardingDetailsPage(initialProfile: widget.initialProfile),
-                ),
+              final nextPage = TrainerOnboardingDetailsPage(
+                initialProfile: widget.initialProfile,
+                isEmbedded: true,
               );
+              if (shellState != null) {
+                shellState.updateBody(nextPage);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+                  ),
+                );
+              }
             },
             icon: const Icon(Icons.edit_rounded, size: 16),
             label: Text(isVi ? 'Chỉnh sửa hồ sơ' : 'Edit profile'),
