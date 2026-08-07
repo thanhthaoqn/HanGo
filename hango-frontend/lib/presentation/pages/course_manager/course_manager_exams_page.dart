@@ -886,7 +886,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exam visibility updated successfully')));
         _fetchExamsData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update visibility: ${response.statusCode}')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('System error, please try again later.')));
       }
     } catch (e) {
       debugPrint('Error updating exam visibility: $e');

@@ -199,10 +199,15 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   final statusB = b['status']?.toString().toUpperCase() ?? '';
                   final priorityA = _getStatusPriority(statusA);
                   final priorityB = _getStatusPriority(statusB);
-                  if (priorityA != priorityB) return priorityA.compareTo(priorityB);
-                  
-                  DateTime d1 = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
-                  DateTime d2 = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
+                  if (priorityA != priorityB)
+                    return priorityA.compareTo(priorityB);
+
+                  DateTime d1 =
+                      DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
+                  DateTime d2 =
+                      DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                      DateTime(2000);
                   return d2.compareTo(d1);
                 } else if (_selectedSortBy == 'NEWEST') {
                   DateTime d1 =
@@ -389,21 +394,25 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               },
             )
           : _editingExamData != null
-              ? CourseManagerEditExamPage(
-                  examId: _editingExamData!['id'] as int,
-                  examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
-                  examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
-                  isReadOnly: !['DRAFT', 'REJECTED'].contains(_editingExamData!['status']?.toString().toUpperCase()),
-                  isCourseManager: false,
-                  isEmbedded: true,
-                  onBack: () {
-                    setState(() {
-                      _editingExamData = null;
-                      _fetchExamsData();
-                    });
-                  },
-                )
-              : _buildBodyContent();
+          ? CourseManagerEditExamPage(
+              examId: _editingExamData!['id'] as int,
+              examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
+              examExpectedCount:
+                  _editingExamData!['expectedQuestionCount'] as int? ?? 10,
+              isReadOnly: ![
+                'DRAFT',
+                'REJECTED',
+              ].contains(_editingExamData!['status']?.toString().toUpperCase()),
+              isCourseManager: false,
+              isEmbedded: true,
+              onBack: () {
+                setState(() {
+                  _editingExamData = null;
+                  _fetchExamsData();
+                });
+              },
+            )
+          : _buildBodyContent();
     }
 
     return Scaffold(
@@ -433,21 +442,29 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                           },
                         )
                       : _editingExamData != null
-                          ? CourseManagerEditExamPage(
-                              examId: _editingExamData!['id'] as int,
-                              examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
-                              examExpectedCount: _editingExamData!['expectedQuestionCount'] as int? ?? 10,
-                              isReadOnly: !['DRAFT', 'REJECTED'].contains(_editingExamData!['status']?.toString().toUpperCase()),
-                              isCourseManager: false,
-                              isEmbedded: true,
-                              onBack: () {
-                                setState(() {
-                                  _editingExamData = null;
-                                  _fetchExamsData();
-                                });
-                              },
-                            )
-                          : _buildBodyContent(),
+                      ? CourseManagerEditExamPage(
+                          examId: _editingExamData!['id'] as int,
+                          examTitle:
+                              _editingExamData!['title'] ?? 'Untitled Exam',
+                          examExpectedCount:
+                              _editingExamData!['expectedQuestionCount']
+                                  as int? ??
+                              10,
+                          isReadOnly: !['DRAFT', 'REJECTED'].contains(
+                            _editingExamData!['status']
+                                ?.toString()
+                                .toUpperCase(),
+                          ),
+                          isCourseManager: false,
+                          isEmbedded: true,
+                          onBack: () {
+                            setState(() {
+                              _editingExamData = null;
+                              _fetchExamsData();
+                            });
+                          },
+                        )
+                      : _buildBodyContent(),
                 ),
               ],
             ),
@@ -1076,8 +1093,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   ),
                 IconButton(
                   icon: Icon(
-                    (status == 'DRAFT' || status == 'REJECTED') 
-                        ? Icons.edit_outlined 
+                    (status == 'DRAFT' || status == 'REJECTED')
+                        ? Icons.edit_outlined
                         : Icons.remove_red_eye_outlined,
                     color: (status == 'DRAFT' || status == 'REJECTED')
                         ? const Color(0xFF64748B)

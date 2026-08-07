@@ -376,7 +376,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       if (mounted) ToastHelper.show(context, 'Questions generated successfully!');
     } catch (e) {
       if (mounted) {
-        ToastHelper.showError(context, 'AI Generation Failed: $e');
+        ToastHelper.showError(context, 'System error, please try again later.');
       }
     } finally {
       if (mounted) {
@@ -467,7 +467,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       }
     } catch (e) {
       if (mounted) {
-        ToastHelper.showError(context, 'Failed to save: $e');
+        ToastHelper.showError(context, 'System error, please try again later.');
       }
     } finally {
       if (mounted) {
@@ -769,19 +769,21 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildLabel('GROUP TYPE'),
-              _buildDropdown(
-                value: group.selectedGroupTypeId,
-                items: _groupTypes,
-                onChanged: widget.isReadOnly ? null : (val) => setState(() => group.selectedGroupTypeId = val),
-                displayKey: 'paramValue',
-                allowNone: true,
-              ),
-            ],
-          ),
+          if (group.isGroup) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildLabel('GROUP TYPE'),
+                _buildDropdown(
+                  value: group.selectedGroupTypeId,
+                  items: _groupTypes,
+                  onChanged: widget.isReadOnly ? null : (val) => setState(() => group.selectedGroupTypeId = val),
+                  displayKey: 'paramValue',
+                  allowNone: true,
+                ),
+              ],
+            ),
+          ],
           if (group.isGroup && !widget.isReadOnly) ...[
             const SizedBox(height: 16),
             Row(
@@ -841,7 +843,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
               ],
             ),
           ],
-          if (!widget.isReadOnly) ...[
+          if (group.isGroup && !widget.isReadOnly) ...[
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -957,18 +959,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   }
 
   Widget _buildSingleQuestionUI(QuestionGroupState group, int groupIndex) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: _buildMetadataSection(group, groupIndex),
-        ),
-        const SizedBox(height: 16),
-        _buildLabel('ANSWER DETAILS'),
-        _buildQuestionCard(group, 0, showTitle: false, showQuestionText: true),
-      ],
-    );
+    return _buildQuestionCard(group, 0, showTitle: false, showQuestionText: true);
   }
 
   Widget _buildQuestionCard(QuestionGroupState group, int index, {bool showTitle = true, bool showQuestionText = true}) {
@@ -1063,6 +1054,31 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                     );
                   }),
                   const SizedBox(height: 16),
+                  if (!group.isGroup && !widget.isReadOnly) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isGeneratingByAi
+                            ? null
+                            : () => _handleGenerateByAIForGroup(group),
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: _isGeneratingByAi
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Generate by AI', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF38C9A6),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 if (showQuestionText) ...[
                   _buildLabel('QUESTION'),
                   TextField(

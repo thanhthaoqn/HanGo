@@ -16,7 +16,8 @@ class TakeExamPage extends StatefulWidget {
   State<TakeExamPage> createState() => _TakeExamPageState();
 }
 
-class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderStateMixin {
+class _TakeExamPageState extends State<TakeExamPage>
+    with SingleTickerProviderStateMixin {
   late int _durationInSeconds;
   late int _timeLeft;
   Timer? _timer;
@@ -25,7 +26,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
   // Answers cache: questionIndex -> selectedOptionIndex (0 to 3)
   Map<int, int> _userAnswers = {};
-  
+
   // Custom scroll controllers for question grid and question content
   final ScrollController _gridScrollController = ScrollController();
   final ScrollController _contentScrollController = ScrollController();
@@ -47,46 +48,49 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
   Future<void> _loadQuestions() async {
     try {
-      final questions = await _examRepository.fetchExamQuestions(widget.exam.id);
-      
+      final questions = await _examRepository.fetchExamQuestions(
+        widget.exam.id,
+      );
+
       final Map<int, List<Map<String, dynamic>>> groupMap = {};
       final List<Map<String, dynamic>> flatQuestions = [];
-      
+
       int globalQIndex = 0;
       for (var q in questions) {
         final processedQ = {
           "id": q['id'],
           "globalIndex": globalQIndex,
           "content": "Question ${globalQIndex + 1}: ${q['content']}",
-          "options": (q['options'] as List).map((o) => o['optionText']).toList(),
+          "options": (q['options'] as List)
+              .map((o) => o['optionText'])
+              .toList(),
           "skill": q['skill'],
         };
-        
+
         flatQuestions.add(processedQ);
-        
+
         final group = q['group'];
         int groupId = group != null ? group['id'] : -1 - globalQIndex;
         if (!groupMap.containsKey(groupId)) {
           groupMap[groupId] = [];
         }
         groupMap[groupId]!.add(processedQ);
-        
+
         globalQIndex++;
       }
-      
+
       final List<Map<String, dynamic>> groups = [];
       for (var entry in groupMap.entries) {
         String? passage;
         if (entry.key >= 0) {
-          final firstQ = questions.firstWhere((q) => q['group'] != null && q['group']['id'] == entry.key);
+          final firstQ = questions.firstWhere(
+            (q) => q['group'] != null && q['group']['id'] == entry.key,
+          );
           passage = firstQ['group']['passage'];
         }
-        groups.add({
-          "passage": passage,
-          "questions": entry.value,
-        });
+        groups.add({"passage": passage, "questions": entry.value});
       }
-      
+
       if (mounted) {
         setState(() {
           _examQuestions = flatQuestions;
@@ -101,14 +105,18 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load questions.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load questions.')));
       }
     }
   }
 
   void _initializeTimer() {
     // Set duration
-    int durationMinutes = widget.exam.durationMinutes > 0 ? widget.exam.durationMinutes : 50;
+    int durationMinutes = widget.exam.durationMinutes > 0
+        ? widget.exam.durationMinutes
+        : 50;
     _durationInSeconds = durationMinutes * 60;
     _timeLeft = _durationInSeconds;
 
@@ -118,7 +126,10 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
       duration: const Duration(milliseconds: 500),
     );
     _timerScaleAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _timerAnimationController!, curve: Curves.easeInOut),
+      CurvedAnimation(
+        parent: _timerAnimationController!,
+        curve: Curves.easeInOut,
+      ),
     );
 
     _loadCachedAnswers();
@@ -150,7 +161,9 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
       if (cachedJson != null) {
         final Map<String, dynamic> decoded = jsonDecode(cachedJson);
         setState(() {
-          _userAnswers = decoded.map((key, value) => MapEntry(int.parse(key), value as int));
+          _userAnswers = decoded.map(
+            (key, value) => MapEntry(int.parse(key), value as int),
+          );
         });
       }
     } catch (e) {
@@ -163,7 +176,9 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     try {
       final prefs = await SharedPreferences.getInstance();
       final cacheKey = 'take_exam_${widget.exam.id}';
-      final Map<String, String> stringified = _userAnswers.map((key, value) => MapEntry(key.toString(), value.toString()));
+      final Map<String, String> stringified = _userAnswers.map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      );
       await prefs.setString(cacheKey, jsonEncode(stringified));
     } catch (e) {
       debugPrint("Error caching exam answers: $e");
@@ -189,7 +204,8 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
           _timeLeft--;
           // Start blinking timer when less than 2 minutes remain (120s)
           if (_timeLeft <= 120) {
-            if (_timerAnimationController != null && !_timerAnimationController!.isAnimating) {
+            if (_timerAnimationController != null &&
+                !_timerAnimationController!.isAnimating) {
               _timerAnimationController!.repeat(reverse: true);
             }
           }
@@ -222,16 +238,14 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
     setState(() {
       _isSubmitted = true;
     });
-    
+
     final attemptMap = await _saveAttemptToHistory();
     double score = 0.0;
     if (attemptMap != null && attemptMap['score'] != null) {
       score = (attemptMap['score'] as num).toDouble();
     }
-    
-    int correctCount = (score * _examQuestions.length / 10).round();
-    
 
+    int correctCount = (score * _examQuestions.length / 10).round();
 
     Navigator.pushReplacement(
       context,
@@ -242,13 +256,20 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
           correctCount: correctCount,
           examQuestions: _examQuestions,
           userAnswers: _userAnswers,
-          attempt: attemptMap ?? {
-            "attemptNumber": 1,
-            "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
-            "score": score,
-            "status": score >= 5.0 ? "PASSED" : "FAILED",
-            "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
-          },
+          attempt:
+              attemptMap ??
+              {
+                "attemptNumber": 1,
+                "date": DateTime.now()
+                    .toString()
+                    .substring(0, 16)
+                    .replaceFirst('T', ' '),
+                "score": score,
+                "status": score >= 5.0 ? "PASSED" : "FAILED",
+                "answers": _userAnswers.map(
+                  (key, value) => MapEntry((key + 1).toString(), value),
+                ),
+              },
         ),
       ),
     );
@@ -331,14 +352,14 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                           _isSubmitted = true;
                         });
                         _timer?.cancel();
-                        
+
                         final attemptMap = await _saveAttemptToHistory();
                         double score = 0.0;
                         if (attemptMap != null && attemptMap['score'] != null) {
                           score = (attemptMap['score'] as num).toDouble();
                         }
-                        int correctCount = (score * _examQuestions.length / 10).round();
-                        
+                        int correctCount = (score * _examQuestions.length / 10)
+                            .round();
 
                         Navigator.pushReplacement(
                           this.context,
@@ -349,14 +370,24 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                               correctCount: correctCount,
                               userAnswers: _userAnswers,
                               examQuestions: _examQuestions,
-                              attempt: attemptMap ?? {
-                                "attemptNumber": 1,
-                                "date": DateTime.now().toString().substring(0, 16).replaceFirst('T', ' '),
-                                "score": score,
-                                "status": score >= 5.0 ? "PASSED" : "FAILED",
-                                "answers": _userAnswers.map((key, value) => MapEntry((key + 1).toString(), value)),
-                                "correctness": {},
-                              },
+                              attempt:
+                                  attemptMap ??
+                                  {
+                                    "attemptNumber": 1,
+                                    "date": DateTime.now()
+                                        .toString()
+                                        .substring(0, 16)
+                                        .replaceFirst('T', ' '),
+                                    "score": score,
+                                    "status": score >= 5.0
+                                        ? "PASSED"
+                                        : "FAILED",
+                                    "answers": _userAnswers.map(
+                                      (key, value) =>
+                                          MapEntry((key + 1).toString(), value),
+                                    ),
+                                    "correctness": {},
+                                  },
                             ),
                           ),
                         );
@@ -395,7 +426,11 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
       _userAnswers.forEach((key, value) {
         answersForSubmit[(key + 1).toString()] = value;
       });
-      final attempt = await repository.submitExamAttempt(widget.exam.id, 0.0, answersForSubmit);
+      final attempt = await repository.submitExamAttempt(
+        widget.exam.id,
+        0.0,
+        answersForSubmit,
+      );
       return attempt;
     } catch (e) {
       debugPrint("Error saving attempt: $e");
@@ -603,7 +638,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
               ),
             ],
           ),
-          
+
           // Countdown Timer!
           AnimatedBuilder(
             animation: _timerScaleAnimation!,
@@ -613,12 +648,19 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
               return Transform.scale(
                 scale: isWarning ? _timerScaleAnimation!.value : 1.0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: isWarning ? const Color(0xFFFEE2E2) : const Color(0xFFE8F8F5),
+                    color: isWarning
+                        ? const Color(0xFFFEE2E2)
+                        : const Color(0xFFE8F8F5),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isWarning ? const Color(0xFFFCA5A5) : const Color(0xFF28B79B),
+                      color: isWarning
+                          ? const Color(0xFFFCA5A5)
+                          : const Color(0xFF28B79B),
                       width: 1.5,
                     ),
                   ),
@@ -628,7 +670,9 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                       Icon(
                         Icons.timer_outlined,
                         size: 16,
-                        color: isWarning ? const Color(0xFFEF4444) : const Color(0xFF167B66),
+                        color: isWarning
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFF167B66),
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -636,7 +680,9 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: isWarning ? const Color(0xFFEF4444) : const Color(0xFF167B66),
+                          color: isWarning
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF167B66),
                         ),
                       ),
                     ],
@@ -652,7 +698,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
 
   Widget _buildExamActiveQuestionPane() {
     final currentQuestion = _examQuestions[_currentQuestionIndex];
-    
+
     // Find passage if exists
     String? passageText;
     for (var group in _examGroups) {
@@ -684,24 +730,34 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           currentQuestion['skill'].toString().toUpperCase(),
-                          style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 11),
+                          style: const TextStyle(
+                            color: Color(0xFF3B82F6),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
                         ),
                       ),
                       Text(
                         'Question ${_currentQuestionIndex + 1} of ${_examQuestions.length}',
-                        style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Passage text if available
                   if (passageText != null && passageText.isNotEmpty) ...[
                     Container(
@@ -713,7 +769,11 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                       ),
                       child: Text(
                         passageText,
-                        style: const TextStyle(fontSize: 16, color: Color(0xFF334155), height: 1.6),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF334155),
+                          height: 1.6,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -722,35 +782,53 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                   // Question text
                   Text(
                     currentQuestion['content'],
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F2937), height: 1.4),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937),
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 32),
 
                   // Option cards
                   ...List.generate(4, (index) {
-                    final isSelected = _userAnswers[_currentQuestionIndex] == index;
-                    final optionLabel = String.fromCharCode(65 + index); // A, B, C, D
+                    final isSelected =
+                        _userAnswers[_currentQuestionIndex] == index;
+                    final optionLabel = String.fromCharCode(
+                      65 + index,
+                    ); // A, B, C, D
                     final optionText = currentQuestion['options'][index];
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),
                       child: InkWell(
-                        onTap: () => _selectAnswer(_currentQuestionIndex, index),
+                        onTap: () =>
+                            _selectAnswer(_currentQuestionIndex, index),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFFE8F8F5) : Colors.white,
+                            color: isSelected
+                                ? const Color(0xFFE8F8F5)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: isSelected ? const Color(0xFF28B79B) : Colors.grey.shade200,
+                              color: isSelected
+                                  ? const Color(0xFF28B79B)
+                                  : Colors.grey.shade200,
                               width: isSelected ? 2 : 1,
                             ),
                             boxShadow: [
                               if (isSelected)
                                 BoxShadow(
-                                  color: const Color(0xFF28B79B).withOpacity(0.1),
+                                  color: const Color(
+                                    0xFF28B79B,
+                                  ).withOpacity(0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 )
@@ -759,7 +837,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                                   color: Colors.black.withOpacity(0.02),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
-                                )
+                                ),
                             ],
                           ),
                           child: Row(
@@ -770,14 +848,18 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                                 height: 32,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: isSelected ? const Color(0xFF28B79B) : Colors.grey.shade100,
+                                  color: isSelected
+                                      ? const Color(0xFF28B79B)
+                                      : Colors.grey.shade100,
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   optionLabel,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: isSelected ? Colors.white : Colors.grey.shade700,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
                                   ),
                                 ),
                               ),
@@ -788,14 +870,22 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                                   optionText,
                                   style: TextStyle(
                                     fontSize: 15,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    color: isSelected ? const Color(0xFF167B66) : const Color(0xFF374151),
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? const Color(0xFF167B66)
+                                        : const Color(0xFF374151),
                                   ),
                                 ),
                               ),
                               // Radio checklist indicator
                               if (isSelected)
-                                const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 22),
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Color(0xFF28B79B),
+                                  size: 22,
+                                ),
                             ],
                           ),
                         ),
@@ -820,9 +910,14 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                 style: ElevatedButton.styleFrom(
                   foregroundColor: const Color(0xFF28B79B),
                   backgroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
                   side: BorderSide(color: Colors.grey.shade200),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               ElevatedButton.icon(
@@ -834,8 +929,13 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
                   backgroundColor: const Color(0xFF28B79B),
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -866,7 +966,7 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
             style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
           const SizedBox(height: 24),
-          
+
           // Question Grid
           Expanded(
             child: SingleChildScrollView(
@@ -901,7 +1001,10 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                       decoration: BoxDecoration(
                         color: bgColor,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: borderColor, width: isActive ? 2 : 1),
+                        border: Border.all(
+                          color: borderColor,
+                          width: isActive ? 2 : 1,
+                        ),
                       ),
                       alignment: Alignment.center,
                       child: Text(
@@ -927,7 +1030,9 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
               onPressed: _confirmSubmit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text(
                 'Submit Exam',
@@ -960,44 +1065,45 @@ class _TakeExamPageState extends State<TakeExamPage> with SingleTickerProviderSt
                 children: [
                   _buildExitExamHeader(),
                   Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  children: [
-                    _buildExamTopBar(isDesktop),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: isDesktop
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 7,
-                                  child: _buildExamActiveQuestionPane(),
-                                ),
-                                const SizedBox(width: 24),
-                                SizedBox(
-                                  width: 320,
-                                  child: _buildExamRightSidebarPane(),
-                                ),
-                              ],
-                            )
-                          : SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                  _buildExamActiveQuestionPane(),
-                                  const SizedBox(height: 24),
-                                  _buildExamRightSidebarPane(),
-                                ],
-                              ),
-                            ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        children: [
+                          _buildExamTopBar(isDesktop),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: isDesktop
+                                ? Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        flex: 7,
+                                        child: _buildExamActiveQuestionPane(),
+                                      ),
+                                      const SizedBox(width: 24),
+                                      SizedBox(
+                                        width: 320,
+                                        child: _buildExamRightSidebarPane(),
+                                      ),
+                                    ],
+                                  )
+                                : SingleChildScrollView(
+                                    child: Column(
+                                      children: [
+                                        _buildExamActiveQuestionPane(),
+                                        const SizedBox(height: 24),
+                                        _buildExamRightSidebarPane(),
+                                      ],
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

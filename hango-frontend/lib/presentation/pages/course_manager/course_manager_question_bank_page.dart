@@ -294,7 +294,7 @@ class _CourseManagerQuestionBankPageState
       setState(() {
         _isLoading = false;
       });
-      if (mounted) ToastHelper.showError(context, 'Failed to import Excel: $e');
+      if (mounted) ToastHelper.showError(context, 'System error, please try again later.');
     }
   }
 
@@ -436,9 +436,9 @@ class _CourseManagerQuestionBankPageState
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
-                                        SnackBar(
+                                        const SnackBar(
                                           content: Text(
-                                            'Failed to update status: $e',
+                                            'System error, please try again later.',
                                           ),
                                         ),
                                       );

@@ -69,7 +69,7 @@ class _CourseManagerMatrixManagementPageState
       print('[MatrixMgmt] error: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        ToastHelper.showError(context, 'Failed to load matrices: $e');
+        ToastHelper.showError(context, 'System error, please try again later.');
       }
     }
   }
@@ -414,9 +414,13 @@ class _CourseManagerMatrixManagementPageState
           ),
         ],
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: DataTable(
         headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
         dataRowMaxHeight: 64,
         dataRowMinHeight: 64,
@@ -529,7 +533,7 @@ class _CourseManagerMatrixManagementPageState
                             });
                             ToastHelper.showError(
                               context,
-                              'Failed to toggle status',
+                              'System error, please try again later.',
                             );
                           }
                         }
@@ -702,7 +706,10 @@ class _CourseManagerMatrixManagementPageState
             ],
           );
         }).toList(),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -78,12 +78,28 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
             _descController.text = widget.initialData!['description'] ?? '';
             final details = widget.initialData!['details'] as List? ?? [];
             _rules.clear();
-            
-            final groupMap = <int, List<Map<String, dynamic>>>{};
-            
+
+            // Track pending group building state
+            int? currentGroupTypeId;
+            List<Map<String, dynamic>>? currentGroupSubQs;
+
+            void flushGroup() {
+              if (currentGroupTypeId != null && currentGroupSubQs != null) {
+                _rules.add({
+                  'type': 'group',
+                  'groupTypeId': currentGroupTypeId,
+                  'subQuestions': currentGroupSubQs,
+                });
+                currentGroupTypeId = null;
+                currentGroupSubQs = null;
+              }
+            }
+
             for (var d in details) {
               int qty = d['quantity'] ?? 1;
               if (d['groupTypeId'] == null) {
+                // Flush any pending group before adding singles
+                flushGroup();
                 for (int i = 0; i < qty; i++) {
                   _rules.add({
                     'type': 'single',
@@ -94,30 +110,30 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                 }
               } else {
                 int groupId = d['groupTypeId'];
-                if (!groupMap.containsKey(groupId)) groupMap[groupId] = [];
+                // If a different group starts, flush current group first
+                if (currentGroupTypeId != null && currentGroupTypeId != groupId) {
+                  flushGroup();
+                }
+                if (currentGroupTypeId == null) {
+                  currentGroupTypeId = groupId;
+                  currentGroupSubQs = [];
+                }
                 for (int i = 0; i < qty; i++) {
-                   groupMap[groupId]!.add({
-                     'skillId': d['skillParamId'],
-                     'diffId': d['difficultyParamId'],
-                   });
+                  currentGroupSubQs!.add({
+                    'skillId': d['skillParamId'],
+                    'diffId': d['difficultyParamId'],
+                  });
                 }
               }
             }
-            
-            for (var entry in groupMap.entries) {
-              _rules.add({
-                 'type': 'group',
-                 'groupTypeId': entry.key,
-                 'subQuestions': entry.value,
-              });
-            }
+            flushGroup();
           }
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingData = false);
-        ToastHelper.showError(context, 'Failed to load parameters: $e');
+        ToastHelper.showError(context, 'System error, please try again later.');
       }
     }
   }
@@ -209,17 +225,40 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
     setState(() => _isSaving = true);
 
     try {
-      final flatDetails = <Map<String, dynamic>>[];
+      // Build ordered flat list preserving rule order,
+      // grouping only CONTIGUOUS identical configs to minimize DB rows
+      final orderedDetails = <Map<String, dynamic>>[];
+
+      Map<String, dynamic>? lastDetail;
+
+      void pushDetail(Map<String, dynamic> d) {
+        final key = '${d['skillParamId']}_${d['difficultyParamId']}_${d['groupTypeId']}';
+        if (lastDetail != null) {
+          final lastKey = '${lastDetail!['skillParamId']}_${lastDetail!['difficultyParamId']}_${lastDetail!['groupTypeId']}';
+          if (lastKey == key) {
+            lastDetail!['quantity'] = (lastDetail!['quantity'] as int) + 1;
+            return;
+          }
+        }
+        lastDetail = {
+          'skillParamId': d['skillParamId'],
+          'difficultyParamId': d['difficultyParamId'],
+          'groupTypeId': d['groupTypeId'],
+          'quantity': 1,
+        };
+        orderedDetails.add(lastDetail!);
+      }
+
       for (var r in _rules) {
         if (r['type'] == 'single') {
-          flatDetails.add({
+          pushDetail({
             'skillParamId': r['skillId'],
             'difficultyParamId': r['diffId'],
             'groupTypeId': null,
           });
         } else {
           for (var sq in (r['subQuestions'] as List)) {
-            flatDetails.add({
+            pushDetail({
               'skillParamId': sq['skillId'],
               'difficultyParamId': sq['diffId'],
               'groupTypeId': r['groupTypeId'],
@@ -228,25 +267,10 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
         }
       }
 
-      final grouped = <String, Map<String, dynamic>>{};
-      for (var d in flatDetails) {
-        final key = '${d['skillParamId']}_${d['difficultyParamId']}_${d['groupTypeId']}';
-        if (grouped.containsKey(key)) {
-          grouped[key]!['quantity'] = (grouped[key]!['quantity'] as int) + 1;
-        } else {
-          grouped[key] = {
-            'skillParamId': d['skillParamId'],
-            'difficultyParamId': d['difficultyParamId'],
-            'groupTypeId': d['groupTypeId'],
-            'quantity': 1,
-          };
-        }
-      }
-
       final data = {
         'title': _titleController.text.trim(),
         'description': _descController.text.trim(),
-        'details': grouped.values.toList(),
+        'details': orderedDetails,
       };
 
       if (widget.mode == MatrixMode.edit && widget.initialData != null) {
@@ -263,7 +287,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
       }
     } catch (e) {
       if (mounted) {
-        ToastHelper.showError(context, 'Failed to create matrix: $e');
+        ToastHelper.showError(context, 'System error, please try again later.');
       }
     } finally {
       if (mounted) {
@@ -291,29 +315,103 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
               children: [
                 _buildContentHeader(context, isDesktop),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(32),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 750),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildGeneralInfoCard(),
-                            const SizedBox(height: 32),
-                            _isLoadingData 
-                              ? const Padding(
-                                  padding: EdgeInsets.all(32.0),
-                                  child: Center(child: CircularProgressIndicator(color: Color(0xFF20B486))),
-                                )
-                              : _buildRulesSection(),
-                            const SizedBox(height: 32),
-                            _buildActionButtons(),
-                            const SizedBox(height: 64),
-                          ],
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(32, 16, 32, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 750),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildGeneralInfoCard(),
+                                  const SizedBox(height: 32),
+                                  _buildRulesHeader(),
+                                  const SizedBox(height: 16),
+                                  if (_isLoadingData)
+                                    const Padding(
+                                      padding: EdgeInsets.all(32.0),
+                                      child: Center(child: CircularProgressIndicator(color: Color(0xFF20B486))),
+                                    )
+                                  else if (_rules.isEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.all(32),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      ),
+                                      child: const Center(
+                                        child: Text(
+                                          'No rules added yet.\nAdd single questions or passages to get started.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      // Reorderable list as a proper sliver — no shrinkWrap, no lag
+                      if (!_isLoadingData && _rules.isNotEmpty)
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          sliver: SliverReorderableList(
+                            itemCount: _rules.length,
+                            onReorder: widget.mode == MatrixMode.view
+                                ? (_, __) {}
+                                : (int oldIndex, int newIndex) {
+                                    setState(() {
+                                      if (newIndex > oldIndex) newIndex--;
+                                      final item = _rules.removeAt(oldIndex);
+                                      _rules.insert(newIndex, item);
+                                    });
+                                  },
+                            proxyDecorator: (child, index, animation) => Material(
+                              elevation: 6,
+                              borderRadius: BorderRadius.circular(16),
+                              color: Colors.transparent,
+                              child: child,
+                            ),
+                            itemBuilder: (context, index) {
+                              return Center(
+                                key: ValueKey('rule_$index'),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 750),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: _buildRuleCard(index),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
+                        sliver: SliverToBoxAdapter(
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 750),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (!_isLoadingData) _buildAddButtons(),
+                                  const SizedBox(height: 32),
+                                  _buildActionButtons(),
+                                  const SizedBox(height: 64),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -399,11 +497,12 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
     );
   }
 
-  Widget _buildRulesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+  // Separate header widget for rules section (used in sliver layout)
+  Widget _buildRulesHeader() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 750),
+        child: Row(
           children: [
             const Expanded(
               child: Text(
@@ -432,97 +531,72 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        if (_rules.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Center(
-              child: Text(
-                'No rules added yet.\nAdd single questions or passages to get started.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
+      ),
+    );
+  }
+
+  Widget _buildAddButtons() {
+    if (widget.mode == MatrixMode.view) return const SizedBox.shrink();
+    return Row(
+      children: [
+        Expanded(
+          child: InkWell(
+            onTap: () => _addRule('single'),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFF20B486)),
+                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _rules.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              return _buildRuleCard(index);
-            },
-          ),
-        const SizedBox(height: 24),
-        if (widget.mode != MatrixMode.view)
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _addRule('single'),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFF20B486)),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add, color: Color(0xFF20B486), size: 20),
-                        SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            'Add Single Question',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit'),
-                          ),
-                        ),
-                      ],
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add, color: Color(0xFF20B486), size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Add Single Question',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit'),
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: InkWell(
-                  onTap: () => _addRule('group'),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF20B486),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            'Add Reading Passage Group',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
-                          ),
-                        ),
-                      ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: InkWell(
+            onTap: () => _addRule('group'),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF20B486),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Add Reading Passage Group',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
+        ),
       ],
     );
   }
@@ -550,6 +624,25 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
         children: [
           Row(
             children: [
+              // Drag handle
+              if (widget.mode != MatrixMode.view)
+                Tooltip(
+                  message: 'Hold to reorder',
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: ReorderableDragStartListener(
+                      index: index,
+                      child: const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: Icon(
+                          Icons.drag_indicator,
+                          color: Color(0xFFCBD5E1),
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: Row(
                   children: [
@@ -599,27 +692,13 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: DropdownButtonFormField<int>(
                     isExpanded: true,
                     decoration: _inputDecoration('Skill *', null),
                     value: rule['skillId'],
                     items: _skills.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name'], overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['skillId'] = val),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<int?>(
-                    isExpanded: true,
-                    decoration: _inputDecoration('Group Type (Optional)', null),
-                    value: rule['groupTypeId'],
-                    items: [
-                      const DropdownMenuItem<int?>(value: null, child: Text('None', style: TextStyle(color: Colors.grey))),
-                      ..._groupTypes.map((s) => DropdownMenuItem<int?>(value: s['id'], child: Text(s['name'])))
-                    ],
-                    onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['groupTypeId'] = val),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -636,6 +715,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
               ],
             ),
           ] else ...[
+
             DropdownButtonFormField<int>(
               isExpanded: true,
               decoration: _inputDecoration('Group Type *', null),

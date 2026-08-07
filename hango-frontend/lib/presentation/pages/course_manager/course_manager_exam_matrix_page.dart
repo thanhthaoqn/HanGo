@@ -87,7 +87,7 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ToastHelper.show(context, 'Failed to load matrices: $e', isError: true);
+        ToastHelper.show(context, 'System error, please try again later.', isError: true);
       }
     }
   }
@@ -495,7 +495,7 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                       }
                                     } catch (e) {
                                       if (mounted) {
-                                        ToastHelper.show(context, 'Generation failed: $e', isError: true);
+                                        ToastHelper.show(context, 'System error, please try again later.', isError: true);
                                       }
                                     }
                                   },

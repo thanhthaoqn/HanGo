@@ -321,7 +321,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       setState(() {
         _isLoading = false;
       });
-      if (mounted) ToastHelper.showError(context, 'Failed to import Excel: $e');
+      if (mounted) ToastHelper.showError(context, 'System error, please try again later.');
     }
   }
 
@@ -470,7 +470,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   q.status = oldStatus;
                 });
                 if (context.mounted) {
-                  ToastHelper.showError(context, 'Failed to update status: $e');
+                  ToastHelper.showError(context, 'System error, please try again later.');
                 }
               }
             },
