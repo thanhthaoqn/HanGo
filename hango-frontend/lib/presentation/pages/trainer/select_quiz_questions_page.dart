@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../widgets/trainer_action_required_card.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
@@ -17,6 +18,8 @@ class SelectQuizQuestionsPage extends StatefulWidget {
   final int sectionIndex;
   final int lessonId; // Database ID of the newly created quiz lesson
   final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
+  final String? courseStatus;
+  final String? rejectionReason;
 
   const SelectQuizQuestionsPage({
     super.key,
@@ -28,6 +31,8 @@ class SelectQuizQuestionsPage extends StatefulWidget {
     required this.sectionIndex,
     required this.lessonId,
     required this.onSectionsChanged,
+    this.courseStatus,
+    this.rejectionReason,
   });
 
   @override
@@ -1153,7 +1158,12 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
               ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(height: 20),
+          TrainerActionRequiredCard(
+            courseStatus: widget.courseStatus,
+            rejectionReason: widget.rejectionReason,
+          ),
+          const SizedBox(height: 20),
           // Trainer Tips Card
           Container(
             clipBehavior: Clip.antiAlias,

@@ -583,6 +583,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                 trainerName: _trainerName,
                                                 trainerInitials: _trainerInitials,
                                                 sections: _sections,
+                                                courseStatus: _courseStatus,
+                                                rejectionReason: _rejectionReason,
                                                 onSectionsChanged: (updatedSections) async {
                                                   setState(() {
                                                     _sections = updatedSections;
@@ -627,6 +629,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                     trainerName: _trainerName,
                                     trainerInitials: _trainerInitials,
                                     sections: _sections,
+                                    courseStatus: _courseStatus,
+                                    rejectionReason: _rejectionReason,
                                     onSectionsChanged: (updatedSections) async {
                                       setState(() {
                                         _sections = updatedSections;

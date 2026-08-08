@@ -8,6 +8,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import '../../../data/repositories/lesson_repository.dart';
+import '../../widgets/trainer_action_required_card.dart';
 import '../../../utils/toast_helper.dart';
 
 class CreateLessonVideoPage extends StatefulWidget {
@@ -19,6 +20,8 @@ class CreateLessonVideoPage extends StatefulWidget {
   final int sectionIndex;
   final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
   final int? lessonIndex;
+  final String? courseStatus;
+  final String? rejectionReason;
 
   const CreateLessonVideoPage({
     super.key,
@@ -30,6 +33,8 @@ class CreateLessonVideoPage extends StatefulWidget {
     required this.sectionIndex,
     required this.onSectionsChanged,
     this.lessonIndex,
+    this.courseStatus,
+    this.rejectionReason,
   });
 
   @override
@@ -664,6 +669,11 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 20),
+        TrainerActionRequiredCard(
+          courseStatus: widget.courseStatus,
+          rejectionReason: widget.rejectionReason,
         ),
         const SizedBox(height: 20),
         // Trainer Tips Card

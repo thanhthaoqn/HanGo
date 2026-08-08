@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import '../../widgets/trainer_action_required_card.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:flutter/foundation.dart';
 import '../../../data/repositories/lesson_repository.dart';
@@ -18,6 +19,8 @@ class CreateLessonTextPage extends StatefulWidget {
   final int sectionIndex;
   final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
   final int? lessonIndex;
+  final String? courseStatus;
+  final String? rejectionReason;
 
   const CreateLessonTextPage({
     super.key,
@@ -29,6 +32,8 @@ class CreateLessonTextPage extends StatefulWidget {
     required this.sectionIndex,
     required this.onSectionsChanged,
     this.lessonIndex,
+    this.courseStatus,
+    this.rejectionReason,
   });
 
   @override
@@ -737,6 +742,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 20),
+        TrainerActionRequiredCard(
+          courseStatus: widget.courseStatus,
+          rejectionReason: widget.rejectionReason,
         ),
         const SizedBox(height: 20),
         // Trainer Tips Card

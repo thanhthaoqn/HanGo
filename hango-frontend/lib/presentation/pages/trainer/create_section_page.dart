@@ -11,6 +11,8 @@ class CreateSectionPage extends StatefulWidget {
   final List<dynamic> sections;
   final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
   final ValueChanged<int>? onStepChanged;
+  final String? courseStatus;
+  final String? rejectionReason;
 
   const CreateSectionPage({
     super.key,
@@ -21,6 +23,8 @@ class CreateSectionPage extends StatefulWidget {
     required this.sections,
     required this.onSectionsChanged,
     this.onStepChanged,
+    this.courseStatus,
+    this.rejectionReason,
   });
 
   @override
@@ -630,6 +634,8 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                       trainerInitials: widget.trainerInitials,
                                       sections: _localSections,
                                       selectedSectionIndex: originalIndex,
+                                      courseStatus: widget.courseStatus,
+                                      rejectionReason: widget.rejectionReason,
                                       onSectionsChanged: (updatedSections) async {
                                         setState(() {
                                           _localSections = updatedSections;

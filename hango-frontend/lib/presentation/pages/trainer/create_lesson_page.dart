@@ -6,6 +6,7 @@ import '../../../utils/config.dart';
 import 'create_lesson_text_page.dart';
 import 'create_lesson_video_page.dart';
 import 'create_quiz_page.dart';
+import '../../widgets/trainer_action_required_card.dart';
 import 'lesson_list_widget.dart';
 import 'select_quiz_questions_page.dart';
 
@@ -17,6 +18,8 @@ class CreateLessonPage extends StatefulWidget {
   final List<dynamic> sections;
   final int selectedSectionIndex;
   final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
+  final String? courseStatus;
+  final String? rejectionReason;
 
   const CreateLessonPage({
     super.key,
@@ -27,6 +30,8 @@ class CreateLessonPage extends StatefulWidget {
     required this.sections,
     required this.selectedSectionIndex,
     required this.onSectionsChanged,
+    this.courseStatus,
+    this.rejectionReason,
   });
 
   @override
@@ -1034,6 +1039,11 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 20),
+        TrainerActionRequiredCard(
+          courseStatus: widget.courseStatus,
+          rejectionReason: widget.rejectionReason,
         ),
         const SizedBox(height: 20),
         // Trainer Tips Card
