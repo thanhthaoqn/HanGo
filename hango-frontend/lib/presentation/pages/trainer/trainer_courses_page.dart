@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../../utils/config.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1512,14 +1513,33 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                             const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 16),
                             const SizedBox(width: 6),
                             Expanded(
-                              child: Text(
-                                'Rejected: $rejectionReason',
-                                style: const TextStyle(
-                                  color: Color(0xFF991B1B),
-                                  fontSize: 12,
-                                  fontFamily: 'Outfit',
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Rejected Reason:',
+                                    style: TextStyle(
+                                      color: Color(0xFF991B1B),
+                                      fontSize: 13,
+                                      fontFamily: 'Outfit',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  MarkdownBody(
+                                    data: rejectionReason,
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: const TextStyle(
+                                        color: Color(0xFF991B1B),
+                                        fontSize: 12,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                      listBullet: const TextStyle(
+                                        color: Color(0xFF991B1B),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
