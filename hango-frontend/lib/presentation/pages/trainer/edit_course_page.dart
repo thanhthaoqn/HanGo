@@ -218,11 +218,15 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _priceNoteController.text = data['priceNote'] ?? '';
           _objectivesController.text = data['objectives'] ?? '';
 
-          final currentCats = data['categories'] as List<dynamic>? ?? [];
-          if (currentCats.isNotEmpty) {
-            _selectedCategoryKey = currentCats.first['paramKey'] ?? 'GRAMMAR';
-          } else if (data['category'] != null) {
-            _selectedCategoryKey = data['category']['paramKey'] ?? 'GRAMMAR';
+          if (data != null) {
+            final currentCats = data['categories'] as List<dynamic>? ?? [];
+            if (currentCats.isNotEmpty) {
+              _selectedCategoryKey = currentCats.first['paramKey'] ?? 'GRAMMAR';
+            } else if (data['categoryKey'] != null) {
+              _selectedCategoryKey = data['categoryKey'] ?? 'GRAMMAR';
+            } else if (data['category'] != null) {
+              _selectedCategoryKey = data['category']['paramKey'] ?? 'GRAMMAR';
+            }
           }
 
           if (data['difficultyKey'] != null &&

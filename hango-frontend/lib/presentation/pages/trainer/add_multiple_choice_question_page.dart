@@ -458,6 +458,7 @@ class _AddMultipleChoiceQuestionPageState
         'explanation': _hintController.text.trim(),
         'categoryId': 1,
         'skillParamId': 1,
+        'groupTypeName': _selectedGroupType,
         'difficultyId': _aiDifficultyId,
         'subQuestions': payloadSubQuestions,
       };

@@ -45,12 +45,55 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
   int _totalElements = 0;
   final int _pageSize = 10;
 
+  List<dynamic> _skillsList = [];
+  List<dynamic> _groupTypesList = [];
+  List<dynamic> _difficultyList = [];
+
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
   @override
   void initState() {
     super.initState();
     _loadQuizQuestions(0);
+    _loadSkills();
+  }
+
+  Future<void> _loadSkills() async {
+    final token = await _authService.getToken();
+    if (token == null) return;
+    try {
+      final res = await http.get(
+        Uri.parse('$apiBaseUrl/metadata/parameters?type=SKILL'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _skillsList = jsonDecode(utf8.decode(res.bodyBytes));
+        });
+      }
+      
+      final resGroup = await http.get(
+        Uri.parse('$apiBaseUrl/metadata/parameters?type=GROUP_TYPE'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (resGroup.statusCode == 200) {
+        setState(() {
+          _groupTypesList = jsonDecode(utf8.decode(resGroup.bodyBytes));
+        });
+      }
+
+      final resDiff = await http.get(
+        Uri.parse('$apiBaseUrl/metadata/parameters?type=DIFFICULTY'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (resDiff.statusCode == 200) {
+        setState(() {
+          _difficultyList = jsonDecode(utf8.decode(resDiff.bodyBytes));
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load metadata: $e');
+    }
   }
 
   // Load Paginated Questions associated with this Quiz Lesson
@@ -520,6 +563,11 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
   Future<void> _showEditQuestionDialog(Map<String, dynamic> q) async {
     final TextEditingController textCtrl = TextEditingController(text: q['questionText'] ?? '');
     final TextEditingController explCtrl = TextEditingController(text: q['explanation'] ?? '');
+    final TextEditingController passageCtrl = TextEditingController(text: q['passageText'] ?? (q['questionGroup'] != null ? q['questionGroup']['contextText'] : ''));
+    int? currentSkillParamId = q['skillParamId'] ?? (q['skillParam'] != null ? q['skillParam']['id'] : null);
+    int? currentGroupTypeParamId = q['questionGroup'] != null ? (q['questionGroup']['groupTypeParamId'] ?? (q['questionGroup']['groupTypeParam'] != null ? q['questionGroup']['groupTypeParam']['id'] : null)) : null;
+    int? currentDifficultyParamId = q['difficultyParamId'] ?? (q['difficultyParam'] != null ? q['difficultyParam']['id'] : null);
+    bool isGrouped = q['passageText'] != null || q['questionGroup'] != null;
     
     List<String> options = [];
     if (q['options'] != null) {
@@ -561,6 +609,72 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (isGrouped) ...[
+                        const Text('Passage Text (Group Context)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: passageCtrl,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                            hintText: 'Enter passage text...',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('Group Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
+                          child: DropdownButton<int>(
+                            isExpanded: true, underline: const SizedBox(),
+                            value: currentGroupTypeParamId,
+                            hint: const Text('Select Group Type'),
+                            items: [
+                              const DropdownMenuItem<int>(value: null, child: Text('None')),
+                              ..._groupTypesList.map((g) => DropdownMenuItem<int>(value: g['id'], child: Text(g['paramValue'] ?? ''))),
+                            ],
+                            onChanged: (val) => setStateSB(() => currentGroupTypeParamId = val),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      const Text('Skill Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
+                        child: DropdownButton<int>(
+                          isExpanded: true, underline: const SizedBox(),
+                          value: currentSkillParamId,
+                          hint: const Text('Select Skill Type'),
+                          items: [
+                            const DropdownMenuItem<int>(value: null, child: Text('None')),
+                            ..._skillsList.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['paramValue'] ?? ''))),
+                          ],
+                          onChanged: (val) => setStateSB(() => currentSkillParamId = val),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Difficulty', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
+                        child: DropdownButton<int>(
+                          isExpanded: true, underline: const SizedBox(),
+                          value: currentDifficultyParamId,
+                          hint: const Text('Select Difficulty'),
+                          items: [
+                            const DropdownMenuItem<int>(value: null, child: Text('None')),
+                            ..._difficultyList.map((d) => DropdownMenuItem<int>(value: d['id'], child: Text(d['paramValue'] ?? ''))),
+                          ],
+                          onChanged: (val) => setStateSB(() => currentDifficultyParamId = val),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       const Text('Question Text', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
                       const SizedBox(height: 8),
                       TextField(
@@ -682,7 +796,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
 
                     try {
                       final token = await _authService.getToken();
-                      final payload = {
+                      final Map<String, dynamic> payload = {
                         "questionText": updatedText,
                         "explanation": updatedExpl,
                         "options": List.generate(updatedOpts.length, (i) => {
@@ -691,8 +805,24 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         })
                       };
                       
+                      if (isGrouped) {
+                        payload["passageText"] = passageCtrl.text.trim();
+                        if (q['questionGroup'] != null) {
+                          payload["groupId"] = q['questionGroup']['id'];
+                        }
+                        if (currentGroupTypeParamId != null) {
+                          payload["groupTypeParamId"] = currentGroupTypeParamId;
+                        }
+                      }
+                      if (currentSkillParamId != null) {
+                        payload["skillParamId"] = currentSkillParamId;
+                      }
+                      if (currentDifficultyParamId != null) {
+                        payload["difficultyParamId"] = currentDifficultyParamId;
+                      }
+                      
                       final response = await http.put(
-                        Uri.parse('$apiBaseUrl/trainer/questions/$qId'),
+                        Uri.parse('$apiBaseUrl/sections/questions/$qId'),
                         headers: {
                           'Content-Type': 'application/json',
                           'Authorization': 'Bearer $token',
@@ -1272,6 +1402,28 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
+                                          if (q['passageText'] != null && q['passageText'].toString().trim().isNotEmpty) ...[
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              margin: const EdgeInsets.only(bottom: 8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                              ),
+                                              child: Text(
+                                                q['passageText'],
+                                                maxLines: 4,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF475569),
+                                                  fontStyle: FontStyle.italic,
+                                                  fontFamily: 'Outfit',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                           Text(
                                             text,
                                             style: const TextStyle(
@@ -1301,6 +1453,63 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                                   ),
                                                 ),
                                               ),
+                                              if (q['skillName'] != null) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFDBEAFE),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    q['skillName'],
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF1E3A8A),
+                                                      fontFamily: 'Outfit',
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                              if (q['groupTypeName'] != null) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFFEF3C7),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    q['groupTypeName'],
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF92400E),
+                                                      fontFamily: 'Outfit',
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                              if (q['difficultyName'] != null) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFE0E7FF),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    q['difficultyName'],
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF3730A3),
+                                                      fontFamily: 'Outfit',
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                               const SizedBox(width: 8),
                                               // Options count badge
                                               Container(

@@ -17,5 +17,8 @@ public class CreateQuestionRequestDTO {
     private Long categoryId;
     private Long skillParamId;
     private Long difficultyId;
+    private String passageText;
+    private Long groupId;
+    private Long groupTypeParamId;
     private List<CreateOptionDTO> options;
 }

@@ -124,7 +124,7 @@ public class CourseImportService {
         );
         SystemParameter difficulty = resolveParameter(
                 "ACADEMIC_LEVEL",
-                valueOrDefault(courseData, "Difficulty", "BASIC"),
+                valueOrDefault(courseData, "Academic Level", "BASIC"),
                 "BASIC",
                 warnings
         );
@@ -268,7 +268,7 @@ public class CourseImportService {
                 if (questionGroup == null) {
                     questionGroup = new com.hango.hango_backend.entity.QuestionGroup();
                     questionGroup.setContextText(passageText);
-                    questionGroup.setGroupTypeParam(category);
+                    questionGroup.setGroupTypeParam(resolveGroupType(questionRow, warnings));
                     questionGroup = questionGroupRepository.save(questionGroup);
                     questionGroupsByPassage.put(groupKey, questionGroup);
                 }
@@ -621,16 +621,16 @@ public class CourseImportService {
         String rawDifficulty = valueOrDefault(questionRow, "Difficulty", "");
         if (!rawDifficulty.isBlank()) {
             return resolveParameter(
-                    "ACADEMIC_LEVEL",
+                    "DIFFICULTY",
                     rawDifficulty,
-                    fallbackDifficulty != null ? fallbackDifficulty.getParamKey() : "BASIC",
+                    fallbackDifficulty != null ? fallbackDifficulty.getParamKey() : "EASY",
                     warnings
             );
         }
         if (fallbackDifficulty != null) {
             return fallbackDifficulty;
         }
-        return resolveParameter("ACADEMIC_LEVEL", "BASIC", "BASIC", warnings);
+        return resolveParameter("DIFFICULTY", "EASY", "EASY", warnings);
     }
 
     private SystemParameter resolveQuestionSkill(
@@ -641,7 +641,7 @@ public class CourseImportService {
         String rawSkill = valueOrDefault(questionRow, "Skill Type", "");
         if (!rawSkill.isBlank()) {
             return resolveParameter(
-                    "COURSE_CATEGORY",
+                    "SKILL",
                     rawSkill,
                     fallbackSkill != null ? fallbackSkill.getParamKey() : "GRAMMAR",
                     warnings
@@ -650,7 +650,23 @@ public class CourseImportService {
         if (fallbackSkill != null) {
             return fallbackSkill;
         }
-        return resolveParameter("COURSE_CATEGORY", "GRAMMAR", "GRAMMAR", warnings);
+        return resolveParameter("SKILL", "GRAMMAR", "GRAMMAR", warnings);
+    }
+
+    private SystemParameter resolveGroupType(
+            Map<String, String> questionRow,
+            List<String> warnings
+    ) {
+        String rawGroupType = valueOrDefault(questionRow, "Group Type", "");
+        if (!rawGroupType.isBlank()) {
+            return resolveParameter(
+                    "GROUP_TYPE",
+                    rawGroupType,
+                    "READING_COMPREHENSION_8_QUESTIONS",
+                    warnings
+            );
+        }
+        return resolveParameter("GROUP_TYPE", "READING_COMPREHENSION_8_QUESTIONS", "READING_COMPREHENSION_8_QUESTIONS", warnings);
     }
 
     private void saveQuestionOptions(Question question, Map<String, String> questionRow) {

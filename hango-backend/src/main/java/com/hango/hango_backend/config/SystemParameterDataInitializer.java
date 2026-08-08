@@ -131,6 +131,26 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
             ensureExistsBulk(toCreate, existingParams, "GROUP_TYPE", entry.getKey(), entry.getValue());
         }
 
+        // --- STEP 2.5: Ensure 3 Academic Levels exist ---
+        Map<String, String> academicLevels = new LinkedHashMap<>();
+        academicLevels.put("BASIC", "Basic");
+        academicLevels.put("INTERMEDIATE", "Intermediate");
+        academicLevels.put("ADVANCED", "Advanced");
+
+        for (Map.Entry<String, String> entry : academicLevels.entrySet()) {
+            ensureExistsBulk(toCreate, existingParams, "ACADEMIC_LEVEL", entry.getKey(), entry.getValue());
+        }
+
+        // --- STEP 3: Ensure 3 Question Difficulties exist ---
+        Map<String, String> questionDifficulties = new LinkedHashMap<>();
+        questionDifficulties.put("EASY", "Easy");
+        questionDifficulties.put("MEDIUM", "Medium");
+        questionDifficulties.put("HARD", "Hard");
+
+        for (Map.Entry<String, String> entry : questionDifficulties.entrySet()) {
+            ensureExistsBulk(toCreate, existingParams, "DIFFICULTY", entry.getKey(), entry.getValue());
+        }
+
         if (!toCreate.isEmpty()) {
             systemParameterRepository.saveAll(toCreate);
             log.info("Created {} new SystemParameters.", toCreate.size());

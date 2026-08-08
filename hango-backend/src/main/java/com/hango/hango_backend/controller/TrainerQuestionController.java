@@ -38,6 +38,7 @@ public class TrainerQuestionController {
         return ResponseEntity.ok(questions);
     }
 
+
     @PostMapping
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> createQuestion(
