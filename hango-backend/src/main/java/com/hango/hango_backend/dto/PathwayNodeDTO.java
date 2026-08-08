@@ -13,6 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PathwayNodeDTO {
+    private Long id;
     private Integer step;
 
     @JsonProperty("course_id")
@@ -75,5 +76,18 @@ public class PathwayNodeDTO {
 
     @JsonProperty("schedule_status")
     private String scheduleStatus;
+
+    // Feature Phase 2: Retention Engine
+    @JsonProperty("mastery_score")
+    private Integer masteryScore;
+
+    @JsonProperty("is_mastered")
+    private Boolean isMastered;
+
+    @JsonProperty("next_review_date")
+    private String nextReviewDate;
+    
+    @JsonProperty("review_interval_days")
+    private Integer reviewIntervalDays;
 }
 

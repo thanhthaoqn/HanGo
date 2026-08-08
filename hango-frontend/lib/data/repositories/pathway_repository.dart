@@ -89,6 +89,41 @@ class PathwayRepository {
     return _putRequest('$baseUrl/pathways/$pathwayId/reroute');
   }
 
+  Future<LearningPathway> submitNodeMastery({
+    required int pathwayId,
+    required int nodeId,
+    required int score,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final uri = Uri.parse('$baseUrl/pathways/$pathwayId/nodes/$nodeId/mastery');
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+    }
+
+    final body = {
+      'score': score,
+    };
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode != 200) {
+      final resBody = utf8.decode(response.bodyBytes);
+      throw Exception('Unable to submit mastery: ${response.statusCode}. $resBody');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    return LearningPathway.fromJson(data);
+  }
+
   Future<LearningPathway> _putRequest(String urlStr) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

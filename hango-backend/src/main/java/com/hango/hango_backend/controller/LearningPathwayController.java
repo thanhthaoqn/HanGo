@@ -93,6 +93,18 @@ public class LearningPathwayController {
         return ResponseEntity.ok(learningPathwayService.applySchedule(id, userDetails.getId(), requestDTO));
     }
 
+    // Feature Phase 2: Mastery
+    @PostMapping("/{id}/nodes/{nodeId}/mastery")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    public ResponseEntity<LearningPathwayResponseDTO> submitMastery(
+            @PathVariable Long id,
+            @PathVariable Long nodeId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @RequestBody com.hango.hango_backend.dto.MasterySubmitRequestDTO requestDTO) {
+        
+        return ResponseEntity.ok(learningPathwayService.submitNodeMastery(id, nodeId, userDetails.getId(), requestDTO));
+    }
+
     /**
      * @deprecated Use schedule_status field from GET /pathways/{id} or GET /pathways/me instead.
      */
