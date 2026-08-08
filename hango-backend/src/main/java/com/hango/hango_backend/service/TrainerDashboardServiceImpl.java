@@ -393,6 +393,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
                 .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
 
+        com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(user.getId()).orElse(null);
+        int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
+        java.math.BigDecimal calculatedPrice = calculateCoursePrice(profile, difficulty, 0, durationMinutes);
+
         // Auto-generate a unique course code to avoid DB unique constraint violations
         String generatedCode = generateUniqueCourseCode();
 
@@ -406,7 +410,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .categories(categorySet)
                 .difficulty(difficulty)
                 .thumbnailUrl(request.getThumbnailUrl())
-                .price(request.getPrice())
+                .price(calculatedPrice)
+                .suggestedPrice(calculatedPrice)
+                .priceNote("")
                 .version("v1")
                 .estimatedDuration(request.getEstimatedDuration())
                 .status("DRAFT")
@@ -455,6 +461,15 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             sessionDTOs = new java.util.ArrayList<>();
         }
 
+        com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
+        int lessonCount = 0;
+        java.util.List<com.hango.hango_backend.entity.Section> sectionsList = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId());
+        for (com.hango.hango_backend.entity.Section sec : sectionsList) {
+            lessonCount += lessonRepository.findBySectionIdOrderByDisplayOrderAsc(sec.getId()).size();
+        }
+        int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
+        java.math.BigDecimal calculatedPrice = calculateCoursePrice(profile, difficulty, lessonCount, durationMinutes);
+
         if (needsNewDraftVersion) {
             // Clone V1 → V2: Create a new DRAFT version preserving the original published
             // course (V1).
@@ -483,9 +498,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .categories(categorySet)
                     .difficulty(difficulty)
                     .thumbnailUrl(request.getThumbnailUrl())
-                    .price(request.getPrice())
-                    .priceNote(request.getPriceNote())
-                    .suggestedPrice(course.getSuggestedPrice())
+                    .price(calculatedPrice)
+                    .priceNote("")
+                    .suggestedPrice(calculatedPrice)
                     .version(newVersion)
                     .estimatedDuration(request.getEstimatedDuration())
                     .status("DRAFT")
@@ -511,8 +526,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setCategory(firstCategory);
         course.setCategories(categorySet);
         course.setDifficulty(difficulty);
-        course.setPrice(request.getPrice());
-        course.setPriceNote(request.getPriceNote());
+        course.setPrice(calculatedPrice);
+        course.setSuggestedPrice(calculatedPrice);
+        course.setPriceNote("");
         course.setEstimatedDuration(request.getEstimatedDuration());
         if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isEmpty()) {
             course.setThumbnailUrl(request.getThumbnailUrl());
@@ -1046,7 +1062,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     }
 
     private java.math.BigDecimal calculateCoursePrice(com.hango.hango_backend.entity.TrainerProfile profile,
-            com.hango.hango_backend.entity.SystemParameter difficulty, int lessonCount) {
+            com.hango.hango_backend.entity.SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
             if ("PROFESSIONAL".equalsIgnoreCase(profile.getTrainerType())) {
@@ -1069,6 +1085,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             }
         }
         price += (lessonCount * 10000L);
+        price += (durationMinutes * 1000L);
         return java.math.BigDecimal.valueOf(price);
     }
 
@@ -1092,7 +1109,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             lessonCount += lessonRepository.findBySectionIdOrderByDisplayOrderAsc(sec.getId()).size();
         }
 
-        java.math.BigDecimal calculatedPrice = calculateCoursePrice(profile, course.getDifficulty(), lessonCount);
+        int durationMinutes = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 0;
+        java.math.BigDecimal calculatedPrice = calculateCoursePrice(profile, course.getDifficulty(), lessonCount, durationMinutes);
+        course.setPrice(calculatedPrice);
         course.setSuggestedPrice(calculatedPrice);
         courseRepository.save(course);
     }

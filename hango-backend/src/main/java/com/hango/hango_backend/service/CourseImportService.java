@@ -135,14 +135,16 @@ public class CourseImportService {
         }
 
         int lessonCount = 0;
+        int durationMinutes = 0;
         for (Map<String, String> row : syllabusRows) {
             String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
             if (type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf")) {
                 lessonCount++;
+                durationMinutes += parseInteger(valueOrDefault(row, "Duration (Mins)", ""), 0);
             }
         }
 
-        BigDecimal calculatedPrice = calculateCoursePrice(trainerProfile, difficulty, lessonCount);
+        BigDecimal calculatedPrice = calculateCoursePrice(trainerProfile, difficulty, lessonCount, durationMinutes);
 
         Course course = Course.builder()
                 .title(courseTitle)
@@ -157,6 +159,7 @@ public class CourseImportService {
                 .priceNote("")
                 .version(valueOrDefault(courseData, "Version", ""))
                 .objectives(valueOrDefault(courseData, "Objectives", ""))
+                .estimatedDuration(durationMinutes)
                 .status("DRAFT")
                 .build();
         Course savedCourse = courseRepository.save(course);
@@ -868,7 +871,7 @@ public class CourseImportService {
         }
     }
  
-    private BigDecimal calculateCoursePrice(TrainerProfile profile, SystemParameter difficulty, int lessonCount) {
+    private BigDecimal calculateCoursePrice(TrainerProfile profile, SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
             if ("PROFESSIONAL".equalsIgnoreCase(profile.getTrainerType())) {
@@ -891,6 +894,7 @@ public class CourseImportService {
             }
         }
         price += (lessonCount * 10000L);
+        price += (durationMinutes * 1000L);
         return BigDecimal.valueOf(price);
     }
  
