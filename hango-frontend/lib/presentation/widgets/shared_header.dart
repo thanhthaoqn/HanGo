@@ -31,6 +31,7 @@ class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool hideNavLinks;
   final bool hideCommerceActions;
   final bool hideLanguageSwitcher;
+  final bool showBackButton;
 
   const SharedHeader({
     Key? key,
@@ -39,6 +40,7 @@ class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
     this.hideNavLinks = false,
     this.hideCommerceActions = false,
     this.hideLanguageSwitcher = false,
+    this.showBackButton = false,
   }) : super(key: key);
 
   @override
@@ -758,7 +760,17 @@ class _SharedHeaderState extends State<SharedHeader> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!widget.isDesktop && !widget.hideNavLinks) ...[
+          if (widget.showBackButton) ...[
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+          ] else if (!widget.isDesktop && !widget.hideNavLinks) ...[
             Builder(
               builder: (context) => IconButton(
                 icon: const Icon(Icons.menu, color: Color(0xFF1F2937)),
