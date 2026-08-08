@@ -553,11 +553,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                                 child: _buildTitleSection(),
                               ),
-                              if (_courseStatus == 'REJECTED' && _rejectionReason != null && _rejectionReason!.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                                  child: _buildRejectionBanner(),
-                                ),
                               const SizedBox(height: 24),
                               Expanded(
                                 child: Row(
@@ -618,10 +613,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 _buildTitleSection(),
-                                if (_courseStatus == 'REJECTED' && _rejectionReason != null && _rejectionReason!.isNotEmpty) ...[
-                                  const SizedBox(height: 16),
-                                  _buildRejectionBanner(),
-                                ],
                                 const SizedBox(height: 24),
                                 _buildLeftPanel(context),
                                 const SizedBox(height: 24),
@@ -829,66 +820,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
     );
   }
 
-  Widget _buildRejectionBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2), // Light red bg
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFCA5A5)), // Red border
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Course Rejected - Fix Required',
-                style: TextStyle(
-                  color: Color(0xFF991B1B),
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Please address the following issues raised by the Course Manager before re-submitting:',
-            style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 14, fontFamily: 'Outfit'),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFFECACA)),
-            ),
-            child: MarkdownBody(
-              data: _rejectionReason!,
-              styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(color: Color(0xFF991B1B), fontSize: 13, fontFamily: 'Outfit', height: 1.5),
-                listBullet: const TextStyle(color: Color(0xFF991B1B)),
-                strong: const TextStyle(color: Color(0xFF7F1D1D), fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildTitleSection() {
     return Row(
@@ -1128,7 +1059,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
               const SizedBox(height: 8),
               Text(
                 _courseStatus == 'REJECTED'
-                    ? 'This course was rejected. Fix the issues above and re-submit for review.'
+                    ? 'This course was rejected. Fix the issues below and re-submit.'
                     : '1/3 steps completed successfully. Complete the remaining steps to publish the course.',
                 style: const TextStyle(
                   fontSize: 12,
@@ -1137,6 +1068,25 @@ class _EditCoursePageState extends State<EditCoursePage> {
                   height: 1.4,
                 ),
               ),
+              if (_courseStatus == 'REJECTED' && _rejectionReason != null && _rejectionReason!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: MarkdownBody(
+                    data: _rejectionReason!,
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(color: Color(0xFF991B1B), fontSize: 11, fontFamily: 'Outfit', height: 1.4),
+                      listBullet: const TextStyle(color: Color(0xFF991B1B), fontSize: 11),
+                      strong: const TextStyle(color: Color(0xFF7F1D1D), fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 11),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _submitCourseForReview,
