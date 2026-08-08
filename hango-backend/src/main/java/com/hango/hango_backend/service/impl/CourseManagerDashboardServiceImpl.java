@@ -112,6 +112,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     .orElse(null);
             if (originalCourse != null && "PUBLISHED".equalsIgnoreCase(originalCourse.getStatus())) {
                 originalCourse.setLatestVersionId(course.getId());
+                originalCourse.setStatus("ARCHIVED");
                 courseRepository.save(originalCourse);
             }
 

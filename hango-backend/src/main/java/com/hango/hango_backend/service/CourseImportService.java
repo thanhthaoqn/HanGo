@@ -104,7 +104,7 @@ public class CourseImportService {
         }
         
         List<String> warnings = new ArrayList<>();
-        if (courseRepository.existsByTitleIgnoreCase(courseTitle)) {
+        if (courseRepository.existsByTitleIgnoreCaseAndDeletedAtIsNull(courseTitle)) {
             throw new IllegalArgumentException("Course with title '" + courseTitle + "' already exists.");
         }
 

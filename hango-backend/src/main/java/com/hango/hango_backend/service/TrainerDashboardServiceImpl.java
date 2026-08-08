@@ -453,8 +453,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setCategories(categorySet);
         course.setDifficulty(difficulty);
 
-        boolean needsNewDraftVersion = "PUBLISHED".equalsIgnoreCase(course.getStatus())
-                && enrollmentRepository.countByCourseId(course.getId()) > 0;
+        boolean needsNewDraftVersion = "PUBLISHED".equalsIgnoreCase(course.getStatus());
 
         List<com.hango.hango_backend.dto.CourseSessionDTO> sessionDTOs = request.getSessions();
         if (sessionDTOs == null) {
@@ -1009,8 +1008,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             throw new RuntimeException("Chỉ có thể xoá khóa học ở trạng thái Nháp (Draft) hoặc Bị từ chối (Rejected).");
         }
 
-        course.setDeletedAt(java.time.LocalDateTime.now());
-        courseRepository.save(course);
+        // Hard delete sections which will cascade to lessons, questions, etc.
+        java.util.List<com.hango.hango_backend.entity.Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId());
+        sectionRepository.deleteAll(sections);
+        
+        // Hard delete the course itself
+        courseRepository.delete(course);
     }
 
     private String generateUniqueCourseCode() {
