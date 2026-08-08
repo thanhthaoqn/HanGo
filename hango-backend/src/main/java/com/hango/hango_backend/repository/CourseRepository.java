@@ -101,6 +101,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     boolean existsByCodeIgnoreCase(String code);
     boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
+    boolean existsByTitleIgnoreCase(String title);
 
     List<Course> findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(String code);
 
