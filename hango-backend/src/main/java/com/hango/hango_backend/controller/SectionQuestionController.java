@@ -57,10 +57,15 @@ public class SectionQuestionController {
             @RequestParam(required = false) String search) {
 
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT q.id, q.question_text, q.explanation, qc.name as category_name, sp.param_value as difficulty_name ")
+        sql.append("SELECT q.id, q.question_text, q.explanation, qc.name as category_name, sp.param_value as difficulty_name, ")
+           .append("q.group_id, qg.context_text as passage_text, sk.param_value as skill_name, gt.param_value as group_type_name, ")
+           .append("sk.id as skill_param_id, gt.id as group_type_param_id, sp.id as difficulty_param_id ")
            .append("FROM questions q ")
            .append("JOIN question_categories qc ON q.category_id = qc.id ")
            .append("JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
+           .append("LEFT JOIN question_groups qg ON q.group_id = qg.id ")
+           .append("LEFT JOIN system_parameters sk ON q.skill_param_id = sk.id ")
+           .append("LEFT JOIN system_parameters gt ON qg.group_type_param_id = gt.id ")
            .append("WHERE q.section_id = ? ");
 
         List<Object> params = new ArrayList<>();
@@ -87,6 +92,14 @@ public class SectionQuestionController {
             String explanation = rs.getString("explanation");
             String categoryName = rs.getString("category_name");
             String difficultyName = rs.getString("difficulty_name");
+            
+            Long groupId = rs.getObject("group_id") != null ? rs.getLong("group_id") : null;
+            String passageText = rs.getString("passage_text");
+            String skillName = rs.getString("skill_name");
+            String groupTypeName = rs.getString("group_type_name");
+            Long skillParamId = rs.getObject("skill_param_id") != null ? rs.getLong("skill_param_id") : null;
+            Long groupTypeParamId = rs.getObject("group_type_param_id") != null ? rs.getLong("group_type_param_id") : null;
+            Long difficultyParamId = rs.getObject("difficulty_param_id") != null ? rs.getLong("difficulty_param_id") : null;
 
             // Fetch options
             List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
@@ -117,6 +130,13 @@ public class SectionQuestionController {
             qMap.put("explanation", explanation);
             qMap.put("categoryName", categoryName);
             qMap.put("difficultyName", difficultyName);
+            qMap.put("groupId", groupId);
+            qMap.put("passageText", passageText);
+            qMap.put("skillName", skillName);
+            qMap.put("groupTypeName", groupTypeName);
+            qMap.put("skillParamId", skillParamId);
+            qMap.put("groupTypeParamId", groupTypeParamId);
+            qMap.put("difficultyParamId", difficultyParamId);
             qMap.put("options", options);
             qMap.put("correctIndex", correctIndex);
             return qMap;
@@ -141,11 +161,16 @@ public class SectionQuestionController {
             @RequestParam(defaultValue = "10") int size) {
 
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT q.id, q.question_text, q.explanation, qc.name as category_name, sp.param_value as difficulty_name ")
+        sql.append("SELECT q.id, q.question_text, q.explanation, qc.name as category_name, sp.param_value as difficulty_name, ")
+           .append("q.group_id, qg.context_text as passage_text, sk.param_value as skill_name, gt.param_value as group_type_name, ")
+           .append("sk.id as skill_param_id, gt.id as group_type_param_id, sp.id as difficulty_param_id ")
            .append("FROM questions q ")
            .append("JOIN lesson_quizzes lq ON q.id = lq.question_id ")
            .append("JOIN question_categories qc ON q.category_id = qc.id ")
            .append("JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
+           .append("LEFT JOIN question_groups qg ON q.group_id = qg.id ")
+           .append("LEFT JOIN system_parameters sk ON q.skill_param_id = sk.id ")
+           .append("LEFT JOIN system_parameters gt ON qg.group_type_param_id = gt.id ")
            .append("WHERE lq.lesson_id = ? ");
 
         List<Object> params = new ArrayList<>();
@@ -167,12 +192,30 @@ public class SectionQuestionController {
             String explanation = rs.getString("explanation");
             String categoryName = rs.getString("category_name");
             String difficultyName = rs.getString("difficulty_name");
+            
+            Long groupId = rs.getObject("group_id") != null ? rs.getLong("group_id") : null;
+            String passageText = rs.getString("passage_text");
+            String skillName = rs.getString("skill_name");
+            String groupTypeName = rs.getString("group_type_name");
+            Long skillParamId = rs.getObject("skill_param_id") != null ? rs.getLong("skill_param_id") : null;
+            Long groupTypeParamId = rs.getObject("group_type_param_id") != null ? rs.getLong("group_type_param_id") : null;
+            Long difficultyParamId = rs.getObject("difficulty_param_id") != null ? rs.getLong("difficulty_param_id") : null;
 
             // Check if it has sub-questions
-            List<Map<String, Object>> subQuestions = jdbcTemplate.queryForList(
-                    "SELECT id FROM questions WHERE group_id = ?",
-                    qId
-            );
+            List<Map<String, Object>> subQuestions = new ArrayList<>();
+            if (groupId != null) {
+                // If it's a header question representing the group
+                subQuestions = jdbcTemplate.queryForList(
+                        "SELECT id FROM questions WHERE group_id = ? AND id != ?",
+                        groupId, qId
+                );
+            } else {
+                // Keep the old buggy logic just in case there are legacy things relying on it
+                subQuestions = jdbcTemplate.queryForList(
+                        "SELECT id FROM questions WHERE group_id = ?",
+                        qId
+                );
+            }
 
             List<String> options = new ArrayList<>();
             int correctIndex = 0;
@@ -221,6 +264,16 @@ public class SectionQuestionController {
             qMap.put("difficultyName", difficultyName);
             qMap.put("options", options);
             qMap.put("correctIndex", correctIndex);
+            
+            qMap.put("passageText", passageText);
+            qMap.put("skillName", skillName);
+            qMap.put("groupTypeName", groupTypeName);
+            qMap.put("skillParamId", skillParamId);
+            qMap.put("groupTypeParamId", groupTypeParamId);
+            qMap.put("difficultyParamId", difficultyParamId);
+            if (groupId != null) {
+                qMap.put("questionGroup", Map.of("id", groupId));
+            }
             return qMap;
         }, params.toArray());
 
@@ -388,14 +441,33 @@ public class SectionQuestionController {
 
         try {
             int updatedRows = jdbcTemplate.update(
-                    "UPDATE questions SET question_text = ?, explanation = ? WHERE id = ?",
+                    "UPDATE questions SET question_text = ?, explanation = ?, skill_param_id = ?, difficulty_param_id = ? WHERE id = ?",
                     request.getQuestionText(),
                     request.getExplanation(),
+                    request.getSkillParamId(),
+                    request.getDifficultyId(),
                     id
             );
 
             if (updatedRows == 0) {
                 return ResponseEntity.status(404).body(Map.of("error", "Question not found"));
+            }
+            
+            if (request.getGroupId() != null) {
+                if (request.getPassageText() != null) {
+                    jdbcTemplate.update(
+                            "UPDATE question_groups SET context_text = ? WHERE id = ?",
+                            request.getPassageText(),
+                            request.getGroupId()
+                    );
+                }
+                if (request.getGroupTypeParamId() != null) {
+                    jdbcTemplate.update(
+                            "UPDATE question_groups SET group_type_param_id = ? WHERE id = ?",
+                            request.getGroupTypeParamId(),
+                            request.getGroupId()
+                    );
+                }
             }
 
             // Update options
@@ -448,6 +520,27 @@ public class SectionQuestionController {
             skillParamId = jdbcTemplate.queryForObject("SELECT id FROM system_parameters WHERE param_type = 'SKILL' LIMIT 1", Long.class);
         }
 
+        Long groupTypeParamId = request.getGroupTypeParamId();
+        if (groupTypeParamId == null && request.getGroupTypeName() != null) {
+            try {
+                groupTypeParamId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM system_parameters WHERE param_type = 'GROUP_TYPE' AND param_value = ? LIMIT 1", 
+                    Long.class, 
+                    request.getGroupTypeName()
+                );
+            } catch (Exception e) {
+                // Ignore and let it fallback to default below
+            }
+        }
+        if (groupTypeParamId != null) {
+            Integer gtCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM system_parameters WHERE id = ?", Integer.class, groupTypeParamId);
+            if (gtCount == null || gtCount == 0) groupTypeParamId = null;
+        }
+        if (groupTypeParamId == null) {
+            groupTypeParamId = jdbcTemplate.queryForObject("SELECT id FROM system_parameters WHERE param_type = 'GROUP_TYPE' LIMIT 1", Long.class);
+        }
+        
+        final Long finalGroupTypeParamId = groupTypeParamId;
 
         // 1. Insert into question_groups
         Long questionGroupId = null;
@@ -459,7 +552,7 @@ public class SectionQuestionController {
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
                 ps.setString(1, "Multiple Choice Group");
-                ps.setLong(2, 17L); // 17 is standard reading comprehension param
+                ps.setLong(2, finalGroupTypeParamId); 
                 ps.setString(3, request.getPassageText());
                 return ps;
             }, keyHolder);

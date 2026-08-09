@@ -18,6 +18,8 @@ public class CreateGroupQuestionRequestDTO {
     private Long categoryId;
     private Long skillParamId; // REQUIRED by DB (skill-param-id)
     private Long difficultyId;
+    private Long groupTypeParamId;
+    private String groupTypeName;
     private String status;
     private List<CreateSubQuestionDTO> subQuestions;
 }

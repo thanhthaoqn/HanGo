@@ -18,6 +18,7 @@ import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.SystemParameterRepository;
 import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.repository.QuestionGroupRepository;
 import com.hango.hango_backend.entity.TrainerProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -59,6 +60,7 @@ public class CourseImportService {
     private static final String TEMPLATE_FILE_NAME = "Hango_Course_Import_Template.xlsx";
 
     private final UserRepository userRepository;
+    private final QuestionGroupRepository questionGroupRepository;
     private final CourseRepository courseRepository;
     private final SectionRepository sectionRepository;
     private final LessonRepository lessonRepository;
@@ -79,195 +81,212 @@ public class CourseImportService {
         TrainerProfile trainerProfile = trainerProfileRepository.findById(trainer.getId()).orElse(null);
 
         WorkbookData workbook = readWorkbook(file);
-        List<Map<String, String>> courseRows = workbook.rowsBySheet.getOrDefault("COURSE", List.of());
-        List<Map<String, String>> sectionRows = workbook.rowsBySheet.getOrDefault("SECTIONS", List.of());
-        List<Map<String, String>> lessonRows = workbook.rowsBySheet.getOrDefault("LESSONS", List.of());
+        List<Map<String, String>> courseRowsRaw = workbook.rowsBySheet.getOrDefault("COURSE", List.of());
+        List<Map<String, String>> syllabusRows = workbook.rowsBySheet.getOrDefault("SYLLABUS", List.of());
         List<Map<String, String>> questionRows = workbook.rowsBySheet.getOrDefault("QUESTIONS", List.of());
 
-        if (courseRows.isEmpty()) {
-            throw new IllegalArgumentException("COURSE sheet must contain at least one course row");
+        if (courseRowsRaw.isEmpty()) {
+            throw new IllegalArgumentException("COURSE sheet must contain at least one row");
         }
 
-        List<String> warnings = new ArrayList<>();
-        Map<String, List<Map<String, String>>> sectionsByCourse = groupRows(sectionRows, "Course Code");
-        Map<String, List<Map<String, String>>> lessonsByCourseAndSection = groupLessons(lessonRows);
-        Map<String, Lesson> lessonsByImportKey = new HashMap<>();
-        Map<String, Section> sectionsByImportKey = new HashMap<>();
-        Map<String, SystemParameter> categoryByCourseCode = new HashMap<>();
-        Map<String, SystemParameter> difficultyByCourseCode = new HashMap<>();
+        Map<String, String> courseData = new java.util.HashMap<>();
+        for (Map<String, String> row : courseRowsRaw) {
+            String field = valueOrDefault(row, "Information Field", "").trim();
+            String data = valueOrDefault(row, "Fill Data", "").trim();
+            if (!field.isEmpty()) {
+                courseData.put(field, data);
+            }
+        }
 
-        List<Long> courseIds = new ArrayList<>();
+        String courseTitle = courseData.get("Title");
+        if (courseTitle == null || courseTitle.isBlank()) {
+            throw new IllegalArgumentException("COURSE sheet is missing required value: Title");
+        }
+        
+        List<String> warnings = new ArrayList<>();
+        if (courseRepository.existsByTitleIgnoreCase(courseTitle)) {
+            throw new IllegalArgumentException("Course with title '" + courseTitle + "' already exists.");
+        }
+
+        String courseCodeRaw = courseData.get("Course Code");
+        if (courseCodeRaw == null || courseCodeRaw.isBlank()) {
+            throw new IllegalArgumentException("COURSE sheet is missing required value: Course Code");
+        }
+        
+        Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
+        String persistedCourseCode = resolveUniqueCourseCode(courseCodeRaw, reservedPersistedCourseCodes, warnings);
+
+        SystemParameter category = resolveParameter(
+                "COURSE_CATEGORY",
+                valueOrDefault(courseData, "Category", "GRAMMAR"),
+                "GRAMMAR",
+                warnings
+        );
+        SystemParameter difficulty = resolveParameter(
+                "ACADEMIC_LEVEL",
+                valueOrDefault(courseData, "Academic Level", "BASIC"),
+                "BASIC",
+                warnings
+        );
+
+        String requestedStatus = valueOrDefault(courseData, "Status", "DRAFT").toUpperCase(Locale.ROOT);
+        if (!"DRAFT".equals(requestedStatus)) {
+            warnings.add("Course " + persistedCourseCode + " was imported as DRAFT because trainer imports still require review before publishing.");
+        }
+
+        int lessonCount = 0;
+        int durationMinutes = 0;
+        for (Map<String, String> row : syllabusRows) {
+            String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
+            if (type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf")) {
+                lessonCount++;
+                durationMinutes += parseInteger(valueOrDefault(row, "Duration (Mins)", ""), 0);
+            }
+        }
+
+        BigDecimal calculatedPrice = calculateCoursePrice(trainerProfile, difficulty, lessonCount, durationMinutes);
+
+        Course course = Course.builder()
+                .title(courseTitle)
+                .description(valueOrDefault(courseData, "Description", ""))
+                .creator(trainer)
+                .category(category)
+                .difficulty(difficulty)
+                .thumbnailUrl(valueOrDefault(courseData, "Thumbnail URL", ""))
+                .code(persistedCourseCode)
+                .price(calculatedPrice)
+                .suggestedPrice(calculatedPrice)
+                .priceNote("")
+                .version(valueOrDefault(courseData, "Version", ""))
+                .objectives(valueOrDefault(courseData, "Objectives", ""))
+                .estimatedDuration(durationMinutes)
+                .status("DRAFT")
+                .build();
+        Course savedCourse = courseRepository.save(course);
+        List<Long> courseIds = List.of(savedCourse.getId());
+
         int importedSections = 0;
         int importedLessons = 0;
         int importedQuestions = 0;
 
-        Set<String> knownCourseCodes = new java.util.HashSet<>();
-        Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
-        for (Map<String, String> courseRow : courseRows) {
-            String courseCode = required(courseRow, "Course Code", "COURSE");
-            if (!knownCourseCodes.add(courseCode)) {
-                throw new IllegalArgumentException("Duplicate Course Code in COURSE sheet: " + courseCode);
+        Section currentSection = null;
+        Map<String, Lesson> lessonsByTitle = new java.util.HashMap<>();
+        Set<String> knownSectionTitles = new java.util.HashSet<>();
+        Set<String> knownLessonTitles = new java.util.HashSet<>();
+
+        for (int i = 0; i < syllabusRows.size(); i++) {
+            Map<String, String> row = syllabusRows.get(i);
+            String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
+            String title = valueOrDefault(row, "Title", "").trim();
+            if (type.isEmpty() || title.isEmpty()) {
+                continue;
             }
 
-            SystemParameter category = resolveParameter(
-                    "COURSE_CATEGORY",
-                    valueOrDefault(courseRow, "Category", "GRAMMAR"),
-                    "GRAMMAR",
-                    warnings
-            );
-            SystemParameter difficulty = resolveParameter(
-                    "ACADEMIC_LEVEL",
-                    valueOrDefault(courseRow, "Difficulty", "BASIC"),
-                    "BASIC",
-                    warnings
-            );
-            categoryByCourseCode.put(courseCode, category);
-            difficultyByCourseCode.put(courseCode, difficulty);
-
-            String requestedStatus = valueOrDefault(courseRow, "Status", "DRAFT").toUpperCase(Locale.ROOT);
-            if (!"DRAFT".equals(requestedStatus)) {
-                warnings.add("Course " + courseCode + " was imported as DRAFT because trainer imports still require review before publishing.");
-            }
-
-            String persistedCourseCode = resolveUniqueCourseCode(courseCode, reservedPersistedCourseCodes, warnings);
-
-            int lessonCount = 0;
-            List<Map<String, String>> countSections = sectionsByCourse.getOrDefault(courseCode, List.of());
-            for (Map<String, String> sectionRow : countSections) {
-                String sectionCode = required(sectionRow, "Section Code", "SECTIONS");
-                String lessonKey = buildLessonKey(courseCode, sectionCode);
-                lessonCount += lessonsByCourseAndSection.getOrDefault(lessonKey, List.of()).size();
-            }
-
-            BigDecimal calculatedPrice = calculateCoursePrice(trainerProfile, difficulty, lessonCount);
-
-            Course course = Course.builder()
-                    .title(required(courseRow, "Title", "COURSE"))
-                    .description(valueOrDefault(courseRow, "Description", ""))
-                    .creator(trainer)
-                    .category(category)
-                    .difficulty(difficulty)
-                    .thumbnailUrl(valueOrDefault(courseRow, "Thumbnail URL", ""))
-                    .code(persistedCourseCode)
-                    .price(calculatedPrice)
-                    .suggestedPrice(calculatedPrice)
-                    .priceNote("")
-                    .version(valueOrDefault(courseRow, "Version", ""))
-                    .objectives(valueOrDefault(courseRow, "Objectives", ""))
-                    .status("DRAFT")
-                    .build();
-            Course savedCourse = courseRepository.save(course);
-            courseIds.add(savedCourse.getId());
-
-            List<Map<String, String>> matchingSections = new ArrayList<>(sectionsByCourse.getOrDefault(courseCode, List.of()));
-            matchingSections.sort(Comparator.comparingInt(row -> parseInt(valueOrDefault(row, "Section Order Index", "0"), 0)));
-
-            Set<String> knownSectionCodes = new java.util.HashSet<>();
-            for (int sectionIndex = 0; sectionIndex < matchingSections.size(); sectionIndex++) {
-                Map<String, String> sectionRow = matchingSections.get(sectionIndex);
-                String sectionCode = required(sectionRow, "Section Code", "SECTIONS");
-                if (!knownSectionCodes.add(sectionCode)) {
-                    throw new IllegalArgumentException("Duplicate Section Code in course " + courseCode + ": " + sectionCode);
+            if (type.equals("section")) {
+                if (!knownSectionTitles.add(title.toLowerCase(Locale.ROOT))) {
+                    throw new IllegalArgumentException("Duplicate Section Title in syllabus: " + title);
                 }
-
                 Section section = Section.builder()
                         .course(savedCourse)
-                        .code(sectionCode)
-                        .title(required(sectionRow, "Section Title", "SECTIONS"))
-                        .description(valueOrDefault(sectionRow, "Section Description", ""))
-                        .displayOrder(parseInt(valueOrDefault(sectionRow, "Section Order Index", ""), sectionIndex + 1))
-                        .version(valueOrDefault(sectionRow, "Version", ""))
+                        .code(persistedCourseCode + "_S" + (importedSections + 1))
+                        .title(title)
+                        .description("")
+                        .displayOrder(importedSections + 1)
+                        .version("")
                         .build();
-                Section savedSection = sectionRepository.save(section);
-                sectionsByImportKey.put(buildLessonKey(courseCode, sectionCode), savedSection);
+                currentSection = sectionRepository.save(section);
                 importedSections++;
-
-                String lessonKey = buildLessonKey(courseCode, sectionCode);
-                List<Map<String, String>> matchingLessons = new ArrayList<>(lessonsByCourseAndSection.getOrDefault(lessonKey, List.of()));
-                matchingLessons.sort(Comparator.comparingInt(row -> parseInt(valueOrDefault(row, "Order Index", "0"), 0)));
-
-                Set<String> knownLessonCodes = new java.util.HashSet<>();
-                for (int lessonIndex = 0; lessonIndex < matchingLessons.size(); lessonIndex++) {
-                    Map<String, String> lessonRow = matchingLessons.get(lessonIndex);
-                    String lessonCode = required(lessonRow, "Lesson Code", "LESSONS");
-                    if (!knownLessonCodes.add(lessonCode)) {
-                        throw new IllegalArgumentException("Duplicate Lesson Code in section " + sectionCode + ": " + lessonCode);
-                    }
-
-                    String lessonType = normalizeLessonType(valueOrDefault(lessonRow, "Lesson Type", "TEXT"));
-                    String content = resolveLessonContent(lessonRow, lessonType);
-                    String videoTranscript = null;
-                    if ("video".equalsIgnoreCase(lessonType) && content != null && content.toLowerCase().contains("youtu")) {
-                        try {
-                            videoTranscript = youtubeTranscriptService.fetchTranscript(content);
-                        } catch (Exception ignored) {
-                        }
-                    }
-
-                    Lesson lesson = Lesson.builder()
-                            .section(savedSection)
-                            .code(lessonCode)
-                            .title(required(lessonRow, "Lesson Title", "LESSONS"))
-                            .lessonType(lessonType)
-                            .skill(category)
-                            .difficulty(difficulty)
-                            .content(content)
-                            .videoTranscript(videoTranscript)
-                            .displayOrder(parseInt(valueOrDefault(lessonRow, "Order Index", ""), lessonIndex + 1))
-                            .description(valueOrDefault(lessonRow, "Learning Objectives", ""))
-                            .pdfName(resolvePdfName(lessonRow))
-                            .questionImageUrl(resolveImageUrl(lessonRow))
-                            .mediaDurationSeconds(parseInteger(valueOrDefault(lessonRow, "Media Duration", ""), null))
-                            .mediaSizeBytes(parseLong(valueOrDefault(lessonRow, "Media Size", ""), null))
-                            .estimatedTimeMinutes(parseInteger(valueOrDefault(lessonRow, "Estimated Time", ""), null))
-                            .version(valueOrDefault(lessonRow, "Version", ""))
-                            .build();
-                    Lesson savedLesson = lessonRepository.save(lesson);
-                    lessonsByImportKey.put(buildLessonKey(courseCode, sectionCode, lessonCode), savedLesson);
-                    importedLessons++;
+            } else if (type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf")) {
+                if (currentSection == null) {
+                    throw new IllegalArgumentException("Found a lesson before any section in SYLLABUS sheet: " + title);
                 }
+                if (!knownLessonTitles.add(title.toLowerCase(Locale.ROOT))) {
+                    throw new IllegalArgumentException("Duplicate Lesson Title in syllabus: " + title);
+                }
+
+                String lessonType = normalizeLessonType(type);
+                String contentUrl = valueOrDefault(row, "Content / Media URL", "");
+
+                String videoTranscript = null;
+                if ("video".equalsIgnoreCase(lessonType) && contentUrl != null && contentUrl.toLowerCase().contains("youtu")) {
+                    try {
+                        videoTranscript = youtubeTranscriptService.fetchTranscript(contentUrl);
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                Integer estimatedTimeMinutes = parseInteger(valueOrDefault(row, "Duration (Mins)", ""), null);
+
+                Lesson lesson = Lesson.builder()
+                        .section(currentSection)
+                        .code(currentSection.getCode() + "_L" + (importedLessons + 1))
+                        .title(title)
+                        .lessonType(lessonType)
+                        .skill(category)
+                        .difficulty(difficulty)
+                        .content(contentUrl)
+                        .videoTranscript(videoTranscript)
+                        .displayOrder(importedLessons + 1)
+                        .description("")
+                        .pdfName("pdf".equalsIgnoreCase(lessonType) ? contentUrl : null)
+                        .questionImageUrl(null)
+                        .mediaDurationSeconds(estimatedTimeMinutes != null ? estimatedTimeMinutes * 60 : null)
+                        .mediaSizeBytes(null)
+                        .estimatedTimeMinutes(estimatedTimeMinutes)
+                        .version("")
+                        .build();
+                Lesson savedLesson = lessonRepository.save(lesson);
+                lessonsByTitle.put(title.toLowerCase(Locale.ROOT), savedLesson);
+                importedLessons++;
             }
         }
 
-        for (Map<String, String> sectionRow : sectionRows) {
-            String courseCode = valueOrDefault(sectionRow, "Course Code", "");
-            if (!courseCode.isBlank() && !knownCourseCodes.contains(courseCode)) {
-                warnings.add("Section row references unknown Course Code: " + courseCode);
-            }
-        }
+        Map<String, com.hango.hango_backend.entity.QuestionGroup> questionGroupsByPassage = new java.util.HashMap<>();
 
         for (Map<String, String> questionRow : questionRows) {
-            if (valueOrDefault(questionRow, "Question Text", "").isBlank()) {
+            String questionText = valueOrDefault(questionRow, "Question Text", "");
+            if (questionText.isBlank()) {
                 continue;
             }
 
-            String courseCode = valueOrDefault(questionRow, "Course Code", "");
-            String sectionCode = valueOrDefault(questionRow, "Section Code", "");
-            String lessonCode = valueOrDefault(questionRow, "Lesson Code", "");
-            if (courseCode.isBlank() || sectionCode.isBlank() || lessonCode.isBlank()) {
-                warnings.add("Question row skipped because Course Code, Section Code, or Lesson Code is missing.");
+            String questionTitle = valueOrDefault(questionRow, "Question Title", "").trim();
+            if (questionTitle.isBlank()) {
+                warnings.add("Question row skipped because Question Title is missing.");
                 continue;
             }
 
-            Lesson targetLesson = lessonsByImportKey.get(buildLessonKey(courseCode, sectionCode, lessonCode));
+            Lesson targetLesson = lessonsByTitle.get(questionTitle.toLowerCase(Locale.ROOT));
             if (targetLesson == null) {
-                warnings.add("Question row skipped because lesson mapping was not found: "
-                        + courseCode + "/" + sectionCode + "/" + lessonCode + ".");
+                warnings.add("Question row skipped because lesson with title '" + questionTitle + "' was not found in SYLLABUS.");
                 continue;
             }
 
-            Section targetSection = sectionsByImportKey.get(buildLessonKey(courseCode, sectionCode));
-            SystemParameter courseCategory = categoryByCourseCode.get(courseCode);
-            SystemParameter courseDifficulty = difficultyByCourseCode.get(courseCode);
+            String groupName = valueOrDefault(questionRow, "Group", "").trim();
+            String passageText = valueOrDefault(questionRow, "Passage Text", "").trim();
+            com.hango.hango_backend.entity.QuestionGroup questionGroup = null;
+            
+            if (!groupName.isEmpty() && !passageText.isEmpty()) {
+                String groupKey = groupName.toLowerCase(Locale.ROOT);
+                questionGroup = questionGroupsByPassage.get(groupKey);
+                if (questionGroup == null) {
+                    questionGroup = new com.hango.hango_backend.entity.QuestionGroup();
+                    questionGroup.setContextText(passageText);
+                    questionGroup.setGroupTypeParam(resolveGroupType(questionRow, warnings));
+                    questionGroup = questionGroupRepository.save(questionGroup);
+                    questionGroupsByPassage.put(groupKey, questionGroup);
+                }
+            }
+
             Question question = new Question();
             question.setCreatedBy(trainer);
-            question.setCode(valueOrDefault(questionRow, "Question Code", ""));
+            question.setCode("Q_" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
             question.setCategory(resolveQuestionCategory(valueOrDefault(questionRow, "Category", ""), warnings));
-            question.setQuestionText(required(questionRow, "Question Text", "QUESTIONS"));
+            question.setQuestionText(questionText);
             question.setExplanation(valueOrDefault(questionRow, "Explaination", valueOrDefault(questionRow, "Explanation", "")));
-            question.setDifficulty(resolveQuestionDifficulty(questionRow, courseDifficulty, warnings));
-            question.setSkillParam(resolveQuestionSkill(questionRow, courseCategory, warnings));
-            question.setSection(targetSection);
+            question.setDifficulty(resolveQuestionDifficulty(questionRow, difficulty, warnings));
+            question.setSkillParam(resolveQuestionSkill(questionRow, category, warnings));
+            question.setSection(targetLesson.getSection());
+            question.setQuestionGroup(questionGroup);
             question.setStatus("APPROVED");
 
             Question savedQuestion = questionRepository.save(question);
@@ -605,16 +624,16 @@ public class CourseImportService {
         String rawDifficulty = valueOrDefault(questionRow, "Difficulty", "");
         if (!rawDifficulty.isBlank()) {
             return resolveParameter(
-                    "ACADEMIC_LEVEL",
+                    "DIFFICULTY",
                     rawDifficulty,
-                    fallbackDifficulty != null ? fallbackDifficulty.getParamKey() : "BASIC",
+                    fallbackDifficulty != null ? fallbackDifficulty.getParamKey() : "EASY",
                     warnings
             );
         }
         if (fallbackDifficulty != null) {
             return fallbackDifficulty;
         }
-        return resolveParameter("ACADEMIC_LEVEL", "BASIC", "BASIC", warnings);
+        return resolveParameter("DIFFICULTY", "EASY", "EASY", warnings);
     }
 
     private SystemParameter resolveQuestionSkill(
@@ -625,7 +644,7 @@ public class CourseImportService {
         String rawSkill = valueOrDefault(questionRow, "Skill Type", "");
         if (!rawSkill.isBlank()) {
             return resolveParameter(
-                    "COURSE_CATEGORY",
+                    "SKILL",
                     rawSkill,
                     fallbackSkill != null ? fallbackSkill.getParamKey() : "GRAMMAR",
                     warnings
@@ -634,7 +653,23 @@ public class CourseImportService {
         if (fallbackSkill != null) {
             return fallbackSkill;
         }
-        return resolveParameter("COURSE_CATEGORY", "GRAMMAR", "GRAMMAR", warnings);
+        return resolveParameter("SKILL", "GRAMMAR", "GRAMMAR", warnings);
+    }
+
+    private SystemParameter resolveGroupType(
+            Map<String, String> questionRow,
+            List<String> warnings
+    ) {
+        String rawGroupType = valueOrDefault(questionRow, "Group Type", "");
+        if (!rawGroupType.isBlank()) {
+            return resolveParameter(
+                    "GROUP_TYPE",
+                    rawGroupType,
+                    "READING_COMPREHENSION_8_QUESTIONS",
+                    warnings
+            );
+        }
+        return resolveParameter("GROUP_TYPE", "READING_COMPREHENSION_8_QUESTIONS", "READING_COMPREHENSION_8_QUESTIONS", warnings);
     }
 
     private void saveQuestionOptions(Question question, Map<String, String> questionRow) {
@@ -836,7 +871,7 @@ public class CourseImportService {
         }
     }
  
-    private BigDecimal calculateCoursePrice(TrainerProfile profile, SystemParameter difficulty, int lessonCount) {
+    private BigDecimal calculateCoursePrice(TrainerProfile profile, SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
             if ("PROFESSIONAL".equalsIgnoreCase(profile.getTrainerType())) {
@@ -859,6 +894,7 @@ public class CourseImportService {
             }
         }
         price += (lessonCount * 10000L);
+        price += (durationMinutes * 1000L);
         return BigDecimal.valueOf(price);
     }
  

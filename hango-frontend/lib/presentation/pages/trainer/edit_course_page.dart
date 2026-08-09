@@ -40,10 +40,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
   // Import-template compatible fields
   final TextEditingController _codeController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController(
-    text: '0',
-  );
-  final TextEditingController _priceNoteController = TextEditingController();
   num? _suggestedPrice;
   final TextEditingController _objectivesController = TextEditingController();
 
@@ -94,8 +90,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
     _descriptionController.dispose();
     _versionController.dispose();
     _codeController.dispose();
-    _priceController.dispose();
-    _priceNoteController.dispose();
     _objectivesController.dispose();
     super.dispose();
   }
@@ -213,16 +207,18 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _uploadedImageUrl = data['thumbnailUrl'] ?? '';
           _versionController.text = data['version'] ?? 'v1.0';
           _codeController.text = data['code'] ?? '';
-          _priceController.text = data['price']?.toString() ?? '0';
           _suggestedPrice = data['suggestedPrice'];
-          _priceNoteController.text = data['priceNote'] ?? '';
           _objectivesController.text = data['objectives'] ?? '';
 
-          final currentCats = data['categories'] as List<dynamic>? ?? [];
-          if (currentCats.isNotEmpty) {
-            _selectedCategoryKey = currentCats.first['paramKey'] ?? 'GRAMMAR';
-          } else if (data['category'] != null) {
-            _selectedCategoryKey = data['category']['paramKey'] ?? 'GRAMMAR';
+          if (data != null) {
+            final currentCats = data['categories'] as List<dynamic>? ?? [];
+            if (currentCats.isNotEmpty) {
+              _selectedCategoryKey = currentCats.first['paramKey'] ?? 'GRAMMAR';
+            } else if (data['categoryKey'] != null) {
+              _selectedCategoryKey = data['categoryKey'] ?? 'GRAMMAR';
+            } else if (data['category'] != null) {
+              _selectedCategoryKey = data['category']['paramKey'] ?? 'GRAMMAR';
+            }
           }
 
           if (data['difficultyKey'] != null &&
@@ -343,7 +339,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
     final code = _codeController.text.trim();
     final desc = _descriptionController.text.trim();
     final objectives = _objectivesController.text.trim();
-    final price = double.tryParse(_priceController.text.trim().isEmpty ? '0' : _priceController.text.trim()) ?? 0;
 
     if (title.length > 255) {
       if (showToast) ToastHelper.showError(context, 'Title cannot exceed 255 characters');
@@ -359,10 +354,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
     if (objectives.length > 5000) {
       if (showToast) ToastHelper.showError(context, 'Objectives cannot exceed 5000 characters');
-      return false;
-    }
-    if (price < 0) {
-      if (showToast) ToastHelper.showError(context, 'Price cannot be negative');
       return false;
     }
 
@@ -382,13 +373,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'description': _descriptionController.text.trim(),
         'version': _versionController.text.trim(),
         'code': _codeController.text.trim(),
-        'price':
-            double.tryParse(
-              _priceController.text.trim().isEmpty
-                  ? '0'
-                  : _priceController.text.trim(),
-            ) ??
-            0,
         'objectives': _objectivesController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
@@ -494,14 +478,6 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'description': _descriptionController.text.trim(),
         'version': _versionController.text.trim(),
         'code': _codeController.text.trim(),
-        'price':
-            double.tryParse(
-              _priceController.text.trim().isEmpty
-                  ? '0'
-                  : _priceController.text.trim(),
-            ) ??
-            0,
-        'priceNote': _priceNoteController.text.trim(),
         'objectives': _objectivesController.text.trim(),
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
@@ -1452,20 +1428,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Price (Desired)',
+                          'System Auto-Price',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF4B5563),
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                        Text(
-                          'Suggested: ${_suggestedPrice ?? 0}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF20B486),
                             fontFamily: 'Outfit',
                           ),
                         ),
@@ -1475,54 +1442,27 @@ class _EditCoursePageState extends State<EditCoursePage> {
                     Row(
                       children: [
                         Expanded(
-                          child: TextFormField(
-                            controller: _priceController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (val) {
-                              setState(() {}); // trigger rebuild to show/hide Reason
-                            },
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.white,
-                              hintText: 'Enter desired price',
-                              hintStyle: const TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 14,
-                                fontFamily: 'Outfit',
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFF20B486),
-                                ),
-                              ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9), // Light grey indicating read-only
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              fontSize: 14,
-                              color: Color(0xFF1E293B),
+                            child: Text(
+                              _suggestedPrice != null ? '${_suggestedPrice} VNĐ' : 'Calculating...',
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Tooltip(
-                          message: 'Re-evaluate price based on content',
+                          message: 'Refresh system price (Base + Lessons + Duration)',
                           child: IconButton(
                             icon: const Icon(Icons.refresh, color: Color(0xFF20B486)),
                             onPressed: _reEvaluatePrice,
@@ -1530,66 +1470,17 @@ class _EditCoursePageState extends State<EditCoursePage> {
                         ),
                       ],
                     ),
-                    if (_suggestedPrice != null && (num.tryParse(_priceController.text) ?? 0) != _suggestedPrice) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Reason for price change (Required)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFFEF4444), // Red to stand out
-                          fontFamily: 'Outfit',
-                        ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Price is automatically calculated by the system based on Trainer Profile, Academic Level, Lesson Count, and Total Duration.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                        height: 1.4,
                       ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _priceNoteController,
-                        maxLines: 2,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please provide a reason for the custom price.';
-                          }
-                          return null;
-                        },
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white,
-                          hintText: 'Why do you want to change the suggested price?',
-                          hintStyle: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 14,
-                            fontFamily: 'Outfit',
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFEF4444),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFEF4444), // Highlight border
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFEF4444),
-                            ),
-                          ),
-                        ),
-                        style: const TextStyle(
-                          fontFamily: 'Outfit',
-                          fontSize: 14,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                    ],
+                    ),
+
                   ],
                 ),
               ),

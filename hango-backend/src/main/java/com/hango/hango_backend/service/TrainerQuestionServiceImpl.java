@@ -213,13 +213,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             group = new QuestionGroup();
             group.setContextText(request.getPassageText());
 
-            SystemParameter groupType = null;
-            if (request.getCategoryId() != null) {
-                groupType = systemParameterRepository.findById(request.getCategoryId()).orElse(null);
-            }
-            if (groupType == null) {
-                groupType = systemParameterRepository.findById(17L).orElse(null); // Fallback
-            }
+            SystemParameter groupType = skillParam;
             group.setGroupTypeParam(groupType);
             group = questionGroupRepository.save(group);
         }
@@ -377,13 +371,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                     .orElseThrow(() -> new RuntimeException("Question Group not found"));
             group.setContextText(request.getPassageText());
 
-            SystemParameter groupType = null;
-            if (request.getCategoryId() != null) {
-                groupType = systemParameterRepository.findById(request.getCategoryId()).orElse(null);
-            }
-            if (groupType == null) {
-                groupType = systemParameterRepository.findById(17L).orElse(null);
-            }
+            SystemParameter groupType = skillParam;
             group.setGroupTypeParam(groupType);
 
             questionGroupRepository.save(group);
