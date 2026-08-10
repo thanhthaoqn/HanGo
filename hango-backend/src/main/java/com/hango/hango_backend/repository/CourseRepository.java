@@ -52,6 +52,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("SELECT COUNT(c) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
     long countByCreatorIdAndDeletedAtIsNull(@Param("creatorId") Long creatorId);
 
+    @Query("SELECT COUNT(DISTINCT c.code) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
+    long countDistinctCourseCodesByCreatorId(@Param("creatorId") Long creatorId);
+
     @Query(value = "SELECT c.id AS id, c.title AS title, " +
            "(SELECT COUNT(e.id) FROM enrollments e WHERE e.course_id = c.id) AS learnersCount, " +
            "(SELECT COUNT(l.id) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id AND l.deleted_at IS NULL) AS lessonsCount, " +

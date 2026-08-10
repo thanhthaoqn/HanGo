@@ -1488,17 +1488,19 @@ class _EditCoursePageState extends State<EditCoursePage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9), // Light grey indicating read-only
+                              color: _suggestedPrice == 0 ? const Color(0xFFE6F4EA) : const Color(0xFFF1F5F9), // Light green if free
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(color: _suggestedPrice == 0 ? const Color(0xFFCEEAD6) : const Color(0xFFE2E8F0)),
                             ),
                             child: Text(
-                              _suggestedPrice != null ? '${_suggestedPrice} VNĐ' : 'Calculating...',
-                              style: const TextStyle(
+                              _suggestedPrice != null 
+                                  ? (_suggestedPrice == 0 ? 'Free (First course promotion)' : '${_suggestedPrice} VNĐ') 
+                                  : 'Calculating...',
+                              style: TextStyle(
                                 fontFamily: 'Outfit',
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                                color: _suggestedPrice == 0 ? const Color(0xFF137333) : const Color(0xFF0F172A),
                               ),
                             ),
                           ),

@@ -707,6 +707,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR")
                         || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
+        if (courseRepository.countDistinctCourseCodesByCreatorId(course.getCreator().getId()) <= 1) {
+            course.setPrice(java.math.BigDecimal.ZERO);
+            course.setSuggestedPrice(java.math.BigDecimal.ZERO);
+        }
+
         if (isManager) {
             course.setStatus("PUBLISHED");
             course.setPublishedAt(java.time.LocalDateTime.now());
@@ -1114,6 +1119,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         int durationMinutes = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 0;
         java.math.BigDecimal calculatedPrice = calculateCoursePrice(profile, course.getDifficulty(), lessonCount, durationMinutes);
+        
+        if (courseRepository.countDistinctCourseCodesByCreatorId(course.getCreator().getId()) <= 1) {
+            calculatedPrice = java.math.BigDecimal.ZERO;
+        }
+        
         course.setPrice(calculatedPrice);
         course.setSuggestedPrice(calculatedPrice);
         courseRepository.save(course);
