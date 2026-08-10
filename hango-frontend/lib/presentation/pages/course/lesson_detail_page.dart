@@ -200,13 +200,31 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         parsedAnswers.add(answersMap);
       }
 
+      String? foundItemType;
+      if (_courseDetail != null) {
+        for (final s in _courseDetail!.sessions) {
+          for (final l in s.lessons) {
+            if (l.id == lessonId) {
+              foundItemType = l.itemType;
+              break;
+            }
+          }
+          if (foundItemType != null) break;
+        }
+      }
+
       setState(() {
         _currentLessonId = lessonId;
         _lessonDetail = newLesson;
+        _itemType = foundItemType;
         _mockAttempts = parsedAttempts;
         _attemptsAnswers = parsedAnswers;
         _isNavigatingLesson = false;
       });
+      
+      if (_itemType?.toLowerCase() == 'video') {
+        _initializePlayer(newLesson.content);
+      }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('last_lesson_id_for_${widget.courseId}', lessonId);
       _saveLastVisitedSession(lessonId, startQuiz);
