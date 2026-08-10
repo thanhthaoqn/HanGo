@@ -35,6 +35,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final CourseRatingRepository courseRatingRepository;
     private final YouTubeTranscriptService youtubeTranscriptService;
     private final NotificationService notificationService;
+    private final CloudinaryService cloudinaryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -530,6 +531,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setPriceNote("");
         course.setEstimatedDuration(request.getEstimatedDuration());
         if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isEmpty()) {
+            if (course.getThumbnailUrl() != null && !course.getThumbnailUrl().equals(request.getThumbnailUrl())) {
+                cloudinaryService.deleteFile(course.getThumbnailUrl());
+            }
             course.setThumbnailUrl(request.getThumbnailUrl());
         }
 
@@ -547,6 +551,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         // Delete sections that were removed
         for (com.hango.hango_backend.entity.Section existingSection : existingSections) {
             if (!requestSectionIds.contains(existingSection.getId())) {
+                List<com.hango.hango_backend.entity.Lesson> lessonsToDel = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(existingSection.getId());
+                for (com.hango.hango_backend.entity.Lesson l : lessonsToDel) {
+                    if (l.getVideoUrl() != null) cloudinaryService.deleteFile(l.getVideoUrl());
+                    if (l.getContent() != null) cloudinaryService.deleteFile(l.getContent());
+                }
                 sectionRepository.delete(existingSection);
             }
         }
@@ -581,6 +590,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
             for (com.hango.hango_backend.entity.Lesson existingLesson : existingLessons) {
                 if (!requestLessonIds.contains(existingLesson.getId())) {
+                    if (existingLesson.getVideoUrl() != null) cloudinaryService.deleteFile(existingLesson.getVideoUrl());
+                    if (existingLesson.getContent() != null) cloudinaryService.deleteFile(existingLesson.getContent());
                     lessonRepository.delete(existingLesson);
                 }
             }
@@ -591,6 +602,20 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 if (lDto.getId() != null && lDto.getId() < 1000000000000L) {
                     lesson = lessonRepository.findById(lDto.getId())
                             .orElse(new com.hango.hango_backend.entity.Lesson());
+                            
+                    // Check if old videoUrl/content changed
+                    String oldVideoUrl = lesson.getVideoUrl();
+                    String oldContent = lesson.getContent();
+                    
+                    String newVideoUrl = lDto.getVideoUrl() != null ? lDto.getVideoUrl() : lDto.getContent();
+                    String newContent = lDto.getContent();
+                    
+                    if (oldVideoUrl != null && !oldVideoUrl.equals(newVideoUrl) && !oldVideoUrl.equals(newContent)) {
+                        cloudinaryService.deleteFile(oldVideoUrl);
+                    }
+                    if (oldContent != null && !oldContent.equals(newContent) && !oldContent.equals(newVideoUrl) && oldVideoUrl == null) {
+                        cloudinaryService.deleteFile(oldContent);
+                    }
                 } else {
                     lesson = new com.hango.hango_backend.entity.Lesson();
                 }

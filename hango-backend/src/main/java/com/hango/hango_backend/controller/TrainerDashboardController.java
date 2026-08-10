@@ -49,6 +49,18 @@ public class TrainerDashboardController {
         }
     }
 
+    @PostMapping("/courses/upload-video")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> uploadCourseVideo(@RequestPart("file") MultipartFile file) {
+        try {
+            String url = cloudinaryService.uploadVideo(file);
+            return ResponseEntity.ok("{\"url\": \"" + url + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @GetMapping("/courses/import/template")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('COURSE_MANAGER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<byte[]> downloadCourseImportTemplate() {
