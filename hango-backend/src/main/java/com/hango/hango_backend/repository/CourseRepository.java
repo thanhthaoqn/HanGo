@@ -59,19 +59,27 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     Optional<Course> findFirstByCreatorIdAndDeletedAtIsNullOrderByCreatedAtAsc(Long creatorId);
 
+    Optional<Course> findFirstByCreatorIdAndStatusAndDeletedAtIsNullOrderByPublishedAtAsc(Long creatorId, String status);
+
     default boolean isEligibleForFirstCoursePromotion(Long creatorId, String currentCourseCode) {
         if (creatorId == null) return false;
-        if (existsByCreatorIdAndStatusAndDeletedAtIsNull(creatorId, "PUBLISHED")) {
-            return false;
+        
+        Optional<Course> firstPublished = findFirstByCreatorIdAndStatusAndDeletedAtIsNullOrderByPublishedAtAsc(creatorId, "PUBLISHED");
+        if (firstPublished.isPresent()) {
+            if (currentCourseCode == null || currentCourseCode.isEmpty()) return false;
+            String basePublished = firstPublished.get().getCode().replaceAll("-V\\d+$", "");
+            String baseCurrent = currentCourseCode.replaceAll("-V\\d+$", "");
+            return basePublished.equals(baseCurrent);
         }
-        Optional<Course> oldestCourse = findFirstByCreatorIdAndDeletedAtIsNullOrderByCreatedAtAsc(creatorId);
-        if (oldestCourse.isEmpty()) {
+        
+        Optional<Course> oldestDraft = findFirstByCreatorIdAndDeletedAtIsNullOrderByCreatedAtAsc(creatorId);
+        if (oldestDraft.isEmpty()) {
             return true; // No courses yet, this is the very first one being created
         }
         if (currentCourseCode == null || currentCourseCode.isEmpty()) {
             return false; // They have a course in DB, but this new one hasn't been assigned a code -> it's the second course
         }
-        String oldestCode = oldestCourse.get().getCode();
+        String oldestCode = oldestDraft.get().getCode();
         if (oldestCode == null) return false;
         
         String baseOldest = oldestCode.replaceAll("-V\\d+$", "");
