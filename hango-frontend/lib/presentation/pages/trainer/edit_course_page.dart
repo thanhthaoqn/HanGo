@@ -1,6 +1,6 @@
-// ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -33,6 +33,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   bool _isLoadingCourse = true;
   bool _isSaving = false;
   String _lastSavedText = 'Last saved: Just now';
+  String? _rejectionReason;
 
   // Form values
   final TextEditingController _titleController = TextEditingController();
@@ -208,6 +209,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _versionController.text = data['version'] ?? 'v1.0';
           _codeController.text = data['code'] ?? '';
           _suggestedPrice = data['suggestedPrice'];
+          _rejectionReason = data['rejectionReason'];
           _objectivesController.text = data['objectives'] ?? '';
 
           if (data != null) {
@@ -581,6 +583,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                 trainerName: _trainerName,
                                                 trainerInitials: _trainerInitials,
                                                 sections: _sections,
+                                                courseStatus: _courseStatus,
+                                                rejectionReason: _rejectionReason,
                                                 onSectionsChanged: (updatedSections) async {
                                                   setState(() {
                                                     _sections = updatedSections;
@@ -625,6 +629,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                     trainerName: _trainerName,
                                     trainerInitials: _trainerInitials,
                                     sections: _sections,
+                                    courseStatus: _courseStatus,
+                                    rejectionReason: _rejectionReason,
                                     onSectionsChanged: (updatedSections) async {
                                       setState(() {
                                         _sections = updatedSections;
@@ -817,6 +823,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
       ),
     );
   }
+
 
   Widget _buildTitleSection() {
     return Row(
@@ -1024,51 +1031,85 @@ class _EditCoursePageState extends State<EditCoursePage> {
           ),
         ),
         const SizedBox(height: 20),
-        if (_courseStatus == 'DRAFT')
+        if (_courseStatus == 'DRAFT' || _courseStatus == 'REJECTED')
           // Progress Overview Card
           Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9), // light grey/blue slate 100
+            color: _courseStatus == 'REJECTED'
+                ? const Color(0xFFFEF2F2) // Light red for rejected
+                : const Color(0xFFF1F5F9), // light grey/blue slate 100
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFEFF2F5)),
+            border: Border.all(
+              color: _courseStatus == 'REJECTED'
+                  ? const Color(0xFFFCA5A5)
+                  : const Color(0xFFEFF2F5),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Progress Overview',
+              Text(
+                _courseStatus == 'REJECTED' ? 'Action Required' : 'Progress Overview',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: _courseStatus == 'REJECTED'
+                      ? const Color(0xFF991B1B)
+                      : const Color(0xFF1E293B),
                   fontFamily: 'Outfit',
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                '1/3 steps completed successfully. Complete the remaining steps to publish the course.',
-                style: TextStyle(
+              Text(
+                _courseStatus == 'REJECTED'
+                    ? 'This course was rejected. Fix the issues below and re-submit.'
+                    : '1/3 steps completed successfully. Complete the remaining steps to publish the course.',
+                style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF64748B),
                   fontFamily: 'Outfit',
                   height: 1.4,
                 ),
               ),
+              if (_courseStatus == 'REJECTED' && _rejectionReason != null && _rejectionReason!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: MarkdownBody(
+                    data: _rejectionReason!,
+                    styleSheet: MarkdownStyleSheet(
+                      p: const TextStyle(color: Color(0xFF991B1B), fontSize: 11, fontFamily: 'Outfit', height: 1.4),
+                      listBullet: const TextStyle(color: Color(0xFF991B1B), fontSize: 11),
+                      strong: const TextStyle(color: Color(0xFF7F1D1D), fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 11),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: _submitCourseForReview,
-                icon: const Icon(Icons.play_arrow, size: 16),
-                label: const Text(
-                  'Submit for Review',
-                  style: TextStyle(
+                icon: Icon(
+                  _courseStatus == 'REJECTED' ? Icons.refresh : Icons.play_arrow,
+                  size: 16,
+                ),
+                label: Text(
+                  _courseStatus == 'REJECTED' ? 'Re-submit for Review' : 'Submit for Review',
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                     fontFamily: 'Outfit',
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20B486),
+                  backgroundColor: _courseStatus == 'REJECTED'
+                      ? const Color(0xFFEF4444) // Red CTA for rejected
+                      : const Color(0xFF20B486),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -1078,10 +1119,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 ),
               ),
               const SizedBox(height: 8),
-                const Text(
-                  'Submit once 100% completed',
+                Text(
+                  _courseStatus == 'REJECTED'
+                      ? 'Save your fixes first, then re-submit'
+                      : 'Submit once 100% completed',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 10,
                     color: Color(0xFF94A3B8),
                     fontFamily: 'Outfit',
@@ -2017,8 +2060,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
       if (response.statusCode == 200) {
         ToastHelper.showSuccess(
           context,
-          'Course submitted for review successfully!',
+          _courseStatus == 'REJECTED'
+              ? 'Course re-submitted for review!'
+              : 'Course submitted for review successfully!',
         );
+        await _loadCourseDetail(); // Reload to reflect new PENDING_APPROVAL status
       } else {
         final data = jsonDecode(response.body);
         final errorMsg = data['error'] ?? response.body;

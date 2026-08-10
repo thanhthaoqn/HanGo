@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../../utils/config.dart';
 import 'package:file_picker/file_picker.dart';
@@ -10,6 +11,7 @@ import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
 
 import 'edit_course_page.dart';
+import '../course/course_detail_page.dart';
 import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
 import 'trainer_profile_page.dart';
@@ -1330,6 +1332,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     final lessons = course['lessonsCount'] ?? 0;
     final dateStr = _formatDate(course['createdAt']);
     final thumbnail = (course['thumbnailUrl'] ?? '') as String;
+    final priceStr = (course['price'] ?? 0).toString();
+    final priceDisplay = priceStr == '0' || priceStr == '0.0' ? 'Free' : '$priceStr VND';
     final rejectionReason = (course['rejectionReason'] ?? '') as String;
 
     final state = _lifecycleState(
@@ -1433,7 +1437,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         if (state == 'LIVE_ONLY')
                           _badge(
                             label: published != null
-                                ? 'PUBLISHED${pubVer.isNotEmpty ? ' · $pubVer' : ''}'
+                                ? '${(published['status'] ?? '').toString().toUpperCase()}${pubVer.isNotEmpty ? ' · $pubVer' : ''}'
                                 : 'DRAFT${draftVer.isNotEmpty ? ' · $draftVer' : ''}',
                             bg: published != null
                                 ? const Color(0xFFE6FFFA)
@@ -1445,7 +1449,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         if (state == 'HAS_DRAFT') ...[
                           _badge(
                             label:
-                                '🟢 PUBLISHED${pubVer.isNotEmpty ? ' · $pubVer' : ''}',
+                                '🟢 ${(published['status'] ?? '').toString().toUpperCase()}${pubVer.isNotEmpty ? ' · $pubVer' : ''}',
                             bg: const Color(0xFFE6FFFA),
                             fg: const Color(0xFF0D9373),
                           ),
@@ -1460,7 +1464,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         if (state == 'PENDING') ...[
                           _badge(
                             label:
-                                '🟢 PUBLISHED${pubVer.isNotEmpty ? ' · $pubVer' : ''}',
+                                '🟢 ${(published?['status'] ?? '').toString().toUpperCase()}${pubVer.isNotEmpty ? ' · $pubVer' : ''}',
                             bg: const Color(0xFFE6FFFA),
                             fg: const Color(0xFF0D9373),
                           ),
@@ -1483,6 +1487,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         _statChip(Icons.people_outline, '$learners learners'),
                         _statChip(Icons.class_outlined, '$lessons lessons'),
                         _statChip(Icons.calendar_today_outlined, dateStr),
+                        _statChip(Icons.sell_outlined, priceDisplay),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -1512,14 +1517,33 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                             const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 16),
                             const SizedBox(width: 6),
                             Expanded(
-                              child: Text(
-                                'Rejected: $rejectionReason',
-                                style: const TextStyle(
-                                  color: Color(0xFF991B1B),
-                                  fontSize: 12,
-                                  fontFamily: 'Outfit',
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Rejected Reason:',
+                                    style: TextStyle(
+                                      color: Color(0xFF991B1B),
+                                      fontSize: 13,
+                                      fontFamily: 'Outfit',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  MarkdownBody(
+                                    data: rejectionReason,
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: const TextStyle(
+                                        color: Color(0xFF991B1B),
+                                        fontSize: 12,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                      listBullet: const TextStyle(
+                                        color: Color(0xFF991B1B),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -1594,10 +1618,15 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
             _actionChip(
               icon: Icons.visibility_outlined,
               label: 'View',
-              onTap: () => ToastHelper.show(
-                context,
-                'View course feature is under development',
-              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        CourseDetailPage(courseId: extractId(course)),
+                  ),
+                );
+              },
             ),
             if (_canManageCourses) ...[
               const SizedBox(width: 8),
@@ -1860,6 +1889,14 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                       statusBg = const Color(0xFFE6FFFA);
                       statusFg = const Color(0xFF0D9373);
                       statusText = 'Published';
+                    } else if (status == 'HIDDEN') {
+                      statusBg = const Color(0xFFF1F5F9);
+                      statusFg = const Color(0xFF475569);
+                      statusText = 'Hidden';
+                    } else if (status == 'ARCHIVED') {
+                      statusBg = const Color(0xFFF3F4F6);
+                      statusFg = const Color(0xFF6B7280);
+                      statusText = 'Archived';
                     } else if (status == 'PENDING_APPROVAL' ||
                         status == 'PENDING') {
                       statusBg = const Color(0xFFEFF6FF);
@@ -1999,9 +2036,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) =>
-                                        EditCoursePage(courseId: courseId),
+                                        CourseDetailPage(courseId: courseId),
                                   ),
-                                ).then((_) => _fetchCoursesData());
+                                );
                               },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF475569),

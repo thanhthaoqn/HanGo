@@ -862,7 +862,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Courses'),
+      appBar: SharedHeader(
+        isDesktop: isDesktop, 
+        activeTab: 'Courses',
+        showBackButton: Navigator.canPop(context),
+      ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),

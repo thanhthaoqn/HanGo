@@ -5,6 +5,7 @@ enum NodeType { normal, fastTrackSkipped, detourRemedial, merged }
 enum ScheduleStatus { onTrack, atRisk, behind, completed }
 
 class PathwayNode {
+  final int id;
   final int step;
   final int courseId;
   final String courseTitle;
@@ -33,7 +34,19 @@ class PathwayNode {
   final List<String>? sourceGoalLabels;
   final String? mergeReason;
 
+  // Phase 2: Retention Engine (Mastery & Spaced Repetition)
+  final int? masteryScore;
+  final bool isMastered;
+  final DateTime? nextReviewDate;
+  final int? reviewIntervalDays;
+
+  bool get isReviewDue {
+    if (nextReviewDate == null) return false;
+    return DateTime.now().isAfter(nextReviewDate!);
+  }
+
   PathwayNode({
+    required this.id,
     required this.step,
     required this.courseId,
     required this.courseTitle,
@@ -55,9 +68,14 @@ class PathwayNode {
     this.scheduleStatus,
     this.sourceGoalLabels,
     this.mergeReason,
+    this.masteryScore,
+    this.isMastered = false,
+    this.nextReviewDate,
+    this.reviewIntervalDays,
   });
 
   PathwayNode copyWith({
+    int? id,
     int? step,
     int? courseId,
     String? courseTitle,
@@ -79,8 +97,13 @@ class PathwayNode {
     ScheduleStatus? scheduleStatus,
     List<String>? sourceGoalLabels,
     String? mergeReason,
+    int? masteryScore,
+    bool? isMastered,
+    DateTime? nextReviewDate,
+    int? reviewIntervalDays,
   }) {
     return PathwayNode(
+      id: id ?? this.id,
       step: step ?? this.step,
       courseId: courseId ?? this.courseId,
       courseTitle: courseTitle ?? this.courseTitle,
@@ -102,6 +125,10 @@ class PathwayNode {
       scheduleStatus: scheduleStatus ?? this.scheduleStatus,
       sourceGoalLabels: sourceGoalLabels ?? this.sourceGoalLabels,
       mergeReason: mergeReason ?? this.mergeReason,
+      masteryScore: masteryScore ?? this.masteryScore,
+      isMastered: isMastered ?? this.isMastered,
+      nextReviewDate: nextReviewDate ?? this.nextReviewDate,
+      reviewIntervalDays: reviewIntervalDays ?? this.reviewIntervalDays,
     );
   }
 
@@ -176,6 +203,9 @@ class PathwayNode {
         : int.tryParse(estimatedRaw?.toString() ?? '');
 
     return PathwayNode(
+      id: json['id'] is int 
+          ? json['id'] as int 
+          : int.tryParse('${json['id']}') ?? 0,
       step: json['step'] is int
           ? json['step'] as int
           : int.tryParse('${json['step']}') ?? 0,
@@ -205,6 +235,10 @@ class PathwayNode {
           ? List<String>.from(json['source_goal_labels'] ?? json['sourceGoalLabels'] ?? [])
           : null,
       mergeReason: json['merge_reason'] ?? json['mergeReason'],
+      masteryScore: json['mastery_score'] ?? json['masteryScore'],
+      isMastered: json['is_mastered'] ?? json['isMastered'] ?? false,
+      nextReviewDate: parseDate(json['next_review_date'] ?? json['nextReviewDate']),
+      reviewIntervalDays: json['review_interval_days'] ?? json['reviewIntervalDays'],
     );
   }
 
@@ -236,6 +270,7 @@ class PathwayNode {
     }
 
     return {
+      'id': id,
       'step': step,
       'course_id': courseId,
       'course_title': courseTitle,
@@ -243,7 +278,24 @@ class PathwayNode {
       'status': formatStatus(status),
       'reason_why': reasonWhy,
       'progress_percent': progressPercent,
+      'skill_type': skillType,
+      'total_lessons': totalLessons,
+      'completed_lessons': completedLessons,
       'node_type': formatNodeType(nodeType),
+      'reroute_reason': rerouteReason,
+      'is_optional': isOptional,
+      'skipped_at': skippedAt?.toIso8601String(),
+      'parent_node_id': parentNodeId,
+      'start_date': startDate?.toIso8601String(),
+      'deadline': deadline?.toIso8601String(),
+      'estimated_hours': estimatedHours,
+      'schedule_status': scheduleStatus?.toString().split('.').last.toUpperCase(),
+      'source_goal_labels': sourceGoalLabels,
+      'merge_reason': mergeReason,
+      'mastery_score': masteryScore,
+      'is_mastered': isMastered,
+      'next_review_date': nextReviewDate?.toIso8601String(),
+      'review_interval_days': reviewIntervalDays,
     };
   }
 }

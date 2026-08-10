@@ -5,6 +5,7 @@ import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
+import '../../widgets/trainer_action_required_card.dart';
 import '../../../utils/toast_helper.dart';
 import 'select_quiz_questions_page.dart';
 
@@ -17,6 +18,9 @@ class CreateQuizPage extends StatefulWidget {
   final List<dynamic> sections;
   final int sectionIndex;
   final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
+  final dynamic lesson;
+  final String? courseStatus;
+  final String? rejectionReason;
 
   const CreateQuizPage({
     super.key,
@@ -27,6 +31,9 @@ class CreateQuizPage extends StatefulWidget {
     required this.sections,
     required this.sectionIndex,
     required this.onSectionsChanged,
+    this.lesson,
+    this.courseStatus,
+    this.rejectionReason,
   });
 
   @override
@@ -159,6 +166,8 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
                 sections: updatedSections,
                 sectionIndex: widget.sectionIndex,
                 lessonId: newQuizId,
+                courseStatus: widget.courseStatus,
+                rejectionReason: widget.rejectionReason,
                 onSectionsChanged: widget.onSectionsChanged,
               ),
             ),
@@ -532,6 +541,11 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 20),
+        TrainerActionRequiredCard(
+          courseStatus: widget.courseStatus,
+          rejectionReason: widget.rejectionReason,
         ),
         const SizedBox(height: 20),
         // Trainer Tips Card

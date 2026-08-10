@@ -155,6 +155,7 @@ PathwayNode node({
   int? estimatedHours,
 }) {
   return PathwayNode(
+    id: step, // Mock id using step
     step: step,
     courseId: courseId,
     courseTitle: title,

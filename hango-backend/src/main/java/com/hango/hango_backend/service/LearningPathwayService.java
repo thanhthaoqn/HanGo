@@ -495,6 +495,7 @@ public class LearningPathwayService {
             }
 
             return PathwayNodeDTO.builder()
+                    .id(node.getId())
                     .step(node.getStepOrder())
                     .courseId(node.getCourse().getId())
                     .courseTitle(node.getCourse().getTitle())
@@ -511,6 +512,10 @@ public class LearningPathwayService {
                     .deadline(node.getDeadline() != null ? node.getDeadline().toString() : null)
                     .estimatedHours(node.getEstimatedHours())
                     .scheduleStatus(node.getScheduleStatus())
+                    .masteryScore(node.getMasteryScore())
+                    .isMastered(node.getIsMastered())
+                    .nextReviewDate(node.getNextReviewDate() != null ? node.getNextReviewDate().toString() : null)
+                    .reviewIntervalDays(node.getReviewIntervalDays())
                     .build();
         }).toList();
 
@@ -583,6 +588,46 @@ public class LearningPathwayService {
                 .scheduleStatus(pathway.getScheduleStatus())
                 .suggestedActions(suggestedActions)
                 .build();
+    }
+
+    @Transactional
+    public LearningPathwayResponseDTO submitNodeMastery(Long pathwayId, Long nodeId, Long studentId, com.hango.hango_backend.dto.MasterySubmitRequestDTO request) {
+        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(studentId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        PathwayNode node = pathway.getNodes().stream()
+                .filter(n -> n.getId().equals(nodeId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException("Node not found in pathway", HttpStatus.NOT_FOUND));
+
+        node.setMasteryScore(request.getScore());
+        
+        if (request.getScore() != null && request.getScore() >= 80) { // Assuming 80 is the mastery threshold
+            node.setIsMastered(true);
+            
+            // Spaced Repetition logic
+            if (node.getReviewIntervalDays() == null) {
+                node.setReviewIntervalDays(1);
+            } else {
+                // simple progression: 1 -> 3 -> 7 -> 14 -> 30
+                int current = node.getReviewIntervalDays();
+                if (current == 1) node.setReviewIntervalDays(3);
+                else if (current == 3) node.setReviewIntervalDays(7);
+                else if (current == 7) node.setReviewIntervalDays(14);
+                else if (current == 14) node.setReviewIntervalDays(30);
+            }
+            node.setNextReviewDate(java.time.LocalDateTime.now().plusDays(node.getReviewIntervalDays()));
+            pathway.setMentorSummary("Congratulations on achieving Mastery! This course is scheduled for review in " + node.getReviewIntervalDays() + " days.");
+        } else {
+            node.setIsMastered(false);
+            pathway.setMentorSummary("Your score is " + request.getScore() + ". You need 80 points to Master the course. Keep reviewing!");
+        }
+
+        return toResponseDto(pathway, studentId);
     }
 
     /**

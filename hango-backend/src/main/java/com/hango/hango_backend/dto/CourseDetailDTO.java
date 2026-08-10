@@ -38,5 +38,6 @@ public class CourseDetailDTO {
     private String difficultyKey;
     private String thumbnailUrl;
     private Integer estimatedDuration;
+    private String rejectionReason;
     private List<CourseSessionDTO> sessions;
 }

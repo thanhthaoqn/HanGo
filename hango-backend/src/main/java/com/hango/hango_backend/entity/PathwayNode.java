@@ -76,5 +76,20 @@ public class PathwayNode {
 
     @Column(name = "merge_reason", columnDefinition = "TEXT")
     private String mergeReason;
+
+    // Feature Phase 2: Retention Engine (Mastery & Spaced Repetition)
+    @Column(name = "mastery_score")
+    private Integer masteryScore;
+
+    @Builder.Default
+    @Column(name = "is_mastered")
+    private Boolean isMastered = false;
+
+    @Column(name = "next_review_date")
+    private java.time.LocalDateTime nextReviewDate;
+
+    @Builder.Default
+    @Column(name = "review_interval_days")
+    private Integer reviewIntervalDays = 1;
 }
 

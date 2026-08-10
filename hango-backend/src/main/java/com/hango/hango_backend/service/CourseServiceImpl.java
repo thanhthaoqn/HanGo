@@ -282,6 +282,7 @@ public class CourseServiceImpl implements CourseService {
                 .latestPublishedCourseId(latestPublishedCourseId)
                 .latestPublishedVersion(latestPublishedVersion)
                 .estimatedDuration(estimatedDuration)
+                .rejectionReason(course.getRejectionReason())
                 .price(course.getPrice())
                 .sessions(sessionDTOs)
                 .build();

@@ -8,6 +8,7 @@ class InteractiveNodeTree extends StatelessWidget {
   final PathwayNode? selectedNode;
   final bool isDarkMode;
   final EdgeInsetsGeometry? contentPadding;
+  final Widget? header;
 
   const InteractiveNodeTree({
     super.key,
@@ -16,17 +17,25 @@ class InteractiveNodeTree extends StatelessWidget {
     this.selectedNode,
     this.isDarkMode = false,
     this.contentPadding,
+    this.header,
   });
 
   @override
   Widget build(BuildContext context) {
+    final itemCount = nodes.length + (header != null ? 1 : 0);
+    
     return ListView.builder(
       padding: contentPadding ?? const EdgeInsets.fromLTRB(22, 18, 22, 28),
-      itemCount: nodes.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
-        final node = nodes[index];
-        final isLast = index == nodes.length - 1;
-        final alignLeft = index.isEven;
+        if (header != null && index == 0) {
+          return header!;
+        }
+        
+        final nodeIndex = header != null ? index - 1 : index;
+        final node = nodes[nodeIndex];
+        final isLast = nodeIndex == nodes.length - 1;
+        final alignLeft = nodeIndex.isEven;
 
         return TweenAnimationBuilder<double>(
           tween: Tween(begin: 0, end: 1),
@@ -255,6 +264,32 @@ class _NodeCard extends StatelessWidget {
             status: node.status,
             isDarkMode: isDarkMode,
           ),
+          if (node.isMastered) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEC4899).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.workspace_premium, color: Color(0xFFEC4899), size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    node.masteryScore != null ? 'Mastery: ${node.masteryScore}%' : 'Mastered',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFEC4899),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (node.status != NodeStatus.locked && node.courseId > 0) ...[
             const SizedBox(height: 14),
             SizedBox(
@@ -268,12 +303,21 @@ class _NodeCard extends StatelessWidget {
                     ),
                   );
                 },
-                icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                label: const Text('Start learning'),
+                icon: Icon(
+                  node.isReviewDue ? Icons.replay : 
+                  (node.status == NodeStatus.completed && !node.isMastered) ? Icons.workspace_premium : 
+                  Icons.play_arrow_rounded, 
+                  size: 18
+                ),
+                label: Text(
+                  node.isReviewDue ? 'Review Now' :
+                  (node.status == NodeStatus.completed && !node.isMastered) ? 'Take Mastery Quiz' :
+                  'Start learning'
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode
-                      ? const Color(0xFF6366F1)
-                      : const Color(0xFF4F46E5),
+                  backgroundColor: node.isReviewDue ? const Color(0xFFF59E0B) :
+                                  (node.status == NodeStatus.completed && !node.isMastered) ? const Color(0xFFEC4899) :
+                                  (isDarkMode ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(

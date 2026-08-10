@@ -5,9 +5,11 @@ import '../../widgets/learning_pathway/ai_mentor_side_panel.dart';
 import '../../widgets/learning_pathway/pathway_summary_header.dart';
 import '../../widgets/learning_pathway/skill_analysis_panel.dart';
 import '../../widgets/learning_pathway/edit_goal_dialog.dart';
+import '../../widgets/learning_pathway/daily_plan_card.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../utils/language_manager.dart';
+import '../course/course_detail_page.dart';
 
 class LearningPathwayPage extends StatefulWidget {
   final bool isEmbedded;
@@ -132,6 +134,37 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
+  Future<void> _submitMastery(int nodeId, int score) async {
+    if (_pathway == null) return;
+    try {
+      final updatedPathway = await _repository.submitNodeMastery(
+        pathwayId: _pathway!.pathwayId,
+        nodeId: nodeId,
+        score: score,
+      );
+      setState(() {
+        _pathway = updatedPathway;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Mastery updated successfully! Score: $score'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update mastery: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showSkillAnalysis() {
     final pathway = _pathway;
     if (pathway == null) return;
@@ -230,6 +263,20 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                   selectedNode: _selectedNode,
                   isDarkMode: _isDarkMode,
                   contentPadding: const EdgeInsets.only(right: 480), // Padding to not hide nodes under mentor
+                  header: DailyPlanCard(
+                    pathway: _pathway!,
+                    isDarkMode: _isDarkMode,
+                    onStartLearning: (node) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CourseDetailPage(courseId: node.courseId),
+                        ),
+                      );
+                    },
+                    onTakeMastery: (node) => _submitMastery(node.id, 90), // Mock score
+                    onReview: (node) => _submitMastery(node.id, 100), // Mock score
+                  ),
                 ),
               ),
               Positioned(
@@ -271,6 +318,20 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
             selectedNode: _selectedNode,
             isDarkMode: _isDarkMode,
             contentPadding: const EdgeInsets.only(bottom: 100),
+            header: DailyPlanCard(
+              pathway: _pathway!,
+              isDarkMode: _isDarkMode,
+              onStartLearning: (node) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CourseDetailPage(courseId: node.courseId),
+                  ),
+                );
+              },
+              onTakeMastery: (node) => _submitMastery(node.id, 90), // Mock score
+              onReview: (node) => _submitMastery(node.id, 100), // Mock score
+            ),
           ),
         ),
       ],
