@@ -553,7 +553,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             if (!requestSectionIds.contains(existingSection.getId())) {
                 List<com.hango.hango_backend.entity.Lesson> lessonsToDel = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(existingSection.getId());
                 for (com.hango.hango_backend.entity.Lesson l : lessonsToDel) {
-                    if (l.getVideoUrl() != null) cloudinaryService.deleteFile(l.getVideoUrl());
                     if (l.getContent() != null) cloudinaryService.deleteFile(l.getContent());
                 }
                 sectionRepository.delete(existingSection);
@@ -590,7 +589,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
             for (com.hango.hango_backend.entity.Lesson existingLesson : existingLessons) {
                 if (!requestLessonIds.contains(existingLesson.getId())) {
-                    if (existingLesson.getVideoUrl() != null) cloudinaryService.deleteFile(existingLesson.getVideoUrl());
                     if (existingLesson.getContent() != null) cloudinaryService.deleteFile(existingLesson.getContent());
                     lessonRepository.delete(existingLesson);
                 }
@@ -603,17 +601,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     lesson = lessonRepository.findById(lDto.getId())
                             .orElse(new com.hango.hango_backend.entity.Lesson());
                             
-                    // Check if old videoUrl/content changed
-                    String oldVideoUrl = lesson.getVideoUrl();
+                    // Check if old content changed
                     String oldContent = lesson.getContent();
                     
-                    String newVideoUrl = lDto.getVideoUrl() != null ? lDto.getVideoUrl() : lDto.getContent();
-                    String newContent = lDto.getContent();
+                    String newContent = lDto.getQuestionText();
                     
-                    if (oldVideoUrl != null && !oldVideoUrl.equals(newVideoUrl) && !oldVideoUrl.equals(newContent)) {
-                        cloudinaryService.deleteFile(oldVideoUrl);
-                    }
-                    if (oldContent != null && !oldContent.equals(newContent) && !oldContent.equals(newVideoUrl) && oldVideoUrl == null) {
+                    if (oldContent != null && !oldContent.equals(newContent)) {
                         cloudinaryService.deleteFile(oldContent);
                     }
                 } else {

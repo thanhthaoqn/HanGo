@@ -9,6 +9,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart' as dio;
 import '../../../utils/file_picker_helper.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../widgets/trainer_action_required_card.dart';
@@ -64,6 +65,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
 
   bool _isUploadingVideo = false;
   String _uploadStatusText = '';
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -200,27 +202,36 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
       if (picked == null) return;
 
       setState(() {
+        _uploadProgress = 0.0;
         _isUploadingVideo = true;
-        _uploadStatusText = 'Uploading...';
+        _uploadStatusText = 'Uploading... 0%';
       });
 
-      final uri = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/video/upload');
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['upload_preset'] = 'hango_preset';
-
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
+      final formData = dio.FormData.fromMap({
+        'upload_preset': 'hango_preset',
+        'file': dio.MultipartFile.fromBytes(
           picked.bytes,
           filename: picked.name,
         ),
+      });
+
+      final dioClient = dio.Dio();
+      final response = await dioClient.post(
+        'https://api.cloudinary.com/v1_1/diqekap4o/video/upload',
+        data: formData,
+        onSendProgress: (int sent, int total) {
+          if (total > 0 && mounted) {
+            setState(() {
+              _uploadProgress = sent / total;
+              final percent = (_uploadProgress * 100).toStringAsFixed(0);
+              _uploadStatusText = 'Uploading... $percent%';
+            });
+          }
+        },
       );
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
+        final data = response.data is String ? jsonDecode(response.data) : response.data;
         
         final String videoUrl = data['secure_url'] ?? data['url'] ?? '';
         final double durationDouble = (data['duration'] as num?)?.toDouble() ?? 0.0;
@@ -241,6 +252,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           }
           
           _isUploadingVideo = false;
+          _uploadProgress = 0.0;
         });
         
         if (mounted) {
@@ -248,7 +260,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
         }
       } else {
         throw Exception(
-          'Upload failed with status: ${response.statusCode} - $responseBody',
+          'Upload failed with status: ${response.statusCode} - ${response.data}',
         );
       }
     } catch (e) {
