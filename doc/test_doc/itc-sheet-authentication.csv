@@ -1,0 +1,216 @@
+Feature,Authentication
+Test requirement,Functional integration tests for Authentication (AuthController / AuthService) — login, registration, Google login, token refresh, logout, forgot/reset password, OTP verification, email verification
+Number of TCs,42
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,42,0
+Round 2,0,0,42,0
+Round 3,0,0,42,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+Login,,,,
+AUTHENTICATION_FT01,"Login with a valid email and the correct password succeeds and issues a full session (access token + refresh token + user profile).","1. Open the HanGo Login page (or prepare POST /api/auth/login).
+2. Enter the email of an existing, verified, ACTIVE account (e.g. learner01@hango.test).
+3. Enter the correct password for that account.
+4. Click Submit / send the request.
+5. Inspect the raw JSON response body and the account's row in the database.","1. 200 OK.
+2. Response body contains accessToken (JWT), refreshToken (opaque string), userId, email, fullName, roles[], avatarUrl.
+3. In the database: failedLoginAttempts is reset to 0, lockedUntil is null, and lastLoginAt is updated to the current time.","- An ACTIVE, verified account exists with a known password."
+AUTHENTICATION_FT02,"Login with the correct email but a wrong password is rejected, and the failed-attempt counter increments.","1. Open the Login page (or prepare POST /api/auth/login).
+2. Enter a valid, existing account's email.
+3. Enter an intentionally incorrect password.
+4. Submit and inspect the response status/body.
+5. Query the account's failedLoginAttempts column in the database.","1. 401 Unauthorized.
+2. Body message: ""Invalid email or password.""
+3. The account's failedLoginAttempts counter is incremented by exactly 1 compared to before the attempt; no token is issued.","- Active account exists with a known password; note its current failedLoginAttempts value before the test."
+AUTHENTICATION_FT03,"5 consecutive failed logins lock the account for 15 minutes, and a 6th attempt is blocked even with the correct password.","1. Prepare an account with 0 prior failed attempts.
+2. Submit POST /api/auth/login with the correct email and a wrong password, 5 times in a row.
+3. Confirm the account's lockedUntil column is now set to roughly now + 15 minutes.
+4. Immediately submit a 6th login attempt, this time with the CORRECT password.
+5. Inspect the 6th attempt's response status/body.","1. After the 5th failure: the account is locked, lockedUntil = now + 15 minutes, failedLoginAttempts resets to 0 internally.
+2. The 6th attempt (even with the correct password) returns 423 Locked, message: ""Account temporarily locked due to too many failed login attempts. Please try again later."" No token issued.","- Active account with a known password, 0 prior failed attempts before the test starts."
+AUTHENTICATION_FT04,"Login with an email that has no matching account is rejected with the same generic message as a wrong password, so the API never reveals whether an email is registered.","1. Open the Login page (or prepare POST /api/auth/login).
+2. Enter an email address that is guaranteed not to exist in the system (e.g. a freshly-generated random address).
+3. Enter any password value.
+4. Submit and compare the response body/message against AUTHENTICATION_FT02's wrong-password response.","1. 401 Unauthorized.
+2. Body message: ""Invalid email or password."" — byte-for-byte identical wording to the wrong-password case in AUTHENTICATION_FT02, confirming no email-enumeration signal is leaked.","- None; any email not present in the users table works."
+AUTHENTICATION_FT05,"Login with an unverified (freshly registered, never clicked the verification link) account is rejected with a specific, actionable message.","1. Register a brand-new account via POST /api/auth/register (or the Register page) and deliberately do NOT click the verification link in the email.
+2. Open the Login page (or prepare POST /api/auth/login).
+3. Enter that new account's email and the password used at registration.
+4. Submit and inspect the response.","1. 403 Forbidden.
+2. Body message: ""Please verify your email address before logging in.""
+3. No token issued; the account's isVerified flag remains false.","- A freshly registered, unverified account exists (status=INACTIVE, isVerified=false)."
+AUTHENTICATION_FT06,"Login with a verified account that an admin has deactivated (INACTIVE) is rejected with a different message than the unverified case.","1. Take an already-verified account and, as an ADMINISTRATOR, set its status to INACTIVE (via Account Management).
+2. Open the Login page (or prepare POST /api/auth/login).
+3. Enter that account's email and correct password.
+4. Submit and inspect the response, comparing the message against AUTHENTICATION_FT05's unverified-account message.","1. 403 Forbidden.
+2. Body message: ""Your account is not active. Please contact support."" — distinct wording from the unverified case, so a tester/frontend can tell the two scenarios apart.","- A verified account exists with status=INACTIVE (admin-deactivated, not a fresh unverified signup)."
+AUTHENTICATION_FT07,"Submitting the login form/request without a password field is rejected by input validation before any account lookup happens.","1. Open the Login page (or prepare POST /api/auth/login).
+2. Enter a valid, existing email.
+3. Leave the password field empty / omit the ""password"" key from the JSON body entirely.
+4. Submit and inspect the response status and the account's failedLoginAttempts (should be unchanged).","1. 400 Bad Request (bean validation failure).
+2. No token issued; the target account's failedLoginAttempts counter is NOT incremented, since validation fails before AuthService is ever called.","- A valid, existing account's email is known (to confirm its counter is untouched)."
+AUTHENTICATION_FT08,"Submitting the login form/request with a missing or blank email field is rejected by input validation.","1. Open the Login page (or prepare POST /api/auth/login).
+2. Leave the email field empty (or omit the ""email"" key / send an empty string).
+3. Enter any password value.
+4. Submit and inspect the response status.","1. 400 Bad Request (bean validation failure).
+2. No token issued.","- None."
+Register,,,,
+AUTHENTICATION_FT09,"Registering a brand-new account with no role specified defaults to LEARNER, leaves the account unverified, and dispatches a verification email.","1. Open the Register page (or prepare POST /api/auth/register).
+2. Fill in a unique, unused email, a password (≥8 chars) and matching confirmPassword, and a full name — leave the role selector at its default (or omit the role field entirely if calling the API directly).
+3. Submit the registration.
+4. Inspect the response body, then check the account's row in the database and the mailbox for the verification email.","1. 200 OK; UserResponse returned with roles=[""LEARNER""], status=INACTIVE, isVerified=false.
+2. A verification email is dispatched to the given address (best-effort — a delivery failure is swallowed server-side and does not fail the registration response).","- Email not already registered anywhere in the system."
+AUTHENTICATION_FT10,"Registering with an email address that already has an account is rejected, and no duplicate row is created.","1. Open the Register page (or prepare POST /api/auth/register).
+2. Enter an email that is already registered (any existing account, verified or not).
+3. Fill the rest of the form with otherwise-valid data.
+4. Submit and inspect the response, then confirm via Account Management that only one row for that email still exists.","1. 409 Conflict, message ""Email is already in use.""; no second users row is created for that email.","- Target email is already registered."
+AUTHENTICATION_FT11,"Self-registration is allowed for LEARNER and TRAINER roles, but rejected for a privileged role like ADMINISTRATOR — confirming the role whitelist on the public registration endpoint.","1. Open the Register page (or prepare POST /api/auth/register) with a fresh, unused email; select/send role=TRAINER.
+2. Submit and confirm the resulting account's roles.
+3. Repeat registration with a second fresh, unused email, this time selecting/sending role=ADMINISTRATOR.
+4. Submit and compare the two outcomes.","1. Step 1-2: 200 OK; roles=[""TRAINER""] — self-service Trainer registration is intentional platform behavior, not a privilege-escalation bypass.
+2. Step 3-4: 400 Bad Request, ""Invalid registration role."" — only LEARNER/TRAINER are accepted via self-registration; no account is created for the ADMINISTRATOR attempt.","- Two distinct, unused email addresses prepared."
+AUTHENTICATION_FT12,"Registering with a confirmPassword value that doesn't match the password is rejected before an account is created.","1. Open the Register page (or prepare POST /api/auth/register) with a fresh, unused email.
+2. Enter a password (e.g. ""pass1234"") and a deliberately different confirmPassword (e.g. ""different"").
+3. Fill the remaining fields with otherwise-valid data.
+4. Submit and inspect the response, then confirm no new account was created for that email.","1. 400 Bad Request, ""Password and confirm password do not match.""; no account created.","- A fresh, unused email address prepared."
+Google Login,,,,
+AUTHENTICATION_FT13,"Logging in with Google using a valid ID token for a brand-new email just-in-time provisions a new, pre-verified Learner account.","1. Obtain a real (or test-environment) Google ID token for an email that has no existing HanGo account.
+2. Open the ""Sign in with Google"" flow (or prepare POST /api/auth/google) and send that idToken.
+3. Submit and inspect the response body.
+4. Check the newly created account's row in the database.","1. 200 OK; token(s) returned in the response.
+2. A new users row is created with isVerified=true, status=ACTIVE, roles=[""LEARNER""], and avatarUrl populated from the Google account's profile picture.","- A real or test Google OAuth2 client is configured; a valid, freshly-issued Google ID token for an unused email is available."
+AUTHENTICATION_FT14,"Google login with a malformed, expired, or otherwise unverifiable ID token is rejected without creating or touching any account.","1. Open the ""Sign in with Google"" flow (or prepare POST /api/auth/google).
+2. Send an obviously invalid idToken value (e.g. the plain string ""not-a-real-jwt"").
+3. Submit and inspect the response.
+4. Confirm no new user row was created.","1. 401 Unauthorized, ""Google authentication failed: invalid token.""; no token issued, no row created.","- None."
+AUTHENTICATION_FT15,"Google login against an existing HanGo account whose status is not ACTIVE is rejected, mirroring the regular-login inactive-account check.","1. Take an existing account linked to a Google email and, as an ADMINISTRATOR, set its status to INACTIVE.
+2. Open the ""Sign in with Google"" flow (or prepare POST /api/auth/google) with a valid ID token for that same email.
+3. Submit and inspect the response.","1. 403 Forbidden, ""Your account is not active. Please contact support.""; no token issued.","- An account with that Google-linked email exists with status=INACTIVE."
+Token Refresh,,,,
+AUTHENTICATION_FT16,"A valid, unexpired, unrevoked refresh token can be exchanged for a fresh access+refresh token pair, and the old refresh token is immediately invalidated (rotation).","1. Log in via POST /api/auth/login to obtain an accessToken and a refreshToken.
+2. Prepare POST /api/auth/refresh-token body {""refreshToken"":""<refreshToken from step 1>""} and send it.
+3. Inspect the response — capture the NEW accessToken/refreshToken pair.
+4. Immediately re-submit the SAME original (step 1) refreshToken a second time.
+5. Compare the two responses.","1. Step 2-3: 200 OK; a NEW accessToken and a NEW refreshToken are returned, different from the originals; the old refresh-token row is marked revoked=true in the database.
+2. Step 4-5: 401 Unauthorized, message: ""Refresh token expired or revoked. Please log in again."" — the old token cannot be reused (rotation/reuse detection).","- A valid active session (refreshToken) from a successful login exists."
+AUTHENTICATION_FT17,"Refreshing with a garbage or non-existent refresh token value is rejected.","1. Prepare POST /api/auth/refresh-token.
+2. Set the body to {""refreshToken"":""not-a-real-token""} (a value that was never issued by the server).
+3. Send the request and inspect the response.","1. 401 Unauthorized.
+2. Body message: ""Invalid refresh token.""","- None."
+AUTHENTICATION_FT18,"Refreshing a session is rejected once the underlying account is no longer ACTIVE/verified, even if the refresh token itself hasn't expired yet.","1. Log in to obtain a refreshToken for a normal ACTIVE account.
+2. As an ADMINISTRATOR, deactivate that account (set status=INACTIVE) via Account Management.
+3. Prepare POST /api/auth/refresh-token with the still-unexpired refreshToken from step 1 and send it.
+4. Inspect the response.","1. 403 Forbidden.
+2. Body message: ""Account is not eligible to refresh a session.""","- A valid refreshToken exists for an account that is then deactivated before the refresh call."
+AUTHENTICATION_FT19,"Refreshing without supplying a refreshToken at all is rejected by input validation.","1. Prepare POST /api/auth/refresh-token.
+2. Send an empty JSON body {} (no refreshToken key).
+3. Inspect the response status.","1. 400 Bad Request (bean validation failure).","- None."
+Logout,,,,
+AUTHENTICATION_FT20,"Logging out with a valid refresh token revokes it, so it can never again be used to refresh the session.","1. Log in to obtain a refreshToken.
+2. Prepare POST /api/auth/logout body {""refreshToken"":""<refreshToken>""} and send it.
+3. Inspect the logout response.
+4. Immediately attempt POST /api/auth/refresh-token with that SAME refreshToken.
+5. Inspect the refresh attempt's response.","1. Step 2-3: 200 OK, body ""Logged out successfully"".
+2. Step 4-5: 401 Unauthorized — the token is now revoked and can no longer be used to refresh.","- Active session (refreshToken) exists."
+AUTHENTICATION_FT21,"Logging out with an already-revoked or completely unknown refresh token still returns a success response — logout is idempotent and never errors.","1. Prepare POST /api/auth/logout.
+2. Send body {""refreshToken"":""garbage-or-already-used-token""} — a value that either was never issued or was already revoked by a prior logout.
+3. Inspect the response.","1. 200 OK, body ""Logged out successfully"" — the service silently no-ops if the token hash isn't found in the database; this is graceful handling, not an error.","- None."
+Forgot Password,,,,
+AUTHENTICATION_FT22,"Requesting a password reset for a registered, verified, ACTIVE email queues a real 6-digit OTP and sends it by email.","1. Open the Forgot Password page (or prepare POST /api/auth/forgot-password) and enter a registered, verified, ACTIVE account's email.
+2. Submit the request and inspect the response.
+3. Check the mailbox for the OTP email and note the 6-digit code.
+4. Confirm a password_reset_otps row exists for that email in the database, with a 5-minute expiry.","1. 200 OK; generic body: ""If an account exists for this email, a password reset code has been sent to it. Please check your inbox (and spam folder).""
+2. A password_reset_otps row is created; the OTP email is actually received.","- Registered, verified, ACTIVE account exists."
+AUTHENTICATION_FT23,"Requesting a password reset for an email that isn't registered returns the exact same generic success response as a registered email — the endpoint never reveals whether an email exists (anti-enumeration).","1. Open the Forgot Password page (or prepare POST /api/auth/forgot-password).
+2. Enter an email address known to have no account.
+3. Submit and capture the response body verbatim.
+4. Compare it, character-for-character, against AUTHENTICATION_FT22's success response.
+5. Confirm no OTP row was created and no email was sent.","1. 200 OK; response body is byte-for-byte IDENTICAL to AUTHENTICATION_FT22's success message.
+2. No OTP row created; no email sent.","- Email not registered."
+AUTHENTICATION_FT24,"Requesting a password reset for an account that exists but is unverified or not ACTIVE also returns the generic success response, without actually queuing an OTP.","1. Identify (or create) an account that is either unverified or has status other than ACTIVE.
+2. Open the Forgot Password page (or prepare POST /api/auth/forgot-password) and enter that account's email.
+3. Submit and inspect the response.
+4. Confirm no password_reset_otps row was created for that email.","1. 200 OK; same generic message as AUTHENTICATION_FT22/FT23.
+2. No OTP row created (silently skipped, since there is no eligible session to reset for that account).","- Account exists but is unverified or not ACTIVE."
+AUTHENTICATION_FT25,"Requesting a second OTP within 60 seconds of the first is silently ignored — no new code/email is generated during the cooldown window.","1. Complete AUTHENTICATION_FT22 to request an OTP and note the received code.
+2. Immediately (within 60 seconds), submit POST /api/auth/forgot-password again for the SAME email.
+3. Inspect the second response.
+4. Check the mailbox / database to confirm no second OTP was generated.","1. 200 OK generic message returned again on the second call.
+2. NO new OTP row/email is generated — the original OTP from step 1 remains the only valid one.","- An OTP was requested for this email less than 60 seconds ago."
+Verify OTP,,,,
+AUTHENTICATION_FT26,"Verifying with the correct, unexpired, previously-unused OTP code succeeds without consuming the code yet.","1. Complete AUTHENTICATION_FT22 to obtain a real OTP from the mailbox.
+2. Open the Verify OTP page (or prepare POST /api/auth/verify-otp) and enter the email and the real OTP code.
+3. Submit and inspect the response.
+4. Confirm in the database that the OTP row still exists (not deleted/consumed).","1. 200 OK, body ""OTP verified successfully"".
+2. The OTP row is NOT deleted or marked consumed yet — it remains usable for the subsequent reset-password step.","- A fresh, unexpired OTP exists for the email."
+AUTHENTICATION_FT27,"Verifying with a code that doesn't match the stored OTP is rejected, and the attempt counter on that OTP increments.","1. Note the OTP row's current attemptCount for the target email (or confirm a fresh OTP with attemptCount=0).
+2. Open the Verify OTP page (or prepare POST /api/auth/verify-otp) and enter the correct email but an obviously wrong code (e.g. ""000000"").
+3. Submit and inspect the response.
+4. Re-query the OTP row's attemptCount.","1. 400 Bad Request, body message: ""Invalid OTP code.""
+2. The OTP row's attemptCount is incremented by exactly 1; the OTP itself is not deleted (it can still be retried, up to the attempt limit).","- A valid OTP row exists for the email; the guessed code is wrong."
+AUTHENTICATION_FT28,"5 consecutive wrong OTP attempts cause the OTP to be deleted outright, forcing the user to request a brand-new one.","1. Starting from a fresh OTP (attemptCount=0), submit POST /api/auth/verify-otp with a wrong code 5 times in a row for the same email.
+2. Inspect the response of the 5th attempt specifically.
+3. Attempt a 6th verify-otp call, this time using the ORIGINAL real code.
+4. Inspect the 6th attempt's response.","1. On the 5th wrong attempt: 400 Bad Request, message: ""Too many incorrect attempts. Please request a new OTP.""
+2. The OTP row is deleted as a result; the 6th attempt (even with the real code) fails since no OTP row exists anymore.","- A valid OTP row exists; attempt counter starts at 0."
+AUTHENTICATION_FT29,"Verifying an OTP after it has passed its 5-minute expiry window is rejected, and the expired row is cleaned up.","1. Obtain a real OTP (via AUTHENTICATION_FT22) and either wait for it to pass its 5-minute expiry, or seed an already-expired row directly in the database for testing purposes.
+2. Open the Verify OTP page (or prepare POST /api/auth/verify-otp) and submit that expired code.
+3. Inspect the response, then confirm the OTP row no longer exists in the database.","1. 400 Bad Request, message: ""OTP code has expired. Please request a new one.""
+2. The OTP row is deleted as a side effect of this call.","- An expired OTP row exists for the email."
+Reset Password,,,,
+AUTHENTICATION_FT30,"Resetting the password with a valid, verified OTP and a genuinely new password succeeds, invalidates every existing session, and the new password immediately works for login.","1. Complete AUTHENTICATION_FT22 (request OTP) and AUTHENTICATION_FT26 (verify OTP) for a test account.
+2. Open the Reset Password page (or prepare POST /api/auth/reset-password) and submit {""email"":...,""otpCode"":...,""newPassword"":""newPass123""} — a password different from the current one.
+3. Inspect the reset response.
+4. Log in again via POST /api/auth/login using the NEW password.
+5. Confirm all of the account's refresh tokens were invalidated (any pre-reset refreshToken now fails to refresh).","1. Step 2-3: 200 OK, body ""Password updated successfully""; all OTP rows for the email are deleted (single-use); ALL of the user's refresh tokens are deleted (forced logout everywhere).
+2. Step 4: login with the new password succeeds.
+3. Step 5: the old refresh token is rejected.","- Valid, unexpired, unconsumed OTP exists for the email."
+AUTHENTICATION_FT31,"Attempting to reset the password to the SAME value as the account's current password is rejected.","1. Obtain a valid, verified OTP for a test account (per AUTHENTICATION_FT22/FT26).
+2. Open the Reset Password page (or prepare POST /api/auth/reset-password) and submit newPassword equal to the account's actual current password.
+3. Inspect the response.
+4. Confirm the password/OTP were not changed/consumed.","1. 400 Bad Request, message: ""New password must be different from the current password.""
+2. Password is not changed; OTP is not consumed.","- Valid OTP exists; the newPassword value chosen equals the account's current password."
+AUTHENTICATION_FT32,"Resetting the password with an OTP that has already expired is rejected, and the expired row is cleaned up.","1. Obtain (or seed) an OTP for a test account and let it pass its 5-minute expiry.
+2. Open the Reset Password page (or prepare POST /api/auth/reset-password) and submit that expired otpCode with a new password.
+3. Inspect the response, then confirm the OTP row is gone and the password is unchanged.","1. 400 Bad Request, message: ""OTP code has expired. Please request a new one.""
+2. The expired OTP row is deleted; password not changed.","- An expired OTP row exists for the email."
+AUTHENTICATION_FT33,"Resetting the password with a fabricated OTP code that never matches any stored OTP is rejected with a generic message that doesn't distinguish \"no OTP exists\" from \"wrong code\".","1. Choose an email with no active OTP row (or an active OTP for a different code).
+2. Open the Reset Password page (or prepare POST /api/auth/reset-password) and submit a made-up otpCode with a new password.
+3. Inspect the response.","1. 400 Bad Request, message: ""Invalid or expired OTP code."" — the same generic message whether the OTP row doesn't exist at all or a real OTP exists but the code just doesn't match; the caller cannot distinguish the two.","- None, or an OTP row exists for a different code than the one submitted."
+Verify Account (email link),,,,
+AUTHENTICATION_FT34,"Clicking a valid, unexpired verification link marks the account verified and activates it.","1. Register a new account via the Register page (or POST /api/auth/register) to receive a verification email containing a token link.
+2. Retrieve the link/token from the received email.
+3. Open GET /api/auth/verify?token=<the real token> directly in a browser (this returns an HTML page, not JSON).
+4. Inspect the rendered page, then attempt a login with that account to confirm it now works.","1. Step 3: 200 OK; HTML success page (""Account Verified Successfully!"") rendered.
+2. The user's isVerified becomes true and status becomes ACTIVE; the verification token is cleared so it cannot be reused.
+3. Step 4: the account can now log in (no longer blocked by AUTHENTICATION_FT05's unverified check).","- A freshly registered, unverified account with a valid (not yet expired, 12h validity) verification token exists."
+AUTHENTICATION_FT35,"Re-visiting an already-consumed verification link shows a friendly \"already verified\" confirmation instead of a confusing error.","1. Complete AUTHENTICATION_FT34 to fully verify an account via its link.
+2. Open the SAME link (GET /api/auth/verify?token=<the same, now-cleared token>) a second time.
+3. Inspect the rendered HTML page and compare it against a genuine invalid-link error page.","1. 200 OK; HTML page titled ""Already Verified"" — distinct, friendlier wording from a genuine error, since the account is already in the desired end state.","- Verification already completed via the same link/token."
+AUTHENTICATION_FT36,"Visiting the verify link with a missing, blank, or completely invalid token shows a clear error page rather than a server error.","1. Open GET /api/auth/verify with no token query parameter at all.
+2. Inspect the rendered page.
+3. Separately, open GET /api/auth/verify?token=garbage-value-that-was-never-issued.
+4. Inspect that rendered page too.","1. Step 1-2: 400 Bad Request; HTML page titled ""Verification Link Invalid"", message ""Invalid verification link.""
+2. Step 3-4: 400 Bad Request; same ""Verification Link Invalid"" page with a generic invalid-link message.","- None."
+Check Verification Status,,,,
+AUTHENTICATION_FT37,"Polling the verification-status endpoint for an already-verified account returns true.","1. Identify (or create and fully verify) an account with isVerified=true.
+2. Prepare GET /api/auth/check-verification?email=<that account's email> and send it.
+3. Inspect the response body.","1. 200 OK, body {""verified"": true}.","- Account exists, isVerified=true."
+AUTHENTICATION_FT38,"Polling the verification-status endpoint for either an unverified account or a completely unknown email both return false — the caller cannot tell the two situations apart.","1. Prepare GET /api/auth/check-verification?email=<a real but still-unverified account's email> and send it; note the result.
+2. Prepare GET /api/auth/check-verification?email=<an email with no account at all> and send it; note the result.
+3. Compare both responses.","1. Both calls: 200 OK, body {""verified"": false} — identical response whether the account doesn't exist or exists-but-unverified.","- A real unverified account and a nonexistent email are both available for comparison."
+Resend Verification Email,,,,
+AUTHENTICATION_FT39,"Resending the verification email succeeds for an unverified account once the 60-second cooldown from the previous send has passed.","1. Identify an unverified account whose last verification email was sent more than 60 seconds ago (wait it out, or seed the timestamp directly).
+2. Open the Resend Verification option (or prepare POST /api/auth/resend-verification?email=<that email>) and submit it.
+3. Inspect the response.
+4. Check the mailbox for the newly (re-)sent verification email and confirm it contains a fresh token.","1. 200 OK, body ""Verification email resent successfully"".
+2. A new verification token (fresh 12h expiry) is generated and (re-)dispatched; the earlier token is invalidated.","- Unverified account exists; not within the 60-second resend cooldown."
+AUTHENTICATION_FT40,"Requesting a resend within 60 seconds of the previous send is rejected with a rate-limit response.","1. Trigger a verification email (via registration or a prior successful resend).
+2. Immediately (within 60 seconds) submit POST /api/auth/resend-verification?email=... again for the SAME email.
+3. Inspect the response.","1. 429 Too Many Requests, message: ""Please wait before requesting another verification email.""","- A verification email was sent to this address less than 60 seconds ago."
+AUTHENTICATION_FT41,"Requesting a resend for an account that is already verified is rejected.","1. Identify an account with isVerified=true.
+2. Prepare POST /api/auth/resend-verification?email=<that account's email> and submit it.
+3. Inspect the response.","1. 400 Bad Request, message: ""Account is already verified.""","- Account exists, isVerified=true."
+AUTHENTICATION_FT42,"Requesting a resend for an email with no matching account returns a clean 404.","1. Choose an email address known to have no account in the system.
+2. Prepare POST /api/auth/resend-verification?email=<that email> and submit it.
+3. Inspect the response.","1. 404 Not Found, message: ""User not found with email: <that email>"".","- Email not registered."

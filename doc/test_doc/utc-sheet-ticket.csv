@@ -1,0 +1,56 @@
+Module	Class	Method	UTCID	Test Case (test method name)	Precondition	Input	Expected Result	Exception	Case Type (N/A/B)	Status	Exec Date	Defect ID	Created By	Executed By
+
+
+Ticket	TicketServiceImpl	createTicket	UTC01	createTicketShouldThrowWhenUserNotFound	no User row	userId=1	Error	RuntimeException: 'User not found'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	createTicket	UTC02	createTicketShouldSaveTicketAndFirstMessageThenNotifyTrainerLead	User exists (LEARNER)	category='CONTENT_ISSUE', priority='HIGH', title/description set	tickets row inserted: status='PENDING'; ticket_messages row inserted with the description as first message; notificationService.notifyRole('TRAINER_LEAD','TicketCreated',...) called	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	createTicket	UTC03	createTicketShouldDefaultCategoryPriorityAndTextWhenNotProvided	User exists	empty TicketCreateDTO	tickets row inserted: category='GENERAL_ENQUIRY', priority='MEDIUM', title='Support Request', description='No details provided.'	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	createTicket	UTC04	createTicketShouldDefaultUserRoleWhenCallerHasNoRoles	User exists with empty roles set	title/description set	tickets row inserted: userRole='ROLE_LEARNER' (hardcoded fallback)	None	B	Passed	2026-08-04		Claude	Claude
+
+
+Ticket	TicketServiceImpl	updateTicket	UTC01	updateTicketShouldThrowWhenTicketNotFound	no Ticket row	ticketId=1	Error	RuntimeException: 'Ticket not found'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	updateTicket	UTC02	updateTicketShouldThrowWhenCallerIsNotOwner	Ticket.user.id=1	callerId=2	Error, no save	RuntimeException: 'Unauthorized to update this ticket'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	updateTicket	UTC03	updateTicketShouldUpdateTitleAndDescriptionWhenOwnerMatches	owner matches	title='New title', description='New desc'	tickets row updated: title/description changed	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	updateTicket	UTC04	updateTicketShouldIgnoreBlankFields	owner matches	title='  ' (blank), description=null	tickets row unchanged (original title/description kept)	None	B	Passed	2026-08-04		Claude	Claude
+
+
+Ticket	TicketServiceImpl	getTicketDetail	UTC01	getTicketDetailShouldThrowWhenTicketNotFound	no Ticket row	ticketId=1	Error	RuntimeException: 'Ticket not found'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	getTicketDetail	UTC02	getTicketDetailShouldThrowWhenNonStaffCallerIsNotOwner	caller is LEARNER, not the ticket owner	callerId=2, ticket.user.id=1	Error	RuntimeException: 'Access denied'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	getTicketDetail	UTC03	getTicketDetailShouldAllowOwner	caller is the ticket owner	callerId=1	TicketResponseDTO returned	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	getTicketDetail	UTC04	getTicketDetailShouldAllowStaffToViewAnotherUsersTicket	caller has role TRAINER_LEAD, not the owner	callerId=99	TicketResponseDTO returned (staff bypass)	None	B	Passed	2026-08-04		Claude	Claude
+
+
+Ticket	TicketServiceImpl	getMyTickets	UTC01	getMyTicketsShouldQueryByUserIdOnlyWhenStatusNullOrAll	—	status='all'	findByUserIdOrderByCreatedAtDesc called	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	getMyTickets	UTC02	getMyTicketsShouldMapProcessedAliasToApprovedAndRejectedStatuses	—	status='PROCESSED'	findByUserIdAndStatusInOrderByCreatedAtDesc called with ['APPROVED','REJECTED']	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	getMyTickets	UTC03	getMyTicketsShouldQueryBySpecificStatusWhenProvided	—	status='pending'	findByUserIdAndStatusOrderByCreatedAtDesc called with 'PENDING' (uppercased)	None	N	Passed	2026-08-04		Claude	Claude
+
+
+Ticket	TicketServiceImpl	addMessage	UTC01	addMessageShouldThrowWhenTicketNotFound	no Ticket row	ticketId=1	Error	RuntimeException: 'Ticket not found'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	addMessage	UTC02	addMessageShouldThrowWhenSenderNotFound	Ticket exists; no User row for sender	senderId=2	Error	RuntimeException: 'User not found'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	addMessage	UTC03	addMessageShouldSaveMessageAndTouchTicketUpdatedAt	owner replies	message='Any update?', attachmentUrls set	ticket_messages row inserted; tickets row saved (updatedAt touched)	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	addMessage	UTC04	addMessageShouldFlipPendingTicketToProcessingWhenStaffReplies	Ticket.status='PENDING'; sender role=TRAINER_LEAD	—	tickets row updated: status='PROCESSING'	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	addMessage	UTC05	addMessageShouldKeepPendingStatusWhenLearnerRepliesToOwnTicket	Ticket.status='PENDING'; sender role=LEARNER (the owner)	—	tickets row status unchanged ('PENDING')	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	addMessage	UTC06	addMessageShouldNotChangeStatusWhenTicketAlreadyProcessing	Ticket.status='PROCESSING'	staff replies	tickets row status unchanged ('PROCESSING')	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	addMessage	UTC07	addMessageShouldAllowReplyingToAnotherUsersTicketWithNoAuthorizationCheck	caller is a stranger (not owner, not staff)	senderId=2, ticket.user.id=1	message saved successfully — no ownership/staff check exists in addMessage, unlike getTicketDetail/updateTicket	None	B	Passed	2026-08-04	GAP-TKT-01 (see note)	Claude	Claude
+
+
+Ticket	TicketServiceImpl	getManagementTickets	UTC01	getManagementTicketsShouldPassNullFiltersWhenStatusCategoryKeywordAllBlank	—	status=null, category=null, keyword=null	findAllFiltered called with (null,null,null)	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	getManagementTickets	UTC02	getManagementTicketsShouldUppercaseStatusAndCategoryAndTrimKeyword	—	status='pending', category='content_issue', keyword='  refund  '	findAllFiltered called with ('PENDING','CONTENT_ISSUE','refund')	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	getManagementTickets	UTC03	getManagementTicketsShouldTreatAllStatusAsNoFilter	—	status='ALL', category='ALL', keyword=''	findAllFiltered called with (null,null,null)	None	B	Passed	2026-08-04		Claude	Claude
+
+
+Ticket	TicketServiceImpl	processTicket	UTC01	processTicketShouldThrowWhenTicketNotFound	no Ticket row	ticketId=1	Error	RuntimeException: 'Ticket not found'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC02	processTicketShouldThrowWhenManagerNotFound	Ticket exists; no User row for manager	managerId=99	Error	RuntimeException: 'Manager not found'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC03	processTicketShouldThrowWhenNonAdminManagerProcessesPayoutInfoUpdateCategory	manager role=TRAINER_LEAD (not admin); ticket.category='PAYOUT_INFO_UPDATE'	action='APPROVE'	Error, no save	RuntimeException: 'Course Manager is not authorized to process Bank/Tax Info Updates or Refund Requests. Assigned to System Admin.'	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC04	processTicketShouldThrowWhenNonAdminManagerProcessesRefundRequestCategory	manager role=TRAINER_LEAD; ticket.category='REFUND_REQUEST'	action='REJECT'	Error	RuntimeException (same RBAC message)	A	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC05	processTicketShouldAllowAdminToProcessPayoutInfoUpdateCategory	manager role=ADMINISTRATOR; ticket.category='PAYOUT_INFO_UPDATE'	action='APPROVE'	tickets row updated: status='APPROVED'	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC06	processTicketShouldApproveWithDefaultResponseWhenNoneProvided	manager role=TRAINER_LEAD; category='GENERAL_ENQUIRY'	action='APPROVE', adminResponse=null	tickets row updated: status='APPROVED', adminResponse='Ticket approved by manager.'; notificationService.notifyUser(owner,'TicketReviewed',...) called	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC07	processTicketShouldApproveWithCustomAdminResponseWhenProvided	—	action='APPROVE', adminResponse='Fixed the bug'	tickets row updated: adminResponse='Fixed the bug'	None	B	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC08	processTicketShouldRejectAndSetRejectionReason	—	action='REJECT', rejectionReason='Not a valid ticket'	tickets row updated: status='REJECTED', rejectionReason set, adminResponse='Ticket rejected by manager.'	None	N	Passed	2026-08-04		Claude	Claude
+Ticket	TicketServiceImpl	processTicket	UTC09	processTicketShouldSaveManagerReplyMessage	—	action='APPROVE'	ticket_messages row inserted: sender=manager, senderRole='ADMINISTRATOR'	None	B	Passed	2026-08-04		Claude	Claude
+
+
+Ticket	TicketServiceImpl	getTicketStats	UTC01	getTicketStatsShouldMapCountsPerStatus	counts stubbed: total=10, pending=3, processing=2, approved=4, rejected=1	—	Map{total=10, pending=3, processing=2, approved=4, rejected=1}	None	N	Passed	2026-08-04		Claude	Claude
+
+Note: Ticket Management (Send/View List/View Detail/Reply Ticket use cases) had zero unit test coverage and was never surveyed in unit_test_plan.md §1 before 2026-08-04, despite having full production code (TicketServiceImpl, TicketController, ManagementTicketController, Ticket/TicketMessage entities). Added this round per tester request ("thấy đang thiếu... phần ticket").
+Note (GAP-TKT-01): TicketServiceImpl.addMessage (Reply to Ticket) never checks that the caller owns the ticket or is staff, unlike getTicketDetail/updateTicket which both enforce ownership-or-staff. Any authenticated user id can post a reply to any other user's ticket. Confirmed via UTC07 above. Not fixed this round (flagged for dev per project convention of not silently patching business-logic gaps found during test-writing).
+Note: Controller layer (TicketController/ManagementTicketController) intentionally not tested per standing tester instruction to focus unit testing on the Service layer only.

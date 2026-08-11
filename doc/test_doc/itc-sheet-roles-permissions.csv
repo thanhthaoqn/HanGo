@@ -1,0 +1,63 @@
+Feature,Roles & Permissions Management
+Test requirement,Functional integration tests for role and permission management (AdminController)
+Number of TCs,10
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,10,0
+Round 2,0,0,10,0
+Round 3,0,0,10,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Permission List,,,,
+ROLES_FT01,"Admin views the full permission catalog and confirms every seeded permission's metadata (module, coreForRoles, restrictedForRoles) is returned.","1. Log in as an ADMINISTRATOR and obtain a valid access token.
+2. Prepare GET /api/admin/permissions with the Authorization header set.
+3. Send the request.
+4. Inspect the response body and count/verify the returned permissions array against the seeded catalog.","1. 200 OK.
+2. Response is an array of all seeded permissions (14 total), each with code, name, description, module, coreForRoles, restrictedForRoles.","- ADMINISTRATOR logged in.
+- RolePermissionDataInitializer has seeded the permission catalog (happens automatically on app startup)."
+ROLES_FT02,"A LEARNER or TRAINER account, which lacks the MANAGE_ACCOUNTS_ROLES authority, is forbidden from viewing the permission catalog.","1. Log in as a LEARNER or TRAINER account (no MANAGE_ACCOUNTS_ROLES authority).
+2. Prepare GET /api/admin/permissions with that account's Authorization header.
+3. Send the request.
+4. Inspect the response status code.","1. 403 Forbidden.","- LEARNER or TRAINER logged in (no MANAGE_ACCOUNTS_ROLES authority)."
+View Role List,,,,
+ROLES_FT03,"Admin views all 4 fixed roles at once and confirms each one's currently assigned permissions[] array is included in the response.","1. Log in as ADMINISTRATOR.
+2. Prepare GET /api/admin/roles with the Authorization header.
+3. Send the request.
+4. Inspect the response body for all 4 roles (LEARNER, TRAINER, COURSE_MANAGER, ADMINISTRATOR) and their permissions[].","1. 200 OK.
+2. Response is an array covering LEARNER, TRAINER, COURSE_MANAGER, ADMINISTRATOR, each with roleName and a permissions[] array reflecting current assignments.","- ADMINISTRATOR logged in.
+- Fixed roles exist (seeded on registration/startup)."
+ROLES_FT04,"A LEARNER account, lacking the MANAGE_ACCOUNTS_ROLES authority, is forbidden from viewing the role list.","1. Log in as a LEARNER account.
+2. Prepare GET /api/admin/roles with that account's Authorization header.
+3. Send the request.
+4. Inspect the response status code.","1. 403 Forbidden.","- LEARNER logged in."
+Update Role Permissions,,,,
+ROLES_FT05,"Admin grants the COURSE_MANAGER role a new permission that isn't on its restricted list, and the change is both persisted and recorded in the audit log.","1. Log in as ADMINISTRATOR and confirm via GET /api/admin/roles that COURSE_MANAGER's current permissions[] does not yet include MODERATE_COMMENTS.
+2. Prepare PUT /api/admin/roles/COURSE_MANAGER/permissions body {""permissionCodes"":[""MODERATE_COMMENTS"", ... existing codes]} — MODERATE_COMMENTS is only restricted for LEARNER, so COURSE_MANAGER is eligible.
+3. Send the request and inspect the response.
+4. GET /api/admin/roles again to confirm the permission was actually added.","1. Step 1: 200 OK, body {""success"":true,""message"":""Permissions updated successfully""}.
+2. Step 2: COURSE_MANAGER's permissions[] now includes MODERATE_COMMENTS.
+3. An audit-log entry (""UPDATE_ROLE_PERMISSIONS"") is recorded.","- ADMINISTRATOR logged in.
+- COURSE_MANAGER role exists and does not currently have MODERATE_COMMENTS."
+ROLES_FT06,"Submitting a permission code that is on the target role's restricted list is silently dropped from the update rather than rejected outright, and the response still reports success.","1. Log in as ADMINISTRATOR and confirm TRAINER's current permissions[] via GET /api/admin/roles.
+2. Prepare PUT /api/admin/roles/TRAINER/permissions body {""permissionCodes"":[""ENROLL_AND_LEARN_COURSES""]} — ENROLL_AND_LEARN_COURSES has restrictedForRoles including TRAINER.
+3. Send the request and inspect the response status/body.
+4. GET /api/admin/roles again to confirm ENROLL_AND_LEARN_COURSES was filtered out.","1. Step 1: 200 OK (no error raised for the restricted code).
+2. Step 2: TRAINER's permissions[] does NOT contain ENROLL_AND_LEARN_COURSES — it was filtered out server-side.","- ADMINISTRATOR logged in.
+- TRAINER role exists."
+ROLES_FT07,"Attempting to strip ADMINISTRATOR's permissions down to an empty list fails to remove its core (must-have) permissions, since those are force-re-added server-side.","1. Log in as ADMINISTRATOR and confirm via GET /api/admin/roles that the ADMINISTRATOR role currently holds its 4 core permissions.
+2. Prepare PUT /api/admin/roles/ADMINISTRATOR/permissions body {""permissionCodes"":[]} (empty list — attempt to strip all permissions).
+3. Send the request and inspect the response.
+4. GET /api/admin/roles again to confirm the 4 core permissions are still present.","1. Step 1: 200 OK.
+2. Step 2: ADMINISTRATOR's permissions[] still contains all 4 of its core permissions (MANAGE_ACCOUNTS_ROLES, MODERATE_COMMENTS, REVIEW_TRAINER_APPLICATIONS, AUDIT_LOG_AI_USAGE) — core permissions for a role are re-added server-side regardless of what the request contains.","- ADMINISTRATOR logged in.
+- ADMINISTRATOR role currently has its 4 core permissions."
+ROLES_FT08,"Attempting to update permissions for a role name that doesn't exist in the system returns a 404 rather than silently succeeding.","1. Log in as ADMINISTRATOR.
+2. Prepare PUT /api/admin/roles/NOT_A_REAL_ROLE/permissions body {""permissionCodes"":[]}.
+3. Send the request.
+4. Inspect the response status and body message.","1. 404 Not Found, body ""Role not found"".","- ADMINISTRATOR logged in."
+ROLES_FT09,"Including an unknown/garbage permission code in the update request is silently ignored rather than causing the whole request to fail.","1. Log in as ADMINISTRATOR.
+2. Prepare PUT /api/admin/roles/TRAINER/permissions body {""permissionCodes"":[""NOT_A_REAL_PERMISSION_CODE""]}.
+3. Send the request and inspect the response status.
+4. GET /api/admin/roles to confirm TRAINER's core permissions are still force-applied despite the garbage code.","1. 200 OK (no error) — the unmatched code has no corresponding Permission row and is simply not added; TRAINER's core permissions are still force-applied.","- ADMINISTRATOR logged in."
+ROLES_FT10,"A TRAINER account, lacking the MANAGE_ACCOUNTS_ROLES authority, cannot update another role's permissions, and the target role is left untouched.","1. Log in as a TRAINER account (no MANAGE_ACCOUNTS_ROLES authority).
+2. Prepare PUT /api/admin/roles/LEARNER/permissions body {""permissionCodes"":[]} using that account's Authorization header.
+3. Send the request and inspect the response status.
+4. Confirm via GET /api/admin/roles (as an admin) that LEARNER's permissions remain unchanged.","1. 403 Forbidden; LEARNER's permissions remain unchanged.","- TRAINER logged in (not ADMINISTRATOR)."

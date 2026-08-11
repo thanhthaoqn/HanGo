@@ -1,0 +1,97 @@
+Feature,Question Bank Management
+Test requirement,Functional integration tests for the trainer's reusable question bank (TrainerQuestionController) and AI-assisted question/exam generation (TrainerQuestionAIController)
+Number of TCs,20
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,20,0
+Round 2,0,0,20,0
+Round 3,0,0,20,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Trainer Question List,,,,
+QUESTIONBANK_FT01,"The default list call, with the type parameter omitted, returns questions of every status rather than only \"quiz-type\" ones as the default's name misleadingly implies.","1. Log in as a trainer who has authored questions in ≥2 different statuses.
+2. Prepare and send GET /api/v1/trainer/question-bank with no type query parameter.
+3. Inspect the returned list's status values.
+4. Confirm questions of every status are present, not just one.","1. 200 OK; questions of ALL statuses are returned — the default ""type=QUIZ"" behaves identically to ""type=ALL"", not as a status filter.","- Caller has authored questions in ≥2 different statuses."
+QUESTIONBANK_FT02,"The question list is always scoped to the caller's own authored questions — one trainer never sees another trainer's bank entries here.","1. Log in as Trainer A and prepare/send GET /api/v1/trainer/question-bank; note the returned questions.
+2. Log out and log in as Trainer B; repeat the same call.
+3. Compare both result sets.
+4. Confirm neither list contains the other trainer's questions.","1. Each call returns only that trainer's own questions — no cross-trainer leakage in this list endpoint (correctIndex is also never included in this list DTO, unlike SectionQuestionController's lists).","- Both trainers have authored ≥1 question each."
+QUESTIONBANK_FT03,"COURSE_MANAGER is an allowed role for the whole question-bank surface, while a plain LEARNER is rejected outright.","1. Log in as a COURSE_MANAGER (holding CREATE_AND_MANAGE_EXAMS_CM) and prepare/send GET /api/v1/trainer/question-bank; inspect the response.
+2. Log out and log in as a plain LEARNER; repeat the same call.
+3. Compare both response statuses.","1. Step 1: 200 OK.
+2. Step 2-3: 403 Forbidden.","- COURSE_MANAGER and LEARNER accounts available."
+Create Question Bank Group,,,,
+QUESTIONBANK_FT04,"Creating a standalone (non-group) question silently drops the categoryId field — it is never persisted, regardless of what the client sends.","1. Log in as an eligible role and confirm a valid categoryId (e.g. 5) exists.
+2. Prepare POST /api/v1/trainer/question-bank body {""subQuestions"":[{""questionText"":""Q1"",""categoryId"":5,...}]} (isGroup=false shape, single question, no passageText).
+3. Send the request and note the created id.
+4. Prepare and send GET /api/v1/trainer/question-bank/detail/{id}?isGroup=false; inspect the categoryId field.","1. Step 4: the returned categoryId is null, NOT 5 — confirmed dropped on create despite being supplied.","- Logged in as an eligible role; a valid categoryId=5 exists."
+QUESTIONBANK_FT05,"Updating that same question with the identical categoryId DOES persist it correctly — an asymmetry between create and update for the same field.","1. Take the question created in QUESTIONBANK_FT04, whose categoryId is currently null.
+2. Prepare PUT /api/v1/trainer/question-bank/{id}?isGroup=false body including categoryId=5.
+3. Send the request.
+4. Prepare and send GET /api/v1/trainer/question-bank/detail/{id}?isGroup=false again; inspect categoryId.","1. Step 4: categoryId now correctly shows 5 — confirming update resolves it but create does not.","- A question created via QUESTIONBANK_FT04 (categoryId currently null)."
+QUESTIONBANK_FT06,"Submitting a completely empty payload (no passage, no sub-questions) reports a false success even though nothing is actually persisted.","1. Log in as an eligible role.
+2. Prepare POST /api/v1/trainer/question-bank body {""passageText"":"""",""subQuestions"":[]}.
+3. Send the request.
+4. Inspect the response's groupId/questionIds and confirm no row was actually created in the database.","1. 200 OK {""message"":""Question created successfully"",""groupId"":null,""questionIds"":[]} — no QuestionGroup or Question row is actually created, despite the success response.","- Logged in as an eligible role."
+View Question Detail,,,,
+QUESTIONBANK_FT07,"Attempting to view another trainer's question returns a misleading 500 instead of a proper 403.","1. Log in as Trainer A and create a question; note its id.
+2. Log out and log in as Trainer B (a different eligible role).
+3. Prepare and send GET /api/v1/trainer/question-bank/detail/{id}?isGroup=false for Trainer A's question.
+4. Inspect the response status and body.","1. 500 Internal Server Error, generic masked body — the real ""You do not have permission to view this question"" reason (a plain RuntimeException, not an ApiException) never reaches the client as a proper 403.","- A question owned by Trainer A exists; caller is Trainer B, both eligible roles."
+QUESTIONBANK_FT08,"The ownership check is skipped entirely for a group with zero linked sub-questions, letting any eligible-role caller view another trainer's empty group unimpeded.","1. As Trainer A, create a group with subQuestions=[] (per QUESTIONBANK_FT06's empty-payload path), or delete all of an existing group's sub-questions via edit; note the group's id.
+2. Log out and log in as Trainer B.
+3. Prepare and send GET /api/v1/trainer/question-bank/detail/{thatGroupId}?isGroup=true.
+4. Inspect the response status and body.","1. Step 3-4: 200 OK — Trainer B successfully retrieves Trainer A's empty group's passage/metadata, bypassing the ownership check that would otherwise apply to a non-empty group.","- An empty (zero sub-question) group exists, owned by Trainer A."
+Update Question Bank Group,,,,
+QUESTIONBANK_FT09,"Editing a single question is a full delete+recreate, so the question's database id changes after every edit.","1. Log in as the question's owner and note its current id.
+2. Prepare and send PUT /api/v1/trainer/question-bank/{id}?isGroup=false with updated text.
+3. Re-fetch the question via the list endpoint.
+4. Compare the id shown now against the id noted in step 1.","1. Step 3-4: the question now has a DIFFERENT id than before the edit — any external reference to the old id (e.g. a lesson_quizzes link) would now point at a deleted row.","- An owned single question exists, referenced from elsewhere (e.g. attached to a lesson quiz) if possible to also observe the broken reference."
+QUESTIONBANK_FT10,"The same empty-group ownership-check bypass allows a caller to overwrite/repopulate another trainer's empty group with new content — more serious than the read-only bypass, since this is a write.","1. As Trainer A, have an empty group (per QUESTIONBANK_FT08) and note its id.
+2. Log out and log in as Trainer B.
+3. Prepare and send PUT /api/v1/trainer/question-bank/{emptyGroupOwnedByA}?isGroup=true with a new passage and new subQuestions.
+4. Inspect the response and confirm the group's id is unchanged but now holds Trainer B's content.","1. 200 OK — Trainer B's new sub-questions are saved into Trainer A's group id, with the group's own id unchanged; any external reference to that group id now serves Trainer B's content under Trainer A's original group identity.","- An empty group owned by Trainer A exists; caller is Trainer B."
+Update Question Status,,,,
+QUESTIONBANK_FT11,"The status toggle accepts any arbitrary string, since there is zero enum validation.","1. Log in as the owner of an existing question.
+2. Prepare and send PATCH /api/v1/trainer/question-bank/{id}/status?status=garbage123&isGroup=false.
+3. Inspect the response.
+4. Re-fetch the question's detail to confirm the persisted status value.","1. 200 OK {""message"":""Status updated successfully""}; the question's status is persisted literally as ""garbage123"".","- Owned question exists."
+QUESTIONBANK_FT12,"Toggling status on an empty group is a silent no-op that still reports success.","1. Log in as the owner of an empty group.
+2. Prepare and send PATCH /api/v1/trainer/question-bank/{emptyGroupId}/status?status=ARCHIVED&isGroup=true.
+3. Inspect the response.
+4. Confirm no rows were actually touched (the group had zero sub-questions to update).","1. 200 OK {""message"":""Status updated successfully""} — zero rows are actually touched since the group has no sub-questions to update, but no error/warning is given.","- An owned empty group exists."
+Download Question-Bank Import Template,,,,
+QUESTIONBANK_FT13,"Downloading the template succeeds for an eligible role when the backend's working directory is correct; failure returns an empty 500 body.","1. Log in as an eligible role.
+2. Prepare and send GET /api/v1/trainer/question-bank/import-excel/template.
+3. Inspect the response status and Content-Disposition header.
+4. (If reproducible) run the backend from an unexpected working directory and repeat the call to confirm the empty-body 500 failure mode.","1. Step 3: 200 OK, binary .xlsx with correct Content-Disposition — verify this specifically if the backend's working directory differs from the repo root/hango-backend/, since all 4 candidate paths are relative and failure yields a bare 500 with NO JSON error body (inconsistent with the app's standard ApiErrorDTO shape elsewhere).","- Eligible role logged in."
+Generate Question via AI,,,,
+QUESTIONBANK_FT14,"Any authenticated role — not just Trainer/Course Manager — can trigger a live AI question-generation call, since there is no role restriction on this endpoint.","1. Log in as a plain LEARNER and identify a valid sectionId.
+2. Prepare POST /api/v1/trainer/questions/ai/generate body {""mode"":""SINGLE"",""topicSeed"":""past simple tense"",""sectionId"":<id>}.
+3. Send the request.
+4. Inspect the response status, confirming it is not 403.","1. 200 OK — the LEARNER successfully triggers a real (presumably billed) Gemini call, with no 403 — worth flagging as a cost-control/abuse gap even though it ""works.""","- Logged in as LEARNER; a valid sectionId (its actual ownership is never checked, only interpolated into the prompt)."
+QUESTIONBANK_FT15,"A mode value other than exactly \"SINGLE\" is silently treated as the MULTIPLE/group branch rather than being rejected.","1. Log in as an eligible role.
+2. Prepare POST /api/v1/trainer/questions/ai/generate body {""mode"":""FOO"",""topicSeed"":""grammar"",""sectionId"":<id>}.
+3. Send the request.
+4. Inspect the response shape (SINGLE vs MULTIPLE).","1. 200 OK; the response comes back in MULTIPLE-mode shape (""group"" populated), since anything not literally ""SINGLE"" falls into that branch — no 400 for the nonsensical mode value.","- Logged in as an eligible role."
+QUESTIONBANK_FT16,"Missing required fields (mode/topicSeed) are rejected with a clean 400 before any AI call is made.","1. Log in as an eligible role.
+2. Prepare POST /api/v1/trainer/questions/ai/generate body {} (no mode, no topicSeed).
+3. Send the request.
+4. Inspect the response status and message.","1. 400 Bad Request, {""message"":""mode is required""} (via ApiException, standard ApiErrorDTO shape) — or ""topicSeed is required"" if mode alone is supplied.","- Logged in as an eligible role."
+QUESTIONBANK_FT17,"A Gemini outage/failure surfaces as a real 502/503 to the caller rather than being silently swallowed.","1. Arrange a test environment where Gemini is unavailable/misconfigured (e.g. an invalid API key).
+2. Log in as an eligible role and prepare POST /api/v1/trainer/questions/ai/generate with a valid body.
+3. Send the request.
+4. Inspect the response status.","1. 502 Bad Gateway (invalid/empty AI JSON) or 503 Service Unavailable (connection/timeout failure) — never a silent fallback to a canned questionless 200, unlike the Pathway/Recommendation modules' graceful-degradation pattern.","- A way to simulate a Gemini failure in the test environment."
+Multi-turn AI Exam-Building Chat,,,,
+QUESTIONBANK_FT18,"The chat endpoint returns a raw plain-text reply rather than a JSON envelope — a real content-type/shape asymmetry vs. every other endpoint in this module.","1. Log in as an eligible role.
+2. Prepare POST /api/v1/trainer/questions/ai/exams/chat body {""history"":[{""role"":""user"",""text"":""I want a 20-question grammar exam""}]}.
+3. Send the request.
+4. Inspect the raw Content-Type header and body via DevTools.","1. 200 OK; Content-Type is text/plain (or similar), and the body is the bare AI reply string — NOT a JSON object like every sibling endpoint.","- Logged in as an eligible role."
+QUESTIONBANK_FT19,"An empty or missing chat history is rejected with a clean 400 on both the chat and generate-from-chat endpoints.","1. Log in as an eligible role.
+2. Prepare and send POST /api/v1/trainer/questions/ai/exams/chat body {""history"":[]}; inspect the response.
+3. Prepare and send POST /api/v1/trainer/questions/ai/exams/generate-from-chat body {""history"":[]}; inspect the response.
+4. Compare both response messages.","1. Both: 400 Bad Request, {""message"":""Chat history is required""}.","- Logged in as an eligible role."
+QUESTIONBANK_FT20,"A malformed AI JSON response on generate-from-chat surfaces a more verbose 502 message than the plain single-question generate endpoint, including the raw parser failure reason.","1. (Requires forcing the AI to return malformed JSON, or code-level review if not reproducible live.) Log in as an eligible role and build a substantial chat history.
+2. Prepare and send POST /api/v1/trainer/questions/ai/exams/generate-from-chat with that history.
+3. Inspect the response status and message if the AI's output is unparseable.
+4. Compare the message's verbosity against QUESTIONBANK_FT17's plain 502.","1. If the AI's JSON is unparseable: 502 Bad Gateway, {""message"":""AI returned invalid JSON payload for exam. Reason: <raw Jackson exception message>""} — the underlying parser error is exposed, unlike /generate's equivalent 502 which omits the reason.","- Logged in as an eligible role; a substantial chat history."

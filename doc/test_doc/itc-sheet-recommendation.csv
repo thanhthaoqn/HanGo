@@ -1,0 +1,40 @@
+Feature,Recommendation
+Test requirement,Functional integration tests for AI-driven weakness-based course recommendations (ExamCourseRecommendationController)
+Number of TCs,8
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,8,0
+Round 2,0,0,8,0
+Round 3,0,0,8,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+Recommend Courses via AI,,,,
+RECOMMENDATION_FT01,"A logged-in learner requests course recommendations based on their own exam attempt, and the result set is capped at 3 courses even if the AI suggested more.","1. Log in as a LEARNER who has completed at least one exam attempt.
+2. Prepare POST /api/v1/exams/ai/recommend-courses body {""examAttemptId"":<own attempt id>}.
+3. Send the request.
+4. Inspect the response body's recommendedCourses[] length and weaknessSummary.","1. 200 OK; ExamCourseRecommendationAIResponseDTO{examAttemptId, weaknessSummary, recommendedCourses[]} with at most 3 entries, even if the AI suggested more.","- Logged in; caller has ≥1 own exam attempt."
+RECOMMENDATION_FT02,"Any authenticated caller can pass ANY examAttemptId — including one belonging to a completely different student — and receive that student's real weakness analysis (confirmed, self-acknowledged IDOR, not fixed).","1. Log in as User A and complete an exam attempt; note its id.
+2. Log out and log in as an unrelated User B.
+3. Prepare and send POST /api/v1/exams/ai/recommend-courses body {""examAttemptId"":<User A's attempt id>}.
+4. Inspect the response and confirm it contains User A's real weakness data.","1. 200 OK — User B receives User A's real weaknessSummary and recommendedCourses, with no ownership check anywhere in the call chain.","- An exam attempt belonging to a different user (A) exists; caller B is any authenticated user."
+RECOMMENDATION_FT03,"Omitting examAttemptId from the request body is rejected with a clean validation error before any AI call is made.","1. Log in as any role.
+2. Prepare POST /api/v1/exams/ai/recommend-courses body {} (no examAttemptId key).
+3. Send the request.
+4. Inspect the response status and message.","1. 400 Bad Request, ""examAttemptId is required"".","- Logged in."
+RECOMMENDATION_FT04,"Passing a non-existent examAttemptId returns a clean 404 instead of a masked error.","1. Log in as any role.
+2. Prepare POST /api/v1/exams/ai/recommend-courses body {""examAttemptId"":999999}.
+3. Send the request.
+4. Inspect the response status and message.","1. 404 Not Found, ""ExamAttempt not found"".","- Logged in; id 999999 unused."
+RECOMMENDATION_FT05,"An unauthenticated call is rejected with a bare, empty-body 401 — a different shape from every other 401 in the codebase.","1. Discard any existing Authorization token.
+2. Prepare POST /api/v1/exams/ai/recommend-courses with no Authorization header and any valid body.
+3. Send the request.
+4. Inspect the response status and confirm the body is empty (not JSON).","1. 401 Unauthorized, with an EMPTY response body (not the usual {""error"":...} or ApiErrorDTO JSON shape used elsewhere).","- None."
+RECOMMENDATION_FT06,"When the AI call fails or returns unparseable output, the endpoint gracefully degrades to a 200 with empty results rather than surfacing a 500/502/503.","1. Arrange a test environment where Gemini is unavailable or misconfigured (e.g. an invalid API key).
+2. Log in and prepare POST /api/v1/exams/ai/recommend-courses with a valid examAttemptId.
+3. Send the request.
+4. Inspect the response status and body.","1. 200 OK; weaknessSummary="""" and recommendedCourses=[] — always 200, never propagated as an error status.","- A way to simulate an AI failure; a valid examAttemptId."
+RECOMMENDATION_FT07,"There is no role restriction at all on this endpoint — TRAINER, COURSE_MANAGER, and ADMINISTRATOR accounts can all call it successfully, unlike the stricter gating on Learning Pathway/AI Assistant.","1. Log in as a TRAINER with access to a valid exam attempt id and call the endpoint; inspect the response.
+2. Repeat as a COURSE_MANAGER.
+3. Repeat as an ADMINISTRATOR.
+4. Confirm all three calls succeed identically.","1. All three succeed 200 OK — confirming zero @PreAuthorize/role gate exists on this controller.","- Each role has access to at least one exam attempt id."
+RECOMMENDATION_FT08,"When the AI names a course id that no longer matches any real, non-deleted course, that entry degrades to blank display fields rather than being silently dropped from the result.","1. (Best-effort/hard to force deterministically — document as designed behavior if directly reproducible, otherwise treat as a code-review note.) Trigger a recommendation where the AI names a stale/non-existent course id.
+2. Inspect the resulting recommendedCourses[] entry for that id.","1. The corresponding RecommendedCourseDTO entry has empty-string title/category/difficulty rather than being filtered out of the response.","- A reproducible way to make the AI return an invalid course id (may require test-double/prompt manipulation)."

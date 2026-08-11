@@ -1,0 +1,55 @@
+Feature,Notification Management
+Test requirement,Functional integration tests for the personal notification inbox (NotificationController) and the Course-Manager broadcast inbox variant (CourseManagerDashboardController)
+Number of TCs,10
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,10,0
+Round 2,0,0,10,0
+Round 3,0,0,10,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Notifications / Unread Count,,,,
+NOTIFICATION_FT01,"A logged-in user views their own paged notification inbox and only sees notifications addressed to them personally or to their role.","1. Log in as a user who has at least one existing notification.
+2. Prepare GET /api/v1/notifications?page=0&size=10 with the Authorization header set.
+3. Send the request.
+4. Inspect the response's content[] and confirm every entry belongs to the caller (by user id or matching recipientRole).","1. 200 OK; a standard Spring Data Page<NotificationDTO> JSON (content/pageable/totalElements/etc), scoped to notifications where user.id=caller OR (user is null AND recipientRole matches one of the caller's roles).","- Logged in; ≥1 notification exists for the caller."
+NOTIFICATION_FT02,"The unread-count badge reflects only the caller's own currently-unread notifications.","1. Log in as a user with a known mix of read and unread notifications.
+2. Prepare GET /api/v1/notifications/unread-count.
+3. Send the request.
+4. Compare the returned count against the actual unread total for that user in the database.","1. 200 {""count"": <n>} matching the caller's actual unread total.","- Logged in; a mix of read/unread notifications exist for the caller."
+Mark (All) Notifications as Read,,,,
+NOTIFICATION_FT03,"Marking an owned notification as read succeeds, while marking a non-existent id returns a clean, correctly-caught 400 with the real reason.","1. Log in as a user with an owned, unread notification (note its id).
+2. Prepare and send PUT /api/v1/notifications/{id}/read; inspect the response and confirm isRead flips to true.
+3. Prepare and send PUT /api/v1/notifications/999999/read (an id confirmed not to exist).
+4. Inspect the second response's status and message.","1. Step 1-2: 200 {""success"":true}; the notification's isRead flips to true.
+2. Step 3-4: 400 Bad Request, {""error"":""Notification not found""} — this specific case IS caught locally with the real message, unlike many other modules' masked-500 patterns.","- An owned unread notification exists; id 999999 unused."
+NOTIFICATION_FT04,"A user cannot mark another user's (or another role's) notification as read.","1. Log in as User A and identify a notification scoped only to User A (or A's role).
+2. Log out and log in as an unrelated User B.
+3. Prepare and send PUT /api/v1/notifications/{that id}/read using User B's Authorization header.
+4. Inspect the response status and message.","1. 400 Bad Request, {""error"":""You are not allowed to modify this notification""}.","- A notification scoped to User A (or A's role) exists; caller is unrelated User B."
+NOTIFICATION_FT05,"Marking all notifications as read updates only the caller's own unread notifications, and reports how many rows were changed.","1. Log in as a user with at least 3 unread notifications.
+2. Prepare PUT /api/v1/notifications/read-all.
+3. Send the request.
+4. Inspect the response's updated count and confirm via GET /api/v1/notifications/unread-count that it is now 0.","1. 200 {""success"":true, ""updated"": 3} (or the actual count) — all of the caller's own notifications become read; other users' notifications are untouched.","- ≥3 unread notifications exist for the caller."
+Role-Broadcast Read State,,,,
+NOTIFICATION_FT06,"Role-broadcast notifications (e.g. a trainer-application submission alert to all admins) now create an INDEPENDENT copy per recipient — verify live whether marking one recipient's copy read leaves other recipients' unread counts unaffected (this reverses a previously-documented shared-row assumption).","1. Trigger an event that broadcasts to a role with ≥2 members (e.g. submit a trainer application, notifying all ADMINISTRATOR accounts).
+2. Log in as Admin X and mark that notification read.
+3. Log out and log in as Admin Y (a different admin who also received the broadcast).
+4. Check Admin Y's unread-count / notification list for the same event.","1. Step 4: Admin Y's copy of the notification is STILL unread — confirming each recipient has an independent row, not a shared one. If Y's copy also shows read, the old shared-broadcast behavior is still in effect and this expectation should be corrected.","- An event that broadcasts to a role with ≥2 real members."
+NOTIFICATION_FT07,"A notification whose linked course was later deleted still displays without error, with the course fields simply blanked out.","1. Trigger a course-related notification (e.g. an enrollment or rating alert) for a specific course.
+2. Have that course deleted/hard-removed from the system.
+3. Log in as the notification's recipient and prepare GET /api/v1/notifications.
+4. Inspect the affected notification's courseId/courseTitle fields.","1. 200 OK; the notification still appears with courseId/courseTitle simply null — no 500.","- A course-linked notification exists whose course is later deleted."
+Course-Manager Notification Inbox Variant,,,,
+NOTIFICATION_FT08,"A TRAINER_LEAD can view and mark items read in the Course-Manager-only shared notification inbox.","1. Log in as a TRAINER_LEAD with at least one Course-Manager-targeted notification.
+2. Prepare and send GET /api/v1/course-manager/notifications; inspect the returned list's recipientRole field.
+3. Pick one notification id from that list and prepare PUT /api/v1/course-manager/notifications/{id}/read.
+4. Send the request and inspect the response.","1. Step 1-2: 200 OK, list of notifications with recipientRole=""COURSE_MANAGER"".
+2. Step 3-4: 200 {""success"":true}.","- TRAINER_LEAD logged in; ≥1 Course-Manager-targeted notification exists."
+NOTIFICATION_FT09,"Marking a non-existent Course-Manager notification returns a plain-string 404 — a distinctly different error shape from NotificationController's own JSON error.","1. Log in as a TRAINER_LEAD.
+2. Prepare PUT /api/v1/course-manager/notifications/999999/read (an id confirmed not to exist).
+3. Send the request.
+4. Inspect the response status and confirm the body is plain text, not JSON.","1. 404, plain-text body ""Notification not found"" (not JSON {""error"":...}) — note this specific shape difference from NOTIFICATION_FT03's JSON body.","- id 999999 unused."
+NOTIFICATION_FT10,"A fully unauthenticated request to any notification endpoint is rejected — confirm live whether it's the controller's own dead-code 401 or the framework's default 403.","1. Discard any existing Authorization token.
+2. Prepare GET /api/v1/notifications with no Authorization header.
+3. Send the request.
+4. Inspect the actual response status code returned.","1. Rejected before reaching business logic — verify the ACTUAL status code returned (likely 403 from Spring's default anonymous handling, since this path isn't in the security filter's permitAll list, making the controller's own ""401 Unauthorized"" JSON body effectively unreachable).","- None."

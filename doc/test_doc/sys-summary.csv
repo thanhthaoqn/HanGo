@@ -1,0 +1,15 @@
+No,Module code,Passed,Failed,Pending,N/A,Number of test cases
+1,Authentication - Registration- Verification & Login Flow,0,0,21,0,21
+2,Trainer Onboarding & Profile Approval Flow,0,0,22,0,22
+3,Course Authoring- Content Building & Publishing Flow,0,0,26,0,26
+4,Course Discovery- Cart- PayOS Payment & Enrollment Flow,0,0,22,0,22
+5,Lesson Learning- Quiz & Progress Tracking Flow,0,0,17,0,17
+6,Exam Authoring- Matrix Generation- Review & Taking Flow,0,0,22,0,22
+7,AI-Generated Learning Pathway Flow,0,0,18,0,18
+8,AI Assistant Q&A & Course Recommendation Flow,0,0,16,0,16
+9,Lesson Comment- Like & Moderation Flow,0,0,15,0,15
+10,Cross-Module Notification Delivery & Read-Tracking Flow,0,0,14,0,14
+11,Trainer Revenue- Monthly Statement & Settlement Flow,0,0,21,0,21
+12,Account- Role & Access Administration Flow,0,0,25,0,25
+13,Support Ticket Submission- Triage & Resolution Flow,0,0,16,0,16
+,Sub total,0,0,255,0,255

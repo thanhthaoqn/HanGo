@@ -2,43 +2,38 @@
 
 > Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.1 (AUTH)
 
-> ⚠️ **Ghi chú 2026-07-24 (đối chiếu `AuthServiceTest`/`unit_test_plan.md`):** hệ thống hiện chỉ cấp **1 JWT duy nhất** lúc login — chưa có `refreshToken`/`logout` endpoint thật, dù tài liệu tổng (`HanGo_Documentation.md` §5) mô tả "access + refresh token". `authenticateUser` hiện chỉ chặn đăng nhập khi `User.status == "INACTIVE"` — tài khoản mang status khác (vd `"LOCKED"`) vẫn đăng nhập được bình thường (GAP-AUTH-01, chưa sửa). Xem `AUDIT_REPORT.md` MED-11/HIGH-09 trước khi giả định 2 hành vi này đã có.
+> ⚠️ **Cập nhật 2026-08-10 (đọc trực tiếp `AuthController`/`AuthService`/`PasswordPolicy`):** hệ thống hiện **có đầy đủ** access token + refresh token (bảng `RefreshToken`, lưu hash, xoay vòng single-use khi refresh, thu hồi khi logout/đổi mật khẩu) — khác với ghi chú "chỉ 1 JWT" ở bản tài liệu trước. `authenticateUser` hiện chặn login với **bất kỳ status nào khác `ACTIVE`** (không chỉ riêng `"INACTIVE"`), và khoá 15 phút sau 5 lần sai mật khẩu liên tiếp.
 
 ## 1. Business Context
-The Authentication feature ensures that only valid users can access the HanGo system. It includes Registration, Login (using traditional Email/Password and Google OAuth2), as well as Forgot Password and Account Verification via OTP. This is the first layer of defense for the EdTech system, ensuring personalized learning paths and data security.
+The Authentication feature ensures that only valid users can access the HanGo system. It includes Register, Login (Email/Password và Google OAuth2), Forgot Password, và Logout. Registration cho phép chọn role **Learner** hoặc **Trainer** ngay lúc đăng ký — chọn Trainer gán role Trainer **ngay lập tức**, không chờ duyệt (xem [05-trainer-application-management.md](05-trainer-application-management.md)).
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Login/Register screens located in `lib/presentation/pages/auth/`.
-- [ ] Form Validation: Email matches regex format, Password >= 8 characters, containing letters and numbers.
-- [ ] OTP verification overlay or screen to enter verification codes.
-- [ ] "Login with Google" button uses `google_sign_in` package to fetch Google Token.
-- [ ] Call authentication API via `lib/data/services/auth_service.dart` using `dio`.
+- [ ] Login/Register screens (`login_page.dart`, `register_page.dart`), Role toggle Learner/Trainer lúc Register (không có lựa chọn Course Manager/Admin).
+- [ ] Form validation: email đúng định dạng, password theo `PasswordPolicy` (xem BR-AUTH-02).
+- [ ] Màn hình nhập OTP (`verify_otp_page.dart`), auto-advance/paste, cooldown gửi lại 60s.
+- [ ] "Login with Google" dùng `google_sign_in`.
+- [ ] `forgot_password_page.dart` → `verify_otp_page.dart` → `reset_password_page.dart`.
 
-**Backend (Spring Boot):**
-- [ ] API `POST /api/auth/login` to authenticate user.
-- [ ] API `POST /api/auth/register` to create a new user (with status inactive, sending verification email).
-- [ ] API `POST /api/auth/google` to verify Google Token and issue internal JWT.
-- [ ] API `POST /api/auth/forgot-password` to trigger password reset OTP email.
-- [ ] API `POST /api/auth/verify-otp` to verify current password reset OTP.
-- [ ] API `POST /api/auth/reset-password` to set a new password after successful OTP verification.
-- [ ] API `GET /api/auth/verify` to activate the account via the verification email link.
-- [ ] API `GET /api/auth/check-verification` and `POST /api/auth/resend-verification` for activation management.
-- [ ] `AuthService` handles logic: hashing password with `BCryptPasswordEncoder`, generating JWT Access Token (24h expiration) and Refresh Token.
+**Backend (Spring Boot, tất cả trong `AuthController` base path `/api/auth`, đều public):**
+- [ ] `POST /login`, `POST /register`, `POST /google`.
+- [ ] `POST /forgot-password`, `POST /verify-otp`, `POST /reset-password`.
+- [ ] `GET /check-verification`, `POST /resend-verification`.
+- [ ] `POST /refresh-token`, `POST /logout`.
+- [ ] `PUT /profile/avatar` (endpoint duy nhất trong controller này yêu cầu đăng nhập).
 
 ## 3. Technical Constraints
-- **Security:** Do not expose plain text passwords in API logs. Use `spring-boot-starter-security`.
-- **Database:** `users` table must have `email` as a UNIQUE constraint.
-- **Frontend:** JWT must be stored securely using `flutter_secure_storage` or `shared_preferences`.
+- **Security:** Mật khẩu hash BCrypt. Refresh token lưu **hash**, không lưu token gốc.
+- **Database:** `users.email` UNIQUE, so khớp không phân biệt hoa/thường.
+- **Frontend:** JWT lưu qua `SharedPreferences`/`flutter_secure_storage` (2 nơi song song, chưa đồng bộ tường minh — xem `HanGo_Documentation.md` §22).
 
 ## 4. Edge Cases
-- **Unverified Account Login:** If a user tries to log in before verifying their email via OTP/link, block the authentication attempt and return HTTP 403 Forbidden (or a specific validation error).
-- **Wrong Password:** Limit login attempts (e.g., 5 times). After 5 failed attempts, lock account for 15 minutes.
-- **Email already exists:** When registering, if the email exists, return HTTP 409 Conflict.
-- **Expired Token:** Frontend `dio` interceptor must catch HTTP 401, clear local storage, and redirect user to Login screen.
+- **Tài khoản chưa verify login:** chặn với thông báo riêng ("hãy xác minh email"), kiểm tra **trước** check status chung.
+- **Sai mật khẩu 5 lần liên tiếp:** khoá đăng nhập 15 phút (HTTP 423), tự reset đếm khi login thành công.
+- **Email đã tồn tại khi register:** trả lỗi rõ ràng, không tạo trùng.
+- **Refresh token hết hạn/bị thu hồi:** `refreshAccessToken` từ chối, yêu cầu đăng nhập lại.
+- **Quên mật khẩu với email không tồn tại:** trả thông báo chung chung giống hệt trường hợp email tồn tại (chống user enumeration).
 
 ## 5. Non-functional Requirements
-- **Performance:** Login API response time must be `< 500ms`.
-- **Security:** Passwords must be hashed using BCrypt before storing.
-
+- **Security:** không log mật khẩu plaintext; OTP tối đa 5 lần thử sai rồi phải xin lại.

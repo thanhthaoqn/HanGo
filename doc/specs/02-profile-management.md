@@ -1,43 +1,35 @@
 # Feature Specification: FE-02 — Profile Management
 
-> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.2 (PROF). Admin-side account list/lock/role management is out of scope here — see [03-rbac.md](03-rbac.md) (FE-03).
+> Ref: [HanGo_Documentation.md](../HanGo_Documentation.md) §7.2 (PROF). Admin-side account list/lock/role management is out of scope here — see [03-account-management.md](03-account-management.md) (FE-03).
 
-> ⚠️ **Ghi chú 2026-07-24:** `ProfileUpdateRequest` hiện **không có** annotation validation nào (`@Valid`/`@NotBlank`/`@Size`) — cập nhật profile không được validate ở tầng server (GAP-PROF-03, chưa sửa — xem `AUDIT_REPORT.md`). Learner "Learning Profile" (FR-PROF-04) và Trainer public/brand page (FR-PROF-05, vốn đã đánh dấu 📌 optional) vẫn chưa xác nhận có implementation đầy đủ tương ứng ở backend — cần đọc lại code trước khi viết test hoặc claim đã "Implemented".
+> ⚠️ **Cập nhật 2026-08-10:** `ProfileUpdateRequest` vẫn **không có** annotation validation nào (`@Valid`/`@NotBlank`/`@Size`) — vẫn mở, chưa sửa. "View Learning History" (FR-PROF-04) hiện được phục vụ qua endpoint danh sách Course có `filterType=ENROLLED|IN_PROGRESS|COMPLETED`, **không phải** một API "learning-profile" tổng hợp riêng như bản trước mô tả.
 
 ## 1. Business Context
-Profile Management lets every logged-in user (Learner, Trainer, Course Manager, Admin) view/update their own personal information (full name, avatar, phone number) and change their own password. Learners additionally get a **Learning Profile** view — courses studied, progress, Exam history, and weaknesses (FR-PROF-04). Trainers may additionally get a public "brand page" (bio, course list) — this is marked open/optional for v1 (📌 FR-PROF-05).
+Profile Management cho mọi role đã đăng nhập xem/sửa thông tin cá nhân và đổi mật khẩu. Learner có thêm "View Learning History". Trainer có thêm "View Trainer Public Profile" (bio, kinh nghiệm, danh sách Course) — mức độ công khai thật sự (Guest xem được hay chỉ user đã login) **chưa xác nhận độc lập** ở đợt audit này, cần kiểm tra route cụ thể trước khi coi là hoàn tất.
 
 ## 2. Acceptance Criteria
 
 **Frontend (Flutter):**
-- [ ] Profile viewing and editing interface for all roles (full name, avatar, phone number).
-- [ ] Image Picker for Avatar upload with image compression before sending to server.
-- [ ] Change Password form requiring current password + new password confirmation.
-- [ ] Learner-only "Learning Profile" view: enrolled courses, progress %, Exam attempt history, Weakness Analysis by SkillType.
-- [ ] (📌 optional) Trainer public profile / brand page: bio, avatar, list of published Courses.
+- [ ] Giao diện xem/sửa profile cho mọi role (họ tên, avatar, số điện thoại, giới tính, ngày sinh, địa chỉ).
+- [ ] Đổi mật khẩu (yêu cầu mật khẩu hiện tại + xác nhận mật khẩu mới).
+- [ ] Learner: "My Learning" hiển thị danh sách Course theo trạng thái (Enrolled/In Progress/Completed) + lịch sử Exam attempt.
+- [ ] Trainer: `trainer_profile_page.dart` — 4 tab (Personal Info, CV & Experience, Bank Account, Security).
 
 **Backend (Spring Boot):**
-- [ ] API `GET /api/v1/users/me` and `PUT /api/v1/users/me` for profile CRUD.
-- [ ] API `GET /api/admin/users` for Admin (supports pagination, search, and filtering by role).
-- [ ] API `PUT /api/admin/users/{id}/status` to lock/unlock accounts.
-- [ ] Integrate Cloudinary API for storing Avatar images and returning secure URLs.
+- [ ] `GET /api/v1/users/me`, `PUT /api/v1/users/me` (không có `@PreAuthorize`, tự check `@AuthenticationPrincipal == null`).
+- [ ] `PUT /api/v1/users/change-password` (yêu cầu đúng mật khẩu hiện tại — FR-PROF-03).
+- [ ] `GET /api/v1/courses?filterType=ENROLLED|IN_PROGRESS|COMPLETED` phục vụ Learning History (không phải endpoint riêng).
+- [ ] Đổi email qua `PUT /me` → tự reset `isVerified=false` (cần verify lại email mới).
+- [ ] Tích hợp Cloudinary lưu Avatar.
 
 ## 3. Technical Constraints
-- **Backend Authorization:** Admin APIs must be strictly protected with `@PreAuthorize("hasRole('ADMINISTRATOR')")`.
-- [ ] API `PUT /api/v1/users/me/password` to change password (requires current password match — FR-PROF-03).
-- [ ] API `GET /api/v1/users/me/learning-profile` aggregating enrollments, progress, Exam attempts and Weakness Analysis for the Learner.
-- [ ] Integrate Cloudinary API for storing Avatar images and returning secure URLs.
-
-## 3. Technical Constraints
-- **Image Upload:** Restrict avatar file size to max 2MB. Only accept `.jpg`, `.png`, `.jpeg` formats.
-- **Frontend:** Profile state must be managed globally (e.g., using Riverpod) so that the avatar updates instantly across all screens after a successful change.
+- **Validation còn thiếu (biết trước khi test):** `ProfileUpdateRequest` không chặn định dạng email/độ dài field ở server — dữ liệu sai vẫn lưu được, phải test kỹ ở tầng UI thay vì tin server chặn hộ.
+- **Image Upload:** giới hạn file avatar theo quy ước chung Cloudinary của dự án (không có giới hạn cứng riêng xác nhận được trong `ProfileUpdateRequest`/`AuthService.updateProfile`).
 
 ## 4. Edge Cases
-- **Wrong current password on Change Password:** Return HTTP 400/401 with a clear message; do not update the password.
-- **Duplicate Email update:** If a user tries to change their email to one already in use, catch `DataIntegrityViolationException` and return HTTP 409 Conflict.
-- **Cloudinary upload failure:** If third-party image upload fails, return a graceful error message without crashing the server.
+- **Sai mật khẩu hiện tại khi đổi mật khẩu:** trả lỗi rõ ràng, không đổi.
+- **Đổi email trùng email đã tồn tại:** service tự kiểm tra unique trước khi lưu, trả lỗi thay vì để DB constraint văng exception thô.
+- **Cloudinary upload lỗi:** không được làm crash luồng cập nhật profile chính.
 
 ## 5. Non-functional Requirements
-- **Performance:** Avatar images should be fetched using optimized Cloudinary URLs (compressed and resized).
-- **Usability:** Provide instant visual feedback (Toast/Snackbar) when profile update succeeds or fails.
-- **Security:** Never log or return the password hash; changing password must re-hash with BCrypt.
+- **Security:** không log/trả về password hash; đổi mật khẩu thành công thu hồi **toàn bộ** refresh token của user (buộc đăng nhập lại mọi thiết bị).
