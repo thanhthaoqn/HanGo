@@ -33,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -80,6 +79,7 @@ class CourseManagerDashboardServiceTest {
         when(courseRepository.countByStatusAndDeletedAtIsNull("PUBLISHED")).thenReturn(20L);
         when(courseRepository.countByStatusAndDeletedAtIsNull("DRAFT")).thenReturn(5L);
         when(courseRepository.countByStatusAndDeletedAtIsNull("ARCHIVED")).thenReturn(3L);
+        when(courseRepository.countByStatusAndDeletedAtIsNull("HIDDEN")).thenReturn(2L);
         when(courseRepository.countByStatusAndDeletedAtIsNull("PENDING")).thenReturn(0L);
         when(examRepository.count()).thenReturn(40L);
 
@@ -87,7 +87,7 @@ class CourseManagerDashboardServiceTest {
 
         assertEquals(150L, result.getRegisteredUsersCount());
         assertEquals(20L, result.getActiveCoursesCount());
-        assertEquals(8L, result.getInactiveCoursesCount());
+        assertEquals(10L, result.getInactiveCoursesCount());
         assertEquals(40L, result.getExamsCount());
     }
 
@@ -163,6 +163,78 @@ class CourseManagerDashboardServiceTest {
     }
 
     // =================================================================
+    // hideCourse
+    // =================================================================
+
+    @Test
+    void hideCourseShouldThrowWhenCourseNotFound() {
+        when(courseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.hideCourse(1L));
+    }
+
+    @Test
+    void hideCourseShouldThrowWhenNotPublished() {
+        Course c = course(1L, "DRAFT", user(2L));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        assertThrows(RuntimeException.class, () -> service.hideCourse(1L));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void hideCourseShouldSetStatusHiddenWhenPublished() {
+        Course c = course(1L, "PUBLISHED", user(2L));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        service.hideCourse(1L);
+
+        assertEquals("HIDDEN", c.getStatus());
+        verify(courseRepository).save(c);
+    }
+
+    // =================================================================
+    // unhideCourse
+    // =================================================================
+
+    @Test
+    void unhideCourseShouldThrowWhenCourseNotFound() {
+        when(courseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.unhideCourse(1L));
+    }
+
+    @Test
+    void unhideCourseShouldThrowWhenNeitherHiddenNorArchived() {
+        Course c = course(1L, "PUBLISHED", user(2L));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        assertThrows(RuntimeException.class, () -> service.unhideCourse(1L));
+        verify(courseRepository, never()).save(any());
+    }
+
+    @Test
+    void unhideCourseShouldSetStatusPublishedWhenHidden() {
+        Course c = course(1L, "HIDDEN", user(2L));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        service.unhideCourse(1L);
+
+        assertEquals("PUBLISHED", c.getStatus());
+        verify(courseRepository).save(c);
+    }
+
+    @Test
+    void unhideCourseShouldSetStatusPublishedWhenArchived() {
+        Course c = course(1L, "ARCHIVED", user(2L));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        service.unhideCourse(1L);
+
+        assertEquals("PUBLISHED", c.getStatus());
+    }
+
+    // =================================================================
     // publishExam
     // =================================================================
 
@@ -222,7 +294,7 @@ class CourseManagerDashboardServiceTest {
 
         service.returnExamToDraft(1L, "Missing answer key");
 
-        assertEquals("DRAFT", exam.getStatus());
+        assertEquals("REJECTED", exam.getStatus());
         assertEquals("Missing answer key", exam.getRejectionReason());
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_CONTENT_REJECTED), any(), messageCaptor.capture(), any());
@@ -261,7 +333,6 @@ class CourseManagerDashboardServiceTest {
         Course newer = course(2L, "PUBLISHED", user(2L));
         newer.setCreatedAt(LocalDateTime.of(2026, 2, 1, 0, 0));
         when(courseRepository.findAll()).thenReturn(List.of(older, newer));
-        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(anyLong())).thenReturn(List.of());
 
         List<CourseReviewDetailDTO> result = service.getCoursesForReview("all");
 
@@ -274,7 +345,6 @@ class CourseManagerDashboardServiceTest {
         Course c = course(5L, "PENDING_APPROVAL", user(2L));
         when(courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc("PENDING_APPROVAL"))
                 .thenReturn(List.of(c));
-        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(5L)).thenReturn(List.of());
 
         List<CourseReviewDetailDTO> result = service.getCoursesForReview(null);
 
@@ -310,6 +380,7 @@ class CourseManagerDashboardServiceTest {
         when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(5L)).thenReturn(List.of(section));
         Lesson lesson = Lesson.builder().id(30L).title("Lesson A").displayOrder(1).build();
         when(lessonRepository.findBySectionIdOrderByDisplayOrderAsc(20L)).thenReturn(List.of(lesson));
+        when(lessonRepository.countByCourseId(5L)).thenReturn(1L);
 
         CourseReviewDetailDTO result = service.getCourseReviewDetail(5L);
 
