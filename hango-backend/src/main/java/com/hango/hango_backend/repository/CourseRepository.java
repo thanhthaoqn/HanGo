@@ -52,6 +52,41 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("SELECT COUNT(c) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
     long countByCreatorIdAndDeletedAtIsNull(@Param("creatorId") Long creatorId);
 
+    @Query("SELECT COUNT(DISTINCT c.code) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
+    long countDistinctCourseCodesByCreatorId(@Param("creatorId") Long creatorId);
+
+    boolean existsByCreatorIdAndStatusAndDeletedAtIsNull(Long creatorId, String status);
+
+    Optional<Course> findFirstByCreatorIdAndDeletedAtIsNullOrderByCreatedAtAsc(Long creatorId);
+
+    Optional<Course> findFirstByCreatorIdAndStatusAndDeletedAtIsNullOrderByPublishedAtAsc(Long creatorId, String status);
+
+    default boolean isEligibleForFirstCoursePromotion(Long creatorId, String currentCourseCode) {
+        if (creatorId == null) return false;
+        
+        Optional<Course> firstPublished = findFirstByCreatorIdAndStatusAndDeletedAtIsNullOrderByPublishedAtAsc(creatorId, "PUBLISHED");
+        if (firstPublished.isPresent()) {
+            if (currentCourseCode == null || currentCourseCode.isEmpty()) return false;
+            String basePublished = firstPublished.get().getCode().replaceAll("-V\\d+$", "");
+            String baseCurrent = currentCourseCode.replaceAll("-V\\d+$", "");
+            return basePublished.equals(baseCurrent);
+        }
+        
+        Optional<Course> oldestDraft = findFirstByCreatorIdAndDeletedAtIsNullOrderByCreatedAtAsc(creatorId);
+        if (oldestDraft.isEmpty()) {
+            return true; // No courses yet, this is the very first one being created
+        }
+        if (currentCourseCode == null || currentCourseCode.isEmpty()) {
+            return false; // They have a course in DB, but this new one hasn't been assigned a code -> it's the second course
+        }
+        String oldestCode = oldestDraft.get().getCode();
+        if (oldestCode == null) return false;
+        
+        String baseOldest = oldestCode.replaceAll("-V\\d+$", "");
+        String baseCurrent = currentCourseCode.replaceAll("-V\\d+$", "");
+        return baseOldest.equals(baseCurrent);
+    }
+
     @Query(value = "SELECT c.id AS id, c.title AS title, " +
            "(SELECT COUNT(e.id) FROM enrollments e WHERE e.course_id = c.id) AS learnersCount, " +
            "(SELECT COUNT(l.id) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id AND l.deleted_at IS NULL) AS lessonsCount, " +

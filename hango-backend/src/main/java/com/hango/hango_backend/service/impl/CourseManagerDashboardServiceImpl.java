@@ -97,6 +97,11 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             throw new RuntimeException("Only courses in PENDING_APPROVAL status can be published");
         }
 
+        if (courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode())) {
+            course.setPrice(java.math.BigDecimal.ZERO);
+            course.setSuggestedPrice(java.math.BigDecimal.ZERO);
+        }
+
         course.setStatus("PUBLISHED");
         course.setRejectionReason(null);
         course.setPublishedAt(java.time.LocalDateTime.now());

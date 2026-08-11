@@ -144,7 +144,7 @@ public class CourseImportService {
             }
         }
 
-        BigDecimal calculatedPrice = calculateCoursePrice(trainerProfile, difficulty, lessonCount, durationMinutes);
+        BigDecimal calculatedPrice = calculateCoursePrice(trainer.getId(), persistedCourseCode, trainerProfile, difficulty, lessonCount, durationMinutes);
 
         Course course = Course.builder()
                 .title(courseTitle)
@@ -871,7 +871,7 @@ public class CourseImportService {
         }
     }
  
-    private BigDecimal calculateCoursePrice(TrainerProfile profile, SystemParameter difficulty, int lessonCount, int durationMinutes) {
+    private BigDecimal calculateCoursePrice(Long creatorId, String courseCode, TrainerProfile profile, SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
             if ("PROFESSIONAL".equalsIgnoreCase(profile.getTrainerType())) {
@@ -895,6 +895,11 @@ public class CourseImportService {
         }
         price += (lessonCount * 10000L);
         price += (durationMinutes * 1000L);
+        
+        if (courseRepository.isEligibleForFirstCoursePromotion(creatorId, courseCode)) {
+            return BigDecimal.ZERO;
+        }
+        
         return BigDecimal.valueOf(price);
     }
  

@@ -7,6 +7,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart' as dio;
+import '../../../utils/file_picker_helper.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../widgets/trainer_action_required_card.dart';
 import '../../../utils/toast_helper.dart';
@@ -58,6 +62,10 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
   YoutubePlayerController? _youtubeController;
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
+
+  bool _isUploadingVideo = false;
+  String _uploadStatusText = '';
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -186,6 +194,85 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
 
   Future<void> _notifyParent() async {
     await widget.onSectionsChanged(_localSections);
+  }
+
+  Future<void> _pickAndUploadVideo() async {
+    try {
+      final picked = await pickVideo();
+      if (picked == null) return;
+
+      setState(() {
+        _uploadProgress = 0.0;
+        _isUploadingVideo = true;
+        _uploadStatusText = 'Uploading... 0%';
+      });
+
+      final formData = dio.FormData.fromMap({
+        'upload_preset': 'hango_preset',
+        'file': dio.MultipartFile.fromBytes(
+          picked.bytes,
+          filename: picked.name,
+        ),
+      });
+
+      final dioClient = dio.Dio();
+      final response = await dioClient.post(
+        'https://api.cloudinary.com/v1_1/diqekap4o/video/upload',
+        data: formData,
+        onSendProgress: (int sent, int total) {
+          if (total > 0 && mounted) {
+            setState(() {
+              _uploadProgress = sent / total;
+              final percent = (_uploadProgress * 100).toStringAsFixed(0);
+              _uploadStatusText = 'Uploading... $percent%';
+            });
+          }
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data is String ? jsonDecode(response.data) : response.data;
+        
+        final String videoUrl = data['secure_url'] ?? data['url'] ?? '';
+        final double durationDouble = (data['duration'] as num?)?.toDouble() ?? 0.0;
+        final int durationSec = durationDouble.round();
+        final int bytes = (data['bytes'] as num?)?.toInt() ?? 0;
+        final int estimatedMins = (durationSec / 60).ceil();
+        
+        setState(() {
+          _videoUrlController.text = videoUrl;
+          if (durationSec > 0) {
+            _mediaDurationController.text = durationSec.toString();
+          }
+          if (bytes > 0) {
+            _mediaSizeController.text = bytes.toString();
+          }
+          if (estimatedMins > 0) {
+            _estimatedTimeController.text = estimatedMins.toString();
+          }
+          
+          _isUploadingVideo = false;
+          _uploadProgress = 0.0;
+        });
+        
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Video uploaded successfully!');
+        }
+      } else {
+        throw Exception(
+          'Upload failed with status: ${response.statusCode} - ${response.data}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error uploading video: $e');
+      if (mounted) {
+        setState(() {
+          _isUploadingVideo = false;
+          _uploadStatusText = 'Upload failed';
+        });
+        ToastHelper.showError(context, 'Error uploading video: $e');
+      }
+    }
   }
 
   void _saveLesson() async {
@@ -1118,6 +1205,34 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
               color: Color(0xFF1E293B),
             ),
           ),
+          const SizedBox(height: 12),
+          // Upload Video Button
+          ElevatedButton.icon(
+            onPressed: _isUploadingVideo ? null : _pickAndUploadVideo,
+            icon: _isUploadingVideo 
+                ? const SizedBox(
+                    width: 16, 
+                    height: 16, 
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                  )
+                : const Icon(Icons.upload_file, size: 18),
+            label: Text(
+              _isUploadingVideo ? _uploadStatusText : 'Upload Video File',
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
           // Video Preview section
           _buildVideoPreview(),
           const SizedBox(height: 24),

@@ -11,6 +11,10 @@ Future<PickedFile?> pickImage() async {
   return impl.pickImageFile();
 }
 
+Future<PickedFile?> pickVideo() async {
+  return impl.pickVideoFile();
+}
+
 Future<PickedFile?> pickPdf() async {
   return impl.pickPdfFile();
 }

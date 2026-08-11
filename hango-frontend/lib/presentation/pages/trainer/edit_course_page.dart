@@ -826,20 +826,53 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
 
   Widget _buildTitleSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Text(
-            '${_titleController.text} (Edit mode)',
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-              fontFamily: 'Outfit',
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                '${_titleController.text} (Edit mode)',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_suggestedPrice == 0) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE6F4EA),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFCEEAD6)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.stars_rounded, color: Color(0xFF137333), size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Congratulations! This is your first course. It will automatically be published as a Free course to help you build your student base.',
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 14,
+                      color: Color(0xFF137333),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -1488,17 +1521,19 @@ class _EditCoursePageState extends State<EditCoursePage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9), // Light grey indicating read-only
+                              color: _suggestedPrice == 0 ? const Color(0xFFE6F4EA) : const Color(0xFFF1F5F9), // Light green if free
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(color: _suggestedPrice == 0 ? const Color(0xFFCEEAD6) : const Color(0xFFE2E8F0)),
                             ),
                             child: Text(
-                              _suggestedPrice != null ? '${_suggestedPrice} VNĐ' : 'Calculating...',
-                              style: const TextStyle(
+                              _suggestedPrice != null 
+                                  ? (_suggestedPrice == 0 ? 'Free (First course promotion)' : '${_suggestedPrice} VNĐ') 
+                                  : 'Calculating...',
+                              style: TextStyle(
                                 fontFamily: 'Outfit',
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                                color: _suggestedPrice == 0 ? const Color(0xFF137333) : const Color(0xFF0F172A),
                               ),
                             ),
                           ),

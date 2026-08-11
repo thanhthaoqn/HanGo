@@ -236,80 +236,229 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   }
 
   void _showRejectDialog() {
-    final reasonController = TextEditingController();
+    bool rejectGeneral = false;
+    final TextEditingController rejectGeneralCtrl = TextEditingController();
+
+    bool rejectQuestions = false;
+    final TextEditingController rejectQuestionsCtrl = TextEditingController();
+
+    bool rejectOptions = false;
+    final TextEditingController rejectOptionsCtrl = TextEditingController();
+
+    bool rejectOther = false;
+    final TextEditingController rejectOtherCtrl = TextEditingController();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Reject Exam',
-            style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Please provide a reason for rejecting this exam:',
-                style: TextStyle(fontFamily: 'Outfit'),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text(
+                'Rejection Checklist',
+                style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Enter reason...',
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Check the issues below and provide details for the Trainer:',
+                      style: TextStyle(fontFamily: 'Outfit', color: Color(0xFF4B5563)),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // General Info Checkbox
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('General Info (Title, Requirements)', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+                      value: rejectGeneral,
+                      activeColor: const Color(0xFFEF4444),
+                      onChanged: (val) => setState(() => rejectGeneral = val ?? false),
+                    ),
+                    if (rejectGeneral)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32, bottom: 8),
+                        child: TextField(
+                          controller: rejectGeneralCtrl,
+                          maxLines: 2,
+                          style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            hintText: 'E.g., Title is unclear...',
+                            filled: true,
+                            fillColor: const Color(0xFFFEF2F2),
+                            contentPadding: const EdgeInsets.all(10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                          ),
+                        ),
+                      ),
+
+                    // Questions & Passages Checkbox
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Questions & Passages (Content, typos)', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+                      value: rejectQuestions,
+                      activeColor: const Color(0xFFEF4444),
+                      onChanged: (val) => setState(() => rejectQuestions = val ?? false),
+                    ),
+                    if (rejectQuestions)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32, bottom: 8),
+                        child: TextField(
+                          controller: rejectQuestionsCtrl,
+                          maxLines: 2,
+                          style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            hintText: 'Specify issues with questions or passages...',
+                            filled: true,
+                            fillColor: const Color(0xFFFEF2F2),
+                            contentPadding: const EdgeInsets.all(10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                          ),
+                        ),
+                      ),
+
+                    // Answers & Options Checkbox
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Answers & Options (Accuracy)', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+                      value: rejectOptions,
+                      activeColor: const Color(0xFFEF4444),
+                      onChanged: (val) => setState(() => rejectOptions = val ?? false),
+                    ),
+                    if (rejectOptions)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32, bottom: 8),
+                        child: TextField(
+                          controller: rejectOptionsCtrl,
+                          maxLines: 2,
+                          style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            hintText: 'E.g., Wrong correct answer marked...',
+                            filled: true,
+                            fillColor: const Color(0xFFFEF2F2),
+                            contentPadding: const EdgeInsets.all(10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                          ),
+                        ),
+                      ),
+
+                    // Other Checkbox
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Other Issues', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+                      value: rejectOther,
+                      activeColor: const Color(0xFFEF4444),
+                      onChanged: (val) => setState(() => rejectOther = val ?? false),
+                    ),
+                    if (rejectOther)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32, bottom: 8),
+                        child: TextField(
+                          controller: rejectOtherCtrl,
+                          maxLines: 2,
+                          style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                          decoration: InputDecoration(
+                            hintText: 'Enter other reasons...',
+                            filled: true,
+                            fillColor: const Color(0xFFFEF2F2),
+                            contentPadding: const EdgeInsets.all(10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                maxLines: 3,
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Color(0xFF64748B)),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (reasonController.text.trim().isEmpty) {
-                  ToastHelper.show(
-                    context,
-                    'Reason is required',
-                    isError: true,
-                  );
-                  return;
-                }
-                Navigator.pop(context);
-                try {
-                  await CourseManagerApi().rejectExam(
-                    widget.examId,
-                    reason: reasonController.text.trim(),
-                  );
-                  if (mounted) {
-                    ToastHelper.show(context, 'Exam rejected successfully!');
-                    _goBack(); // Go back to list
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ToastHelper.show(
-                      context,
-                      'Error rejecting exam: $e',
-                      isError: true,
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-              ),
-              child: const Text(
-                'Reject',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Color(0xFF64748B)),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (!rejectGeneral && !rejectQuestions && !rejectOptions && !rejectOther) {
+                      ToastHelper.showError(context, 'Please check at least one issue.');
+                      return;
+                    }
+
+                    List<String> reasons = [];
+                    
+                    if (rejectGeneral) {
+                      String detail = rejectGeneralCtrl.text.trim();
+                      if (detail.isEmpty) detail = "Need to review general information.";
+                      reasons.add("- [x] **General Info (Title, Requirements):**\n  $detail");
+                    }
+                    
+                    if (rejectQuestions) {
+                      String detail = rejectQuestionsCtrl.text.trim();
+                      if (detail.isEmpty) detail = "Issues found in questions or passages.";
+                      reasons.add("- [x] **Questions & Passages (Content, typos):**\n  $detail");
+                    }
+                    
+                    if (rejectOptions) {
+                      String detail = rejectOptionsCtrl.text.trim();
+                      if (detail.isEmpty) detail = "Issues found in answers or options.";
+                      reasons.add("- [x] **Answers & Options (Accuracy):**\n  $detail");
+                    }
+                    
+                    if (rejectOther) {
+                      String detail = rejectOtherCtrl.text.trim();
+                      if (detail.isNotEmpty) {
+                        reasons.add("- [x] **Other Issues:**\n  $detail");
+                      }
+                    }
+                    
+                    String finalReason = reasons.join("\n\n");
+                    
+                    Navigator.pop(context);
+                    
+                    try {
+                      await CourseManagerApi().rejectExam(
+                        widget.examId,
+                        reason: finalReason,
+                      );
+                      if (mounted) {
+                        ToastHelper.show(context, 'Exam rejected successfully!');
+                        _goBack(); // Go back to list
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ToastHelper.show(
+                          context,
+                          'Error rejecting exam: $e',
+                          isError: true,
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                  child: const Text(
+                    'Reject',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
