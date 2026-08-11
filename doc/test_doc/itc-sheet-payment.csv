@@ -1,0 +1,122 @@
+Feature,Payment & Revenue
+Test requirement,Functional integration tests for cart/checkout (CartController, PaymentController) and trainer/course-manager revenue statements (MonthlyStatementController)
+Number of TCs,26
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,26,0
+Round 2,0,0,26,0
+Round 3,0,0,26,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+Cart CRUD + Sync,,,,
+PAYMENT_FT01,"Viewing the cart auto-hides any item the caller already owns, silently cleaning it up rather than showing a stale entry.","1. Log in and add a course to the cart.
+2. Enroll in that same course via a separate path (e.g. free enrollment).
+3. Prepare and send GET /api/v1/cart.
+4. Inspect the returned items and confirm the now-owned course is absent.","1. The now-owned course is silently absent from the cart response, with no error/notice.","- Logged in; a course in cart that the caller subsequently enrolls in."
+PAYMENT_FT02,"Adding a course already owned by the caller is rejected, while adding one already in the cart silently succeeds as a no-op.","1. Log in and identify a course the caller already owns.
+2. Prepare and send POST /api/v1/cart/items body {""courseId"":<already enrolled course>}; inspect the response.
+3. Add a different course to the cart, then send POST /api/v1/cart/items body {""courseId"":<that same course, already in cart>}.
+4. Inspect the second response and confirm no duplicate cart row was created.","1. Step 2: 400 {""error"":""Bạn đã sở hữu khóa học này.""}.
+2. Step 3-4: 200 {""success"":true,""message"":""Course added to cart""} — no duplicate row, no error.","- Logged in; a course already enrolled and a course already in cart."
+PAYMENT_FT03,"Removing an item that isn't in the cart, and clearing an already-empty cart, are both harmless, idempotent successes.","1. Log in with an empty cart.
+2. Prepare and send DELETE /api/v1/cart/items/{courseIdNotInCart}; inspect the response.
+3. Prepare and send DELETE /api/v1/cart (clear an already-empty cart).
+4. Inspect both responses for a success status.","1. Both: 200 {""success"":true} — no error for a no-op.","- Logged in."
+PAYMENT_FT04,"Syncing the cart with a client-supplied course-id list replaces the cart wholesale, and any invalid/non-existent ids in the list are silently skipped.","1. Log in and note a valid course id.
+2. Prepare POST /api/v1/cart/sync body {""courseIds"":[<valid id>, 999999]} (999999 confirmed unused).
+3. Send the request.
+4. Prepare and send GET /api/v1/cart to confirm only the valid course is present.","1. 200 OK; the cart now contains only the valid course — id 999999 is silently ignored, no error.","- Logged in; a valid course id and an unused id 999999."
+Create Payment (Checkout),,,,
+PAYMENT_FT05,"Checking out a fully-free course (price 0 or unset) bypasses PayOS entirely and enrolls the learner immediately.","1. Log in and identify a course with price ≤0.
+2. Prepare POST /api/v1/payment/create body {""courseId"":<a free course>}.
+3. Send the request and inspect the response.
+4. Confirm an Enrollment row was created and any matching cart item was removed.","1. 200 OK; PaymentResponseDTO{paymentUrl:""FREE_SUCCESS"", qrCode:null, txnRef:""FREE_..."", amount:0}; an Enrollment is created immediately, the matching cart item (if any) is removed, and a notification/email is fired — no PayOS redirect involved.","- Logged in; a course with price ≤0 exists."
+PAYMENT_FT06,"Requesting checkout with no course information supplied returns a masked 500 rather than a clean 400 (confirmed gap).","1. Log in as any role.
+2. Prepare POST /api/v1/payment/create body {} (no courseId, no courseIds).
+3. Send the request.
+4. Inspect the response status and message.","1. 500 Internal Server Error, {""error"":""Không tìm thấy thông tin khóa học thanh toán.""} — Vietnamese message, but delivered at 500 not 400.","- Logged in."
+PAYMENT_FT07,"Checking out a course the caller already owns entirely also produces a masked 500, not a clean 409/400.","1. Log in and identify a course the caller already fully owns.
+2. Prepare POST /api/v1/payment/create body {""courseId"":<already fully enrolled>}.
+3. Send the request.
+4. Inspect the response status and message.","1. 500 Internal Server Error, {""error"":""User is already enrolled in all selected courses.""}.","- Logged in; a course the caller already owns."
+PAYMENT_FT08,"A mixed multi-course checkout — one course already owned, one not — only charges for the unowned course, while still forwarding both course ids to PayOS.","1. Log in and identify one owned course and one unowned, paid course.
+2. Prepare POST /api/v1/payment/create body {""courseIds"":[<owned>,<not owned, paid>]}.
+3. Send the request and inspect the returned totalAmount.
+4. Inspect the underlying PayOS orderCode/description for whether both course ids are referenced.","1. 200 OK; totalAmount reflects only the NOT-owned course's price, but the resulting PayOS orderCode/description still references both course ids in courseIdsStr — worth confirming this doesn't double-charge or silently drop the owned course from the record.","- Logged in; one owned + one unowned paid course."
+PAYMENT_FT09,"Polling payment status for a transaction belonging to a different user returns 404 with a generic \"Unauthorized\" body rather than 403.","1. Log in as User A and create a payment; note its txnRef.
+2. Log out and log in as unrelated User B.
+3. Prepare and send GET /api/v1/payment/status/{txnRefBelongingToUserA} as User B.
+4. Inspect the response status and message.","1. 404 Not Found, {""error"":""Unauthorized""} — a 404 status is used for both ""not found"" and ""not yours"" cases uniformly.","- A payment record belonging to User A exists; caller is User B."
+PAYMENT_FT10,"Polling a completely non-existent txnRef returns 404 with a distinct \"Payment not found\" message.","1. Log in as any role.
+2. Prepare GET /api/v1/payment/status/GARBAGE-REF (a txnRef confirmed not to exist).
+3. Send the request.
+4. Inspect the response status and message, comparing it against PAYMENT_FT09's wording.","1. 404 Not Found, {""error"":""Payment not found""}.","- ""GARBAGE-REF"" unused."
+Handle PayOS Webhook,,,,
+PAYMENT_FT11,"A webhook payload whose signature doesn't match the computed HMAC is rejected before any database lookup happens.","1. Build a webhook JSON payload for a real payment's orderCode.
+2. Deliberately corrupt/mismatch the signature field.
+3. Prepare and send POST /api/v1/payment/payos-webhook with that payload.
+4. Inspect the response status and confirm the target Payment row is untouched.","1. 400 Bad Request, {""error"":""Invalid webhook signature""}; no Payment row is looked up or modified — verified before any DB access.","- A crafted payload with a deliberately wrong signature."
+PAYMENT_FT12,"Re-delivering an already-processed (SUCCESS) webhook is a safe, idempotent no-op that doesn't duplicate any side effects.","1. Deliver a valid, correctly-signed success webhook for a payment, moving it to SUCCESS.
+2. Confirm the resulting Enrollment/notification/cart-cleanup occurred once.
+3. Re-deliver the IDENTICAL webhook payload again.
+4. Inspect the second response and confirm no duplicate side effects occurred.","1. Step 3-4: 200 {""success"":true}; no duplicate enrollment, no duplicate notification/cart deletion — short-circuited by the already-SUCCESS check.","- A payment already moved to SUCCESS via a prior webhook delivery."
+PAYMENT_FT13,"A webhook referencing an unknown/nonexistent orderCode silently returns success with nothing changed in the database.","1. Build a validly-signed webhook payload whose data.orderCode doesn't match any real Payment row.
+2. Prepare and send POST /api/v1/payment/payos-webhook with that payload.
+3. Inspect the response status.
+4. Confirm no Payment row anywhere in the database was modified.","1. 200 {""success"":true} — no error surfaced, and (by design) nothing in the database changes, since the Optional lookup is simply empty.","- A validly-signed payload referencing a nonexistent orderCode."
+PAYMENT_FT14,"A successful webhook computes the trainer/platform revenue split correctly based on the course creator's trainer type.","1. Create and deliver a successful webhook for a payment whose course creator's TrainerProfile.trainerType=PROFESSIONAL; inspect the resulting platformFee/trainerEarnings split.
+2. Repeat for a payment whose creator's trainerType=PEER_TUTOR; inspect its split.
+3. Compare both splits against the expected percentages.","1. Step 1: platformFee=30% of gross, trainerEarnings=70%.
+2. Step 2: platformFee=40% of gross, trainerEarnings=60%. Both scaled to 2dp HALF_UP, settlementStatus=PENDING.","- Two payments, one per trainer type, ready to be confirmed via webhook."
+PAYMENT_FT15,"A successful webhook for a multi-course purchase auto-enrolls the payer only in the courses they don't already own, while still cleaning up every matching cart item.","1. Prepare a multi-course payment where the payer already owns one of the courses.
+2. Deliver the successful webhook for that payment.
+3. Inspect the Enrollment/notification results for the not-yet-enrolled course(s).
+4. Confirm the already-owned course's cart item was still removed, with no duplicate Enrollment/notification created for it.","1. The not-yet-enrolled course(s) get a new Enrollment + creator notification + cart-item deletion; the already-enrolled course's cart item is still deleted (cleanup) but no duplicate Enrollment/notification is created for it.","- A multi-course payment where the payer already owns one of the courses."
+View/Search Payments (Manager),,,,
+PAYMENT_FT16,"A privileged role can list all transactions and export them to Excel; a genuine export failure returns a distinctly-empty 500 body.","1. Log in as TRAINER_LEAD/COURSE_MANAGER/ADMINISTRATOR in an environment with transaction data.
+2. Prepare and send GET /api/v1/payment/manager/all; inspect the filterable results.
+3. Prepare and send GET /api/v1/payment/manager/export-excel; inspect the returned file.
+4. (If reproducible) force an export failure and inspect the resulting response body shape.","1. Steps 2-3: 200 OK with filterable transaction data / a binary .xlsx respectively.
+2. Step 4: 500 Internal Server Error with a completely NULL body — a distinct shape from every other error response in this controller.","- Privileged role logged in; transaction data exists."
+Trainer Revenue Summary / Statements,,,,
+PAYMENT_FT17,"A trainer views their own revenue summary and statement list, correctly scoped to their own data only.","1. Log in as a TRAINER holding VIEW_OWN_REVENUE with ≥1 statement.
+2. Prepare and send GET /api/v1/trainer/revenue-summary; inspect the response.
+3. Prepare and send GET /api/v1/trainer/statements; inspect the response.
+4. Confirm every entry belongs to the caller.","1. Both: 200 OK, data scoped only to the caller's own statements/payments.","- Logged in trainer with VIEW_OWN_REVENUE; has ≥1 statement."
+PAYMENT_FT18,"Confirming or rejecting another trainer's statement is masked to a generic 500 instead of a clean 403/404.","1. Log in as Trainer A and identify a PENDING_TRAINER_CONFIRM statement of their own; note its id.
+2. Log out and log in as unrelated Trainer B.
+3. Prepare and send POST /api/v1/trainer/statements/{idOwnedByTrainerA}/confirm as Trainer B.
+4. Inspect the response status and body.","1. 500 Internal Server Error, generic masked body — the real ""Unauthorized statement access"" RuntimeException never reaches the client as a clean 403.","- A statement owned by Trainer A exists; caller is Trainer B."
+PAYMENT_FT19,"A trainer rejecting their own statement stores the supplied reason and moves the statement to REJECTED.","1. Log in as the owning trainer and identify a PENDING_TRAINER_CONFIRM statement.
+2. Prepare POST /api/v1/trainer/statements/{id}/reject body {""reason"":""Amount looks wrong""}.
+3. Send the request.
+4. Inspect the statement's resulting status and adminNotes.","1. 200 OK; status=REJECTED; adminNotes includes ""Rejected by Trainer: Amount looks wrong"".","- Owning trainer; statement in PENDING_TRAINER_CONFIRM."
+Course-Manager Statement Generation & Settlement,,,,
+PAYMENT_FT20,"Generating the monthly cutoff sweeps ALL eligible pending payments for a trainer regardless of age, and re-running it later upserts newly-eligible payments into the SAME statement rather than creating a duplicate.","1. Log in as COURSE_MANAGER and prepare/send POST /api/v1/course-manager/statements/generate?periodMonth=2026-08 for a trainer with eligible payments; note the resulting statement.
+2. Have a new SUCCESS payment for that same trainer land with settlementStatus=PENDING.
+3. Re-run the same generate call for the same periodMonth.
+4. Inspect the statement afterward to confirm it's the same row, now including the new payment.","1. Step 1: creates/updates one statement per trainer with eligible payments.
+2. Step 3-4: the SAME statement row is found and re-summed to include the newly-eligible payment — even if it was already PENDING_TRAINER_CONFIRM from step 1 (the lookup doesn't gate on status).","- COURSE_MANAGER logged in; a trainer with ≥1 SUCCESS, settlementStatus=PENDING payment."
+PAYMENT_FT21,"The 10% PIT tax threshold is inclusive at exactly 2,000,000 VND gross, and no tax applies just below it.","1. Arrange a trainer/period whose trainerGrossSum will compute to exactly 2,000,000; generate the statement and inspect pitTaxAmount.
+2. Arrange a second trainer/period whose gross computes to 1,999,999; generate that statement and inspect pitTaxAmount.
+3. Compare both results.","1. Statement 1: pitTaxAmount = 10% of gross (tax applies at exactly the threshold, per >= comparison).
+2. Statement 2: pitTaxAmount = 0, netPayoutAmount = full gross.","- Two trainers/periods arranged to produce these exact gross totals."
+PAYMENT_FT22,"Settling a statement validates the bank reference and receipt URL format server-side, but validation failures are masked to 500 instead of a clean 400; .webp receipts are explicitly rejected.","1. Log in as COURSE_MANAGER and identify a PENDING_TRAINER_CONFIRM or TRAINER_CONFIRMED statement.
+2. Prepare POST /api/v1/course-manager/statements/{id}/settle body {""bankTxnRef"":""ab"",""payoutReceiptUrl"":""https://x.com/receipt.webp""} (ref too short, webp format).
+3. Send the request.
+4. Inspect the response status and confirm the statement was not settled.","1. 500 Internal Server Error — the real IllegalArgumentException message (""Invalid receipt file format. Only JPG, JPEG, and PNG images are allowed (WEBP is excluded)."" or a bankTxnRef-length message) is masked, not surfaced as a clean 400.","- COURSE_MANAGER logged in; a PENDING_TRAINER_CONFIRM or TRAINER_CONFIRMED statement exists."
+PAYMENT_FT23,"A valid settle call marks the statement PAID and every linked payment SETTLED.","1. Log in as COURSE_MANAGER and identify a statement ready to settle.
+2. Prepare POST /api/v1/course-manager/statements/{id}/settle body {""bankTxnRef"":""FT123456"",""payoutReceiptUrl"":""https://x.com/receipt.png""}.
+3. Send the request.
+4. Inspect the statement's status/paidAt and every linked Payment's settlementStatus.","1. 200 OK; statement.status=PAID, paidAt set; every linked Payment.settlementStatus becomes SETTLED; a settlement email is attempted (best-effort).","- A statement ready to settle exists."
+PAYMENT_FT24,"Cancelling a statement releases its linked payments back to pending settlement, making them eligible to be swept into the next cutoff run.","1. Log in as COURSE_MANAGER and identify a statement with ≥1 linked payment.
+2. Prepare and send POST /api/v1/course-manager/statements/{id}/cancel.
+3. Inspect the statement's status and its linked payments' settlementStatus.
+4. Re-run the generate cutoff for the same trainer/period and confirm those payments are swept in again.","1. Step 2-3: status=CANCELLED; linked payments' settlementStatus reset to PENDING, statementId cleared.
+2. Step 4: those payments are swept into a fresh (or the regenerated) statement again.","- A statement with ≥1 linked payment exists."
+PAYMENT_FT25,"Regenerating a statement is only legal from REJECTED or CANCELLED status; attempting it from any other status is masked to 500 rather than a clean error.","1. Log in as COURSE_MANAGER and identify a statement currently in PENDING_TRAINER_CONFIRM (not REJECTED/CANCELLED).
+2. Prepare and send POST /api/v1/course-manager/statements/{id}/regenerate.
+3. Inspect the response status and message.","1. 500 Internal Server Error — the real IllegalStateException (""Only REJECTED or CANCELLED statements can be recalculated & regenerated."") is masked, not delivered as a clean 400.","- A statement in PENDING_TRAINER_CONFIRM status."
+PAYMENT_FT26,"A role lacking the required authority is correctly rejected with a proper 403 — a contrast with this module's many other masked-500 gaps, since @PreAuthorize fires before the controller's own try/catch ever runs.","1. Log in as a plain LEARNER.
+2. Prepare POST /api/v1/course-manager/statements/generate?periodMonth=2026-08 with that account's Authorization header.
+3. Send the request.
+4. Inspect the response status and message.","1. 403 Forbidden, {""message"": ""Access denied. You do not have permission to use this function or it has been deactivated by an administrator.""} — this specific denial IS cleanly surfaced, since @PreAuthorize fires before the controller method body (and its lack of local try/catch) ever runs.","- Plain LEARNER logged in."

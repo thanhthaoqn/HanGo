@@ -45,10 +45,13 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
-  final TextEditingController _learningObjectivesController = TextEditingController();
-  final TextEditingController _estimatedTimeController = TextEditingController();
+  final TextEditingController _learningObjectivesController =
+      TextEditingController();
+  final TextEditingController _estimatedTimeController =
+      TextEditingController();
   final TextEditingController _descController = TextEditingController();
-  final MarkdownTextEditingController _questionController = MarkdownTextEditingController();
+  final MarkdownTextEditingController _questionController =
+      MarkdownTextEditingController();
 
   // Upload states
   String? _uploadedImageUrl;
@@ -72,9 +75,11 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       _titleController.text = lesson['title'] ?? '';
       _codeController.text = lesson['lessonCode'] ?? '';
       _learningObjectivesController.text = lesson['learningObjectives'] ?? '';
-      _estimatedTimeController.text = lesson['estimatedTimeMinutes']?.toString() ?? '';
+      _estimatedTimeController.text =
+          lesson['estimatedTimeMinutes']?.toString() ?? '';
       _descController.text = lesson['description'] ?? '';
-      _questionController.text = lesson['questionText'] ?? lesson['content'] ?? '';
+      _questionController.text =
+          lesson['questionText'] ?? lesson['content'] ?? '';
       _uploadedPdfName = (lesson['pdfName'] as String?)?.isNotEmpty == true
           ? lesson['pdfName']
           : null;
@@ -118,9 +123,13 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         setState(() {
           _titleController.text = detail.title;
           _questionController.text = detail.content;
-          if (detail.lessonCode != null) _codeController.text = detail.lessonCode!;
-          if (detail.learningObjectives != null) _learningObjectivesController.text = detail.learningObjectives!;
-          if (detail.estimatedTimeMinutes != null) _estimatedTimeController.text = detail.estimatedTimeMinutes.toString();
+          if (detail.lessonCode != null)
+            _codeController.text = detail.lessonCode!;
+          if (detail.learningObjectives != null)
+            _learningObjectivesController.text = detail.learningObjectives!;
+          if (detail.estimatedTimeMinutes != null)
+            _estimatedTimeController.text = detail.estimatedTimeMinutes
+                .toString();
         });
       }
     } catch (e) {
@@ -171,14 +180,14 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     });
 
     try {
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/raw/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/raw/upload',
+      );
       final request = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          file.bytes,
-          filename: file.name,
-        ));
+        ..files.add(
+          http.MultipartFile.fromBytes('file', file.bytes, filename: file.name),
+        );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
@@ -193,7 +202,10 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         });
 
         if (mounted) {
-          ToastHelper.showSuccess(context, 'PDF document uploaded successfully.');
+          ToastHelper.showSuccess(
+            context,
+            'PDF document uploaded successfully.',
+          );
         }
       } else {
         throw Exception('Failed to upload PDF. Status: ${response.statusCode}');
@@ -241,22 +253,39 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       final selectedText = text.substring(start, end);
 
       // Case 1: The selection INCLUDES the tags (e.g., they selected "**bold**")
-      if (tagOpen.isNotEmpty && tagClose.isNotEmpty && selectedText.startsWith(tagOpen) && selectedText.endsWith(tagClose)) {
-        final innerText = selectedText.substring(tagOpen.length, selectedText.length - tagClose.length);
+      if (tagOpen.isNotEmpty &&
+          tagClose.isNotEmpty &&
+          selectedText.startsWith(tagOpen) &&
+          selectedText.endsWith(tagClose)) {
+        final innerText = selectedText.substring(
+          tagOpen.length,
+          selectedText.length - tagClose.length,
+        );
         final newText = text.replaceRange(start, end, innerText);
         _questionController.text = newText;
-        _questionController.selection = TextSelection.collapsed(offset: start + innerText.length);
+        _questionController.selection = TextSelection.collapsed(
+          offset: start + innerText.length,
+        );
         return;
       }
-      
+
       // Case 2: The selection is INSIDE the tags (e.g., they selected "bold" inside "**bold**", or they just have blinking cursor inside "**|**")
-      if (tagOpen.isNotEmpty && tagClose.isNotEmpty && start >= tagOpen.length && end <= text.length - tagClose.length) {
+      if (tagOpen.isNotEmpty &&
+          tagClose.isNotEmpty &&
+          start >= tagOpen.length &&
+          end <= text.length - tagClose.length) {
         final before = text.substring(start - tagOpen.length, start);
         final after = text.substring(end, end + tagClose.length);
         if (before == tagOpen && after == tagClose) {
-          final newText = text.replaceRange(start - tagOpen.length, end + tagClose.length, selectedText);
+          final newText = text.replaceRange(
+            start - tagOpen.length,
+            end + tagClose.length,
+            selectedText,
+          );
           _questionController.text = newText;
-          _questionController.selection = TextSelection.collapsed(offset: start - tagOpen.length + selectedText.length);
+          _questionController.selection = TextSelection.collapsed(
+            offset: start - tagOpen.length + selectedText.length,
+          );
           return;
         }
       }
@@ -281,7 +310,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
     final title = _titleController.text.trim();
     final code = _codeController.text.trim();
     final objectives = _learningObjectivesController.text.trim();
-    final estimatedTime = int.tryParse(_estimatedTimeController.text.trim()) ?? 0;
+    final estimatedTime =
+        int.tryParse(_estimatedTimeController.text.trim()) ?? 0;
     final desc = _descController.text.trim();
     final question = _questionController.text.trim();
 
@@ -290,7 +320,10 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       return;
     }
     if (title.length > 100) {
-      ToastHelper.showError(context, 'Lesson title cannot exceed 100 characters');
+      ToastHelper.showError(
+        context,
+        'Lesson title cannot exceed 100 characters',
+      );
       return;
     }
     if (code.length > 20) {
@@ -298,15 +331,24 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
       return;
     }
     if (desc.length > 500) {
-      ToastHelper.showError(context, 'Description cannot exceed 500 characters');
+      ToastHelper.showError(
+        context,
+        'Description cannot exceed 500 characters',
+      );
       return;
     }
     if (objectives.length > 1000) {
-      ToastHelper.showError(context, 'Learning objectives cannot exceed 1000 characters');
+      ToastHelper.showError(
+        context,
+        'Learning objectives cannot exceed 1000 characters',
+      );
       return;
     }
     if (estimatedTime <= 0) {
-      ToastHelper.showError(context, 'Please enter a valid estimated time (> 0 minutes)');
+      ToastHelper.showError(
+        context,
+        'Please enter a valid estimated time (> 0 minutes)',
+      );
       return;
     }
 
@@ -409,16 +451,27 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                             SizedBox(
                               width: 280,
                               child: SingleChildScrollView(
-                                padding: const EdgeInsets.fromLTRB(24, 0, 0, 24),
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  0,
+                                  0,
+                                  24,
+                                ),
                                 child: _buildLeftPanel(context),
                               ),
                             ),
                             const SizedBox(width: 24),
                             Expanded(
                               child: SingleChildScrollView(
-                                padding: const EdgeInsets.fromLTRB(0, 0, 24, 24),
+                                padding: const EdgeInsets.fromLTRB(
+                                  0,
+                                  0,
+                                  24,
+                                  24,
+                                ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     _buildMainFormCard(section),
                                     const SizedBox(height: 24),
@@ -676,7 +729,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               // Item 2: Syllabus
               InkWell(
                 onTap: () {
-                  Navigator.pop(context); // Pops back to CreateLessonPage (Syllabus)
+                  Navigator.pop(
+                    context,
+                  ); // Pops back to CreateLessonPage (Syllabus)
                 },
                 borderRadius: BorderRadius.circular(8),
                 child: ClipRRect(
@@ -1259,7 +1314,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                       setState(() {});
                     },
                     decoration: const InputDecoration(
-                      hintText: 'Enter your lesson content here... (Format highlights in real-time)',
+                      hintText:
+                          'Enter your lesson content here... (Format highlights in real-time)',
                       hintStyle: TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 14,
@@ -1518,7 +1574,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
               color: Color(0xFF1E293B),
             ),
           ),
-
         ],
       ),
     );
@@ -1668,52 +1723,95 @@ class MarkdownTextEditingController extends TextEditingController {
 
         if (matchedText.startsWith('**') && matchedText.endsWith('**')) {
           final content = matchedText.substring(2, matchedText.length - 2);
-          children.add(const TextSpan(text: '**', style: TextStyle(fontSize: 0, color: Colors.transparent)));
-          children.add(TextSpan(
-            text: content,
-            style: matchStyle.copyWith(
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF0F172A),
+          children.add(
+            const TextSpan(
+              text: '**',
+              style: TextStyle(fontSize: 0, color: Colors.transparent),
             ),
-          ));
-          children.add(const TextSpan(text: '**', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+          );
+          children.add(
+            TextSpan(
+              text: content,
+              style: matchStyle.copyWith(
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          );
+          children.add(
+            const TextSpan(
+              text: '**',
+              style: TextStyle(fontSize: 0, color: Colors.transparent),
+            ),
+          );
         } else if (matchedText.startsWith('*') && matchedText.endsWith('*')) {
           final content = matchedText.substring(1, matchedText.length - 1);
-          children.add(const TextSpan(text: '*', style: TextStyle(fontSize: 0, color: Colors.transparent)));
-          children.add(TextSpan(
-            text: content,
-            style: matchStyle.copyWith(
-              fontStyle: FontStyle.italic,
-              color: const Color(0xFF0F172A),
+          children.add(
+            const TextSpan(
+              text: '*',
+              style: TextStyle(fontSize: 0, color: Colors.transparent),
             ),
-          ));
-          children.add(const TextSpan(text: '*', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+          );
+          children.add(
+            TextSpan(
+              text: content,
+              style: matchStyle.copyWith(
+                fontStyle: FontStyle.italic,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          );
+          children.add(
+            const TextSpan(
+              text: '*',
+              style: TextStyle(fontSize: 0, color: Colors.transparent),
+            ),
+          );
         } else if (matchedText.startsWith('`') && matchedText.endsWith('`')) {
           final content = matchedText.substring(1, matchedText.length - 1);
-          children.add(const TextSpan(text: '`', style: TextStyle(fontSize: 0, color: Colors.transparent)));
-          children.add(TextSpan(
-            text: content,
-            style: matchStyle.copyWith(
-              fontFamily: 'monospace',
-              backgroundColor: const Color(0xFFF1F5F9),
-              color: const Color(0xFF0F172A),
+          children.add(
+            const TextSpan(
+              text: '`',
+              style: TextStyle(fontSize: 0, color: Colors.transparent),
             ),
-          ));
-          children.add(const TextSpan(text: '`', style: TextStyle(fontSize: 0, color: Colors.transparent)));
+          );
+          children.add(
+            TextSpan(
+              text: content,
+              style: matchStyle.copyWith(
+                fontFamily: 'monospace',
+                backgroundColor: const Color(0xFFF1F5F9),
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          );
+          children.add(
+            const TextSpan(
+              text: '`',
+              style: TextStyle(fontSize: 0, color: Colors.transparent),
+            ),
+          );
         } else if (matchedText.startsWith('#')) {
           final matchIndex = matchedText.indexOf(' ');
           if (matchIndex != -1) {
             final hashes = matchedText.substring(0, matchIndex + 1);
             final content = matchedText.substring(matchIndex + 1);
-            children.add(TextSpan(text: hashes, style: const TextStyle(fontSize: 0, color: Colors.transparent)));
-            children.add(TextSpan(
-              text: content,
-              style: matchStyle.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: (style?.fontSize ?? 14) * 1.15,
-                color: const Color(0xFF20B486),
+            children.add(
+              TextSpan(
+                text: hashes,
+                style: const TextStyle(fontSize: 0, color: Colors.transparent),
               ),
-            ));
+            );
+            children.add(
+              TextSpan(
+                text: content,
+                style: matchStyle.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: (style?.fontSize ?? 14) * 1.15,
+                  color: const Color(0xFF20B486),
+                ),
+              ),
+            );
           } else {
             children.add(TextSpan(text: matchedText, style: matchStyle));
           }
@@ -1722,16 +1820,31 @@ class MarkdownTextEditingController extends TextEditingController {
           final closeParen = matchedText.lastIndexOf(')');
           if (closeBracket != -1 && closeParen != -1) {
             final textPart = matchedText.substring(1, closeBracket);
-            final urlPart = matchedText.substring(closeBracket, closeParen + 1); // contains ](url)
-            children.add(const TextSpan(text: '[', style: TextStyle(fontSize: 0, color: Colors.transparent)));
-            children.add(TextSpan(
-              text: textPart,
-              style: matchStyle.copyWith(
-                color: const Color(0xFF2563EB),
-                decoration: TextDecoration.underline,
+            final urlPart = matchedText.substring(
+              closeBracket,
+              closeParen + 1,
+            ); // contains ](url)
+            children.add(
+              const TextSpan(
+                text: '[',
+                style: TextStyle(fontSize: 0, color: Colors.transparent),
               ),
-            ));
-            children.add(TextSpan(text: urlPart, style: const TextStyle(fontSize: 0, color: Colors.transparent)));
+            );
+            children.add(
+              TextSpan(
+                text: textPart,
+                style: matchStyle.copyWith(
+                  color: const Color(0xFF2563EB),
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            );
+            children.add(
+              TextSpan(
+                text: urlPart,
+                style: const TextStyle(fontSize: 0, color: Colors.transparent),
+              ),
+            );
           } else {
             children.add(TextSpan(text: matchedText, style: matchStyle));
           }
@@ -1747,4 +1860,3 @@ class MarkdownTextEditingController extends TextEditingController {
     return TextSpan(style: style, children: children);
   }
 }
-

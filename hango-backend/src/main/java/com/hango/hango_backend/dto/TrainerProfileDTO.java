@@ -1,15 +1,18 @@
 package com.hango.hango_backend.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TrainerProfileDTO {
     private Long userId;
     private String trainerType; // PROFESSIONAL | PEER_TUTOR
@@ -19,6 +22,9 @@ public class TrainerProfileDTO {
 
     // documents
     private String scoreReportUrl;
+    private String pedagogicalDegreeUrl;
+    private String cvUrl;
+    private List<TrainerDocumentDTO> certificates;
 
     // payout
     private String bankName;

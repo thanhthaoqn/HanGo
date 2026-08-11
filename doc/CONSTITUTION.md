@@ -19,7 +19,7 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 - **State Management (Frontend):** Completely separate UI and Logic. Do not make direct API calls inside the `build()` function.
 
 ## 3. Frontend Guidelines (Flutter & UI/UX)
-- **Framework & Libraries:** Dart `^3.12.0`, Flutter. **Current baseline (as actually implemented, audited 2026-07-24):** state management is a single root `ChangeNotifierProvider<AppState>` (package `provider`) plus per-page `StatefulWidget` + `setState()` — new screens should follow this same pattern for consistency rather than introducing Riverpod ad hoc. Routing is imperative `Navigator.push`/`MaterialPageRoute` — there is no centralized route table today. Networking uses `package:http` directly per repository/service (the `dio` dependency is declared in `pubspec.yaml` but currently unused). *Adopting Riverpod/go_router/Dio project-wide remains an open option for a future version — see [`ROADMAP.md`](ROADMAP.md) — but is not the current standard; don't introduce them piecemeal in a single new screen.*
+- **Framework & Libraries:** Dart `^3.12.0`, Flutter. **Current baseline (as actually implemented, re-verified 2026-08-10):** state management is a single root `ChangeNotifierProvider<AppState>` (package `provider`) plus per-page `StatefulWidget` + `setState()` — new screens should follow this same pattern for consistency rather than introducing Riverpod ad hoc. Routing is imperative `Navigator.push`/`MaterialPageRoute` — there is no centralized route table today. Networking uses `package:http` directly per repository/service (the `dio` dependency is declared in `pubspec.yaml` but currently unused). *Adopting Riverpod/go_router/Dio project-wide remains an open option for a future version (see `HanGo_Documentation.md` §23) but is not the current standard; don't introduce them piecemeal in a single new screen.*
 - **Colors & UI/UX:**
   - **Primary Color:** Teal Green (`#20B486`). 
   - **Background & Text:** Slate 50 (`#F8FAFC`) for background, Slate 800 (`#1E293B`) for text.
@@ -33,7 +33,7 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 - **Framework & Libraries:** Java 17, Spring Boot 4.0.6.
 - **Entities & DTOs:** 
   - ABSOLUTELY DO NOT return `@Entity` directly from the Controller to the client — this rule **is** followed consistently in the current code.
-  - Always use DTOs (Data Transfer Objects) for Request/Response. **Current baseline:** mapping is done manually (Lombok `@Builder` chains or field-by-field copies inside services) — MapStruct is **not** actually used anywhere in the codebase today despite earlier plans. Keep using the existing manual-mapping style for consistency unless the team decides to adopt MapStruct project-wide (see [`ROADMAP.md`](ROADMAP.md)); don't introduce it for a single new DTO only.
+  - Always use DTOs (Data Transfer Objects) for Request/Response. **Current baseline:** mapping is done manually (Lombok `@Builder` chains or field-by-field copies inside services) — MapStruct is **not** actually used anywhere in the codebase today despite earlier plans. Keep using the existing manual-mapping style for consistency unless the team decides to adopt MapStruct project-wide; don't introduce it for a single new DTO only.
 - **Lombok:** Optimize boilerplate code using annotations such as `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`.
 - **Validation:** Mandatory application of input validation annotations (e.g., `@Valid`, `@NotBlank`, `@NotNull`) on request DTOs.
 
@@ -73,9 +73,9 @@ This document is the "Constitution" of the HanGo EdTech Platform project. All AI
 - **Pull Request (PR):** All generated code should be pushed to a separate branch, not automatically committed directly to the `main` or `dev` branch.
 
 ## 9. Testing Requirements
-- **Frontend:** Write Unit Tests and Widget Tests for important components and features. **Current baseline:** only 2 test files exist today (one model test, one widget test) — this is a known gap, not a target state; see [`AUDIT_REPORT.md`](AUDIT_REPORT.md) HIGH-08 and [`ROADMAP.md`](ROADMAP.md).
-- **Backend:** Mandatory Unit Tests using JUnit 5 and Mockito, **Service layer only** (Controller-layer tests are out of scope except where real business logic lives directly in a Controller with no backing Service — see `agent_qa.md`). Testcontainers/`@SpringBootTest` integration tests are aspirational — none exist in the current suite (517 Service-layer unit tests, 0 integration tests as of 2026-07-24).
-- Full strategy, priorities and test case catalogue: [`TESTING.md`](TESTING.md), [`agent_qa.md`](agent_qa.md), [`specs/unit_test_plan.md`](specs/unit_test_plan.md), [`TEST_AUDIT_REPORT.md`](TEST_AUDIT_REPORT.md).
+- **Frontend:** Write Unit Tests and Widget Tests for important components and features. **Current baseline:** only 4 test files exist today (up from 2) — still a known gap covering a small fraction of the ~75 pages, not a target state.
+- **Backend:** Mandatory Unit Tests using JUnit 5 and Mockito, **Service layer only** (Controller-layer tests are out of scope except where real business logic lives directly in a Controller with no backing Service — see `agent_qa.md`). Testcontainers/`@SpringBootTest` integration tests are aspirational — none exist in the current suite (~36 Service-layer test classes as of 2026-08-10; the new Ticket module has no tests yet).
+- Full strategy, priorities and test case catalogue: [`test_doc/TESTING.md`](test_doc/TESTING.md), [`agent_qa.md`](agent_qa.md), [`test_doc/unit_test_plan.md`](test_doc/unit_test_plan.md).
 
 ## 10. AI Prompting Workflow
 When a Developer assigns a task to AI, Context must be provided in the following standard format:

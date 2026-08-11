@@ -34,4 +34,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     List<Enrollment> findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(Long creatorId);
 
     List<Enrollment> findByCourseIdIn(List<Long> courseIds);
+
+    @Query("SELECT COUNT(DISTINCT e.user.id) FROM Enrollment e WHERE e.course.id IN :courseIds")
+    int countDistinctUsersByCourseIdIn(@Param("courseIds") List<Long> courseIds);
 }

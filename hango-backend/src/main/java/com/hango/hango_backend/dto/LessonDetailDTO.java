@@ -31,4 +31,6 @@ public class LessonDetailDTO {
     
     private String mediaFileUrl;
     private String mediaType;
+    private String itemType;
+    private String videoTranscript;
 }

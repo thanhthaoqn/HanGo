@@ -9,8 +9,8 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Cấu trúc request theo đúng format của Gemini API (v1beta generateContent).
- * Tham khảo: https://ai.google.dev/api/generate-content
+ * Request payload structure matching Gemini API (v1beta generateContent).
+ * Reference: https://ai.google.dev/api/generate-content
  */
 @Data
 @Builder
@@ -44,8 +44,29 @@ public class GeminiGenerateRequest {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Part {
         private String text;
+        private FileData fileData;
+        private InlineData inlineData;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FileData {
+        private String mimeType;
+        private String fileUri;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class InlineData {
+        private String mimeType;
+        private String data;
     }
 
     @Data

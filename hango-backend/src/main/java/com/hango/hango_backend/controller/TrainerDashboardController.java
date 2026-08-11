@@ -6,6 +6,8 @@ import com.hango.hango_backend.dto.CourseImportResultDTO;
 import com.hango.hango_backend.service.CourseImportService;
 import com.hango.hango_backend.service.ExamHistoryService;
 import com.hango.hango_backend.service.TrainerDashboardService;
+import com.hango.hango_backend.service.GeminiClientService;
+import com.hango.hango_backend.dto.GenerateTranscriptRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -38,6 +40,23 @@ public class TrainerDashboardController {
     private final CloudinaryService cloudinaryService;
     private final CourseImportService courseImportService;
     private final ExamHistoryService examHistoryService;
+    private final GeminiClientService geminiClientService;
+
+    @PostMapping("/courses/generate-transcript")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> generateVideoTranscript(@RequestBody GenerateTranscriptRequest request) {
+        try {
+            if (request == null || request.getVideoUrl() == null || request.getVideoUrl().isBlank()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"videoUrl is required\"}");
+            }
+            String transcript = geminiClientService.generateVideoTranscript(request.getVideoUrl());
+            // Return JSON so the Frontend can parse it easily
+            return ResponseEntity.ok(java.util.Map.of("transcript", transcript));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
+        }
+    }
 
     @PostMapping("/courses/upload")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")

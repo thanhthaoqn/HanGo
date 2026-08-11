@@ -1,0 +1,96 @@
+Feature,Course Content Management
+Test requirement,Functional integration tests for lesson content/progress (LessonController) and course-scoped question authoring (SectionQuestionController)
+Number of TCs,19
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,19,0
+Round 2,0,0,19,0
+Round 3,0,0,19,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Lesson Detail,,,,
+COURSECONTENT_FT01,"Anyone can view a lesson's detail — content, questions, and estimated time — without logging in.","1. Identify a lesson that belongs to a published course.
+2. Discard any Authorization token.
+3. Prepare and send GET /api/v1/lessons/{id}.
+4. Inspect the response body's content, questions[], and estimatedTime fields, and confirm isCompleted=false.","1. 200 OK; LessonDetailDTO returned (content, questions[], estimatedTime, etc.); isCompleted=false since no user context.","- A lesson exists."
+COURSECONTENT_FT02,"A lesson's quiz questions always include the correct-answer index in the raw response, regardless of whether the caller ever attempted the quiz (confirmed pre-attempt answer leak).","1. Identify a lesson with at least one quiz question, for a caller who has never attempted it.
+2. Prepare and send GET /api/v1/lessons/{id}.
+3. Open the raw JSON response (via DevTools/Network tab, not a pretty-printed summary) and locate the questions[] array.
+4. Inspect each question object for a correctIndex field.","1. Each question object includes a populated correctIndex, viewable before any quiz attempt — verify via DevTools/Network raw response body.","- A lesson with ≥1 quiz question exists."
+COURSECONTENT_FT03,"Requesting a lesson id that doesn't exist returns a masked 500 instead of a clean 404.","1. Confirm id 999999 does not correspond to any real lesson.
+2. Prepare and send GET /api/v1/lessons/999999.
+3. Inspect the response status and body message.","1. 500 Internal Server Error, generic body ""An internal system error occurred. Please try again later."" — the real ""Lesson not found"" reason is not surfaced.","- id 999999 unused."
+Mark Lesson Complete,,,,
+COURSECONTENT_FT04,"Marking a lesson complete uses only the caller's JWT identity — there is no client-controlled user-id parameter (regression check for a previously-fixed identity-spoofing gap).","1. Log in as any role and identify a lesson to mark complete.
+2. Prepare PUT /api/v1/lessons/{id}/complete?completed=true with the caller's Authorization header.
+3. Send the request and confirm no userId query parameter has any effect if appended.
+4. Query the LessonProgress row for the caller's own user id to confirm it was written.","1. 200 OK {""message"": ""Lesson progress updated successfully""}; the LessonProgress row is written for the CALLER's own id regardless of any extra query params supplied.","- Logged in; lesson exists."
+COURSECONTENT_FT05,"Any authenticated user of any role can mark any lesson complete, even without being enrolled in the course, since no enrollment check exists.","1. Log in as a user confirmed NOT enrolled in the course containing a particular lesson.
+2. Prepare and send PUT /api/v1/lessons/{id}/complete for that lesson.
+3. Inspect the response status.
+4. Confirm a LessonProgress row was created/updated for the caller despite the missing enrollment.","1. 200 OK — the LessonProgress row is still created/updated despite the caller having no Enrollment for that course.","- Logged in as any role; target lesson's course has no enrollment for the caller."
+COURSECONTENT_FT06,"Re-marking a lesson with the same completed value it already holds is a harmless no-op that still reports success.","1. Mark a lesson complete via PUT /api/v1/lessons/{id}/complete?completed=true.
+2. Send the identical request a second time for the same lesson.
+3. Inspect the second response's status and message.
+4. Confirm no duplicate LessonProgress row was created.","1. Step 2: 200 OK, no duplicate LessonProgress row/write occurs (early-return in service), no error.","- Lesson already marked complete by the caller."
+Get / Submit Quiz Attempt (Lesson),,,,
+COURSECONTENT_FT07,"A learner can view only their own quiz-attempt history for a lesson, scoped strictly by JWT identity with no userId parameter.","1. Log in as a user with prior quiz attempts on a lesson.
+2. Prepare and send GET /api/v1/lessons/{id}/quiz-attempts.
+3. Inspect the returned list's attemptNumber/state/grade/submittedTime/answers fields.
+4. Confirm every returned attempt belongs to the caller.","1. 200 OK; only the caller's own attempts are returned, each with attemptNumber/state/grade (""%.1f / 10.0"")/submittedTime/answers.","- Logged in; ≥1 prior quiz attempt on the lesson."
+COURSECONTENT_FT08,"Submitting a quiz attempt with the score field omitted causes an unhandled server error instead of a clean validation message.","1. Log in as a learner and identify a lesson with a quiz.
+2. Prepare POST /api/v1/lessons/{id}/quiz-attempts body {""state"":""SUBMITTED"",""answers"":{}} (no ""score"" key).
+3. Send the request.
+4. Inspect the response status and body.","1. 500 Internal Server Error — String.format(""%.1f / 10.0"", null) throws internally; generic masked error body, not a clean validation error.","- Logged in; lesson with a quiz exists."
+COURSECONTENT_FT09,"Submitting any quiz attempt — even one scoring 0 — automatically marks the lesson complete as a side effect.","1. Log in as a learner on a lesson with a quiz, not yet marked complete.
+2. Prepare and send POST /api/v1/lessons/{id}/quiz-attempts with a valid body and score=0.
+3. Prepare and send GET /api/v1/lessons/{id}.
+4. Inspect the isCompleted field.","1. Step 3-4: isCompleted=true for the caller, even though the quiz score was 0 — auto-complete fires on any submission regardless of score.","- Logged in; lesson with a quiz exists, not previously completed."
+COURSECONTENT_FT10,"There is no cap on quiz attempts — a learner can resubmit the same lesson's quiz indefinitely.","1. Log in as a learner on a lesson with a quiz.
+2. Prepare and send POST /api/v1/lessons/{id}/quiz-attempts three times in a row, with any valid body each time.
+3. Inspect each response's status and attemptNumber.
+4. Confirm all three attempts are distinct rows with incrementing attempt numbers.","1. All three succeed 200 OK, each creating a new attempt with an incrementing attemptNumber — no server-side maximum-attempts enforcement.","- Logged in; lesson with a quiz exists."
+View Sections & Question Counts,,,,
+COURSECONTENT_FT11,"There is no role gate at all on section/question-count listing — a plain LEARNER can access this trainer-authoring surface.","1. Log in as a plain LEARNER.
+2. Identify a course with sections and prepare GET /api/v1/trainer/courses/{courseId}/sections.
+3. Send the request.
+4. Inspect the response status and body.","1. 200 OK — the LEARNER successfully receives the section list with question counts, despite this being an authoring-surface endpoint with no @PreAuthorize.","- Logged in as LEARNER; a course with sections exists."
+View Section/Lesson Questions,,,,
+COURSECONTENT_FT12,"The paginated question list for a section leaks the correct-answer index to any authenticated user, due to the same missing role gate.","1. Log in as a plain LEARNER.
+2. Identify a section with questions and prepare GET /api/v1/trainer/sections/{sectionId}/questions?page=0&size=10.
+3. Send the request.
+4. Inspect each item in content[] for a populated correctIndex.","1. 200 OK; each item in content[] includes a populated correctIndex — a LEARNER can read every answer key in the system this way.","- Logged in as LEARNER; a section with questions exists."
+Select Questions for Quiz,,,,
+COURSECONTENT_FT13,"Boundary values for the quantity and mode parameters either degrade gracefully or fail predictably rather than being validated.","1. Log in and prepare GET /api/v1/trainer/sections/{sectionId}/questions/select?quantity=0&mode=RANDOM; send it and inspect the result.
+2. Prepare and send the same call with quantity=-1&mode=RANDOM; inspect the result.
+3. Prepare and send the same call with quantity=5&mode=NOT_A_REAL_MODE; inspect the result.
+4. Compare all three outcomes.","1. Step 1: 200 OK, empty list.
+2. Step 2: likely a SQL/500 error (invalid LIMIT) — confirm actual behavior.
+3. Step 3: 200 OK, behaves as sequential (ORDER BY id ASC) since an unrecognized mode silently falls through to the non-random branch.","- Section with questions exists."
+Save Questions to Lesson Quiz,,,,
+COURSECONTENT_FT14,"Saving a lesson's quiz question selection is a full delete-then-recreate, so submitting an empty list clears the lesson's quiz entirely rather than being rejected.","1. Save a non-empty questionIds list to a lesson's quiz via POST /api/v1/trainer/lessons/{lessonId}/questions.
+2. Confirm the quiz now has that set of questions.
+3. Prepare and send the same endpoint again with body {""questionIds"": []}.
+4. Re-fetch the lesson's quiz to confirm it is now empty.","1. Step 3-4: 200 OK {""message"":""Questions saved to quiz successfully""}; the lesson's quiz now has ZERO questions — this is the documented way to clear a quiz, not an error.","- Lesson with an existing saved quiz question set."
+Create / Update Question (single),,,,
+COURSECONTENT_FT15,"Creating a single question has no role gate at all — a plain LEARNER can create one, and it is auto-approved with zero review.","1. Log in as a plain LEARNER and identify a valid sectionId.
+2. Prepare POST /api/v1/trainer/questions body {""sectionId"":<id>,""questionText"":""Injected question"",""options"":[...]}.
+3. Send the request.
+4. Inspect the response and query the new question's status in the database.","1. 200 OK {""message"":""Question created successfully"",""id"":<id>}; the question is persisted with status=""APPROVED"" (hardcoded) despite being created by a LEARNER with no review step.","- Logged in as LEARNER; a valid sectionId exists."
+COURSECONTENT_FT16,"Updating a question has no ownership check — any authenticated user can edit any question by ID, and its options are fully replaced rather than merged.","1. Log in as User B, who is NOT the creator of an existing question.
+2. Prepare PUT /api/v1/trainer/questions/{id} with new questionText/options for that question.
+3. Send the request.
+4. Inspect the response and confirm the prior options were replaced entirely by the new set.","1. 200 OK; the question is updated despite B not owning it; the prior options are deleted and replaced entirely by the new set.","- A question created by a different user exists; caller B is any authenticated user."
+COURSECONTENT_FT17,"Updating a question id that genuinely doesn't exist returns a proper 404 — the one exception to this area's usual masked-500 pattern.","1. Log in as any authenticated user.
+2. Prepare PUT /api/v1/trainer/questions/999999 with any valid body.
+3. Send the request.
+4. Inspect the response status and body.","1. 404 Not Found, {""error"":""Question not found""}.","- id 999999 unused."
+Create Group Question (passage),,,,
+COURSECONTENT_FT18,"Creating a group question with a blank passage and no sub-questions still creates an orphan group row and reports success.","1. Log in as any eligible role and identify a valid sectionId.
+2. Prepare POST /api/v1/trainer/questions/group body {""sectionId"":<id>,""passageText"":"""",""subQuestions"":[]}.
+3. Send the request.
+4. Inspect the response body and confirm a question_groups row was actually created despite the empty content.","1. 200 OK {""message"":""Group question created successfully"",""id"":<groupId>,""questionIds"":[]} — a question_groups row is created despite having no real content.","- Logged in; valid sectionId."
+COURSECONTENT_FT19,"If one sub-question in a multi-sub-question group fails to insert after earlier ones already succeeded, the already-created group and prior sub-questions are NOT rolled back — a partial/broken group persists despite the \"error\" response.","1. Log in as any eligible role and prepare a group payload with 2+ subQuestions, where the FIRST is valid and a LATER one has data that causes an insert failure (e.g. an invalid categoryId).
+2. Prepare and send POST /api/v1/trainer/questions/group with that payload.
+3. Inspect the response status/message.
+4. Re-fetch the question bank / query the database to check whether the group row and the earlier successful sub-question(s) still exist.","1. Step 3: 400 {""error"":""Failed to save sub question: ...""}.
+2. Step 4: the group row AND the earlier, successfully-inserted sub-question(s) still exist in the database — no automatic rollback occurred, despite the error response implying total failure.","- Logged in; valid sectionId; ability to craft a sub-question that fails partway through a multi-sub-question group."

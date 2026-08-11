@@ -20,6 +20,7 @@ public class CourseLessonDTO {
     private Long examId;
     private Integer questionCount;
     private Boolean isCompleted;
+    private java.util.List<QuizQuestionDTO> questions;
     
     @Size(max = 500, message = "Lesson description cannot exceed 500 characters")
     private String description;
@@ -39,4 +40,6 @@ public class CourseLessonDTO {
     
     @Size(max = 1000, message = "Learning objectives cannot exceed 1000 characters")
     private String learningObjectives;
+    
+    private String videoTranscript;
 }

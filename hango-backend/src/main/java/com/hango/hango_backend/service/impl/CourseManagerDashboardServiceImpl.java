@@ -35,6 +35,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     private final EnrollmentRepository enrollmentRepository;
     private final NotificationService notificationService;
     private final ExamHistoryService examHistoryService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional(readOnly = true)
@@ -220,6 +221,61 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                                     .pdfName(lesson.getPdfName())
                                     .questionImageUrl(lesson.getQuestionImageUrl())
                                     .estimatedTime(lesson.getEstimatedTime())
+                                    .lessonCode(lesson.getCode())
+                                    .mediaDurationSeconds(lesson.getMediaDurationSeconds())
+                                    .mediaSizeBytes(lesson.getMediaSizeBytes())
+                                    .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes())
+                                    .learningObjectives(lesson.getLearningObjectives())
+                                    .videoTranscript(lesson.getVideoTranscript())
+                                    .questions("quiz".equalsIgnoreCase(lesson.getLessonType()) ? 
+                                            jdbcTemplate.query(
+                                                "SELECT q.id AS question_id, q.question_text, q.explanation, qg.context_text AS passage " +
+                                                "FROM lesson_quizzes lq " +
+                                                "JOIN questions q ON lq.question_id = q.id " +
+                                                "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
+                                                "WHERE lq.lesson_id = ? " +
+                                                "ORDER BY lq.display_order ASC",
+                                                (rs, rowNum) -> {
+                                                    Long qId = rs.getLong("question_id");
+                                                    String questionText = rs.getString("question_text");
+                                                    String explanation = rs.getString("explanation");
+                                                    String passage = rs.getString("passage");
+                                                    
+                                                    java.util.List<java.util.Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
+                                                            "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                                                            qId
+                                                    );
+                                                    
+                                                    java.util.List<String> options = new java.util.ArrayList<>();
+                                                    Integer correctIndex = 0;
+                                                    for (int i = 0; i < optionsRows.size(); i++) {
+                                                        java.util.Map<String, Object> row = optionsRows.get(i);
+                                                        options.add((String) row.get("option_text"));
+                                                        Object isCorrectObj = row.get("is_correct");
+                                                        boolean isCorrect = false;
+                                                        if (isCorrectObj instanceof Boolean) {
+                                                            isCorrect = (Boolean) isCorrectObj;
+                                                        } else if (isCorrectObj instanceof Number) {
+                                                            isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                                                        }
+                                                        if (isCorrect) {
+                                                            correctIndex = i;
+                                                        }
+                                                    }
+                                                    
+                                                    return com.hango.hango_backend.dto.QuizQuestionDTO.builder()
+                                                            .id(qId)
+                                                            .passage(passage)
+                                                            .questionText(questionText)
+                                                            .explanation(explanation)
+                                                            .options(options)
+                                                            .correctIndex(correctIndex)
+                                                            .build();
+                                                },
+                                                lesson.getId()
+                                            )
+                                            : null
+                                    )
                                     .build())
                             .collect(Collectors.toList());
                     return CourseSessionDTO.builder()

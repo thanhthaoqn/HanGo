@@ -24,7 +24,9 @@ public class CourseSummaryDTO {
     private BigDecimal price;
     private BigDecimal progressPercentage;
 
-    public CourseSummaryDTO(Long id, String categoryName, String title, String creatorName, Double rating, Long learnersCount, String difficultyName, String thumbnailUrl, BigDecimal price, BigDecimal progressPercentage) {
+    private String code;
+
+    public CourseSummaryDTO(Long id, String categoryName, String title, String creatorName, Double rating, Long learnersCount, String difficultyName, String thumbnailUrl, BigDecimal price, BigDecimal progressPercentage, String code) {
         this.id = id;
         this.categoryName = categoryName;
         this.title = title;
@@ -35,5 +37,6 @@ public class CourseSummaryDTO {
         this.thumbnailUrl = thumbnailUrl;
         this.price = price;
         this.progressPercentage = progressPercentage;
+        this.code = code;
     }
 }

@@ -100,6 +100,15 @@ public class CourseServiceImpl implements CourseService {
             
             dto.setCategories(catNames);
             dto.setCategoryName(catNames.isEmpty() ? "" : String.join(", ", catNames));
+
+            // Populate learnersCount and rating using course family logic
+            String baseCode = dto.getCode() != null ? dto.getCode().replaceAll("-V\\d+$", "").toUpperCase() : String.valueOf(dto.getId());
+            List<Long> familyIds = courseRepository.findFamilyCourseIdsByBaseCode(baseCode);
+            int learnersCount = enrollmentRepository.countDistinctUsersByCourseIdIn(familyIds);
+            dto.setLearnersCount((long) learnersCount);
+            
+            Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
+            dto.setRating(avgRating != null ? avgRating : 0.0);
         }
 
         return dtos;
@@ -196,6 +205,12 @@ public class CourseServiceImpl implements CourseService {
                         .pdfName(lesson.getPdfName())
                         .questionImageUrl(lesson.getQuestionImageUrl())
                         .estimatedTime(estTime)
+                        .lessonCode(lesson.getCode())
+                        .mediaDurationSeconds(lesson.getMediaDurationSeconds())
+                        .mediaSizeBytes(lesson.getMediaSizeBytes())
+                        .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes() != null ? lesson.getEstimatedTimeMinutes() : estTime)
+                        .learningObjectives(lesson.getLearningObjectives())
+                        .videoTranscript(lesson.getVideoTranscript())
                         .build();
                 }).collect(Collectors.toList());
 
@@ -209,7 +224,9 @@ public class CourseServiceImpl implements CourseService {
         }).collect(Collectors.toList());
 
         // For Learners Count and Rating
-        int learnersCount = enrollmentRepository.countByCourseFamily(id);
+        String baseCode = course.getCode() != null ? course.getCode().replaceAll("-V\\d+$", "").toUpperCase() : String.valueOf(course.getId());
+        List<Long> familyIds = courseRepository.findFamilyCourseIdsByBaseCode(baseCode);
+        int learnersCount = enrollmentRepository.countDistinctUsersByCourseIdIn(familyIds);
         
         String creatorName = "Unknown Trainer";
         try {
@@ -250,9 +267,11 @@ public class CourseServiceImpl implements CourseService {
         String categoryKey = categoryKeys.isEmpty() ? "" : categoryKeys.get(0);
         String categoryName = categoryNames.isEmpty() ? "" : String.join(", ", categoryNames);
 
-        // Average rating / total ratings are cached on Course by CourseRatingServiceImpl for quick display.
-        double averageRating = course.getAverageRating() != null ? course.getAverageRating() : 0.0;
-        int totalRatings = course.getTotalRatings() != null ? course.getTotalRatings() : 0;
+        // Average rating / total ratings are cached on Course by CourseRatingServiceImpl, but for V7 they are 0.
+        // We must aggregate across the entire family.
+        Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
+        double averageRating = avgRating != null ? avgRating : 0.0;
+        int totalRatings = courseRatingRepository.findByCourseIdIn(familyIds).size();
 
         int estimatedDuration = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 12;
         return CourseDetailDTO.builder()

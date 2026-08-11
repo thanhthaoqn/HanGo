@@ -1,7 +1,7 @@
 # HanGo QA Agent Guidelines
 
 > Tài liệu này định nghĩa các quy tắc cho **QA Agent** khi sinh và chạy test trên repo HanGo.
-> Đọc cùng với [`/doc/TESTING.md`](TESTING.md) và [`/doc/specs/unit_test_plan.md`](specs/unit_test_plan.md).
+> Đọc cùng với [`/doc/test_doc/TESTING.md`](test_doc/TESTING.md) và [`/doc/test_doc/unit_test_plan.md`](test_doc/unit_test_plan.md) — vị trí đã cập nhật 2026-08-10 (không còn `doc/TESTING.md`/`doc/specs/unit_test_plan.md` ở vị trí cũ).
 
 ---
 
@@ -37,21 +37,25 @@ QA Agent hoạt động trên **toàn bộ repo** (không bị giới hạn doma
 
 ## 3. Test Priorities (Ưu tiên theo nghiệp vụ)
 
+> Mã module đã cập nhật 2026-08-10 để khớp Feature Map 19-module hiện tại (`HanGo_Documentation.md` §6). Xem bảng đối chiếu số cũ→mới ở `doc/specs/` nếu cần tra lại test case cũ viết theo mã FE trước đây.
+
 QA Agent phải ưu tiên test theo mức độ nghiệp vụ quan trọng:
 
 ### 🔴 CRITICAL — Bắt buộc có test trước khi Done
-1. **Payment & Revenue** (FE-12): **PayOS** webhook idempotency, chữ ký HMAC-SHA256, đối soát amount, revenue split (Teacher/`PROFESSIONAL` 70% · Tutor/`PEER_TUTOR` 60%) — *đã có test đầy đủ tại `PaymentServiceImplTest`/`MonthlyStatementServiceImplTest`/`CartServiceImplTest`, cập nhật tên lớp cũ "VNPay IPN" vì cổng thanh toán thật là PayOS.*
-2. **RBAC / Authorization** (FE-03): Mọi API endpoint phải test với đúng role và sai role
-3. **Exam Grading** (FE-08): Tính điểm tự động, 40 câu / 50 phút
-4. **Authentication** (FE-01): JWT validation, OTP verification — *lưu ý: hiện chỉ cấp 1 JWT, chưa có refresh token/logout endpoint thật (xem `AUDIT_REPORT.md` MED-11) — đừng viết test cho refresh token cho tới khi tính năng này thực sự tồn tại.*
+1. **Payment & Revenue** (FE-14): **PayOS** webhook idempotency, chữ ký HMAC-SHA256, đối soát amount, revenue split (Teacher/`PROFESSIONAL` 70% · Tutor/`PEER_TUTOR` 60%), thuế TNCN 10% khi ≥2 triệu VND — *đã có test tại `PaymentServiceImplTest`/`MonthlyStatementServiceImplTest`/`CartServiceImplTest`.*
+2. **Role and Permission Management** (FE-04) + **Account Management** (FE-03): RBAC giờ là ma trận động (`Permission`/`role_permissions`, `PUT /api/admin/roles/{roleName}/permissions`) — test cả 2 chiều: endpoint tôn trọng permission đã cấu hình, **và** các endpoint biết là chưa đọc permission code (`CourseManagerDashboardController`, `ManagementTicketController` — vẫn dùng `hasAnyRole` thuần) không bị kỳ vọng nhầm là đã theo ma trận.
+3. **Exam Grading** (FE-09): Tính điểm tự động server-side, thang 10 — *lưu ý: "40 câu/50 phút" chỉ đúng cho 1 Exam đặt sẵn (Entry Placement Test, id=999), không phải rule chung cho mọi Exam — đừng viết test giả định mọi Exam đều 40 câu/50 phút.*
+4. **Authentication** (FE-01): JWT + refresh token (đã có bảng `RefreshToken`, lưu hash, xoay vòng single-use), OTP verification, khoá 15 phút sau 5 lần sai mật khẩu.
+5. **Ticket Management** (FE-16): module mới, **hiện chưa có test class nào** (`TicketServiceImpl` chưa có `TicketServiceImplTest`) — ưu tiên bổ sung, đặc biệt luồng Course Manager bị chặn xử lý category `PAYOUT_INFO_UPDATE`/`REFUND_REQUEST`.
 
 ### 🟡 IMPORTANT — Cần có test
-5. **Course Versioning** (FE-05, FE-06): Published course tạo version mới khi sửa
-6. **Learning Progress** (FE-10): Sequential unlock (Lesson N → N+1)
-7. **Recommendation** (FE-11): Weakness analysis theo SkillType
+6. **Course Versioning** (FE-06): Published course tạo version mới khi sửa — nhớ cover cả 2 đường tới `PUBLISHED` (review chuẩn qua Course Manager, và "legacy self-publish" của Trainer).
+7. **Learning Progress** (FE-13): tính % hoàn thành, cờ `COMPLETED` — *sequential unlock (Lesson N → N+1) hiện chỉ enforce ở Frontend, chưa có ở server; nếu QA phát hiện gọi thẳng API bỏ qua được thứ tự, đây là gap đã biết (xem `HanGo_Documentation.md` §22), không phải phát hiện mới cần báo lại.*
+8. **AI Recommendation** (FE-11): Weakness analysis từ câu trả lời sai, IDOR khả dĩ ở `recommendCoursesAI` (không verify chủ sở hữu `examAttemptId`) đáng được test riêng.
+9. **Exam Matrix Management** (FE-10): generate Exam từ matrix lấy đúng số câu theo luật.
 
 ### 🟢 NORMAL — Test khi có thời gian
-8. Các module còn lại (FE-02, FE-04, FE-07, FE-09, FE-13, FE-14)
+10. Các module còn lại: FE-02 (Profile), FE-05 (Trainer Application), FE-07 (Course Content), FE-08 (Question Bank), FE-12 (AI Assistant), FE-15 (Cart), FE-17 (Comment), FE-18 (Notification), FE-19 (Dashboard).
 
 ---
 

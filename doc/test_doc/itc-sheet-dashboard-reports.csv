@@ -1,0 +1,59 @@
+Feature,Dashboard & Reports
+Test requirement,Functional integration tests for aggregate/read-only dashboard and reporting endpoints across AdminController, TrainerDashboardController, and CourseManagerDashboardController
+Number of TCs,11
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,11,0
+Round 2,0,0,11,0
+Round 3,0,0,11,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Report (Admin Dashboard),,,,
+DASHBOARD_FT01,"An admin views platform-wide dashboard statistics, including a 7-day registration trend and the top courses by enrollment.","1. Log in as ADMINISTRATOR in an environment with existing users/courses/enrollments.
+2. Prepare GET /api/admin/dashboard/stats with the Authorization header set.
+3. Send the request.
+4. Inspect the response's totalUsers/totalCourses/totalEnrollments, the 7-day weeklyLabels[]/weeklyValues[] trend, and topCourses[].","1. 200 OK; totalUsers, totalRoles, totalCourses, totalEnrollments, weeklyLabels[]/weeklyValues[] (7 entries, oldest-to-newest, real registration counts per day), topCourses[] (up to 5, by enrollment count).","- ADMINISTRATOR logged in; users/courses/enrollments exist."
+DASHBOARD_FT02,"A TRAINER or LEARNER account, lacking the required dashboard authority, is forbidden from viewing the admin dashboard stats.","1. Log in as a plain TRAINER or LEARNER account.
+2. Prepare GET /api/admin/dashboard/stats with that account's Authorization header.
+3. Send the request.
+4. Inspect the response status.","1. 403 Forbidden.","- TRAINER/LEARNER logged in (no VIEW_PLATFORM_DASHBOARD/MANAGE_ACCOUNTS_ROLES authority)."
+View Audit Log,,,,
+DASHBOARD_FT03,"An admin views the most recent admin-action audit log entries, respecting the requested limit and newest-first ordering.","1. Log in as ADMINISTRATOR in an environment with several prior account/role changes logged.
+2. Prepare GET /api/admin/audit-log?limit=5.
+3. Send the request.
+4. Inspect the response's entry count, ordering, and fields (actorName/actorEmail, actionType, targetUserId, details, createdAt).","1. 200 OK; at most 5 entries, newest first, each with actorName/actorEmail, actionType, targetUserId, details, createdAt (dd/MM/yyyy HH:mm).","- ADMINISTRATOR logged in; ≥5 audit-log entries exist (e.g. from prior account/role changes)."
+DASHBOARD_FT04,"A plain LEARNER account is forbidden from viewing the audit log.","1. Log in as a plain LEARNER account.
+2. Prepare GET /api/admin/audit-log with that account's Authorization header.
+3. Send the request.
+4. Inspect the response status.","1. 403 Forbidden.","- LEARNER logged in."
+View AI Usage Stats,,,,
+DASHBOARD_FT05,"An admin views AI usage/cost statistics that reflect real, previously-logged Gemini calls.","1. As any logged-in role, trigger a few real AI calls beforehand (e.g. AI Assistant messages, AI question generation).
+2. Log in as ADMINISTRATOR and prepare GET /api/admin/ai-usage.
+3. Send the request.
+4. Inspect the response's totalCalls/successCount/failureCount/chatCalls/embeddingCalls/successRate and the 7-day weekly trend.","1. 200 OK; totalCalls/successCount/failureCount/chatCalls/embeddingCalls/successRate all reflect real AiUsageLog rows; weeklyLabels[]/weeklyValues[] show a 7-day call-count trend.","- ADMINISTRATOR logged in; ≥1 real AI call logged beforehand."
+View Trainer Dashboard,,,,
+DASHBOARD_FT06,"A trainer's dashboard correctly aggregates their own courses, learners, exams, revenue, and rating into a single summary.","1. Log in as a trainer who owns at least one course with some enrolled learners and payments.
+2. Prepare GET /api/v1/trainer/dashboard.
+3. Send the request.
+4. Inspect coursesCount, learnersCount, examsCount, totalRevenue, averageRating, courses[], and monthlyRevenues[] in the response.","1. 200 OK; coursesCount, learnersCount (distinct across all the trainer's courses), examsCount, totalRevenue (defaults to 0, never null), averageRating, courses[] (one row per course family, most-recent version, with versionsCount), monthlyRevenues[] (12 fixed Jan-Dec entries for the current year, zero-filled where no revenue).","- Logged in as an eligible authoring role; owns ≥1 course with some learners/payments."
+DASHBOARD_FT07,"The trainer dashboard's \"recent activities\" feed correctly merges three different event types by recency and caps the combined list at 5 entries.","1. Ensure the trainer has more than 5 combined recent payment, enrollment, and rating events across their courses.
+2. Prepare GET /api/v1/trainer/dashboard.
+3. Send the request.
+4. Inspect recentActivities[] — count the entries and check the relative-time strings.","1. recentActivities[] contains at most 5 entries total, drawn from the union of the last 5 payments + last 5 enrollments + last 5 ratings, re-sorted and capped to the 5 most recent overall, each with a human-readable relative ""time"" string (""X mins/hours/days ago"").","- ≥6 combined recent payment/enrollment/rating events exist for the trainer's courses."
+View Course-Manager Dashboard,,,,
+DASHBOARD_FT08,"A Course Manager views platform-wide learner and course counts.","1. Log in as COURSE_MANAGER or ADMINISTRATOR in an environment with learners and courses of various statuses.
+2. Prepare GET /api/v1/course-manager/dashboard.
+3. Send the request.
+4. Inspect registeredUsersCount, activeCoursesCount, and inactiveCoursesCount in the response.","1. 200 OK; registeredUsersCount (role=LEARNER), activeCoursesCount (status=PUBLISHED), inactiveCoursesCount.","- COURSE_MANAGER/ADMINISTRATOR logged in; learners and courses of various statuses exist."
+DASHBOARD_FT09,"The inactiveCoursesCount figure silently undercounts submitted-for-review courses, because it queries the literal status string \"PENDING\" instead of the real \"PENDING_APPROVAL\" value that submission actually sets (confirmed likely bug, worth verifying against live data).","1. Log in as COURSE_MANAGER and note the current inactiveCoursesCount via GET /api/v1/course-manager/dashboard.
+2. As a trainer, submit a DRAFT course for review so its status becomes PENDING_APPROVAL.
+3. As COURSE_MANAGER, call GET /api/v1/course-manager/dashboard again.
+4. Compare the before/after inactiveCoursesCount values.","1. inactiveCoursesCount does NOT increase after the submission — the course sitting in PENDING_APPROVAL is silently excluded from the count, since no course is ever persisted with the literal status ""PENDING"" that the query actually filters on.","- COURSE_MANAGER logged in; a DRAFT course ready to submit."
+DASHBOARD_FT10,"A plain TRAINER account is forbidden from viewing the Course-Manager dashboard, even though the URL itself is public at the filter level.","1. Log in as a plain TRAINER account (no COURSE_MANAGER/ADMINISTRATOR role).
+2. Prepare GET /api/v1/course-manager/dashboard with that account's Authorization header.
+3. Send the request.
+4. Inspect the response status, confirming the request does reach the controller before being denied by method security.","1. 403 Forbidden — confirm this is actually enforced given the URL-level permitAll (i.e. the request does reach the controller before being denied by method security).","- Plain TRAINER logged in (not COURSE_MANAGER/ADMINISTRATOR)."
+Trainer Course List (bundled counts),,,,
+DASHBOARD_FT11,"A trainer's own course-list view bundles status-count badges computed from their FULL course set, independent of whatever narrow status/search filter is currently applied to the visible list.","1. Log in as a trainer with courses across at least 3 different statuses.
+2. Prepare GET /api/v1/trainer/courses?status=DRAFT&search=xyz (a narrow filter expected to match few or zero courses).
+3. Send the request.
+4. Compare the returned courses[] (should be narrowly filtered) against the count badges (allCount/draftCount/publishedCount/hiddenCount/pendingCount/rejectedCount) in the same response.","1. The count badges reflect the trainer's FULL, unfiltered course set — they do not shrink to match the narrow status=DRAFT&search=xyz filter, while courses[] itself IS correctly filtered.","- Trainer with courses across ≥3 different statuses."

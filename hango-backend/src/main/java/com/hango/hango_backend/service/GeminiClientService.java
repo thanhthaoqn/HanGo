@@ -1,47 +1,55 @@
 package com.hango.hango_backend.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.hango.hango_backend.config.GeminiProperties;
 import com.hango.hango_backend.dto.AiHealthResponse;
 import com.hango.hango_backend.dto.GeminiEmbeddingDto;
+import com.hango.hango_backend.dto.GeminiFileResponse;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
 import com.hango.hango_backend.dto.GeminiGenerateResponse;
 import com.hango.hango_backend.entity.AiUsageLog;
 import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.AiUsageLogRepository;
 import jakarta.annotation.PostConstruct;
+import java.text.Normalizer;
+import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.util.retry.Retry;
-import org.springframework.cache.annotation.Cacheable;
-
-import java.time.Duration;
-import java.util.List;
-
 /**
- * Lớp duy nhất trong toàn hệ thống gọi trực tiếp tới Gemini API.
- * Tự động khởi tạo WebClient nội bộ để tránh lỗi định tuyến nhầm domain.
+ * Centralized service for invoking Gemini API endpoints.
+ * Initializes an internal WebClient with Base URL and API Key header.
  */
 @Service
 @Slf4j
 public class GeminiClientService {
+        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+        private static final String DOC_TYPE_PEDAGOGICAL_DEGREE = "PEDAGOGICAL_DEGREE";
+        private static final String DOC_TYPE_TEACHING_CERTIFICATE = "TEACHING_CERTIFICATE";
+        private static final String DOC_TYPE_LANGUAGE_PROFICIENCY = "LANGUAGE_PROFICIENCY";
+        private static final String DOC_TYPE_ACADEMIC_TRANSCRIPT = "ACADEMIC_TRANSCRIPT";
+        private static final String DOC_TYPE_TEACHING_CV = "TEACHING_CV";
+        private static final String DOC_TYPE_OTHER = "OTHER";
 
         private WebClient webClient;
         private final GeminiProperties geminiProperties;
         private final AiUsageLogRepository aiUsageLogRepository;
 
-        // Sử dụng Constructor injection thủ công thay cho @RequiredArgsConstructor
         public GeminiClientService(GeminiProperties geminiProperties, AiUsageLogRepository aiUsageLogRepository) {
                 this.geminiProperties = geminiProperties;
                 this.aiUsageLogRepository = aiUsageLogRepository;
         }
 
-        /**
-         * Records usage for FR-RBAC-07 (AI Usage Monitoring) — used by both real Gemini
-         * call sites below.
-         */
         private void recordUsage(String callType, boolean success, long durationMs, String errorMessage) {
                 try {
                         String safeErrorMessage = errorMessage;
@@ -66,40 +74,29 @@ public class GeminiClientService {
                 }
         }
 
-        /**
-         * Tự động chạy ngay khi ứng dụng khởi động để thiết lập WebClient với Base URL
-         * chính xác và tích hợp bảo mật Header x-goog-api-key cho khóa dạng AQ.
-         */
         @PostConstruct
         public void init() {
-                // Lấy baseUrl cấu hình từ file properties, nếu trống thì dùng URL gốc của
-                // Google làm dự phòng
                 String baseUrl = geminiProperties.getBaseUrl();
                 if (baseUrl == null || baseUrl.isBlank()) {
                         baseUrl = "https://generativelanguage.googleapis.com";
                 }
 
-                // Đảm bảo baseUrl kết thúc bằng dấu gạch chéo để WebClient ghép path không lỗi
                 if (!baseUrl.endsWith("/")) {
                         baseUrl = baseUrl + "/";
                 }
 
-                // Cấu hình WebClient dùng chung: Đính kèm sẵn Header nhận diện API Key cho
-                // Google AI Studio
                 this.webClient = WebClient.builder()
                                 .baseUrl(baseUrl)
                                 .defaultHeader("Content-Type", "application/json")
-                                // 🔥 ĐÂY LÀ DÒNG QUAN TRỌNG: Đưa trực tiếp API Key thế hệ mới vào Header hệ
-                                // thống
                                 .defaultHeader("x-goog-api-key", geminiProperties.getApiKey())
                                 .build();
-                log.info("Gemini WebClient khởi tạo thành công với địa chỉ: {}", baseUrl);
+                log.info("Gemini WebClient initialized successfully with base URL: {}", baseUrl);
         }
 
         @Cacheable(value = "geminiStatus")
         public AiHealthResponse checkAvailability() {
                 if (geminiProperties.getApiKey() == null || geminiProperties.getApiKey().isBlank()) {
-                        return buildHealth(false, "GEMINI_API_KEY chua duoc cau hinh");
+                        return buildHealth(false, "GEMINI_API_KEY is not configured");
                 }
 
                 GeminiGenerateRequest request = GeminiGenerateRequest.builder()
@@ -114,7 +111,6 @@ public class GeminiClientService {
                                                 .build())
                                 .build();
 
-                // ✅ ĐÃ SỬA: Loại bỏ hoàn toàn tham số `?key=` gây lỗi 403 trên URL
                 String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
 
                 try {
@@ -128,12 +124,12 @@ public class GeminiClientService {
 
                         String text = response != null ? response.extractText() : null;
                         if (text == null || text.isBlank()) {
-                                return buildHealth(false, "Gemini da phan hoi nhung khong co noi dung hop le");
+                                return buildHealth(false, "Gemini responded but without valid content");
                         }
                         return buildHealth(true, "Online");
                 } catch (Exception e) {
                         log.warn("Gemini health check failed", e);
-                        return buildHealth(false, "Khong goi duoc Gemini API: " + e.getClass().getSimpleName());
+                        return buildHealth(false, "Failed to call Gemini API: " + e.getClass().getSimpleName());
                 }
         }
 
@@ -147,8 +143,8 @@ public class GeminiClientService {
         }
 
         /**
-         * Gọi Gemini chat model để sinh câu trả lời, kèm theo TOÀN BỘ LỊCH SỬ cuộc trò
-         * chuyện.
+         * Calls the Gemini chat model to generate a response, including the ENTIRE chat
+         * history.
          */
         public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
                 GeminiGenerateRequest request = GeminiGenerateRequest.builder()
@@ -156,14 +152,13 @@ public class GeminiClientService {
                                                 .parts(List.of(GeminiGenerateRequest.Part.builder().text(systemPrompt)
                                                                 .build()))
                                                 .build())
-                                .contents(chatHistory) // Gửi toàn bộ mảng lịch sử bao gồm cả câu hỏi mới ở cuối
+                                .contents(chatHistory)
                                 .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
                                                 .temperature(0.4)
                                                 .maxOutputTokens(8192)
                                                 .build())
                                 .build();
 
-                // ✅ ĐÃ SỬA: Loại bỏ hoàn toàn tham số `?key=` gây lỗi 403 trên URL
                 String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
                 long startedAt = System.currentTimeMillis();
 
@@ -173,11 +168,8 @@ public class GeminiClientService {
                                         .bodyValue(request)
                                         .retrieve()
                                         .bodyToMono(GeminiGenerateResponse.class)
-
-                                        // 🛡️ TỰ ĐỘNG THỬ LẠI KHI DÍNH LỖI NGHẼN MẠCH 429
                                         .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
                                                         .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
-
                                         .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
                                         .block();
 
@@ -185,7 +177,7 @@ public class GeminiClientService {
 
                         if (text == null || text.isBlank()) {
                                 recordUsage("CHAT", false, System.currentTimeMillis() - startedAt, "Empty response");
-                                throw new ApiException("AI không trả về nội dung hợp lệ", HttpStatus.BAD_GATEWAY);
+                                throw new ApiException("AI returned an invalid response", HttpStatus.BAD_GATEWAY);
                         }
                         recordUsage("CHAT", true, System.currentTimeMillis() - startedAt, null);
                         return text;
@@ -193,16 +185,17 @@ public class GeminiClientService {
                 } catch (ApiException e) {
                         throw e;
                 } catch (Exception e) {
-                        log.error("Lỗi khi gọi Gemini chat API", e);
+                        log.error("Error calling Gemini chat API", e);
                         recordUsage("CHAT", false, System.currentTimeMillis() - startedAt,
                                         e.getClass().getSimpleName());
-                        throw new ApiException("Không thể kết nối tới AI Assistant lúc này, vui lòng thử lại sau",
+                        throw new ApiException("Không thể kết nối đến Trợ lý AI vào lúc này, vui lòng thử lại sau",
                                         HttpStatus.SERVICE_UNAVAILABLE);
                 }
         }
 
         /**
-         * Gọi Gemini embedding model để chuyển 1 đoạn text thành vector số.
+         * Calls the Gemini embedding model to convert a text string into a numerical
+         * vector.
          */
         public List<Double> generateEmbedding(String text) {
 
@@ -213,7 +206,6 @@ public class GeminiClientService {
                                                 .build())
                                 .build();
 
-                // ✅ ĐÃ SỬA: Loại bỏ hoàn toàn tham số `?key=` gây lỗi 403 trên URL
                 String path = String.format("v1beta/models/%s:embedContent", geminiProperties.getEmbeddingModel());
                 long startedAt = System.currentTimeMillis();
 
@@ -223,18 +215,15 @@ public class GeminiClientService {
                                         .bodyValue(request)
                                         .retrieve()
                                         .bodyToMono(GeminiEmbeddingDto.Response.class)
-
-                                        // 🛡️ TỰ ĐỘNG THỬ LẠI KHI DÍNH LỖI NGHẼN MẠCH 429
                                         .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
                                                         .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
-
                                         .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
                                         .block();
 
                         if (response == null || response.getEmbedding() == null) {
                                 recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt,
                                                 "Empty response");
-                                throw new ApiException("Không thể tạo embedding cho nội dung này",
+                                throw new ApiException("Could not generate embedding for this content",
                                                 HttpStatus.BAD_GATEWAY);
                         }
                         recordUsage("EMBEDDING", true, System.currentTimeMillis() - startedAt, null);
@@ -243,11 +232,482 @@ public class GeminiClientService {
                 } catch (ApiException e) {
                         throw e;
                 } catch (Exception e) {
-                        log.error("Lỗi khi gọi Gemini embedding API", e);
+                        log.error("Error calling Gemini embedding API", e);
                         recordUsage("EMBEDDING", false, System.currentTimeMillis() - startedAt,
                                         e.getClass().getSimpleName());
-                        throw new ApiException("Không thể xử lý nội dung lúc này, vui lòng thử lại sau",
+                        throw new ApiException("Cannot process content at this time, please try again later",
                                         HttpStatus.SERVICE_UNAVAILABLE);
+                }
+        }
+
+        /**
+<<<<<<< Updated upstream
+         * Auto-generate transcript for a video using Gemini 1.5 Flash Audio/Video
+         * capability.
+         */
+        public String generateVideoTranscript(String videoUrl) {
+                long startedAt = System.currentTimeMillis();
+                java.io.File tempFile = null;
+                try {
+                        // 1. Download file from Cloudinary to temp file
+                        tempFile = java.io.File.createTempFile("video", ".mp4");
+                        try (java.io.InputStream in = new java.net.URL(videoUrl).openStream()) {
+                                java.nio.file.Files.copy(in, tempFile.toPath(),
+                                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        }
+
+                        // 2. Upload to Gemini File API
+                        String uploadUrl = "https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=media";
+
+                        WebClient uploadClient = WebClient.builder()
+                                        .defaultHeader("x-goog-api-key", geminiProperties.getApiKey())
+                                        .defaultHeader("Content-Type", "video/mp4")
+                                        .build();
+
+                        byte[] fileBytes = java.nio.file.Files.readAllBytes(tempFile.toPath());
+
+                        GeminiFileResponse uploadResponse = uploadClient.post()
+                                        .uri(uploadUrl)
+                                        .bodyValue(fileBytes)
+                                        .retrieve()
+                                        .bodyToMono(GeminiFileResponse.class)
+                                        .block();
+
+                        if (uploadResponse == null || uploadResponse.getFile() == null) {
+                                throw new ApiException("Could not upload video to AI", HttpStatus.BAD_GATEWAY);
+                        }
+
+                        String fileUri = uploadResponse.getFile().getUri();
+                        String fileName = uploadResponse.getFile().getName();
+
+                        // 2.5 Poll for ACTIVE state since video processing takes time
+                        boolean isActive = false;
+                        for (int i = 0; i < 60; i++) {
+                                String getUrl = "https://generativelanguage.googleapis.com/v1beta/" + fileName;
+                                GeminiFileResponse.FileInfo getResponse = uploadClient.get()
+                                                .uri(getUrl)
+                                                .retrieve()
+                                                .bodyToMono(GeminiFileResponse.FileInfo.class)
+                                                .block();
+                                                
+                                if (getResponse != null) {
+                                        String state = getResponse.getState();
+                                        if ("ACTIVE".equalsIgnoreCase(state)) {
+                                                isActive = true;
+                                                break;
+                                        } else if ("FAILED".equalsIgnoreCase(state)) {
+                                                throw new ApiException("AI video processing failed", HttpStatus.BAD_GATEWAY);
+                                        }
+                                }
+                                try {
+                                        Thread.sleep(2000);
+                                } catch (InterruptedException ie) {
+                                        Thread.currentThread().interrupt();
+                                        break;
+                                }
+                        }
+
+                        if (!isActive) {
+                                throw new ApiException("AI video processing timed out", HttpStatus.GATEWAY_TIMEOUT);
+                        }
+
+                        // 3. Call Gemini to transcribe
+                        GeminiGenerateRequest request = GeminiGenerateRequest.builder()
+                                        .contents(List.of(GeminiGenerateRequest.Content.builder()
+                                                        .role("user")
+                                                        .parts(List.of(
+                                                                        GeminiGenerateRequest.Part.builder()
+                                                                                        .fileData(GeminiGenerateRequest.FileData
+                                                                                                        .builder()
+                                                                                                        .mimeType("video/mp4")
+                                                                                                        .fileUri(fileUri)
+                                                                                                        .build())
+                                                                                        .build(),
+                                                                        GeminiGenerateRequest.Part.builder()
+                                                                                        .text("Please generate a detailed transcript in the language of this video. You MUST format the output EXACTLY as a valid WebVTT (.vtt) file, including the 'WEBVTT' header and accurate timestamps (e.g., 00:00:00.000 --> 00:00:05.000) for every spoken sentence. Answer with the direct VTT content only, without any greetings or markdown blocks.")
+                                                                                        .build()))
+                                                        .build()))
+                                        .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
+                                                        .temperature(0.2)
+                                                        .maxOutputTokens(8000)
+                                                        .build())
+                                        .build();
+
+                        String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
+
+                        GeminiGenerateResponse response = webClient.post()
+                                        .uri(path)
+                                        .bodyValue(request)
+                                        .retrieve()
+                                        .bodyToMono(GeminiGenerateResponse.class)
+                                        .timeout(Duration.ofSeconds(60))
+                                        .block();
+
+                        String text = response != null ? response.extractText() : null;
+                        if (text == null || text.isBlank()) {
+                                throw new ApiException("AI could not generate a transcript for this video",
+                                                HttpStatus.BAD_GATEWAY);
+                        }
+
+                        recordUsage("TRANSCRIPT", true, System.currentTimeMillis() - startedAt, null);
+                        return text;
+                } catch (Exception e) {
+                        log.error("Error calling Gemini transcript API", e);
+                        recordUsage("TRANSCRIPT", false, System.currentTimeMillis() - startedAt,
+                                        e.getClass().getSimpleName());
+                        throw new ApiException("Could not generate transcript at this time: " + e.getMessage(),
+                                        HttpStatus.SERVICE_UNAVAILABLE);
+                } finally {
+                        if (tempFile != null && tempFile.exists()) {
+                                tempFile.delete();
+                        }
+                }
+        }
+
+        /**
+         * Vision AI: Analyzes uploaded document/degree/certificate image using Gemini
+         * Vision API.
+         * Extracts document title, issuing institution, holder name, and pedagogical
+         * classification.
+         */
+        public String analyzeDocumentImage(byte[] imageBytes, String mimeType) {
+                String base64Data = java.util.Base64.getEncoder().encodeToString(imageBytes);
+                String prompt = "Carefully OCR and inspect all text on this uploaded document image.\n"
+                                + "Return ONLY a raw valid JSON object (no markdown formatting, no code block backticks) with keys:\n"
+                                + "1. \"documentTitle\": Choose the single most accurate title from these exact 5 options:\n"
+                                + "   - \"Bachelor of English Pedagogy Degree\" -> IF the document is a university degree, bachelor diploma, or graduation degree (contains 'Báº°NG Cá»¬ NHÃ‚N', 'DEGREE OF BACHELOR', 'Äáº I Há»ŒC', 'Báº°NG Tá»T NGHIá»†P').\n"
+                                + "   - \"TEFL / TESOL Teaching Certificate\" -> IF the document is a teaching license or certificate (contains 'TESOL', 'TEFL', 'CELTA', 'TEACHER LICENCE', 'TEACHING ENGLISH').\n"
+                                + "   - \"IELTS / Proficiency Certificate\" -> IF the document is an English language proficiency certificate (contains 'CHá»¨NG CHá»ˆ NGOáº I NGá»®', 'CERTIFICATE OF PROFICIENCY', 'IELTS', 'TOEIC', 'TOEFL', 'APTIS', 'VSTEP', 'CAMBRIDGE', 'Báº¬C 2', 'Báº¬C 3', 'Báº¬C 4', 'Báº¬C 5').\n"
+                                + "   - \"High School Academic Records\" -> IF the document is a high school report card, student grade book, or grade table (contains 'Há»ŒC Báº ', 'Báº¢NG ÄIá»‚M', 'TOÃN', 'VÄ‚N', 'Há»ŒC Lá»°C', 'GVCN').\n"
+                                + "   - \"Professional Teaching CV / Resume\" -> IF the document is a curriculum vitae / resume (contains 'CURRICULUM VITAE', 'RESUME', 'SÆ  Yáº¾U LÃ Lá»ŠCH', or teacher profile with photo and work experience sections).\n"
+                                + "2. \"issuingInstitution\": Name of school, university, or organization that issued this document.\n"
+                                + "3. \"holderName\": Full name of the person on the document.\n"
+                                + "4. \"isPedagogical\": boolean (true if teaching degree, pedagogy diploma, teaching CV/resume, TEFL, TESOL, or CELTA, else false).";
+                prompt += "\nIMPORTANT: ignore any abbreviated schema above and use this FINAL schema instead.\n"
+                                + "Return keys: documentType, documentTitle, evidenceText, ocrText, issuingInstitution, holderName, isPedagogical.\n"
+                                + "documentType must be exactly one of: PEDAGOGICAL_DEGREE, TEACHING_CERTIFICATE, LANGUAGE_PROFICIENCY, ACADEMIC_TRANSCRIPT, TEACHING_CV, OTHER.\n"
+                                + "Classification priority rules:\n"
+                                + "- Use PEDAGOGICAL_DEGREE only when there are clear degree phrases like 'BANG CU NHAN', 'BANG TOT NGHIEP', 'THE DEGREE OF BACHELOR', 'DEGREE OF BACHELOR', 'BACHELOR OF', or 'GRADUATION DIPLOMA'. University or college names alone are not enough.\n"
+                                + "- Never classify a bachelor degree or graduation diploma as TEACHING_CERTIFICATE.\n"
+                                + "- Use TEACHING_CERTIFICATE only for TESOL, TEFL, CELTA, or teaching licence style certificates.\n"
+                                + "- Use LANGUAGE_PROFICIENCY for IELTS, TOEIC, TOEFL, APTIS, VSTEP, or CAMBRIDGE certificates.\n"
+                                + "- Use ACADEMIC_TRANSCRIPT for report cards, transcripts, grade books, or score tables.\n"
+                                + "- Use TEACHING_CV for CV, resume, or teacher profile documents.\n"
+                                + "documentTitle must match documentType using one exact value: Bachelor of English Pedagogy Degree, TEFL / TESOL Teaching Certificate, IELTS / Proficiency Certificate, High School Academic Records, Professional Teaching CV / Resume, Other Credential Proof.\n"
+                                + "evidenceText must be an array of 3 to 6 short exact OCR snippets copied from the image.\n"
+                                + "ocrText must be a short OCR excerpt containing the most important visible text.\n"
+                                + "isPedagogical is true only for PEDAGOGICAL_DEGREE, TEACHING_CERTIFICATE, or TEACHING_CV.";
+
+                GeminiGenerateRequest request = GeminiGenerateRequest.builder()
+                                .contents(List.of(GeminiGenerateRequest.Content.builder()
+                                                .role("user")
+                                                .parts(List.of(
+                                                                GeminiGenerateRequest.Part.builder()
+                                                                                .inlineData(GeminiGenerateRequest.InlineData
+                                                                                                .builder()
+                                                                                                .mimeType(mimeType != null
+                                                                                                                && !mimeType.isBlank()
+                                                                                                                                ? mimeType
+                                                                                                                                : "image/jpeg")
+                                                                                                .data(base64Data)
+                                                                                                .build())
+                                                                                .build(),
+                                                                GeminiGenerateRequest.Part.builder().text(prompt)
+                                                                                .build()))
+                                                .build()))
+                                .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
+                                                .temperature(0.0)
+                                                .maxOutputTokens(500)
+                                                .build())
+                                .build();
+
+                String modelName = geminiProperties.getChatModel();
+                if (modelName == null || modelName.isBlank()) {
+                        modelName = "gemini-1.5-flash-lite";
+                }
+                long startedAt = System.currentTimeMillis();
+
+                String result = executeVisionRequest(request, modelName, startedAt);
+                if (result == null && !"gemini-1.5-flash-lite".equals(modelName)) {
+                        log.info("Retrying Vision AI request with fallback model gemini-1.5-flash-lite");
+                        result = executeVisionRequest(request, "gemini-1.5-flash-lite", startedAt);
+                }
+                return normalizeDocumentAnalysisPayload(result);
+        }
+
+        String normalizeDocumentAnalysisPayload(String rawJson) {
+                if (rawJson == null || rawJson.isBlank()) {
+                        return rawJson;
+                }
+
+                try {
+                        JsonNode parsed = OBJECT_MAPPER.readTree(rawJson);
+                        if (!(parsed instanceof ObjectNode objectNode)) {
+                                return rawJson;
+                        }
+
+                        String normalizedType = inferTrainerDocumentType(
+                                        textValue(objectNode, "documentType"),
+                                        textValue(objectNode, "documentTitle"),
+                                        textValue(objectNode, "ocrText"),
+                                        textValue(objectNode, "issuingInstitution"),
+                                        collectEvidenceText(objectNode),
+                                        objectNode.path("isPedagogical").asBoolean(false));
+
+                        objectNode.put("documentType", normalizedType);
+                        objectNode.put("documentTitle",
+                                        canonicalTitleForType(normalizedType, textValue(objectNode, "documentTitle")));
+                        objectNode.put("isPedagogical", isPedagogicalType(normalizedType));
+
+                        if (!objectNode.has("evidenceText")) {
+                                objectNode.set("evidenceText", OBJECT_MAPPER.createArrayNode());
+                        }
+
+                        return OBJECT_MAPPER.writeValueAsString(objectNode);
+                } catch (Exception e) {
+                        log.warn("Could not normalize document analysis payload: {}", e.getMessage());
+                        return rawJson;
+                }
+        }
+
+        private String collectEvidenceText(ObjectNode objectNode) {
+                StringBuilder builder = new StringBuilder();
+                JsonNode evidenceNode = objectNode.get("evidenceText");
+                if (evidenceNode instanceof ArrayNode arrayNode) {
+                        for (JsonNode item : arrayNode) {
+                                appendIfPresent(builder, item != null ? item.asText() : null);
+                        }
+                } else {
+                        appendIfPresent(builder, textValue(objectNode, "evidenceText"));
+                }
+
+                return builder.toString().trim();
+        }
+
+        private void appendIfPresent(StringBuilder builder, String value) {
+                if (value == null || value.isBlank()) {
+                        return;
+                }
+                if (builder.length() > 0) {
+                        builder.append(' ');
+                }
+                builder.append(value.trim());
+        }
+
+        private String inferTrainerDocumentType(
+                        String explicitType,
+                        String title,
+                        String ocrText,
+                        String issuingInstitution,
+                        String evidenceText,
+                        boolean isPedagogical) {
+                String normalizedExplicitType = explicitType != null ? explicitType.trim().toUpperCase() : null;
+                Map<String, Integer> scores = initializeDocumentScores();
+
+                if (normalizedExplicitType != null && scores.containsKey(normalizedExplicitType)) {
+                        addScore(scores, normalizedExplicitType, 2);
+                }
+
+                scoreDocumentText(scores, title, 2);
+                scoreDocumentText(scores, ocrText, 3);
+                scoreDocumentText(scores, evidenceText, 4);
+                scoreDocumentText(scores, issuingInstitution, 1);
+
+                if (isPedagogical) {
+                        addScore(scores, DOC_TYPE_TEACHING_CERTIFICATE, 2);
+                        addScore(scores, DOC_TYPE_PEDAGOGICAL_DEGREE, 1);
+                        addScore(scores, DOC_TYPE_TEACHING_CV, 1);
+                }
+
+                String detectedType = bestScoringDocumentType(scores);
+                int detectedScore = scores.getOrDefault(detectedType, 0);
+
+                if (normalizedExplicitType != null && scores.containsKey(normalizedExplicitType) && detectedScore <= 2) {
+                        return normalizedExplicitType;
+                }
+
+                if (detectedScore > 0) {
+                        return detectedType;
+                }
+
+                if (normalizedExplicitType != null && scores.containsKey(normalizedExplicitType)) {
+                        return normalizedExplicitType;
+                }
+
+                if (isPedagogical) {
+                        return DOC_TYPE_TEACHING_CERTIFICATE;
+                }
+
+                return DOC_TYPE_OTHER;
+        }
+
+        private boolean isPedagogicalType(String documentType) {
+                return DOC_TYPE_PEDAGOGICAL_DEGREE.equals(documentType)
+                                || DOC_TYPE_TEACHING_CERTIFICATE.equals(documentType)
+                                || DOC_TYPE_TEACHING_CV.equals(documentType);
+        }
+
+        private String canonicalTitleForType(String documentType, String fallbackTitle) {
+                return switch (documentType) {
+                        case DOC_TYPE_PEDAGOGICAL_DEGREE -> "Bachelor of English Pedagogy Degree";
+                        case DOC_TYPE_TEACHING_CERTIFICATE -> "TEFL / TESOL Teaching Certificate";
+                        case DOC_TYPE_LANGUAGE_PROFICIENCY -> "IELTS / Proficiency Certificate";
+                        case DOC_TYPE_ACADEMIC_TRANSCRIPT -> "High School Academic Records";
+                        case DOC_TYPE_TEACHING_CV -> "Professional Teaching CV / Resume";
+                        case DOC_TYPE_OTHER -> fallbackTitle != null && !fallbackTitle.isBlank()
+                                        ? fallbackTitle.trim()
+                                        : "Other Credential Proof";
+                        default -> fallbackTitle != null && !fallbackTitle.isBlank()
+                                        ? fallbackTitle.trim()
+                                        : "Other Credential Proof";
+                };
+        }
+
+        private String textValue(ObjectNode objectNode, String fieldName) {
+                JsonNode value = objectNode.get(fieldName);
+                if (value == null || value.isNull()) {
+                        return null;
+                }
+                String text = value.asText();
+                return text != null && !text.isBlank() ? text.trim() : null;
+        }
+
+        private Map<String, Integer> initializeDocumentScores() {
+                Map<String, Integer> scores = new LinkedHashMap<>();
+                scores.put(DOC_TYPE_PEDAGOGICAL_DEGREE, 0);
+                scores.put(DOC_TYPE_TEACHING_CERTIFICATE, 0);
+                scores.put(DOC_TYPE_LANGUAGE_PROFICIENCY, 0);
+                scores.put(DOC_TYPE_ACADEMIC_TRANSCRIPT, 0);
+                scores.put(DOC_TYPE_TEACHING_CV, 0);
+                scores.put(DOC_TYPE_OTHER, 0);
+                return scores;
+        }
+
+        private void scoreDocumentText(Map<String, Integer> scores, String rawText, int multiplier) {
+                String normalizedText = normalizeComparableText(rawText);
+                if (normalizedText.isBlank()) {
+                        return;
+                }
+
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CERTIFICATE, 8 * multiplier,
+                                "tefl", "tesol", "celta", "teaching certificate", "teaching certification",
+                                "teacher licence", "teacher license");
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CERTIFICATE, 4 * multiplier,
+                                "teaching english", "lead trainer", "course director", "teaching practice");
+
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_LANGUAGE_PROFICIENCY, 8 * multiplier,
+                                "ielts", "toeic", "toefl", "aptis", "vstep", "test report form",
+                                "international english language testing system");
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_LANGUAGE_PROFICIENCY, 5 * multiplier,
+                                "trf", "british council", "idp", "cambridge english", "cambridge assessment",
+                                "certificate of proficiency");
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_LANGUAGE_PROFICIENCY, 3 * multiplier,
+                                "cefr", "language proficiency", "proficiency", "ngoai ngu");
+
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_PEDAGOGICAL_DEGREE, 8 * multiplier,
+                                "the degree of bachelor", "degree of bachelor", "bachelor of", "bang cu nhan",
+                                "bang tot nghiep", "cu nhan", "tot nghiep", "graduation diploma");
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_PEDAGOGICAL_DEGREE, 4 * multiplier,
+                                "pedagogy", "pedagogical", "pedagog", "su pham", "qualification", "degree",
+                                "diploma", "english language teaching");
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_PEDAGOGICAL_DEGREE, multiplier,
+                                "university", "college of foreign languages", "college", "dai hoc",
+                                "faculty of education");
+
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_ACADEMIC_TRANSCRIPT, 8 * multiplier,
+                                "hoc ba", "bang diem", "transcript", "academic records", "report card");
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_ACADEMIC_TRANSCRIPT, 4 * multiplier,
+                                "hoc luc", "grade table", "school year", "semester", "grade point");
+
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CV, 8 * multiplier,
+                                "curriculum vitae", "resume", "teacher profile", "so yeu ly lich", " cv ");
+                addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CV, 4 * multiplier,
+                                "work experience", "employment history", "teaching experience", "career objective",
+                                "professional summary");
+        }
+
+        private void addScoreIfContains(Map<String, Integer> scores, String normalizedText, String type, int points,
+                        String... patterns) {
+                for (String pattern : patterns) {
+                        if (containsPattern(normalizedText, pattern)) {
+                                addScore(scores, type, points);
+                        }
+                }
+        }
+
+        private void addScore(Map<String, Integer> scores, String type, int points) {
+                scores.put(type, scores.getOrDefault(type, 0) + points);
+        }
+
+        private String bestScoringDocumentType(Map<String, Integer> scores) {
+                List<String> priority = List.of(
+                                DOC_TYPE_LANGUAGE_PROFICIENCY,
+                                DOC_TYPE_TEACHING_CERTIFICATE,
+                                DOC_TYPE_PEDAGOGICAL_DEGREE,
+                                DOC_TYPE_ACADEMIC_TRANSCRIPT,
+                                DOC_TYPE_TEACHING_CV,
+                                DOC_TYPE_OTHER);
+
+                String bestType = DOC_TYPE_OTHER;
+                int bestScore = -1;
+                for (String type : priority) {
+                        int score = scores.getOrDefault(type, 0);
+                        if (score > bestScore) {
+                                bestScore = score;
+                                bestType = type;
+                        }
+                }
+                return bestType;
+        }
+
+        private boolean containsPattern(String normalizedText, String pattern) {
+                return normalizedText.contains(normalizeComparableText(pattern));
+        }
+
+        private String normalizeComparableText(String raw) {
+                if (raw == null) {
+                        return "";
+                }
+                String normalized = Normalizer.normalize(raw, Normalizer.Form.NFD)
+                                .replaceAll("\\p{M}+", "")
+                                .toLowerCase()
+                                .replace('\u0111', 'd');
+                normalized = normalized.replaceAll("[^a-z0-9]+", " ").trim();
+                return normalized.isEmpty() ? "" : " " + normalized + " ";
+        }
+
+        private String executeVisionRequest(GeminiGenerateRequest request, String modelName, long startedAt) {
+                String path = String.format("v1beta/models/%s:generateContent", modelName);
+                try {
+                        GeminiGenerateResponse response = webClient.post()
+                                        .uri(path)
+                                        .bodyValue(request)
+                                        .retrieve()
+                                        .bodyToMono(GeminiGenerateResponse.class)
+                                        .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
+                                                        .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
+                                        .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
+                                        .block();
+
+                        String text = response != null ? response.extractText() : null;
+                        if (text != null) {
+                                text = text.trim();
+                                if (text.startsWith("```json")) {
+                                        text = text.substring(7);
+                                } else if (text.startsWith("```")) {
+                                        text = text.substring(3);
+                                }
+                                if (text.endsWith("```")) {
+                                        text = text.substring(0, text.length() - 3);
+                                }
+                                text = text.trim();
+                        }
+                        recordUsage("VISION", text != null, System.currentTimeMillis() - startedAt,
+                                        text == null ? "Empty" : null);
+                        return text;
+                } catch (Exception e) {
+                        log.warn("Failed to analyze image with Vision model {}: {}", modelName, e.getMessage());
+                        return null;
                 }
         }
 }

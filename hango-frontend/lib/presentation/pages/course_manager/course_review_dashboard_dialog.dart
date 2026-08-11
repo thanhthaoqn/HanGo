@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -907,7 +908,13 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
 
   Widget _buildVideoLesson() {
     final description = _selectedLessonData!['description']?.toString() ?? '';
-    final estimatedTime = _selectedLessonData!['estimatedTime']?.toString() ?? '10';
+    final estimatedTime = _selectedLessonData!['estimatedTimeMinutes']?.toString() 
+                       ?? _selectedLessonData!['estimatedTime']?.toString() 
+                       ?? '0';
+    final mediaDuration = _selectedLessonData!['mediaDurationSeconds'];
+    final mediaSize = _selectedLessonData!['mediaSizeBytes'];
+    final transcript = _selectedLessonData!['videoTranscript']?.toString() ?? '';
+    final objectives = _selectedLessonData!['learningObjectives']?.toString() ?? '';
 
     final videoUrl = _selectedLessonData!['videoUrl']?.toString() ?? 
                      _selectedLessonData!['content']?.toString() ?? 
@@ -921,7 +928,7 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: videoUrl.isNotEmpty 
-                  ? _ReviewVideoPlayer(videoUrl: videoUrl)
+                  ? _ReviewVideoPlayer(videoUrl: videoUrl, videoTranscript: transcript)
                   : Container(
                       color: Colors.black87,
                       child: const Center(
@@ -934,16 +941,73 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
               ),
             ),
         const SizedBox(height: 24),
-        Row(
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
           children: [
-            const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF64748B)),
-            const SizedBox(width: 8),
-            Text(
-              'Estimated Time: $estimatedTime mins',
-              style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
-            ),
+            if (estimatedTime != '0')
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Estimated: $estimatedTime mins',
+                    style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            if (mediaDuration != null && mediaDuration is num)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Duration: ${(mediaDuration as num) ~/ 60}m ${(mediaDuration as num) % 60}s',
+                    style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            if (mediaSize != null && mediaSize is num)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.data_usage, size: 18, color: Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Size: ${((mediaSize as num) / (1024 * 1024)).toStringAsFixed(1)} MB',
+                    style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
           ],
         ),
+        if (objectives.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.track_changes, size: 18, color: Color(0xFF64748B)),
+                    SizedBox(width: 8),
+                    Text('Learning Objectives', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(objectives, style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF334155), height: 1.5)),
+              ],
+            ),
+          ),
+        ],
         if (description.isNotEmpty) ...[
           const SizedBox(height: 24),
           const Text(
@@ -956,6 +1020,26 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
             style: const TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF334155), height: 1.6),
           ),
         ],
+        if (transcript.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const Text(
+            'Transcript',
+            style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Text(
+              transcript,
+              style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF334155), height: 1.6),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -963,6 +1047,7 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
   Widget _buildTextLesson() {
     final content = _selectedLessonData!['questionText']?.toString() ?? _selectedLessonData!['content']?.toString() ?? '';
     final description = _selectedLessonData!['description']?.toString() ?? '';
+    final pdfName = _selectedLessonData!['pdfName']?.toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -977,6 +1062,64 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
               fontWeight: FontWeight.w500,
               fontStyle: FontStyle.italic,
               height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
+        if (pdfName != null && pdfName.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 32),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Attached File',
+                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        pdfName.split('/').last,
+                        style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF64748B), fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final url = Uri.parse(pdfName);
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    } else {
+                      if (context.mounted) {
+                        ToastHelper.showError(context, 'Could not open the file.');
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.download, size: 18, color: Colors.white),
+                  label: const Text(
+                    'Download',
+                    style: TextStyle(fontFamily: 'Outfit', color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 32),
@@ -998,80 +1141,119 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
   }
 
   Widget _buildQuizLesson() {
-    final content = _selectedLessonData!['questionText']?.toString() ?? '';
-    final description = _selectedLessonData!['description']?.toString() ?? '';
+    final questionsList = _selectedLessonData!['questions'] as List?;
+    if (questionsList == null || questionsList.isEmpty) {
+      return const Center(child: Text('No questions available for this quiz.'));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDBEAFE),
-                      borderRadius: BorderRadius.circular(8),
+      children: questionsList.asMap().entries.map((entry) {
+        final index = entry.key;
+        final question = entry.value as Map<String, dynamic>;
+        final questionText = question['questionText']?.toString() ?? '';
+        final passage = question['passage']?.toString() ?? '';
+        final options = List<String>.from(question['options'] ?? []);
+        final correctIndex = question['correctIndex'] as int? ?? 0;
+        final explanation = question['explanation']?.toString();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDBEAFE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'QUESTION ${index + 1}',
+                        style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E40AF)),
+                      ),
                     ),
-                    child: const Text(
-                      'QUESTION',
-                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E40AF)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (passage.isNotEmpty) ...[
+                  Text(
+                    passage,
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 16,
+                      color: Color(0xFF334155),
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (questionText.isNotEmpty)
+                  Text(
+                    questionText,
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                      height: 1.5,
+                    ),
+                  )
+                else
+                  const Text(
+                    'No question text provided.',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                  ),
+                const SizedBox(height: 24),
+                const Divider(color: Color(0xFFE2E8F0)),
+                const SizedBox(height: 16),
+                ...options.asMap().entries.map((optEntry) {
+                  final optIndex = optEntry.key;
+                  final optText = optEntry.value;
+                  final letter = String.fromCharCode(65 + optIndex);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildMockQuizOption(letter, optText, isCorrect: optIndex == correctIndex),
+                  );
+                }),
+                if (explanation != null && explanation.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.lightbulb_outline, color: Color(0xFFD97706), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Explanation: $explanation',
+                            style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF92400E), fontSize: 14),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              if (content.isNotEmpty)
-                Text(
-                  content,
-                  style: const TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
-                    height: 1.5,
-                  ),
-                )
-              else
-                const Text(
-                  'No question text provided.',
-                  style: TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
-                ),
-              if (description.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 15,
-                    color: Color(0xFF475569),
-                    height: 1.5,
-                  ),
-                ),
               ],
-              const SizedBox(height: 24),
-              const Divider(color: Color(0xFFE2E8F0)),
-              const SizedBox(height: 16),
-              _buildMockQuizOption('A', 'Mock Option 1'),
-              const SizedBox(height: 12),
-              _buildMockQuizOption('B', 'Mock Option 2', isCorrect: true),
-              const SizedBox(height: 12),
-              _buildMockQuizOption('C', 'Mock Option 3'),
-              const SizedBox(height: 12),
-              _buildMockQuizOption('D', 'Mock Option 4'),
-            ],
+            ),
           ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 
@@ -1170,8 +1352,9 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
 
 class _ReviewVideoPlayer extends StatefulWidget {
   final String videoUrl;
+  final String? videoTranscript;
 
-  const _ReviewVideoPlayer({required this.videoUrl});
+  const _ReviewVideoPlayer({required this.videoUrl, this.videoTranscript});
 
   @override
   State<_ReviewVideoPlayer> createState() => _ReviewVideoPlayerState();
@@ -1208,14 +1391,20 @@ class _ReviewVideoPlayerState extends State<_ReviewVideoPlayer> {
     return match?.group(1);
   }
 
+  String _currentQualityToken = 'sp_hd';
+
   Future<void> _initializePlayer() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    final ytId = _extractYouTubeVideoId(widget.videoUrl);
+    _initializePlayerWithQuality(widget.videoUrl, 'sp_hd');
+  }
+
+  Future<void> _initializePlayerWithQuality(String url, String resolutionToken) async {
+    _currentQualityToken = resolutionToken;
+    final ytId = _extractYouTubeVideoId(url);
     if (ytId != null) {
-      _isYoutube = true;
+      setState(() {
+        _isYoutube = true;
+        _isLoading = true;
+      });
       _youtubeController = YoutubePlayerController.fromVideoId(
         videoId: ytId,
         autoPlay: false,
@@ -1229,27 +1418,203 @@ class _ReviewVideoPlayerState extends State<_ReviewVideoPlayer> {
       setState(() {
         _isLoading = false;
       });
-    } else {
-      _isYoutube = false;
-      try {
-        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-        await _videoPlayerController!.initialize();
-        _chewieController = ChewieController(
-          videoPlayerController: _videoPlayerController!,
-          autoPlay: false,
-          looping: false,
-          aspectRatio: _videoPlayerController!.value.aspectRatio,
-        );
-      } catch (e) {
-        debugPrint('Error initializing video player: $e');
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+      return;
+    }
+
+    _isYoutube = false;
+    
+    String finalUrl = url;
+    if (url.contains('res.cloudinary.com') && url.endsWith('.mp4')) {
+      if (resolutionToken == 'sp_hd') {
+        finalUrl = url.replaceFirst('/upload/', '/upload/sp_hd/').replaceAll('.mp4', '.m3u8');
+      } else {
+        finalUrl = url.replaceFirst('/upload/', '/upload/q_auto,$resolutionToken/');
       }
     }
+
+    final position = _videoPlayerController?.value.position ?? Duration.zero;
+    final wasPlaying = _videoPlayerController?.value.isPlaying ?? false;
+    
+    _videoPlayerController?.dispose();
+    _chewieController?.dispose();
+    
+    setState(() {
+      _chewieController = null;
+      _videoPlayerController = null;
+      _isLoading = true;
+    });
+
+    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(finalUrl));
+    
+    try {
+      await _videoPlayerController!.initialize();
+    } catch (e) {
+      debugPrint('Error with quality $resolutionToken: $e. Falling back to original URL.');
+      if (finalUrl != url) {
+        _videoPlayerController?.dispose();
+        _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+        await _videoPlayerController!.initialize();
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+    }
+    
+    if (position > Duration.zero) {
+      await _videoPlayerController!.seekTo(position);
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _chewieController = ChewieController(
+          videoPlayerController: _videoPlayerController!,
+          autoPlay: position > Duration.zero ? wasPlaying : false,
+          looping: false,
+          aspectRatio: _videoPlayerController!.value.aspectRatio,
+          subtitle: _parseVttSubtitles(widget.videoTranscript ?? ''),
+          subtitleBuilder: (context, dynamic subtitle) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              subtitle.toString(),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'Outfit'),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          additionalOptions: _buildQualityOptions(url),
+        );
+      });
+    }
+  }
+
+  List<OptionItem> Function(BuildContext) _buildQualityOptions(String originalUrl) {
+    if (!originalUrl.contains('res.cloudinary.com')) {
+      return (context) => [];
+    }
+    
+    final qualityNames = {
+      'sp_hd': 'Auto (HLS)',
+      'h_1080': '1080p',
+      'h_720': '720p',
+      'h_480': '480p',
+    };
+    
+    return (context) {
+      return [
+        OptionItem(
+          onTap: (ctx) {
+            Navigator.pop(ctx);
+            _showQualityPicker(context, originalUrl);
+          },
+          iconData: Icons.high_quality,
+          title: 'Video Quality',
+          subtitle: qualityNames[_currentQualityToken] ?? 'Auto (HLS)',
+        ),
+      ];
+    };
+  }
+
+  void _showQualityPicker(BuildContext context, String originalUrl) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Video Quality',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              _buildQualityTile('sp_hd', 'Auto (HLS)', originalUrl, ctx),
+              _buildQualityTile('h_1080', '1080p', originalUrl, ctx),
+              _buildQualityTile('h_720', '720p', originalUrl, ctx),
+              _buildQualityTile('h_480', '480p', originalUrl, ctx),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQualityTile(String token, String name, String url, BuildContext ctx) {
+    final isSelected = _currentQualityToken == token;
+    return ListTile(
+      leading: isSelected ? const Icon(Icons.check, color: Colors.blue) : const SizedBox(width: 24),
+      title: Text(
+        name,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? Colors.blue : null,
+        ),
+      ),
+      onTap: () {
+        Navigator.pop(ctx);
+        if (!isSelected) {
+          _initializePlayerWithQuality(url, token);
+        }
+      },
+    );
+  }
+
+  Subtitles? _parseVttSubtitles(String transcript) {
+    if (transcript.isEmpty || !transcript.trim().startsWith('WEBVTT')) {
+      return null;
+    }
+    List<Subtitle> parsedSubtitles = [];
+    final lines = transcript.split('\n');
+    int i = 0;
+    while (i < lines.length) {
+      if (lines[i].contains('-->')) {
+        final times = lines[i].split('-->');
+        if (times.length == 2) {
+          final start = _parseVttTime(times[0].trim());
+          final end = _parseVttTime(times[1].trim());
+          
+          String text = '';
+          i++;
+          while (i < lines.length && lines[i].trim().isNotEmpty) {
+            text += lines[i] + '\n';
+            i++;
+          }
+          parsedSubtitles.add(Subtitle(index: parsedSubtitles.length, start: start, end: end, text: text.trim()));
+        }
+      }
+      i++;
+    }
+    if (parsedSubtitles.isEmpty) return null;
+    return Subtitles(parsedSubtitles);
+  }
+
+  Duration _parseVttTime(String time) {
+    try {
+      final parts = time.split(':');
+      if (parts.length == 3) {
+        final secsAndMillis = parts[2].split('.');
+        if (secsAndMillis.length == 2) {
+          return Duration(
+            hours: int.parse(parts[0]),
+            minutes: int.parse(parts[1]),
+            seconds: int.parse(secsAndMillis[0]),
+            milliseconds: int.parse(secsAndMillis[1]),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing VTT time: $e');
+    }
+    return Duration.zero;
   }
 
   void _disposeControllers() {

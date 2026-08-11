@@ -1,0 +1,53 @@
+Feature,AI Assistant
+Test requirement,Functional integration tests for the lesson-scoped AI learning assistant (AIAssistantController)
+Number of TCs,10
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,10,0
+Round 2,0,0,10,0
+Round 3,0,0,10,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+Send Message to AI Assistant,,,,
+AIASSISTANT_FT01,"Sending an in-scope question about the current lesson's content succeeds and returns a real, model-generated reply.","1. Log in as a LEARNER enrolled in a course with at least one lesson.
+2. Open the lesson (or prepare POST /api/v1/ai-assistant/messages) and note the lessonId.
+3. Prepare the request body {""lessonId"":<id>,""message"":""Can you explain the past perfect tense used in this lesson?""}.
+4. Send the request and inspect the response body.","1. 200 OK; SendMessageResponse{conversationId, reply, wasOutOfScope:false, suggestedQuestions[]}.","- Logged in with AI_LEARNING_ASSISTANT permission; lesson exists."
+AIASSISTANT_FT02,"An out-of-scope question is deflected with a canned fallback WITHOUT calling the LLM — but first confirm the scope-similarity threshold isn't accidentally disabled by missing config (a real deployment risk).","1. Verify hango.ai-assistant.scope-similarity-threshold is actually set to a nonzero value in the running environment (check application.properties/env vars) before running the rest of this case.
+2. Log in as a LEARNER and prepare POST /api/v1/ai-assistant/messages body {""lessonId"":<id>,""message"":""What's the weather like today in Hanoi?""}.
+3. Send the request.
+4. Inspect the response's wasOutOfScope flag and the reply text.","1. Step 3-4: 200 OK; wasOutOfScope=true; reply is the canned out-of-scope fallback text, not a live model answer — if this instead returns what looks like a real AI-generated response, the threshold config gap is live and the guardrail is a no-op.","- Logged in; lesson exists."
+AIASSISTANT_FT03,"Sending a message with no lessonId at all is rejected by validation before it ever reaches the AI layer.","1. Log in as a LEARNER.
+2. Prepare POST /api/v1/ai-assistant/messages body {""message"":""hello""} (no lessonId key).
+3. Send the request.
+4. Inspect the response status and validation message.","1. 400 Bad Request; validation message references lessonId (""Cần chỉ định bài học để AI biết phạm vi hỗ trợ"").","- Logged in."
+AIASSISTANT_FT04,"A message exceeding the 500-character limit is rejected by validation.","1. Log in as a LEARNER with a valid lessonId.
+2. Prepare POST /api/v1/ai-assistant/messages with a message string of 600 characters.
+3. Send the request.
+4. Inspect the response status and validation message.","1. 400 Bad Request; validation message ""Câu hỏi không được vượt quá 500 ký tự"".","- Logged in; lessonId valid."
+AIASSISTANT_FT05,"Sending a message scoped to a lessonId that doesn't exist returns a clean 404 rather than a generic error.","1. Log in as a LEARNER.
+2. Prepare POST /api/v1/ai-assistant/messages body {""lessonId"":999999,""message"":""hello""}.
+3. Send the request.
+4. Inspect the response status and message.","1. 404 Not Found, ""Không tìm thấy bài học này"".","- Logged in; id 999999 unused."
+AIASSISTANT_FT06,"A learner can ask about ANY lesson by id, even one belonging to a course they are not enrolled in — there is no enrollment check on this endpoint.","1. Log in as a LEARNER who is confirmed NOT enrolled in a particular course.
+2. Identify a lessonId that belongs to that course.
+3. Prepare and send POST /api/v1/ai-assistant/messages body {""lessonId"":<that lesson>,""message"":""explain this""}.
+4. Inspect the response status.","1. 200 OK — the request succeeds despite the caller having no enrollment in the lesson's course.","- Logged in learner not enrolled in the target lesson's course."
+AIASSISTANT_FT07,"Supplying a conversationId that doesn't belong to the caller silently starts a brand-new conversation instead of erroring or leaking another user's history.","1. Log in as a LEARNER.
+2. Prepare POST /api/v1/ai-assistant/messages body {""lessonId"":<id>,""message"":""hi"",""conversationId"":999999} (an id that doesn't belong to the caller).
+3. Send the request.
+4. Inspect the returned conversationId and confirm it differs from 999999.","1. 200 OK; the returned conversationId is a NEW id, not 999999 and not an error — no cross-account data is exposed.","- Logged in."
+AIASSISTANT_FT08,"A Gemini/LLM failure surfaces as a real HTTP error to the caller, unlike the Learning Pathway/Recommendation modules which gracefully degrade.","1. Arrange a test environment where Gemini is unavailable or misconfigured.
+2. Log in as a LEARNER and prepare POST /api/v1/ai-assistant/messages with a valid in-scope question.
+3. Send the request.
+4. Inspect the response status.","1. 502 Bad Gateway (empty/invalid model output) or 503 Service Unavailable (connection/timeout) — NOT a silent 200 fallback.","- A way to simulate a Gemini failure."
+View Conversation History,,,,
+AIASSISTANT_FT09,"Viewing conversation history requires the AI_LEARNING_ASSISTANT permission — re-verify live whether an unauthenticated call is actually blocked (contradicts an old, possibly-stale assumption that it silently succeeds).","1. Discard any existing Authorization token and prepare GET /api/v1/ai-assistant/conversations with no Authorization header; send it and note the status.
+2. Log in as a LEARNER holding AI_LEARNING_ASSISTANT with ≥1 prior conversation.
+3. Repeat GET /api/v1/ai-assistant/conversations with that valid token.
+4. Inspect both responses.","1. Step 1: 403 Forbidden (method-level @PreAuthorize should reject an anonymous/ROLE_ANONYMOUS principal) — confirm this live, do not assume either outcome.
+2. Steps 2-4: 200 OK; List of the caller's own AIConversation records (including full messages[]).","- Step 2-4 needs a logged-in LEARNER with ≥1 prior conversation."
+Check AI Service Status,,,,
+AIASSISTANT_FT10,"The health-check endpoint is fully public and never errors, reflecting configuration state in the response body instead of an HTTP error.","1. Discard any existing Authorization token.
+2. Prepare GET /api/v1/ai-assistant/status with no Authorization header.
+3. Send the request.
+4. Inspect the response body's available/message fields.","1. 200 OK; AiHealthResponse{available, message, chatModel, embeddingModel} — if GEMINI_API_KEY isn't configured, available=false with an explanatory message, still HTTP 200.","- None."

@@ -114,4 +114,59 @@ public class TrainerOnboardingController {
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
+
+    private final com.hango.hango_backend.service.GeminiClientService geminiClientService;
+
+    @PostMapping(value = "/trainers/analyze-document", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> analyzeDocumentFile(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"File is required\"}");
+            }
+            byte[] bytes = file.getBytes();
+            String contentType = file.getContentType();
+            String resultJson = geminiClientService.analyzeDocumentImage(bytes, contentType);
+            if (resultJson == null || resultJson.isBlank()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"AI Vision analysis failed\"}");
+            }
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/json")
+                    .body(resultJson);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping(value = "/trainers/analyze-document-url")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> analyzeDocumentUrl(@RequestBody java.util.Map<String, String> body) {
+        try {
+            String imageUrl = body.get("imageUrl");
+            if (imageUrl == null || imageUrl.isBlank()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"imageUrl is required\"}");
+            }
+            byte[] bytes = org.springframework.web.reactive.function.client.WebClient.create()
+                    .get()
+                    .uri(imageUrl)
+                    .retrieve()
+                    .bodyToMono(byte[].class)
+                    .block();
+            String contentType = "image/jpeg";
+            if (imageUrl.toLowerCase().endsWith(".png")) contentType = "image/png";
+            else if (imageUrl.toLowerCase().endsWith(".webp")) contentType = "image/webp";
+
+            String resultJson = geminiClientService.analyzeDocumentImage(bytes, contentType);
+            if (resultJson == null || resultJson.isBlank()) {
+                return ResponseEntity.badRequest().body("{\"error\": \"AI Vision analysis failed\"}");
+            }
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/json")
+                    .body(resultJson);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
 }

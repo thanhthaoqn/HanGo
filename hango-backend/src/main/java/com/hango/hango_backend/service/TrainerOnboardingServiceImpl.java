@@ -1,6 +1,10 @@
 package com.hango.hango_backend.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.LoginResponse;
+import com.hango.hango_backend.dto.TrainerDocumentDTO;
 import com.hango.hango_backend.dto.TrainerProfileDTO;
 import com.hango.hango_backend.dto.TrainerReviewRequest;
 import com.hango.hango_backend.entity.Role;
@@ -16,16 +20,27 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
+    private static final String DOC_TYPE_PEDAGOGICAL_DEGREE = "PEDAGOGICAL_DEGREE";
+    private static final String DOC_TYPE_TEACHING_CERTIFICATE = "TEACHING_CERTIFICATE";
+    private static final String DOC_TYPE_LANGUAGE_PROFICIENCY = "LANGUAGE_PROFICIENCY";
+    private static final String DOC_TYPE_ACADEMIC_TRANSCRIPT = "ACADEMIC_TRANSCRIPT";
+    private static final String DOC_TYPE_TEACHING_CV = "TEACHING_CV";
+    private static final String DOC_TYPE_OTHER = "OTHER";
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -34,6 +49,7 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
     private final EmailService emailService;
     private final NotificationService notificationService;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     @jakarta.annotation.PostConstruct
     public void initSchemaFix() {
@@ -151,10 +167,10 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
 
         // Prevent modification if already waiting or suspended
         if ("AWAITING_APPROVAL".equalsIgnoreCase(profile.getStatus())) {
-            throw new IllegalStateException("Hồ sơ đang chờ duyệt, bạn không thể chỉnh sửa thông tin.");
+            throw new IllegalStateException("Application is currently awaiting approval. Profile details cannot be modified.");
         }
         if ("SUSPENDED".equalsIgnoreCase(profile.getStatus())) {
-            throw new IllegalStateException("Tài khoản của bạn đã bị đình chỉ hoạt động.");
+            throw new IllegalStateException("Your trainer account has been suspended.");
         }
 
         // Auto-save updating fields
@@ -162,7 +178,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         if (dto.getWorkplace() != null) profile.setWorkplace(dto.getWorkplace());
         if (dto.getAgreementSigned() != null) profile.setAgreementSigned(dto.getAgreementSigned());
         
-        if (dto.getScoreReportUrl() != null) profile.setScoreReportUrl(dto.getScoreReportUrl());
+        if (hasDocumentPayload(dto)) {
+            applyDocuments(profile, resolveDocuments(dto));
+        }
 
         if (dto.getBankName() != null) profile.setBankName(dto.getBankName());
         if (dto.getBankAccount() != null) profile.setBankAccount(dto.getBankAccount());
@@ -197,7 +215,7 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 .orElseThrow(() -> new IllegalArgumentException("Trainer profile not found for user: " + email));
 
         if ("AWAITING_APPROVAL".equalsIgnoreCase(profile.getStatus())) {
-            throw new IllegalStateException("Hồ sơ đang ở trạng thái chờ xét duyệt.");
+            throw new IllegalStateException("Application is currently under review.");
         }
 
         // 1. Sync any incoming updates first
@@ -224,9 +242,21 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
             throw new IllegalArgumentException("Please upload an avatar image.");
         }
 
-        // At least one certification proof
-        if (isEmpty(profile.getScoreReportUrl())) {
-            throw new IllegalArgumentException("Please upload at least one credentials proof document.");
+        List<TrainerDocumentDTO> documents = extractDocuments(profile);
+        boolean hasPedagogicalProof = documents.stream()
+                .map(TrainerDocumentDTO::getType)
+                .anyMatch(this::isPedagogicalDocumentType);
+        boolean hasAnyProof = documents.stream()
+                .map(TrainerDocumentDTO::getUrl)
+                .anyMatch(url -> !isEmpty(url));
+
+        if ("PROFESSIONAL".equalsIgnoreCase(profile.getTrainerType()) && !hasPedagogicalProof) {
+            throw new IllegalArgumentException("A teaching/pedagogical degree or credential is required for Teacher applications.");
+        }
+
+        // At least one credentials proof document or CV
+        if (!hasAnyProof) {
+            throw new IllegalArgumentException("Please upload at least one credentials proof document or CV.");
         }
 
         // 3. Mark submitted and freeze edits
@@ -260,9 +290,26 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         List<TrainerProfile> filtered = new ArrayList<>();
 
         for (TrainerProfile p : all) {
+            try {
+                if (p.getUser() == null || p.getUser().getEmail() == null) {
+                    continue; // Skip orphan profiles without valid user
+                }
+            } catch (Exception e) {
+                log.warn("Skipping orphan trainer profile user_id {}: missing User entity", p.getUserId());
+                continue;
+            }
+
             // Apply status filter
-            if (status != null && !status.equalsIgnoreCase("ALL")) {
-                if (!status.equalsIgnoreCase(p.getStatus())) {
+            if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+                String reqStatus = status.trim().toUpperCase();
+                if ("REJECTED".equals(reqStatus) || "PENDING_VERIFICATION".equals(reqStatus)) {
+                    boolean isRejected = "PENDING_VERIFICATION".equalsIgnoreCase(p.getStatus()) ||
+                            "SUSPENDED".equalsIgnoreCase(p.getStatus()) ||
+                            "REJECTED".equalsIgnoreCase(p.getStatus());
+                    if (!isRejected) {
+                        continue;
+                    }
+                } else if (!reqStatus.equalsIgnoreCase(p.getStatus())) {
                     continue;
                 }
             }
@@ -270,8 +317,14 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
             // Apply search query (email or full name)
             if (search != null && !search.trim().isEmpty()) {
                 String q = search.trim().toLowerCase();
-                String name = p.getUser() != null ? p.getUser().getFullName() : "";
-                String email = p.getUser() != null ? p.getUser().getEmail() : "";
+                String name = "";
+                String email = "";
+                try {
+                    name = p.getUser().getFullName() != null ? p.getUser().getFullName() : "";
+                    email = p.getUser().getEmail() != null ? p.getUser().getEmail() : "";
+                } catch (Exception e) {
+                    continue;
+                }
                 if (!name.toLowerCase().contains(q) && !email.toLowerCase().contains(q)) {
                     continue;
                 }
@@ -302,16 +355,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         profile.setAdminNotes(request.getAdminNotes());
 
         if ("VERIFIED".equalsIgnoreCase(newStatus)) {
-            // Setup default split rate if not custom-ridden by the admin
-            if (request.getRevenueShare() != null) {
-                if (request.getRevenueShare() < 0.50 || request.getRevenueShare() > 0.95) {
-                    throw new IllegalArgumentException("Trainer revenue share must be between 0.50 (50%) and 0.95 (95%).");
-                }
-                profile.setRevenueShare(request.getRevenueShare());
-            } else {
-                double defaultShare = "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType()) ? 0.60 : 0.70;
-                profile.setRevenueShare(defaultShare);
-            }
+            // Automatically assign fixed revenue share based on trainer type: 70% Teacher, 60% Tutor
+            double autoShare = "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType()) ? 0.60 : 0.70;
+            profile.setRevenueShare(autoShare);
 
             // Automatically grant TRAINER role to user if not already present
             if (profile.getUser() != null) {
@@ -377,7 +423,25 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
     }
 
     private TrainerProfileDTO mapToDTO(TrainerProfile p) {
-        User user = p.getUser();
+        String fullName = "N/A";
+        String email = "N/A";
+        String phoneNumber = "N/A";
+        String gender = null;
+        String avatarUrl = null;
+
+        try {
+            User user = p.getUser();
+            if (user != null) {
+                fullName = user.getFullName() != null ? user.getFullName() : "N/A";
+                email = user.getEmail() != null ? user.getEmail() : "N/A";
+                phoneNumber = user.getPhoneNumber() != null ? user.getPhoneNumber() : "N/A";
+                gender = user.getGender();
+                avatarUrl = user.getAvatarUrl();
+            }
+        } catch (Exception e) {
+            log.warn("Could not load User entity for trainer_profile user_id {}: {}", p.getUserId(), e.getMessage());
+        }
+
         return TrainerProfileDTO.builder()
                 .userId(p.getUserId())
                 .trainerType(p.getTrainerType())
@@ -385,6 +449,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 .bio(p.getBio())
                 .workplace(p.getWorkplace())
                 .scoreReportUrl(p.getScoreReportUrl())
+                .pedagogicalDegreeUrl(p.getPedagogicalDegreeUrl())
+                .cvUrl(p.getCvUrl())
+                .certificates(extractDocuments(p))
                 .bankName(p.getBankName())
                 .bankAccount(p.getBankAccount())
                 .bankAccountName(p.getBankAccountName())
@@ -395,12 +462,337 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 .submittedAt(p.getSubmittedAt())
                 .reviewedAt(p.getReviewedAt())
                 .adminNotes(p.getAdminNotes())
-                .fullName(user != null ? user.getFullName() : "N/A")
-                .email(user != null ? user.getEmail() : "N/A")
-                .phoneNumber(user != null ? user.getPhoneNumber() : "N/A")
-                .gender(user != null ? user.getGender() : null)
-                .avatarUrl(user != null ? user.getAvatarUrl() : null)
+                .fullName(fullName)
+                .email(email)
+                .phoneNumber(phoneNumber)
+                .gender(gender)
+                .avatarUrl(avatarUrl)
                 .build();
+    }
+
+    private boolean hasDocumentPayload(TrainerProfileDTO dto) {
+        return dto.getCertificates() != null
+                || dto.getScoreReportUrl() != null
+                || dto.getPedagogicalDegreeUrl() != null
+                || dto.getCvUrl() != null;
+    }
+
+    private List<TrainerDocumentDTO> resolveDocuments(TrainerProfileDTO dto) {
+        List<TrainerDocumentDTO> documents = new ArrayList<>();
+
+        if (dto.getCertificates() != null) {
+            documents.addAll(dto.getCertificates());
+        } else if (!isEmpty(dto.getScoreReportUrl()) && dto.getScoreReportUrl().trim().startsWith("[")) {
+            documents.addAll(parseDocumentsJson(dto.getScoreReportUrl()));
+        }
+
+        Map<String, TrainerDocumentDTO> byUrl = new LinkedHashMap<>();
+        for (TrainerDocumentDTO document : documents) {
+            TrainerDocumentDTO normalized = normalizeDocument(document);
+            if (normalized != null) {
+                byUrl.put(normalized.getUrl(), normalized);
+            }
+        }
+
+        mergeLegacyUrl(byUrl, dto.getPedagogicalDegreeUrl(), DOC_TYPE_PEDAGOGICAL_DEGREE, canonicalTitleForType(DOC_TYPE_PEDAGOGICAL_DEGREE));
+        mergeLegacyUrl(byUrl, dto.getCvUrl(), DOC_TYPE_TEACHING_CV, canonicalTitleForType(DOC_TYPE_TEACHING_CV));
+
+        if (!isEmpty(dto.getScoreReportUrl()) && !dto.getScoreReportUrl().trim().startsWith("[")) {
+            String inferredType = inferDocumentType(null, dto.getScoreReportUrl(), null, null);
+            mergeLegacyUrl(byUrl, dto.getScoreReportUrl(), inferredType, canonicalTitleForType(inferredType));
+        }
+
+        return new ArrayList<>(byUrl.values());
+    }
+
+    private List<TrainerDocumentDTO> extractDocuments(TrainerProfile profile) {
+        Map<String, TrainerDocumentDTO> byUrl = new LinkedHashMap<>();
+
+        for (TrainerDocumentDTO document : parseDocumentsJson(profile.getScoreReportUrl())) {
+            TrainerDocumentDTO normalized = normalizeDocument(document);
+            if (normalized != null) {
+                byUrl.put(normalized.getUrl(), normalized);
+            }
+        }
+
+        mergeLegacyUrl(byUrl, profile.getPedagogicalDegreeUrl(), DOC_TYPE_PEDAGOGICAL_DEGREE, canonicalTitleForType(DOC_TYPE_PEDAGOGICAL_DEGREE));
+        mergeLegacyUrl(byUrl, profile.getCvUrl(), DOC_TYPE_TEACHING_CV, canonicalTitleForType(DOC_TYPE_TEACHING_CV));
+
+        if (byUrl.isEmpty() && !isEmpty(profile.getScoreReportUrl()) && !profile.getScoreReportUrl().trim().startsWith("[")) {
+            String inferredType = inferDocumentType(null, profile.getScoreReportUrl(), null, null);
+            mergeLegacyUrl(byUrl, profile.getScoreReportUrl(), inferredType, canonicalTitleForType(inferredType));
+        }
+
+        return new ArrayList<>(byUrl.values());
+    }
+
+    private List<TrainerDocumentDTO> parseDocumentsJson(String rawJson) {
+        if (isEmpty(rawJson) || !rawJson.trim().startsWith("[")) {
+            return List.of();
+        }
+
+        try {
+            List<TrainerDocumentDTO> parsed = objectMapper.readValue(
+                    rawJson,
+                    new TypeReference<List<TrainerDocumentDTO>>() {});
+            return parsed != null ? parsed : List.of();
+        } catch (JsonProcessingException e) {
+            log.warn("Could not parse trainer document JSON payload: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private void applyDocuments(TrainerProfile profile, List<TrainerDocumentDTO> rawDocuments) {
+        List<TrainerDocumentDTO> documents = rawDocuments.stream()
+                .map(this::normalizeDocument)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (documents.isEmpty()) {
+            profile.setScoreReportUrl(null);
+            profile.setPedagogicalDegreeUrl(null);
+            profile.setCvUrl(null);
+            return;
+        }
+
+        profile.setScoreReportUrl(writeDocumentsJson(documents));
+        profile.setPedagogicalDegreeUrl(findFirstUrlByTypes(documents, DOC_TYPE_PEDAGOGICAL_DEGREE, DOC_TYPE_TEACHING_CERTIFICATE));
+        profile.setCvUrl(findFirstUrlByTypes(documents, DOC_TYPE_TEACHING_CV));
+    }
+
+    private String writeDocumentsJson(List<TrainerDocumentDTO> documents) {
+        try {
+            return objectMapper.writeValueAsString(documents);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Could not serialize trainer documents.", e);
+        }
+    }
+
+    private TrainerDocumentDTO normalizeDocument(TrainerDocumentDTO document) {
+        if (document == null || isEmpty(document.getUrl())) {
+            return null;
+        }
+
+        String type = shouldPreserveManualDocumentType(document.getType(), document.getSource())
+                ? document.getType().trim().toUpperCase()
+                : inferDocumentType(
+                        document.getType(),
+                        document.getName(),
+                        document.getUrl(),
+                        document.getIssuingInstitution());
+        String name = !isEmpty(document.getName()) ? document.getName().trim() : canonicalTitleForType(type);
+
+        TrainerDocumentDTO.TrainerDocumentDTOBuilder builder = TrainerDocumentDTO.builder()
+                .type(type)
+                .name(name)
+                .url(document.getUrl().trim());
+
+        if (!isEmpty(document.getIssuingInstitution())) {
+            builder.issuingInstitution(document.getIssuingInstitution().trim());
+        }
+        if (!isEmpty(document.getHolderName())) {
+            builder.holderName(document.getHolderName().trim());
+        }
+        if (!isEmpty(document.getSource())) {
+            builder.source(document.getSource().trim());
+        }
+
+        return builder.build();
+    }
+
+    private boolean shouldPreserveManualDocumentType(String explicitType, String source) {
+        String normalizedExplicitType = !isEmpty(explicitType) ? explicitType.trim().toUpperCase() : null;
+        String normalizedSource = !isEmpty(source) ? source.trim().toLowerCase(Locale.ROOT) : null;
+
+        return normalizedExplicitType != null
+                && !DOC_TYPE_OTHER.equals(normalizedExplicitType)
+                && isKnownDocumentType(normalizedExplicitType)
+                && normalizedSource != null
+                && normalizedSource.endsWith("_manual");
+    }
+
+    private boolean isKnownDocumentType(String type) {
+        return DOC_TYPE_PEDAGOGICAL_DEGREE.equals(type)
+                || DOC_TYPE_TEACHING_CERTIFICATE.equals(type)
+                || DOC_TYPE_LANGUAGE_PROFICIENCY.equals(type)
+                || DOC_TYPE_ACADEMIC_TRANSCRIPT.equals(type)
+                || DOC_TYPE_TEACHING_CV.equals(type)
+                || DOC_TYPE_OTHER.equals(type);
+    }
+
+    private void mergeLegacyUrl(Map<String, TrainerDocumentDTO> byUrl, String url, String type, String name) {
+        if (isEmpty(url)) {
+            return;
+        }
+
+        String trimmedUrl = url.trim();
+        byUrl.computeIfAbsent(trimmedUrl, key -> TrainerDocumentDTO.builder()
+                .type(type)
+                .name(name)
+                .url(trimmedUrl)
+                .build());
+    }
+
+    private String findFirstUrlByTypes(List<TrainerDocumentDTO> documents, String... types) {
+        for (TrainerDocumentDTO document : documents) {
+            if (document == null || isEmpty(document.getUrl())) {
+                continue;
+            }
+            for (String type : types) {
+                if (type.equalsIgnoreCase(document.getType())) {
+                    return document.getUrl();
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isPedagogicalDocumentType(String type) {
+        return DOC_TYPE_PEDAGOGICAL_DEGREE.equalsIgnoreCase(type)
+                || DOC_TYPE_TEACHING_CERTIFICATE.equalsIgnoreCase(type)
+                || DOC_TYPE_TEACHING_CV.equalsIgnoreCase(type);
+    }
+
+    private String inferDocumentType(String explicitType, String name, String url, String issuingInstitution) {
+        String normalizedExplicitType = !isEmpty(explicitType) ? explicitType.trim().toUpperCase() : null;
+        Map<String, Integer> scores = initializeDocumentScores();
+
+        if (normalizedExplicitType != null && scores.containsKey(normalizedExplicitType)) {
+            addDocumentScore(scores, normalizedExplicitType, 2);
+        }
+
+        scoreDocumentText(scores, name, 2);
+        scoreDocumentText(scores, url, 1);
+        scoreDocumentText(scores, issuingInstitution, 1);
+
+        String detectedType = bestScoringDocumentType(scores);
+        int detectedScore = scores.getOrDefault(detectedType, 0);
+
+        if (normalizedExplicitType != null && scores.containsKey(normalizedExplicitType) && detectedScore <= 2) {
+            return normalizedExplicitType;
+        }
+
+        if (detectedScore > 0) {
+            return detectedType;
+        }
+
+        return normalizedExplicitType != null && scores.containsKey(normalizedExplicitType)
+                ? normalizedExplicitType
+                : DOC_TYPE_OTHER;
+    }
+
+    private Map<String, Integer> initializeDocumentScores() {
+        Map<String, Integer> scores = new LinkedHashMap<>();
+        scores.put(DOC_TYPE_PEDAGOGICAL_DEGREE, 0);
+        scores.put(DOC_TYPE_TEACHING_CERTIFICATE, 0);
+        scores.put(DOC_TYPE_LANGUAGE_PROFICIENCY, 0);
+        scores.put(DOC_TYPE_ACADEMIC_TRANSCRIPT, 0);
+        scores.put(DOC_TYPE_TEACHING_CV, 0);
+        scores.put(DOC_TYPE_OTHER, 0);
+        return scores;
+    }
+
+    private void scoreDocumentText(Map<String, Integer> scores, String rawText, int multiplier) {
+        String normalizedText = normalizeComparableText(rawText);
+        if (normalizedText.isBlank()) {
+            return;
+        }
+
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CERTIFICATE, 8 * multiplier,
+                "tefl", "tesol", "celta", "teaching certificate", "teaching certification",
+                "teacher licence", "teacher license");
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CERTIFICATE, 4 * multiplier,
+                "teaching english", "lead trainer", "course director", "teaching practice");
+
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_LANGUAGE_PROFICIENCY, 8 * multiplier,
+                "ielts", "toeic", "toefl", "aptis", "vstep", "test report form",
+                "international english language testing system");
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_LANGUAGE_PROFICIENCY, 5 * multiplier,
+                "trf", "british council", "idp", "cambridge english", "cambridge assessment",
+                "certificate of proficiency");
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_LANGUAGE_PROFICIENCY, 3 * multiplier,
+                "cefr", "language proficiency", "proficiency", "ngoai ngu");
+
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_PEDAGOGICAL_DEGREE, 8 * multiplier,
+                "the degree of bachelor", "degree of bachelor", "bachelor of", "bang cu nhan",
+                "bang tot nghiep", "cu nhan", "tot nghiep", "graduation diploma");
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_PEDAGOGICAL_DEGREE, 4 * multiplier,
+                "pedagogy", "pedagogical", "pedagog", "su pham", "qualification", "degree",
+                "diploma", "english language teaching");
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_PEDAGOGICAL_DEGREE, multiplier,
+                "university", "college of foreign languages", "college", "dai hoc",
+                "faculty of education");
+
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_ACADEMIC_TRANSCRIPT, 8 * multiplier,
+                "hoc ba", "bang diem", "transcript", "academic records", "report card");
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_ACADEMIC_TRANSCRIPT, 4 * multiplier,
+                "hoc luc", "grade table", "school year", "semester", "grade point");
+
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CV, 8 * multiplier,
+                "curriculum vitae", "resume", "teacher profile", "so yeu ly lich", " cv ");
+        addScoreIfContains(scores, normalizedText, DOC_TYPE_TEACHING_CV, 4 * multiplier,
+                "work experience", "employment history", "teaching experience", "career objective",
+                "professional summary");
+    }
+
+    private void addScoreIfContains(Map<String, Integer> scores, String normalizedText, String type, int points,
+                                    String... patterns) {
+        for (String pattern : patterns) {
+            if (normalizedText.contains(normalizeComparableText(pattern))) {
+                addDocumentScore(scores, type, points);
+            }
+        }
+    }
+
+    private void addDocumentScore(Map<String, Integer> scores, String type, int points) {
+        scores.put(type, scores.getOrDefault(type, 0) + points);
+    }
+
+    private String bestScoringDocumentType(Map<String, Integer> scores) {
+        String bestType = DOC_TYPE_OTHER;
+        int bestScore = -1;
+
+        for (String type : List.of(
+                DOC_TYPE_LANGUAGE_PROFICIENCY,
+                DOC_TYPE_TEACHING_CERTIFICATE,
+                DOC_TYPE_PEDAGOGICAL_DEGREE,
+                DOC_TYPE_ACADEMIC_TRANSCRIPT,
+                DOC_TYPE_TEACHING_CV,
+                DOC_TYPE_OTHER)) {
+            int score = scores.getOrDefault(type, 0);
+            if (score > bestScore) {
+                bestScore = score;
+                bestType = type;
+            }
+        }
+
+        return bestType;
+    }
+
+    private String normalizeComparableText(String rawText) {
+        if (isEmpty(rawText)) {
+            return "";
+        }
+
+        String normalized = Normalizer.normalize(rawText, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase()
+                .replace('\u0111', 'd')
+                .replaceAll("[^a-z0-9]+", " ")
+                .trim();
+
+        return normalized.isEmpty() ? "" : " " + normalized + " ";
+    }
+
+    private String canonicalTitleForType(String type) {
+        return switch (type) {
+            case DOC_TYPE_PEDAGOGICAL_DEGREE -> "Bachelor of English Pedagogy Degree";
+            case DOC_TYPE_TEACHING_CERTIFICATE -> "TEFL / TESOL Teaching Certificate";
+            case DOC_TYPE_LANGUAGE_PROFICIENCY -> "IELTS / Proficiency Certificate";
+            case DOC_TYPE_ACADEMIC_TRANSCRIPT -> "High School Academic Records";
+            case DOC_TYPE_TEACHING_CV -> "Professional Teaching CV / Resume";
+            default -> "Other Credential Proof";
+        };
     }
 
     private boolean isEmpty(String str) {

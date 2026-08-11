@@ -1,0 +1,137 @@
+Feature,Learning Pathway
+Test requirement,Functional integration tests for the AI-generated adaptive learning pathway (LearningPathwayController) — roadmap generation, scheduling, reroute/detour, mentor chat
+Number of TCs,31
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,31,0
+Round 2,0,0,31,0
+Round 3,0,0,31,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+Generate Learning Pathway,,,,
+PATHWAY_FT01,"Generating a new pathway from a valid own exam attempt succeeds and archives any prior ACTIVE pathway, enforcing the single-active-pathway rule.","1. Log in as a learner who already has an ACTIVE pathway from a prior generation.
+2. Prepare POST /api/v1/pathways/generate body {""examAttemptId"":<own attempt>}.
+3. Send the request and inspect the response's nodes[]/weak_skills[].
+4. Prepare and send GET /api/v1/pathways/me to confirm the old pathway is now archived.","1. Step 3: 200 OK; LearningPathwayResponseDTO with nodes[], weak_skills[], etc.
+2. Step 4: returns the NEW pathway; the old one is now status=ARCHIVED, confirming the single-active-pathway invariant.","- Logged in learner with ENROLL_AND_LEARN_COURSES; owns a completed exam attempt; already has one ACTIVE pathway from before."
+PATHWAY_FT02,"Generating a pathway using another student's exam attempt id is correctly rejected as forbidden.","1. Log in as Student B and identify an exam attempt belonging to a different Student A.
+2. Prepare POST /api/v1/pathways/generate body {""examAttemptId"":<belongs to Student A>}.
+3. Send the request.
+4. Inspect the response status and message.","1. 403 Forbidden, ""Access denied to this exam attempt"".","- An exam attempt belonging to a different student exists."
+PATHWAY_FT03,"Generating from a non-existent exam attempt id returns a clean 404.","1. Log in as any learner.
+2. Prepare POST /api/v1/pathways/generate body {""examAttemptId"":999999}.
+3. Send the request.
+4. Inspect the response status and message.","1. 404 Not Found, ""Exam Attempt not found"".","- id 999999 unused."
+PATHWAY_FT04,"If zero PUBLISHED courses exist, generation falls back to using courses of ANY status rather than failing.","1. Arrange a test environment where every course is DRAFT (none PUBLISHED).
+2. Log in as a learner with a valid own exam attempt.
+3. Prepare and send POST /api/v1/pathways/generate.
+4. Inspect the resulting pathway's nodes and the courses they reference.","1. 200 OK; the generated pathway's nodes reference DRAFT courses, since the fallback engaged.","- No PUBLISHED courses exist in the environment; ≥1 DRAFT course exists."
+PATHWAY_FT05,"If there are no courses at all in the system, generation still succeeds with an empty roadmap and a canned message rather than erroring.","1. Arrange a test environment with zero courses of any status.
+2. Log in as a learner with a valid own exam attempt.
+3. Prepare and send POST /api/v1/pathways/generate.
+4. Inspect the response's nodes[] and mentor_summary.","1. 200 OK; nodes=[] and mentor_summary is a canned ""no courses available yet""-style message — not an error.","- No courses exist in the environment at all."
+PATHWAY_FT06,"The first node in a newly generated pathway always defaults to IN_PROGRESS and every other node to LOCKED, regardless of whatever status the AI itself returned.","1. Log in and generate a pathway that produces ≥3 nodes.
+2. Inspect each node's status field in the response.
+3. Confirm node 1 is IN_PROGRESS and every subsequent node is LOCKED.","1. Node 1: IN_PROGRESS. Nodes 2+: LOCKED — normalized server-side, not trusted from the AI's raw output.","- A successful generation with ≥3 resulting nodes."
+View Pathway Detail / My Pathway,,,,
+PATHWAY_FT07,"Viewing another student's pathway by id is correctly rejected — re-verify this holds, since it was historically flagged as a possible IDOR.","1. Log in as Student A and generate/confirm a pathway; note its id.
+2. Log out and log in as unrelated Student B.
+3. Prepare and send GET /api/v1/pathways/{that pathway id} as Student B.
+4. Inspect the response status and message.","1. 403 Forbidden, ""Access denied"" — confirm this is enforced, since it determines whether a previously-flagged gap is actually fixed.","- A pathway belonging to Student A exists; caller is Student B."
+PATHWAY_FT08,"Viewing a pathway id that doesn't exist returns a clean 404.","1. Log in as any learner.
+2. Prepare and send GET /api/v1/pathways/999999.
+3. Inspect the response status and message.","1. 404 Not Found, ""Pathway not found"".","- id 999999 unused."
+PATHWAY_FT09,"A node's returned status is recomputed live from actual lesson-completion data on every read, so it can auto-promote from LOCKED without any pathway-specific mutation call.","1. Log in and note a LOCKED node's underlying course and its lessons.
+2. Prepare and send PUT /api/v1/lessons/{id}/complete for one of that course's lessons — an action completely unrelated to the pathway API.
+3. Prepare and send GET /api/v1/pathways/{id} again.
+4. Inspect that node's status field.","1. Step 3-4: the node's status has changed to IN_PROGRESS (or COMPLETED at 100%) purely because of the out-of-band lesson completion — no pathway mutation call was made.","- A LOCKED node whose course has at least one completable lesson."
+PATHWAY_FT10,"Requesting the active pathway when the learner has none (or all are archived) returns a clean 404.","1. Log in as a learner who has never generated a pathway (or whose only pathway is archived).
+2. Prepare and send GET /api/v1/pathways/me.
+3. Inspect the response status and message.","1. 404 Not Found, ""No active learning pathway found"".","- Learner with zero pathways (or all archived)."
+Reroute Pathway (legacy simple form),,,,
+PATHWAY_FT11,"Rerouting appears to unconditionally re-lock all downstream (non-completed) nodes regardless of whether the latest exam score was good or bad — verify this holds even for a HIGH-scoring student, where the messaging implies \"no action needed.\"","1. Log in and arrange the caller's most recent exam attempt to score ≥60.
+2. Note the current status of every downstream (non-completed) node in the pathway.
+3. Prepare and send PUT /api/v1/pathways/{id}/reroute.
+4. Inspect the mentor summary text AND re-check every downstream node's status/progress for any changes.","1. Step 3-4: 200 OK; mentor summary says the plan is fine, BUT the node-locking loop still runs — confirm whether downstream nodes are still reset/locked despite the ""no changes needed"" messaging (documents a possible mismatch between text and actual state mutation).","- Own pathway with a recent exam attempt scoring ≥60."
+PATHWAY_FT12,"Rerouting a non-owned or entirely non-existent pathway is correctly rejected.","1. Log in and identify another student's pathway id.
+2. Prepare and send PUT /api/v1/pathways/{anotherStudentsPathwayId}/reroute; inspect the response.
+3. Prepare and send PUT /api/v1/pathways/999999/reroute; inspect the response.
+4. Compare both response statuses/messages.","1. Step 2: 403 ""Access denied"". Step 3: 404 ""Pathway not found"".","- Another student's pathway exists; id 999999 unused."
+Apply / View Pathway Schedule,,,,
+PATHWAY_FT13,"Applying a valid schedule computes per-node hours from each course's lesson count and builds a backwards calendar toward the target date.","1. Log in with an own pathway containing ≥1 node.
+2. Prepare PUT /api/v1/pathways/{id}/schedule body {""goalName"":""Band 6.5"",""targetDate"":""<a date ~8 weeks out>"",""hoursPerWeek"":10,""preferredStudyDays"":[1,3,5]}.
+3. Send the request.
+4. Inspect each node's start_date/deadline/estimated_hours and the overall schedule_status.","1. 200 OK; schedule_status=""ON_TRACK""; each node has start_date/deadline/estimated_hours populated (estimated_hours = lessonCount×2, or 3 if the course has zero lessons).","- Own pathway with ≥1 node."
+PATHWAY_FT14,"An hoursPerWeek value of 0 or negative is accepted with no validation error, producing a degenerate, all-same-day schedule rather than being rejected.","1. Log in with an own pathway.
+2. Prepare PUT /api/v1/pathways/{id}/schedule body {""goalName"":""Test"",""targetDate"":""<future date>"",""hoursPerWeek"":0}.
+3. Send the request.
+4. Inspect every node's start_date/deadline/estimated_hours.","1. 200 OK (no validation error); every node's startDate=deadline=targetDate, estimatedHours=0.","- Own pathway exists."
+PATHWAY_FT15,"A targetDate already in the past is accepted with no validation, and the resulting nodes are immediately flagged BEHIND.","1. Log in with an own pathway.
+2. Prepare PUT /api/v1/pathways/{id}/schedule body {""goalName"":""Test"",""targetDate"":""<a date in the past>"",""hoursPerWeek"":10}.
+3. Send the request.
+4. Inspect every non-completed node's scheduleStatus.","1. 200 OK (no rejection for a past date); every non-completed node's scheduleStatus comes back ""BEHIND"" immediately.","- Own pathway exists."
+PATHWAY_FT16,"A schedule's BEHIND/ON_TRACK status is computed once at apply-time and does NOT auto-recompute later, so a schedule that was ON_TRACK when applied keeps reporting ON_TRACK even after its deadline silently passes.","1. Log in and apply a schedule with a target date just 1-2 days in the future (so it reports ON_TRACK at apply time).
+2. Wait until that date has passed (or simulate a clock advance in a test environment).
+3. Prepare and send GET /api/v1/pathways/{id} again WITHOUT re-applying any schedule.
+4. Inspect the node's scheduleStatus.","1. Step 3-4: nodes still show scheduleStatus=""ON_TRACK"" from the original apply-time computation, even though their deadlines are now in the past — confirms this field is NOT recomputed on every read (contrast with node status/progress, which IS recomputed live per PATHWAY_FT09).","- A schedule applied with a target date that will pass within the test window."
+PATHWAY_FT17,"The deprecated schedule-status endpoint serves a JSON-looking body over a plain-text Content-Type rather than application/json.","1. Log in with an own pathway.
+2. Prepare and send GET /api/v1/pathways/{id}/schedule-status.
+3. Inspect the raw response body.
+4. Inspect the response's Content-Type header via DevTools.","1. 200 OK, body {""status"": ""<value>""} — but Content-Type is text/plain, not application/json; a strict JSON-only HTTP client could mishandle this.","- Own pathway exists."
+Progress Snapshot,,,,
+PATHWAY_FT18,"Requesting the progress snapshot for a non-existent or non-owned pathway returns a masked 500 rather than a clean 404/403 (confirmed bug — the service throws a plain IllegalArgumentException with no matching exception handler).","1. Log in and prepare/send GET /api/v1/pathways/999999/progress-snapshot; inspect the response.
+2. Identify another student's pathway id and prepare/send GET /api/v1/pathways/{anotherStudentsPathwayId}/progress-snapshot; inspect the response.
+3. Compare both response statuses against the expected 404/403.","1. Both: 500 Internal Server Error, generic masked body — NOT 404/403 as the ""Pathway not found""/""Access denied"" messages would imply.","- id 999999 unused; another student's pathway exists."
+PATHWAY_FT19,"The has_weak_skill_overlap field on every node is always false, regardless of the node's actual course/skills — self-documented as an unfinished feature, not a hidden bug.","1. Log in with an own pathway containing multiple nodes.
+2. Prepare and send GET /api/v1/pathways/{id}/progress-snapshot.
+3. Inspect every entry in nodes_snapshot[] for its has_weak_skill_overlap value.","1. 200 OK; every entry in nodes_snapshot[] has has_weak_skill_overlap=false, regardless of the node's actual course/skills.","- Own pathway exists."
+Reroute (Suggestions / Accept / Decline),,,,
+PATHWAY_FT20,"A node that has failed its quiz 2 or more times consecutively triggers a DETOUR_REMEDIAL reroute suggestion.","1. Log in with an own pathway whose current node is IN_PROGRESS.
+2. Submit two LessonQuizAttempts on that node's course, each scoring below 60, back to back.
+3. Prepare and send POST /api/v1/pathways/{id}/reroute/suggestions.
+4. Inspect the returned pending_reroute_suggestion.","1. 200 OK; pending_reroute_suggestion.node_type=""DETOUR_REMEDIAL"", can_skip=false, reason references the fail count.","- Own pathway; 2 consecutive failing quiz attempts on the current IN_PROGRESS node's course."
+PATHWAY_FT21,"A node completed with an exact 100.0 score, whose next node isn't already unlocked, triggers a FAST_TRACK_SKIPPED reroute suggestion.","1. Log in with an own pathway and complete the current node's course with a perfect 100.0 quiz score.
+2. Prepare and send POST /api/v1/pathways/{id}/reroute/suggestions.
+3. Inspect the returned pending_reroute_suggestion.","1. 200 OK; pending_reroute_suggestion.node_type=""FAST_TRACK_SKIPPED"", can_skip=true (since has_weak_skill_overlap is always false per PATHWAY_FT19, this condition reduces to just the 100.0 score check).","- Own pathway; current node completed with exactly 100.0."
+PATHWAY_FT22,"The suggestions endpoint hits the SAME 500-instead-of-403/404 bug as the progress-snapshot endpoint, and is reachable by an ownership mismatch alone.","1. Log in and identify another student's pathway id.
+2. Prepare and send POST /api/v1/pathways/{anotherStudentsPathwayId}/reroute/suggestions.
+3. Inspect the response status and body.","1. 500 Internal Server Error, generic masked body — NOT the expected 403, since this endpoint calls the same progress-snapshot service first, before any of its own checks run.","- Another student's pathway exists."
+PATHWAY_FT23,"Accepting a FAST_TRACK suggestion correctly marks the node skipped and writes an audit event; accepting a DETOUR_REQUIRED suggestion instead inserts the pathway's FIRST course as a \"remedial\" step regardless of what skill is actually weak.","1. Obtain a FAST_TRACK_ELIGIBLE suggestion (per PATHWAY_FT21), then prepare and send POST /api/v1/pathways/{id}/reroute/accept; inspect the resulting node and audit log.
+2. Separately, obtain a DETOUR_REQUIRED suggestion (per PATHWAY_FT20), then prepare and send POST /api/v1/pathways/{id}/reroute/accept; inspect the newly inserted node.
+3. Compare the inserted ""remedial"" course's identity against the pathway's very first course.","1. Step 1: 200 OK; the target node becomes status=COMPLETED, nodeType=FAST_TRACK_SKIPPED, isOptional=true; the next LOCKED node unlocks; a PathwayEvent audit record is written.
+2. Step 2: 200 OK; a new ""remedial"" node is inserted that is literally a copy of the pathway's own FIRST course — even if that course has nothing to do with the actual failing skill — subsequent nodes shift down by one stepOrder; a PathwayEvent is also written.","- Suggestions obtained per PATHWAY_FT20/21 respectively."
+PATHWAY_FT24,"Declining a suggestion is a pure no-op, so the identical suggestion reappears immediately on the next check.","1. Log in and obtain a pending suggestion via POST /api/v1/pathways/{id}/reroute/suggestions.
+2. Prepare and send POST /api/v1/pathways/{id}/reroute/decline.
+3. Prepare and send POST /api/v1/pathways/{id}/reroute/suggestions again.
+4. Compare the second suggestion's node_type/reason against the first.","1. Step 2: 200 OK, just re-returns the current pathway state.
+2. Step 3-4: the SAME suggestion (same node_type/reason) is returned again — nothing was recorded to suppress it.","- A pending suggestion exists as of step 1."
+Mentor Action,,,,
+PATHWAY_FT25,"An unrecognized actionType is not rejected — it returns 200 with a generic \"don't know how to handle it\" message instead of a validation error.","1. Log in with an own pathway.
+2. Prepare POST /api/v1/pathways/{id}/mentor-action body {""actionType"":""NOT_A_REAL_ACTION""}.
+3. Send the request.
+4. Inspect the response status and mentor_summary text.","1. 200 OK; mentor_summary is a generic fallback acknowledging the unknown action — no 400/422.","- Own pathway exists."
+PATHWAY_FT26,"Sending a non-numeric hoursPerWeek inside the ADJUST_SCHEDULE payload throws an unguarded cast exception, surfacing as a masked 500.","1. Log in with an own pathway that already has a targetDate/hoursPerWeek set.
+2. Prepare POST /api/v1/pathways/{id}/mentor-action body {""actionType"":""ADJUST_SCHEDULE"",""payload"":{""hoursPerWeek"":""ten""}} (a string instead of a number).
+3. Send the request.
+4. Inspect the response status.","1. 500 Internal Server Error — the unguarded ((Number) payload.get(""hoursPerWeek"")).intValue() cast throws a ClassCastException for a non-numeric JSON value.","- Own pathway exists, ideally already has a targetDate/hoursPerWeek set."
+Chat with Pathway Mentor,,,,
+PATHWAY_FT27,"An ordinary off-topic question that matches neither the \"learning\" nor the \"off-topic\" keyword lists is treated as in-scope by default and forwarded to the live LLM — a looser guardrail than the lesson-level AI Assistant's embedding-based check.","1. Log in with an own pathway.
+2. Prepare POST /api/v1/pathways/{id}/chat body {""message"":""What's 2+2?""} (a message matching neither keyword list).
+3. Send the request.
+4. Inspect the response's was_out_of_scope flag and reply content.","1. 200 OK; was_out_of_scope=false — the message is forwarded to the live LLM despite arguably being off-topic, since the keyword pre-filter only catches a short hardcoded list (bitcoin/crypto/weather/recipe/football/etc.).","- Logged in; own pathway exists."
+PATHWAY_FT28,"Supplying a foreign or bogus conversation_id silently starts a NEW conversation instead of erroring or exposing another user's chat.","1. Log in with an own pathway.
+2. Prepare POST /api/v1/pathways/{id}/chat body {""message"":""hi"",""conversation_id"":999999} (an id not owned by the caller).
+3. Send the request.
+4. Inspect the returned conversation_id and confirm it differs from 999999.","1. 200 OK; the returned conversation_id is a new id, not 999999 — no error, no cross-account leak.","- Own pathway exists."
+PATHWAY_FT29,"Chat history spanning multiple conversation threads is NOT in strict chronological order — it's newest-conversation-first, chronological within each thread, which can look like a confusing jump backward in time.","1. Log in and trigger creation of a second conversation thread for the same pathway (e.g. via PATHWAY_FT28's bogus-id trick), so two threads now exist.
+2. Prepare and send GET /api/v1/pathways/{id}/chat/history.
+3. Inspect the ordering of messages across the two threads in the response.","1. The returned list shows the newest conversation's messages first (oldest-to-newest within it), THEN jumps back to the older conversation's messages (also oldest-to-newest within it) — not one single global chronological timeline.","- ≥2 conversation threads exist for the same pathway."
+PATHWAY_FT30,"Clearing chat history deletes every conversation thread for the pathway in a single call — there is no way to delete just one thread.","1. Log in and ensure ≥2 conversation threads exist for the pathway.
+2. Prepare and send DELETE /api/v1/pathways/{id}/chat/history.
+3. Prepare and send GET /api/v1/pathways/{id}/chat/history again.
+4. Inspect the returned list to confirm it is now empty.","1. Step 2: 200 OK, empty body.
+2. Step 3-4: returns an empty list — ALL threads were removed, not just one.","- ≥2 conversation threads exist for the pathway."
+Multi-Course Merge (Feature C),,,,
+PATHWAY_FT31,"The multi-goal merge-preview/merge-confirm endpoints referenced by earlier planning docs do not exist in current code — confirm they 404 rather than assuming any documented merge behavior.","1. Log in as any learner.
+2. Prepare and send POST /api/v1/pathways/merge-preview with any body.
+3. Prepare and send POST /api/v1/pathways/{id}/merge-confirm with any body.
+4. Inspect both responses' status codes.","1. Both: 404 Not Found (no controller route is mapped to either path) — this is a documentation/reality gap to flag to the dev team, not a bug to work around in testing.","- None."

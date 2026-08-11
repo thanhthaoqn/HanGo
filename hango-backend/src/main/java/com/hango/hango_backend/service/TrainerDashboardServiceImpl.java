@@ -41,6 +41,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final ExamHistoryService examHistoryService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private String getBaseCode(String code, Long id) {
+        if (code == null || code.isBlank()) return String.valueOf(id);
+        return code.replaceAll("-V\\d+$", "").toUpperCase();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public TrainerDashboardSummaryDTO getTrainerDashboardSummary(String email) {
@@ -48,7 +53,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         Long trainerId = user.getId();
 
-        long coursesCount = courseRepository.countByCreatorIdAndDeletedAtIsNull(trainerId);
         long learnersCount = enrollmentRepository.countDistinctStudentsByCourseCreatorId(trainerId);
         long examsCount = examRepository.countByCreatedByIdAndDeletedAtIsNull(trainerId);
 
@@ -64,30 +68,54 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         List<TrainerCourseDetailProjection> baseProjections = courseRepository.findTrainerCoursesDetailBase(trainerId,
                 "ALL", null);
-        Map<Long, List<TrainerCourseDetailProjection>> groupedById = baseProjections.stream()
-                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
+        
+        Map<String, List<TrainerCourseDetailProjection>> groupedByCode = baseProjections.stream()
+                .collect(Collectors.groupingBy(p -> getBaseCode(p.getCode(), p.getId())));
 
-        List<TrainerCourseDTO> courses = groupedById.values().stream()
+        long coursesCount = groupedByCode.values().stream()
+                .filter(group -> group.stream().anyMatch(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus())))
+                .count();
+
+        List<TrainerCourseDTO> courses = groupedByCode.values().stream()
                 .map(group -> {
+                    // Try to find the latest PUBLISHED version
                     TrainerCourseDetailProjection latest = group.stream()
+                            .filter(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus()))
                             .max((p1, p2) -> {
-                                if (p1.getCreatedAt() == null)
-                                    return -1;
-                                if (p2.getCreatedAt() == null)
-                                    return 1;
+                                if (p1.getCreatedAt() == null) return -1;
+                                if (p2.getCreatedAt() == null) return 1;
                                 return p1.getCreatedAt().compareTo(p2.getCreatedAt());
                             })
-                            .orElse(group.get(0));
+                            // If no PUBLISHED version, fallback to the latest version of ANY status
+                            .orElseGet(() -> group.stream()
+                                    .max((p1, p2) -> {
+                                        if (p1.getCreatedAt() == null) return -1;
+                                        if (p2.getCreatedAt() == null) return 1;
+                                        return p1.getCreatedAt().compareTo(p2.getCreatedAt());
+                                    }).orElse(group.get(0))
+                            );
+                            
+                    List<Long> familyIds = group.stream().map(com.hango.hango_backend.repository.TrainerCourseDetailProjection::getId).collect(Collectors.toList());
+                    Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
+                    
                     return TrainerCourseDTO.builder()
                             .id(latest.getId())
                             .title(latest.getTitle())
-                            .learnersCount(latest.getLearnersCount() != null ? latest.getLearnersCount() : 0L)
+                            .learnersCount(group.stream().mapToLong(p -> p.getLearnersCount() != null ? p.getLearnersCount() : 0L).sum())
                             .lessonsCount(latest.getLessonsCount() != null ? latest.getLessonsCount() : 0L)
                             .thumbnailUrl(latest.getThumbnailUrl())
                             .versionsCount((long) group.size())
+                            .price(latest.getPrice() != null ? latest.getPrice() : java.math.BigDecimal.ZERO)
+                            .rating(avgRating != null ? avgRating : 0.0)
                             .build();
                 })
-                .sorted((c1, c2) -> c2.getId().compareTo(c1.getId()))
+                .sorted((c1, c2) -> {
+                    int learnerCompare = Long.compare(c2.getLearnersCount(), c1.getLearnersCount());
+                    if (learnerCompare != 0) return learnerCompare;
+                    int ratingCompare = Double.compare(c2.getRating() != null ? c2.getRating() : 0.0, c1.getRating() != null ? c1.getRating() : 0.0);
+                    if (ratingCompare != 0) return ratingCompare;
+                    return c2.getId().compareTo(c1.getId());
+                })
                 .collect(Collectors.toList());
 
         // Monthly Revenues
@@ -192,11 +220,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         List<TrainerCourseDetailProjection> allProjections = courseRepository.findTrainerCoursesDetailBase(trainerId,
                 "ALL", null);
 
-        // 2. Group by Root ID and get the Latest Version for each course
-        Map<Long, List<TrainerCourseDetailProjection>> groupedById = allProjections.stream()
-                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
+        // 2. Group by Root Code and get the Latest Version for each course
+        Map<String, List<TrainerCourseDetailProjection>> groupedByCode = allProjections.stream()
+                .collect(Collectors.groupingBy(p -> getBaseCode(p.getCode(), p.getId())));
 
-        List<TrainerCourseDetailProjection> latestProjections = groupedById.values().stream()
+        List<TrainerCourseDetailProjection> latestProjections = groupedByCode.values().stream()
                 .map(group -> group.stream()
                         .max((p1, p2) -> {
                             if (p1.getCreatedAt() == null)
@@ -627,7 +655,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setDescription(lDto.getDescription());
                 lesson.setContent(lDto.getQuestionText());
 
-                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                if (lDto.getVideoTranscript() != null && !lDto.getVideoTranscript().isBlank()) {
+                    lesson.setVideoTranscript(lDto.getVideoTranscript());
+                } else if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
                     String transcript = youtubeTranscriptService.fetchTranscript(lDto.getQuestionText());
                     lesson.setVideoTranscript(transcript);
                 } else {
@@ -636,6 +666,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
                 lesson.setPdfName(lDto.getPdfName());
                 lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
+                
+                lesson.setEstimatedTime(lDto.getEstimatedTime());
+                lesson.setCode(lDto.getLessonCode());
+                lesson.setMediaDurationSeconds(lDto.getMediaDurationSeconds());
+                lesson.setMediaSizeBytes(lDto.getMediaSizeBytes());
+                lesson.setEstimatedTimeMinutes(lDto.getEstimatedTimeMinutes());
+                lesson.setLearningObjectives(lDto.getLearningObjectives());
+
                 lesson.setVersion(savedCourse.getVersion());
                 lesson.setSkill(savedCourse.getCategory());
                 lesson.setDifficulty(savedCourse.getDifficulty());

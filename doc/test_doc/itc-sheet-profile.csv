@@ -1,0 +1,71 @@
+Feature,Profile Management
+Test requirement,Functional integration tests for self-service profile management (UserController / AuthController avatar)
+Number of TCs,14
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,14,0
+Round 2,0,0,14,0
+Round 3,0,0,14,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Own Profile,,,,
+PROFILE_FT01,"A logged-in user retrieves their own profile and confirms the returned data matches their own account, not anyone else's.","1. Log in as any role and obtain a valid access token.
+2. Prepare GET /api/v1/users/me with the Authorization header set.
+3. Send the request.
+4. Inspect the response body to confirm it matches the caller's own account.","1. 200 OK; UserResponse for the caller's own account (id, email, fullName, phoneNumber, gender, roles[], status, etc).","- Logged in with a valid access token."
+PROFILE_FT02,"Attempting to view the /me profile endpoint with no Authorization header at all is rejected before any account lookup happens.","1. Do not log in / discard any existing Authorization token.
+2. Prepare GET /api/v1/users/me with no Authorization header.
+3. Send the request.
+4. Inspect the response status and body message.","1. 401 Unauthorized, body ""Error: Unauthorized"".","- None."
+Update Own Profile,,,,
+PROFILE_FT03,"A logged-in user updates their own name, phone, gender, date of birth, and address in one request, and all fields are persisted.","1. Log in as any role and obtain a valid access token.
+2. Prepare PUT /api/v1/users/me body {""fullName"":""New Name"",""phoneNumber"":""0912345678"",""gender"":""MALE"",""dateOfBirth"":""1998-05-05"",""address"":""123 Main St""}.
+3. Send the request.
+4. Inspect the response body to confirm every field was updated.","1. 200 OK; UserResponse reflects all updated fields.","- Logged in."
+PROFILE_FT04,"Attempting to change one's own username to a value already taken by a different account is rejected, leaving the original username intact.","1. Log in and identify another account's existing username.
+2. Prepare PUT /api/v1/users/me body {""username"":""<another user's existing username>""}.
+3. Send the request.
+4. Inspect the response and confirm the caller's username is unchanged.","1. 400 Bad Request, message ""Error: Username is already in use!""; username unchanged.","- Another account already has that username."
+PROFILE_FT05,"Changing one's own email to an address already registered by another account is rejected, while changing it to a genuinely unused address succeeds but resets the account's verification status.","1. Log in and identify another account's existing email.
+2. Prepare and send PUT /api/v1/users/me body {""email"":""<another existing user's email>""}; inspect the response.
+3. As a currently-verified user, prepare and send PUT /api/v1/users/me body {""email"":""brandnew@example.com""} (a genuinely unused address).
+4. Inspect the response body and confirm the account's isVerified flag.","1. Step 1: 400 Bad Request, ""Error: Email is already in use!""; email unchanged.
+2. Step 2: 200 OK; email updated AND isVerified becomes false (must re-verify the new address before some flows work again).","- Step 1 needs another account with a known email; step 2 needs an unused email."
+PROFILE_FT06,"Attempting to update the own-profile endpoint with no Authorization header at all is rejected before any changes are applied.","1. Discard any existing Authorization token.
+2. Prepare PUT /api/v1/users/me with no Authorization header and any body.
+3. Send the request.
+4. Inspect the response status and body.","1. 401 Unauthorized, body ""Error: Unauthorized"".","- None."
+Change Password (logged-in),,,,
+PROFILE_FT07,"Changing password with the correct current password and a genuinely different new password succeeds immediately, and every previously issued refresh token is invalidated, forcing re-login on other devices.","1. Log in and obtain both an access token and a refresh token for a known-password account.
+2. Prepare and send PUT /api/v1/users/change-password body {""currentPassword"":""<correct>"",""newPassword"":""newPass123""}; inspect the response.
+3. Attempt POST /api/auth/refresh-token using the refresh token issued in step 1.
+4. Inspect the refresh attempt's response.","1. Step 1: 200 OK, body {""message"": ""Password changed successfully!""}.
+2. Step 2: refresh fails (401) — all of the user's refresh tokens were deleted as a side effect of the password change.","- Logged in; knows current password."
+PROFILE_FT08,"Changing password while supplying an incorrect current password is rejected, and the account's real password remains unchanged.","1. Log in as any role with a known current password.
+2. Prepare PUT /api/v1/users/change-password body {""currentPassword"":""wrong-password"",""newPassword"":""newPass123""}.
+3. Send the request.
+4. Inspect the response and confirm the password was not changed (e.g. by logging in again with the old password).","1. 400 Bad Request, body {""error"": ""Incorrect current password.""}; password unchanged.","- Logged in."
+PROFILE_FT09,"Attempting to change password to the exact same value as the current password is rejected, preventing a no-op password change.","1. Log in as any role with a known current password.
+2. Prepare PUT /api/v1/users/change-password body {""currentPassword"":""<correct>"",""newPassword"":""<same value>""}.
+3. Send the request.
+4. Inspect the response status and message.","1. 400 Bad Request, body {""error"": ""New password must be different from the current password.""}.","- Logged in; knows current password."
+PROFILE_FT10,"Attempting to change password with no Authorization header at all is rejected, and this endpoint's error body is a raw JSON string rather than the {""message"":...} shape used elsewhere.","1. Discard any existing Authorization token.
+2. Prepare PUT /api/v1/users/change-password with no Authorization header and any body.
+3. Send the request.
+4. Inspect the response status and body shape.","1. 401 Unauthorized, body {""error"": ""Unauthorized""} — note this endpoint's error responses are raw JSON strings, not the {""message"":...} shape used elsewhere.","- None."
+Upload Avatar,,,,
+PROFILE_FT11,"Uploading a small, valid JPEG under the 2MB limit succeeds for every eligible role, and the returned avatarUrl points at the newly uploaded image.","1. Log in as an eligible role (LEARNER, TRAINER, TRAINER_LEAD, or ADMINISTRATOR) and prepare a 500KB .jpg image file.
+2. Prepare POST /api/auth/profile/avatar as multipart form-data with key ""file"" set to that image.
+3. Send the request.
+4. Inspect the response body's avatarUrl and confirm the image is reachable.","1. 200 OK; UserResponse with avatarUrl pointing to the newly uploaded Cloudinary image.","- Logged in as an eligible role; a small valid image file available."
+PROFILE_FT12,"Uploading an avatar image larger than the 2MB limit is rejected, and the account's existing avatarUrl is left untouched.","1. Log in and prepare an image file confirmed to exceed 2MB.
+2. Prepare POST /api/auth/profile/avatar as multipart form-data with that oversized file.
+3. Send the request.
+4. Inspect the response and confirm avatarUrl is unchanged.","1. 400 Bad Request, body ""Error: Avatar file must not exceed 2MB.""; avatarUrl unchanged.","- Logged in; an oversized image file available."
+PROFILE_FT13,"Uploading a disallowed file type such as .gif or .pdf as an avatar is rejected by content-type validation, and the existing avatarUrl is left untouched.","1. Log in and prepare a .gif or .pdf file.
+2. Prepare POST /api/auth/profile/avatar as multipart form-data with that file.
+3. Send the request.
+4. Inspect the response and confirm avatarUrl is unchanged.","1. 400 Bad Request, body ""Error: Avatar must be a .jpg, .jpeg, or .png image.""; avatarUrl unchanged.","- Logged in; a non-jpg/png file available."
+PROFILE_FT14,"Submitting the avatar upload request with no file part attached at all is rejected by validation before any upload is attempted.","1. Log in as any eligible role.
+2. Prepare POST /api/auth/profile/avatar with an empty/missing file part.
+3. Send the request.
+4. Inspect the response status and message.","1. 400 Bad Request, body ""Error: Avatar file is required.""","- Logged in."

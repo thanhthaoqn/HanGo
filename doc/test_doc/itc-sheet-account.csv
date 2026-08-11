@@ -1,0 +1,100 @@
+Feature,Account Management
+Test requirement,Functional integration tests for admin-side user account management (AdminController)
+Number of TCs,20
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,20,0
+Round 2,0,0,20,0
+Round 3,0,0,20,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Account List,,,,
+ACCOUNTS_FT01,"Admin views the default account list with no filters applied, which defaults to roleType=staff and therefore excludes pure LEARNER accounts.","1. Log in as ADMINISTRATOR.
+2. Prepare GET /api/admin/users with no query parameters.
+3. Send the request.
+4. Inspect the response body's content[], totalElements, totalPages, page, and size fields.","1. 200 OK.
+2. Response has content[] (id, fullName, email, status, roles[]), totalElements, totalPages, page=0, size=10; all rows exclude pure LEARNER accounts.","- ADMINISTRATOR logged in.
+- At least one non-learner account exists."
+ACCOUNTS_FT02,"Filtering the account list by roleType=learner, trainer, or admin in turn returns only accounts that actually hold the matching role.","1. Log in as ADMINISTRATOR.
+2. Prepare and send GET /api/admin/users?roleType=learner; inspect content[].
+3. Prepare and send GET /api/admin/users?roleType=trainer; inspect content[].
+4. Prepare and send GET /api/admin/users?roleType=admin; inspect content[].","1. Each response's content[] contains only accounts whose roles[] match the requested type (LEARNER / TRAINER / ADMINISTRATOR respectively).","- Accounts of each role type exist."
+ACCOUNTS_FT03,"Searching with a short substring of a known account's name or email filters the list down to only matching (case-insensitive) accounts.","1. Log in as ADMINISTRATOR and identify a known account's name or email substring.
+2. Prepare GET /api/admin/users?roleType=staff&search=<substring of a known account's name or email>.
+3. Send the request.
+4. Inspect content[] to confirm only matching accounts are returned.","1. content[] contains only accounts whose fullName or email (case-insensitive) contains the search substring.","- At least 2 accounts with distinguishable names/emails exist."
+ACCOUNTS_FT04,"Paging through the account list with a small page size returns correctly sized, non-overlapping pages with a matching totalPages count.","1. Log in as ADMINISTRATOR, with at least 3 accounts matching roleType=staff.
+2. Prepare and send GET /api/admin/users?roleType=staff&page=0&size=2; inspect the first page.
+3. Prepare and send GET /api/admin/users?roleType=staff&page=1&size=2; inspect the second page.
+4. Compare both pages' content[] for size, no duplication, and totalElements/totalPages consistency.","1. Each page returns at most 2 items; totalElements matches the full filtered count; totalPages = ceil(totalElements/2); page 1 contains the next 2 (or remaining) rows, no overlap/dup with page 0.","- At least 3 accounts match roleType=staff."
+ACCOUNTS_FT05,"A LEARNER or TRAINER account, lacking the MANAGE_ACCOUNTS_ROLES authority, is forbidden from viewing the admin account list.","1. Log in as a LEARNER or TRAINER account.
+2. Prepare GET /api/admin/users with that account's Authorization header.
+3. Send the request.
+4. Inspect the response status code.","1. 403 Forbidden.","- LEARNER or TRAINER logged in (no MANAGE_ACCOUNTS_ROLES authority)."
+View Account Detail,,,,
+ACCOUNTS_FT06,"Admin retrieves a single existing account by id and receives its full detail, including fields not shown in the list view.","1. Log in as ADMINISTRATOR and identify an existing account's id.
+2. Prepare GET /api/admin/users/{id}.
+3. Send the request.
+4. Inspect the response body for the full UserResponse fields.","1. 200 OK; body is the full UserResponse (id, email, fullName, phoneNumber, gender, roles[], status, createdAt, updatedAt, etc).","- ADMINISTRATOR logged in; target account id exists."
+ACCOUNTS_FT07,"Viewing an account id that doesn't exist in the database returns a clean 404 rather than an empty/malformed body.","1. Log in as ADMINISTRATOR.
+2. Prepare GET /api/admin/users/999999 (an id confirmed not to exist).
+3. Send the request.
+4. Inspect the response status and error message.","1. 404 Not Found, body ""Error: User not found with id: 999999"".","- ADMINISTRATOR logged in; id 999999 unused."
+Create Account,,,,
+ACCOUNTS_FT08,"Admin creates a new TRAINER account with a unique email, and the account is pre-verified and active immediately, skipping the normal email-verification flow.","1. Log in as ADMINISTRATOR and pick a fresh, unused email (e.g. newstaff@example.com).
+2. Prepare POST /api/admin/users body {""email"":""newstaff@example.com"",""password"":""pass1234"",""fullName"":""New Staff"",""role"":""TRAINER""}.
+3. Send the request.
+4. Inspect the response body and confirm the new account's status/isVerified/roles in the database.","1. 200 OK; UserResponse returned with roles=[""TRAINER""], isVerified=true, status=ACTIVE (admin-created accounts skip email verification).
+2. An audit-log entry (""CREATE_USER"") is recorded.","- ADMINISTRATOR logged in; email not already registered."
+ACCOUNTS_FT09,"Creating an account with no role field defaults it to TRAINER, and submitting the short alias role=""ADMIN"" is normalized to the full ADMINISTRATOR role name.","1. Log in as ADMINISTRATOR and pick a fresh, unused email.
+2. Prepare and send POST /api/admin/users with no ""role"" field at all; inspect the created account's roles[].
+3. Pick a second fresh, unused email and prepare POST /api/admin/users body including ""role"":""ADMIN"" (short alias).
+4. Send the request and inspect the created account's roles[].","1. Step 1: created account has roles=[""TRAINER""] (default).
+2. Step 2: created account has roles=[""ADMINISTRATOR""] (alias normalized).","- ADMINISTRATOR logged in; both emails unused."
+ACCOUNTS_FT10,"Creating an account with an unrecognized role name like ""SUPERUSER"" is rejected by validation before any row is written.","1. Log in as ADMINISTRATOR and pick a fresh, unused email.
+2. Prepare POST /api/admin/users body including ""role"":""SUPERUSER"".
+3. Send the request.
+4. Inspect the response status/message and confirm no account was created for that email.","1. 400 Bad Request, message contains ""Invalid role! Must be one of [...]""; no account created.","- ADMINISTRATOR logged in."
+ACCOUNTS_FT11,"Creating an account with an email that already belongs to an existing user is rejected, and no duplicate row is created.","1. Log in as ADMINISTRATOR and identify an already-registered email.
+2. Prepare POST /api/admin/users with that email and otherwise-valid data.
+3. Send the request.
+4. Inspect the response and confirm via GET /api/admin/users that only one row for that email still exists.","1. 400 Bad Request, message ""Error: Email is already in use!""; no duplicate row created.","- ADMINISTRATOR logged in; target email already registered."
+Update Account,,,,
+ACCOUNTS_FT12,"Admin updates an existing account's name, phone, gender, and date of birth in one request, and every changed field is recorded in the audit log.","1. Log in as ADMINISTRATOR and identify an existing account's id.
+2. Prepare PUT /api/admin/users/{id} body {""fullName"":""Updated Name"",""phoneNumber"":""0912345678"",""gender"":""FEMALE"",""dateOfBirth"":""1999-01-01""}.
+3. Send the request.
+4. Inspect the response body to confirm the updated fields, then check the audit log entry.","1. 200 OK; returned UserResponse reflects all updated fields.
+2. An audit-log entry (""UPDATE_USER"") listing the changed fields is recorded.","- ADMINISTRATOR logged in; target account exists."
+ACCOUNTS_FT13,"Attempting to change an account's email to an address already used by a different account is rejected, leaving the original email intact.","1. Log in as ADMINISTRATOR and identify two distinct accounts with different emails.
+2. Prepare PUT /api/admin/users/{id} body {""email"":""<another existing user's email>""} for the first account.
+3. Send the request.
+4. Inspect the response and confirm the first account's email was not changed.","1. 400 Bad Request, message ""Error: Email is already in use!""; email not changed.","- Two distinct accounts exist with different emails."
+ACCOUNTS_FT14,"Reassigning a LEARNER account to COURSE_MANAGER replaces its role set entirely rather than appending to it.","1. Log in as ADMINISTRATOR and identify an account currently holding only the LEARNER role.
+2. Prepare PUT /api/admin/users/{id} body {""role"":""COURSE_MANAGER""}.
+3. Send the request.
+4. Inspect the response body's roles[] to confirm it is now exactly [""COURSE_MANAGER""].","1. 200 OK; the user's roles[] becomes exactly [""COURSE_MANAGER""] (single-role replace, prior LEARNER role removed).","- Target account currently holds a different single role."
+ACCOUNTS_FT15,"Updating an account with a role name that doesn't exist in the system, e.g. ""GHOST_ROLE"", is rejected and the account's role is left untouched.","1. Log in as ADMINISTRATOR and identify an existing account's id.
+2. Prepare PUT /api/admin/users/{id} body {""role"":""GHOST_ROLE""}.
+3. Send the request.
+4. Inspect the response and confirm the account's role is unchanged.","1. 400 Bad Request, message ""Error: Role not found!""; role unchanged.","- Target account exists."
+ACCOUNTS_FT16,"An admin attempting to change their own account's status through the general update endpoint is blocked, preventing accidental self-lockout.","1. Log in as ADMINISTRATOR and note the caller's own user id.
+2. Prepare PUT /api/admin/users/{self-id} body {""status"":""INACTIVE""}.
+3. Send the request.
+4. Inspect the response and confirm the admin's own status is unchanged.","1. 400 Bad Request, message ""Error: Admin cannot change the status of their own account""; status unchanged.","- Admin knows their own user id."
+ACCOUNTS_FT17,"Updating an account's status to an unsupported value like ""BANNED"" is rejected by validation, leaving the account's real status untouched.","1. Log in as ADMINISTRATOR and identify an existing account (not the caller's own).
+2. Prepare PUT /api/admin/users/{id} body {""status"":""BANNED""}.
+3. Send the request.
+4. Inspect the response and confirm the account's status is unchanged.","1. 400 Bad Request, message ""Error: status must be one of [ACTIVE, INACTIVE]""; status unchanged.","- Target account exists (not the caller's own)."
+ACCOUNTS_FT18,"Attempting to update an account id that doesn't exist in the database returns a 404 rather than silently no-oping.","1. Log in as ADMINISTRATOR.
+2. Prepare PUT /api/admin/users/999999 with any valid body.
+3. Send the request.
+4. Inspect the response status and message.","1. 404, body ""User not found"".","- id 999999 unused."
+Toggle Status (direct),,,,
+ACCOUNTS_FT19,"Admin toggles a different account's status directly via the dedicated status endpoint, and the change is both persisted and recorded in the audit log.","1. Log in as ADMINISTRATOR and identify an ACTIVE account that is not the caller.
+2. Prepare PUT /api/admin/users/{id}/status?status=INACTIVE.
+3. Send the request.
+4. Inspect the response, confirm the account's status is now INACTIVE, and check the audit log entry.","1. 200 OK, body {""success"":true,""message"":""User status updated successfully""}; the account's status becomes INACTIVE; an audit-log entry (""UPDATE_USER_STATUS"") is recorded.","- ADMINISTRATOR logged in; target account is ACTIVE and is not the caller."
+ACCOUNTS_FT20,"An admin cannot toggle their own status through the status endpoint, and separately an unsupported status value like ""SUSPENDED"" is rejected for any account.","1. Log in as ADMINISTRATOR and note the caller's own id and another existing account's id.
+2. Prepare and send PUT /api/admin/users/{self-id}/status?status=INACTIVE; inspect the response.
+3. Prepare and send PUT /api/admin/users/{other-id}/status?status=SUSPENDED; inspect the response.
+4. Confirm neither call actually changed any account's status.","1. Step 1: 400 Bad Request, ""Error: Admin cannot change the status of their own account"".
+2. Step 2: 400 Bad Request, ""Error: status must be one of [ACTIVE, INACTIVE]"".","- Admin knows their own id; another account exists."

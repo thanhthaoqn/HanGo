@@ -1,0 +1,82 @@
+Feature,Ticket Management
+Test requirement,Functional integration tests for learner support tickets (TicketController) and staff processing (ManagementTicketController) — first-time coverage, no prior test documentation existed for this module
+Number of TCs,16
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,16,0
+Round 2,0,0,16,0
+Round 3,0,0,16,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+Create Ticket,,,,
+TICKET_FT01,"Creating a ticket with every field omitted still succeeds, applying sensible defaults for category, priority, title, and description.","1. Log in as any authenticated role.
+2. Prepare POST /api/v1/tickets body {} (no category/priority/title/description).
+3. Send the request.
+4. Inspect the returned TicketResponseDTO's default field values.","1. 200 OK; TicketResponseDTO with priority=""MEDIUM"", category=""GENERAL_ENQUIRY"", title=""Support Request"", description=""No details provided."", status=""PENDING"", a generated ticketCode (""#<hex timestamp>"").","- Logged in as any authenticated role."
+TICKET_FT02,"Ticket category has no create-time whitelist — any string is accepted and persisted verbatim, even values normally reserved for staff-only routing.","1. Log in as any authenticated role.
+2. Prepare POST /api/v1/tickets body {""category"":""not_a_real_category""}.
+3. Send the request.
+4. Inspect the returned category field.","1. 200 OK; the ticket is created with category=""not_a_real_category"" as literally supplied — no validation error.","- Logged in."
+Update / View Ticket,,,,
+TICKET_FT03,"A user can edit their own ticket's title/description, while editing another user's ticket is masked to a generic 500 instead of a clean 403.","1. Log in as the owner of an existing ticket and prepare PUT /api/v1/tickets/{ownTicketId} body {""title"":""Updated title""}; send it and confirm the title changed.
+2. Log out and log in as a different, unrelated user.
+3. Prepare and send PUT /api/v1/tickets/{theOtherUsersTicketId} body {""title"":""hacked""}.
+4. Inspect the second response's status.","1. Step 1: 200 OK, title updated.
+2. Steps 2-4: 500 Internal Server Error, generic masked body — the real ""Unauthorized to update this ticket"" RuntimeException never reaches the client as a clean 403.","- A ticket owned by a different user exists for step 2."
+TICKET_FT04,"Viewing a ticket's full detail (including message thread) is allowed for its owner or any staff role, but an unrelated learner is denied via a masked 500 instead of a clean 403.","1. Log in as the ticket's owner and prepare/send GET /api/v1/tickets/{id}; confirm it returns full detail with messages[].
+2. Log in as an ADMINISTRATOR/TRAINER_LEAD/COURSE_MANAGER (not the owner) and repeat the same GET.
+3. Log in as an unrelated LEARNER (not the owner, not staff) and repeat the same GET.
+4. Compare all three response statuses.","1. Steps 1-2: 200 OK, full detail with messages[].
+2. Step 3: 500 Internal Server Error, generic masked body — the real ""Access denied"" RuntimeException is not surfaced as a clean 403.","- A ticket exists; an unrelated LEARNER account is available for step 3."
+TICKET_FT05,"A learner can list their own tickets, filterable by status including the special \"PROCESSED\" alias that maps to both terminal states.","1. Log in as a learner with tickets in multiple statuses (some APPROVED, some REJECTED, some still PENDING/PROCESSING).
+2. Prepare and send GET /api/v1/tickets/my-tickets?status=PROCESSED.
+3. Inspect the returned list.
+4. Confirm every returned ticket's status is either APPROVED or REJECTED, and none are PENDING/PROCESSING.","1. 200 OK; only tickets whose status is APPROVED or REJECTED are returned (PROCESSED is a virtual filter mapping to both terminal states).","- Logged in; tickets in multiple statuses exist for the caller."
+Ticket Messages,,,,
+TICKET_FT06,"The ticket owner can add a follow-up message to their own ticket's thread.","1. Log in as the owner of an existing ticket.
+2. Prepare POST /api/v1/tickets/{ownTicketId}/messages body {""message"":""Any update on this?""}.
+3. Send the request.
+4. GET the ticket's detail to confirm the message now appears in the thread.","1. 200 OK; TicketMessageDTO returned, appended to the thread.","- Logged in; owns a ticket."
+TICKET_FT07,"Any authenticated user — completely unrelated to a ticket — can post a message into that ticket's thread by ID alone, with zero ownership/staff check (confirmed IDOR, highest-priority gap in this module).","1. Log in as Learner X and create a ticket (Ticket A); note its id.
+2. Log out and log in as unrelated Learner Y (not staff, not the owner).
+3. Prepare and send POST /api/v1/tickets/{A's id}/messages body {""message"":""I can see this thread""} as Learner Y.
+4. Log back in as Learner X and GET /api/v1/tickets/{A's id} to confirm Y's message appears in the thread.","1. Step 3: 200 OK — succeeds despite Y having no relationship to the ticket.
+2. Step 4: Y's message IS present in X's ticket thread — confirming the cross-account write succeeded, unlike the read-side GET (TICKET_FT04) which does at least attempt an owner-or-staff check.","- Two unrelated learner accounts, X (ticket owner) and Y (unrelated)."
+TICKET_FT08,"A staff reply auto-transitions a PENDING ticket to PROCESSING, while the ticket owner's own follow-up messages never trigger this transition.","1. Log in as the learner owner of a fresh PENDING ticket and add a message to it; confirm the status stays PENDING.
+2. Log in as staff (ADMINISTRATOR/TRAINER_LEAD/COURSE_MANAGER) and add a reply to the same ticket.
+3. Inspect the ticket's status after the staff reply.","1. Step 1: status remains PENDING after the owner's own message.
+2. Steps 2-3: status flips to PROCESSING after the staff reply.","- A fresh PENDING ticket exists."
+Staff Queue / Process Ticket,,,,
+TICKET_FT09,"Staff can list and filter the management queue by status, category, and keyword together, and the results narrow correctly.","1. Log in as ADMINISTRATOR/TRAINER_LEAD/COURSE_MANAGER in an environment with multiple, distinguishable tickets.
+2. Prepare GET /api/v1/management/tickets?status=PENDING&category=GENERAL_ENQUIRY&keyword=<part of a known ticket's title or requester's name>.
+3. Send the request.
+4. Inspect the returned list and confirm every entry matches all three filters.","1. 200 OK; results correctly narrowed by all three filters combined.","- ADMINISTRATOR/TRAINER_LEAD/COURSE_MANAGER logged in; multiple tickets exist with distinguishable titles/requesters."
+TICKET_FT10,"Staff approves a ticket without supplying a custom response, and a sensible default response is applied automatically.","1. Log in as staff and identify a processable ticket (not PAYOUT_INFO_UPDATE/REFUND_REQUEST unless caller is admin).
+2. Prepare POST /api/v1/management/tickets/{id}/process body {""action"":""APPROVE""} (no adminResponse).
+3. Send the request.
+4. Inspect the ticket's resulting status/adminResponse and confirm the owner was notified.","1. 200 OK; status=APPROVED, adminResponse=""Ticket approved by manager.""; processedBy/processedAt set; the ticket owner is notified (TicketReviewed).","- Staff logged in; a PENDING/PROCESSING ticket exists (category NOT PAYOUT_INFO_UPDATE/REFUND_REQUEST, or caller IS an admin — see TICKET_FT12)."
+TICKET_FT11,"Staff rejects a ticket while supplying a custom rejection reason, and that reason is persisted on the ticket.","1. Log in as staff and identify a processable ticket.
+2. Prepare POST /api/v1/management/tickets/{id}/process body {""action"":""REJECT"",""rejectionReason"":""Not a valid request""}.
+3. Send the request.
+4. Inspect the ticket's resulting status/rejectionReason.","1. 200 OK; status=REJECTED, rejectionReason=""Not a valid request""; owner notified.","- Staff logged in; a processable ticket exists."
+TICKET_FT12,"A Course Manager (non-admin) is correctly blocked by business rule from processing PAYOUT_INFO_UPDATE/REFUND_REQUEST tickets, but the denial is masked to a generic 500 instead of a clean 403 — the ticket itself IS correctly left untouched despite the confusing error.","1. Via a direct HTTP call (bypassing the UI, which never lets a user pick this category), create a ticket with category=""REFUND_REQUEST"".
+2. Log in as a COURSE_MANAGER (not holding an Admin-ish role).
+3. Prepare and send POST /api/v1/management/tickets/{id}/process body {""action"":""APPROVE""}.
+4. Inspect the response status/body, then GET the ticket again to confirm its status is unchanged.","1. Step 3: 500 Internal Server Error, generic masked body — the real, meaningful business-rule message (""Course Manager is not authorized to process Bank/Tax Info Updates or Refund Requests. Assigned to System Admin."") is not surfaced to the caller.
+2. Step 4: the ticket's status is UNCHANGED (still PENDING/PROCESSING) — data integrity holds even though the error message is wrong/unhelpful.","- A REFUND_REQUEST or PAYOUT_INFO_UPDATE category ticket exists (create via direct HTTP call, bypassing the UI); caller is COURSE_MANAGER, not ADMINISTRATOR."
+TICKET_FT13,"Submitting an unrecognized process action value leaves the ticket's actual status unchanged, yet still appends a confusing, reject-phrased audit message and reports success.","1. Log in as staff and identify a processable ticket.
+2. Prepare POST /api/v1/management/tickets/{id}/process body {""action"":""MAYBE""}.
+3. Send the request.
+4. Inspect the ticket's status/adminResponse/rejectionReason (should be unchanged) and the newly appended thread message.","1. 200 OK — but the ticket's status/adminResponse/rejectionReason are all UNCHANGED from before the call; a system message using reject-style phrasing (""...rejected by <staff>. Reason: N/A"") is still appended to the thread despite no actual status change.","- Staff logged in; a processable ticket exists."
+TICKET_FT14,"Ticket creation only notifies TRAINER_LEAD staff — a COURSE_MANAGER-only account receives no notification despite being fully authorized to process tickets.","1. Prepare two staff test accounts: one holding only TRAINER_LEAD, one holding only COURSE_MANAGER (no TRAINER_LEAD).
+2. As any user, create a new ticket.
+3. Log in as the TRAINER_LEAD-only account and check its notification inbox.
+4. Log in as the COURSE_MANAGER-only account and check its notification inbox.","1. Step 3: the TRAINER_LEAD account receives a ""TicketCreated"" notification.
+2. Step 4: the COURSE_MANAGER-only account receives NONE for this event, despite @PreAuthorize allowing it to process the ticket.","- Both a TRAINER_LEAD-only and a COURSE_MANAGER-only (no TRAINER_LEAD) staff account exist."
+TICKET_FT15,"The staff dashboard reports accurate ticket counts broken down by status.","1. Log in as staff in an environment with tickets spread across multiple statuses.
+2. Prepare and send GET /api/v1/management/tickets/stats.
+3. Inspect the returned total/pending/processing/approved/rejected counts.
+4. Cross-check each count against the actual tickets in the system.","1. 200 OK {total, pending, processing, approved, rejected} matching the real counts in the system.","- Staff logged in; tickets exist across multiple statuses."
+TICKET_FT16,"A plain LEARNER cannot access either the staff queue listing or the process-ticket action.","1. Log in as a plain LEARNER account.
+2. Prepare and send GET /api/v1/management/tickets with that account's Authorization header.
+3. Prepare and send POST /api/v1/management/tickets/{id}/process with the same account's Authorization header.
+4. Inspect both response statuses.","1. Both: 403 Forbidden.","- Plain LEARNER logged in."

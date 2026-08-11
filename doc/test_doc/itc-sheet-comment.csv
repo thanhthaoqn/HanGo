@@ -1,0 +1,74 @@
+Feature,Comment Management
+Test requirement,Functional integration tests for lesson comments (CommentController) and admin moderation (AdminCommentController)
+Number of TCs,15
+Testing Round,Passed,Failed,Pending,N/A
+Round 1,0,0,15,0
+Round 2,0,0,15,0
+Round 3,0,0,15,0
+
+Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+View Lesson Comments,,,,
+COMMENT_FT01,"Anyone can view a lesson's approved comment thread without logging in.","1. Identify a lesson that already has at least one APPROVED comment.
+2. Discard any Authorization token.
+3. Prepare and send GET /api/v1/comments/lesson/{lessonId}.
+4. Inspect the response body's list of comments.","1. 200 OK; List<CommentDTO> of APPROVED comments (plus the caller's own PENDING ones, if authenticated).","- A lesson with ≥1 APPROVED comment exists."
+Add / Update / Delete Comment,,,,
+COMMENT_FT02,"Posting, editing, or deleting a comment now genuinely requires a valid JWT — regression check for a previously-fixed identity-spoofing gap (there is no longer a client-controlled userId parameter anywhere).","1. Discard any Authorization token.
+2. Prepare POST /api/v1/comments/lesson/{lessonId} body {""content"":""test""} with no Authorization header.
+3. Send the request.
+4. Inspect the response status and confirm no comment row was created.","1. Rejected before reaching the comment logic (401/403 depending on filter-chain behavior — confirm which live) — NOT a 200 success as an old, now-fixed gap once allowed.","- None."
+COMMENT_FT03,"A comment with clean, unremarkable text is automatically approved by the moderation rule engine and becomes immediately visible.","1. Log in as any authenticated role.
+2. Prepare POST /api/v1/comments/lesson/{lessonId} body {""content"":""This lesson was really helpful, thanks!""}.
+3. Send the request and inspect the returned status.
+4. GET the lesson's thread (per COMMENT_FT01) to confirm the comment is now publicly visible.","1. 200 OK; the returned CommentDTO has status=APPROVED and is immediately visible to everyone via COMMENT_FT01.","- Logged in (any authenticated role — no role restriction on commenting)."
+COMMENT_FT04,"A comment containing a blacklisted profanity keyword is auto-rejected by the rule engine, with the detection reason recorded on the row.","1. Log in as any authenticated role.
+2. Prepare POST /api/v1/comments/lesson/{lessonId} with content containing a known blacklisted profanity term.
+3. Send the request.
+4. Inspect the returned comment's status and detectionReason.","1. 200 OK (the POST itself succeeds); the comment's status is REJECTED, with detectionReason ""Blacklist keyword detected: \""<word>\"""".","- Logged in."
+COMMENT_FT05,"A comment containing a mild/suspicious (not blacklisted) keyword is held for review instead of being auto-approved or auto-rejected.","1. Log in as any authenticated role.
+2. Prepare POST /api/v1/comments/lesson/{lessonId} with content containing a mild insult keyword (e.g. ""ngu"", ""stupid"", ""idiot"").
+3. Send the request.
+4. Inspect the returned comment's status and detectionReason.","1. Comment status=PENDING, detectionReason ""Suspicious keyword detected: \""<word>\"""".","- Logged in."
+COMMENT_FT06,"A comment containing a phone number, URL, email, or off-platform-contact phrase is also flagged for review rather than auto-approved.","1. Log in as any authenticated role.
+2. Prepare POST /api/v1/comments/lesson/{lessonId} with content containing a Vietnamese phone-number pattern (e.g. ""0912345678"") or the word ""zalo""/""inbox"".
+3. Send the request.
+4. Inspect the returned comment's status and detectionReason.","1. Comment status=PENDING, detectionReason describes the matched pattern (e.g. ""Contains a phone number"").","- Logged in."
+COMMENT_FT07,"A comment held as PENDING is visible only to its own author, and completely absent from another viewer's copy of the same thread.","1. Post a comment that lands in PENDING (per COMMENT_FT05/06), noting its author.
+2. As that same author, GET the lesson's comment thread.
+3. Log in as a different user and GET the same lesson's comment thread.
+4. Compare both lists for the presence of the PENDING comment.","1. Step 2: the PENDING comment IS visible to its author.
+2. Step 3-4: the SAME comment is absent from a different viewer's list.","- A PENDING comment exists from a known author."
+COMMENT_FT08,"A REJECTED comment is hidden from everyone, including its own original author.","1. Post a comment that gets auto-REJECTED (per COMMENT_FT04), noting its author.
+2. As that same author, GET the lesson's comment thread.
+3. Confirm the rejected comment does not appear anywhere in the response.","1. The rejected comment does NOT appear in the author's own view of the thread either — only visible via the admin moderation endpoints.","- A REJECTED comment exists."
+COMMENT_FT09,"Editing a rejected comment's text into something clean automatically re-approves it, with no separate manual resubmission step required.","1. Have a REJECTED comment (per COMMENT_FT04/08) as its author.
+2. Prepare PUT /api/v1/comments/{commentId} body {""content"":""This is now a clean, helpful comment.""}.
+3. Send the request.
+4. Inspect the returned status and confirm it is now visible in the public thread.","1. 200 OK; the comment's status flips to APPROVED automatically, since the same rule engine re-evaluates on every edit.","- A REJECTED comment owned by the caller."
+COMMENT_FT10,"A user cannot edit or delete another user's comment — but the denial is masked to a generic 500 rather than a clean 403/404.","1. Log in as User A and post a comment; note its id.
+2. Log out and log in as an unrelated User B.
+3. Prepare and send PUT /api/v1/comments/{commentIdOwnedByA} body {""content"":""hacked""} as User B; inspect the response.
+4. Prepare and send DELETE /api/v1/comments/{commentIdOwnedByA} as User B; inspect the response.","1. Both: 500 Internal Server Error, generic masked body — the real ""You are not allowed to edit/delete this comment"" RuntimeException is swallowed rather than surfaced as 403.","- A comment owned by User A exists; caller is User B."
+Like / Unlike Comment,,,,
+COMMENT_FT11,"Any authenticated user can like an approved comment and then unlike it, with the like count reflecting both actions.","1. Log in as any authenticated role and identify an APPROVED comment.
+2. Prepare and send POST /api/v1/comments/{id}/like; inspect the returned like count.
+3. Prepare and send POST /api/v1/comments/{id}/unlike.
+4. Inspect the returned like count again to confirm it decremented.","1. Both: 200 OK, returned CommentDTO reflects the updated like count/state.","- Logged in; an APPROVED comment exists."
+COMMENT_FT12,"HTML/script content submitted in a comment is stored and returned verbatim with no output sanitization (documented, not yet fixed — do not treat as newly discovered).","1. Log in as any authenticated role.
+2. Prepare POST /api/v1/comments/lesson/{lessonId} body {""content"":""<script>alert(1)</script>""}.
+3. Send the request.
+4. GET the lesson's thread and inspect the raw JSON response for that comment's content field.","1. The raw content field contains the literal, unescaped <script> tag — no server-side sanitization/encoding is applied.","- Logged in."
+View / Manage Comments (Admin),,,,
+COMMENT_FT13,"Admin views the full moderation queue and a single comment's detail, confirming the detail view exposes extra moderation-only fields hidden from the list.","1. Log in as ADMINISTRATOR in an environment with comments of multiple statuses.
+2. Prepare and send GET /api/admin/comments; inspect the fields present on each list item.
+3. Pick one comment's id and prepare/send GET /api/admin/comments/{id}.
+4. Compare the detail response's fields against the list response's fields.","1. Step 2: list of all comments (any status) with id/type/commenter/status/etc, but NOT originalContent/normalizedContent/detectionReason.
+2. Step 3-4: same fields PLUS originalContent, normalizedContent, and detectionReason.","- ADMINISTRATOR logged in; comments of multiple statuses exist."
+COMMENT_FT14,"Admin can set a comment's status to any arbitrary string, since there is no whitelist validation on this endpoint.","1. Log in as ADMINISTRATOR and identify an existing comment's id.
+2. Prepare PUT /api/admin/comments/{id}/status?status=garbage.
+3. Send the request.
+4. GET the comment's admin detail to confirm the persisted status value.","1. 200 {""success"":true,""message"":""Comment status updated successfully""}; the comment's status is persisted literally as ""GARBAGE"" (uppercased) — no enum/whitelist check rejects it.","- ADMINISTRATOR logged in; a comment exists."
+COMMENT_FT15,"Admin can hard-delete a comment, and attempting to operate on a non-existent comment id returns a clean plain-string 404.","1. Log in as ADMINISTRATOR and identify an existing comment's id.
+2. Prepare and send DELETE /api/admin/comments/{that id}; confirm it disappears from the moderation queue.
+3. Prepare DELETE /api/admin/comments/999999 (an id confirmed not to exist).
+4. Inspect the response status and body shape.","1. 404, plain-text body ""Comment not found"" (not JSON) — note this specific shape when asserting the response.","- ADMINISTRATOR logged in; id 999999 unused."
