@@ -1386,6 +1386,80 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     height: 1.2,
                   ),
                 ),
+                if (lesson.estimatedTimeMinutes != null || lesson.mediaDurationSeconds != null || lesson.mediaSizeBytes != null) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      if (lesson.estimatedTimeMinutes != null && lesson.estimatedTimeMinutes! > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.timer_outlined, size: 14, color: Color(0xFF475569)),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${lesson.estimatedTimeMinutes} min estimated',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (lesson.mediaDurationSeconds != null && lesson.mediaDurationSeconds! > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.play_circle_outline, size: 14, color: Color(0xFF475569)),
+                              const SizedBox(width: 6),
+                              Text(
+                                () {
+                                  final s = lesson.mediaDurationSeconds!;
+                                  final m = s ~/ 60;
+                                  final rs = s % 60;
+                                  return m > 0 ? '${m}m ${rs}s' : '${rs}s';
+                                }(),
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (lesson.mediaSizeBytes != null && lesson.mediaSizeBytes! > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.data_usage, size: 14, color: Color(0xFF475569)),
+                              const SizedBox(width: 6),
+                              Text(
+                                () {
+                                  final mb = lesson.mediaSizeBytes! / (1024 * 1024);
+                                  return mb >= 1.0 ? '${mb.toStringAsFixed(1)} MB' : '${(lesson.mediaSizeBytes! / 1024).toStringAsFixed(0)} KB';
+                                }(),
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 24),
                 const Divider(color: Color(0xFFF1F5F9), height: 1),
                 const SizedBox(height: 24),

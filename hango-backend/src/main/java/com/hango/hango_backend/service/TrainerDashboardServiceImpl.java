@@ -634,6 +634,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
                 lesson.setPdfName(lDto.getPdfName());
                 lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
+                
+                lesson.setEstimatedTime(lDto.getEstimatedTime());
+                lesson.setCode(lDto.getLessonCode());
+                lesson.setMediaDurationSeconds(lDto.getMediaDurationSeconds());
+                lesson.setMediaSizeBytes(lDto.getMediaSizeBytes());
+                lesson.setEstimatedTimeMinutes(lDto.getEstimatedTimeMinutes());
+                lesson.setLearningObjectives(lDto.getLearningObjectives());
+
                 lesson.setVersion(savedCourse.getVersion());
                 lesson.setSkill(savedCourse.getCategory());
                 lesson.setDifficulty(savedCourse.getDifficulty());
