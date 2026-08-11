@@ -57,7 +57,7 @@ class CartServiceImplTest {
     void getCartItemsShouldMapCartItemsToCourseSummaries() {
         CartItem item = CartItem.builder().course(course(1L, "Course A")).build();
         when(cartItemRepository.findByUserIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(item));
-        when(enrollmentRepository.existsByUserIdAndCourseId(10L, 1L)).thenReturn(false);
+        when(enrollmentRepository.findEnrolledCourseIds(10L, List.of(1L))).thenReturn(List.of());
 
         List<CourseSummaryDTO> result = cartService.getCartItems(10L);
 
@@ -69,7 +69,7 @@ class CartServiceImplTest {
     void getCartItemsShouldSkipCoursesTheUserIsAlreadyEnrolledIn() {
         CartItem item = CartItem.builder().course(course(1L, "Course A")).build();
         when(cartItemRepository.findByUserIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(item));
-        when(enrollmentRepository.existsByUserIdAndCourseId(10L, 1L)).thenReturn(true);
+        when(enrollmentRepository.findEnrolledCourseIds(10L, List.of(1L))).thenReturn(List.of(1L));
 
         List<CourseSummaryDTO> result = cartService.getCartItems(10L);
 
@@ -95,7 +95,7 @@ class CartServiceImplTest {
                 .build();
         CartItem item = CartItem.builder().course(course).build();
         when(cartItemRepository.findByUserIdOrderByCreatedAtDesc(10L)).thenReturn(List.of(item));
-        when(enrollmentRepository.existsByUserIdAndCourseId(10L, 1L)).thenReturn(false);
+        when(enrollmentRepository.findEnrolledCourseIds(10L, List.of(1L))).thenReturn(List.of());
 
         List<CourseSummaryDTO> result = cartService.getCartItems(10L);
 

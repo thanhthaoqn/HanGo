@@ -9,6 +9,9 @@ import org.springframework.stereotype.Repository;
 public interface ExamQuestionRepository extends JpaRepository<ExamQuestion, ExamQuestionId> {
     int countByIdExamId(Long examId);
 
+    @org.springframework.data.jpa.repository.Query("SELECT eq.id.examId, COUNT(eq) FROM ExamQuestion eq WHERE eq.id.examId IN :examIds GROUP BY eq.id.examId")
+    java.util.List<Object[]> countQuestionsByExamIds(@org.springframework.data.repository.query.Param("examIds") java.util.List<Long> examIds);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
     void deleteByIdExamId(Long examId);

@@ -6,11 +6,15 @@ import '../domain/model/course.dart';
 
 class CartManager {
   static final ValueNotifier<int> cartCountNotifier = ValueNotifier<int>(0);
-  static final ValueNotifier<List<Course>> cartCoursesNotifier = ValueNotifier<List<Course>>([]);
+  static final ValueNotifier<List<Course>> cartCoursesNotifier =
+      ValueNotifier<List<Course>>([]);
   static final CartRepository _cartRepository = CartRepository();
   static final CourseRepository _courseRepository = CourseRepository();
 
   static final Set<int> _pendingDeletedCourseIds = <int>{};
+  static Future<void>? _updateInFlight;
+  static DateTime? _lastRemoteSyncAt;
+  static const Duration _remoteSyncTtl = Duration(seconds: 20);
 
   static bool isPendingDeletion(int courseId) {
     return _pendingDeletedCourseIds.contains(courseId);
@@ -30,17 +34,21 @@ class CartManager {
   static Future<List<String>> getCartIds() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    
+
     if (token != null && token.isNotEmpty) {
+      final cachedCourses = cartCoursesNotifier.value
+          .where((c) => !_pendingDeletedCourseIds.contains(c.id))
+          .toList();
+      if (cachedCourses.isNotEmpty && !_isRemoteSyncStale()) {
+        return cachedCourses.map((c) => c.id.toString()).toList();
+      }
+
       try {
-        final items = await _cartRepository.getCartItems();
-        final filteredItems = items.where((c) => !_pendingDeletedCourseIds.contains(c.id)).toList();
-        cartCoursesNotifier.value = filteredItems;
-        cartCountNotifier.value = filteredItems.length;
-        final ids = filteredItems.map((c) => c.id.toString()).toList();
-        final key = await getCartKey();
-        await prefs.setStringList(key, ids);
-        return ids;
+        await updateCount(forceRefresh: cachedCourses.isEmpty);
+        return cartCoursesNotifier.value
+            .where((c) => !_pendingDeletedCourseIds.contains(c.id))
+            .map((c) => c.id.toString())
+            .toList();
       } catch (e) {
         debugPrint('Error fetching DB cart: $e');
       }
@@ -81,6 +89,7 @@ class CartManager {
     if (token != null && token.isNotEmpty) {
       try {
         await _cartRepository.addItemToCart(courseId);
+        _markRemoteSyncFresh();
       } catch (e) {
         debugPrint('Error adding item to DB cart: $e');
       }
@@ -108,6 +117,7 @@ class CartManager {
     if (token != null && token.isNotEmpty) {
       try {
         await _cartRepository.removeItemFromCart(courseId);
+        _markRemoteSyncFresh();
       } catch (e) {
         debugPrint('Error removing item from DB cart: $e');
       } finally {
@@ -122,7 +132,10 @@ class CartManager {
     final prefs = await SharedPreferences.getInstance();
     final guestCart = prefs.getStringList('guest_cart_course_ids') ?? [];
     if (guestCart.isNotEmpty) {
-      final intIds = guestCart.map((e) => int.tryParse(e)).whereType<int>().toList();
+      final intIds = guestCart
+          .map((e) => int.tryParse(e))
+          .whereType<int>()
+          .toList();
       try {
         await _cartRepository.syncCart(intIds);
         await prefs.remove('guest_cart_course_ids');
@@ -133,16 +146,43 @@ class CartManager {
     await updateCount();
   }
 
-  static Future<void> updateCount() async {
+  static Future<void> updateCount({bool forceRefresh = false}) {
+    if (!forceRefresh && !_isRemoteSyncStale()) {
+      return Future.value();
+    }
+
+    final inFlight = _updateInFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _updateCountInternal(forceRefresh: forceRefresh);
+    _updateInFlight = future;
+    return future.whenComplete(() {
+      if (identical(_updateInFlight, future)) {
+        _updateInFlight = null;
+      }
+    });
+  }
+
+  static Future<void> _updateCountInternal({required bool forceRefresh}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    
+
     if (token != null && token.isNotEmpty) {
       try {
         final items = await _cartRepository.getCartItems();
-        final filteredItems = items.where((c) => !_pendingDeletedCourseIds.contains(c.id)).toList();
+        final filteredItems = items
+            .where((c) => !_pendingDeletedCourseIds.contains(c.id))
+            .toList();
         cartCoursesNotifier.value = filteredItems;
         cartCountNotifier.value = filteredItems.length;
+        final key = await getCartKey();
+        await prefs.setStringList(
+          key,
+          filteredItems.map((c) => c.id.toString()).toList(),
+        );
+        _markRemoteSyncFresh();
         return;
       } catch (e) {
         debugPrint('Error updating DB cart count: $e');
@@ -156,13 +196,31 @@ class CartManager {
       cartCountNotifier.value = 0;
     } else {
       try {
-        final allCourses = await _courseRepository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
-        final filtered = allCourses.where((c) => cart.contains(c.id.toString())).toList();
+        final allCourses = await _courseRepository.fetchCourses(
+          search: '',
+          filterType: 'ALL',
+          difficulty: 'ALL',
+        );
+        final filtered = allCourses
+            .where((c) => cart.contains(c.id.toString()))
+            .toList();
         cartCoursesNotifier.value = filtered;
         cartCountNotifier.value = filtered.length;
       } catch (_) {
         cartCountNotifier.value = cart.length;
       }
     }
+  }
+
+  static bool _isRemoteSyncStale() {
+    final lastSync = _lastRemoteSyncAt;
+    if (lastSync == null) {
+      return true;
+    }
+    return DateTime.now().difference(lastSync) > _remoteSyncTtl;
+  }
+
+  static void _markRemoteSyncFresh() {
+    _lastRemoteSyncAt = DateTime.now();
   }
 }

@@ -48,14 +48,37 @@ public class ExamService {
             exams = examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED");
         }
 
-        return exams.stream().map(this::mapToDTO).collect(Collectors.toList());
+        if (exams.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        List<Long> examIds = exams.stream().map(Exam::getId).collect(Collectors.toList());
+
+        java.util.Map<Long, Integer> questionCounts = new java.util.HashMap<>();
+        List<Object[]> questionRows = examQuestionRepository.countQuestionsByExamIds(examIds);
+        if (questionRows != null) {
+            for (Object[] row : questionRows) {
+                questionCounts.put(((Number) row[0]).longValue(), ((Number) row[1]).intValue());
+            }
+        }
+
+        java.util.Map<Long, Long> studentCounts = new java.util.HashMap<>();
+        List<Object[]> studentRows = examAttemptRepository.countDistinctStudentsByExamIds(examIds);
+        if (studentRows != null) {
+            for (Object[] row : studentRows) {
+                studentCounts.put(((Number) row[0]).longValue(), ((Number) row[1]).longValue());
+            }
+        }
+
+        return exams.stream().map(exam -> {
+            int qCount = questionCounts.getOrDefault(exam.getId(), 0);
+            Long sCount = studentCounts.getOrDefault(exam.getId(), 0L);
+            return mapToDTO(exam, qCount, sCount);
+        }).collect(Collectors.toList());
     }
 
-    private ExamResponseDTO mapToDTO(Exam exam) {
-        int questionCount = examQuestionRepository.countByIdExamId(exam.getId());
-
+    private ExamResponseDTO mapToDTO(Exam exam, int questionCount, Long count) {
         String learnerCountStr = "0";
-        Long count = examAttemptRepository.countDistinctStudentsByExamId(exam.getId());
         if (count != null && count > 0) {
             learnerCountStr = count.toString();
         }

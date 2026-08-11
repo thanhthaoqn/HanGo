@@ -17,6 +17,10 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(DISTINCT e.student.id) FROM ExamAttempt e WHERE e.exam.id = :examId")
     Long countDistinctStudentsByExamId(@org.springframework.data.repository.query.Param("examId") Long examId);
 
+    @org.springframework.data.jpa.repository.Query("SELECT e.exam.id, COUNT(DISTINCT e.student.id) FROM ExamAttempt e WHERE e.exam.id IN :examIds GROUP BY e.exam.id")
+    java.util.List<Object[]> countDistinctStudentsByExamIds(@org.springframework.data.repository.query.Param("examIds") java.util.List<Long> examIds);
+
+
     List<ExamAttempt> findByStudentIdOrderByStartedAtDesc(Long studentId);
 
     List<ExamAttempt> findByExamIdAndStudentIdOrderByStartedAtDesc(Long examId, Long studentId);

@@ -10,6 +10,7 @@ import java.util.List;
 
 @Repository
 public interface ExamRepository extends JpaRepository<Exam, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
     List<Exam> findByDeletedAtIsNullAndStatus(String status);
 
     List<Exam> findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long createdById);

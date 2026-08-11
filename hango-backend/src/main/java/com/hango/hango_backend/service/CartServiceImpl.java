@@ -14,7 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,6 +33,15 @@ public class CartServiceImpl implements CartService {
     @Transactional(readOnly = true)
     public List<CourseSummaryDTO> getCartItems(Long userId) {
         List<CartItem> cartItems = cartItemRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<Long> courseIds = cartItems.stream()
+                .map(CartItem::getCourse)
+                .filter(course -> course != null && course.getId() != null)
+                .map(Course::getId)
+                .collect(Collectors.toList());
+        List<Long> enrolledIds = courseIds.isEmpty()
+                ? List.of()
+                : enrollmentRepository.findEnrolledCourseIds(userId, courseIds);
+        Set<Long> enrolledCourseIds = enrolledIds == null ? Set.of() : new HashSet<>(enrolledIds);
         List<CourseSummaryDTO> dtoList = new ArrayList<>();
 
         for (CartItem item : cartItems) {
@@ -37,8 +49,7 @@ public class CartServiceImpl implements CartService {
             if (course == null) continue;
 
             // Remove automatically from cart if user is already enrolled
-            boolean isEnrolled = enrollmentRepository.existsByUserIdAndCourseId(userId, course.getId());
-            if (isEnrolled) {
+            if (enrolledCourseIds.contains(course.getId())) {
                 log.info("Skipping enrolled courseId={} for userId={} cart response", course.getId(), userId);
                 continue;
             }

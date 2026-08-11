@@ -839,8 +839,19 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             return e2.getCreatedAt().compareTo(e1.getCreatedAt());
         });
 
+        List<Long> examIds = exams.stream().map(com.hango.hango_backend.entity.Exam::getId).collect(Collectors.toList());
+        java.util.Map<Long, Integer> questionCounts = new java.util.HashMap<>();
+        if (!examIds.isEmpty()) {
+            List<Object[]> questionRows = examQuestionRepository.countQuestionsByExamIds(examIds);
+            if (questionRows != null) {
+                for (Object[] row : questionRows) {
+                    questionCounts.put(((Number) row[0]).longValue(), ((Number) row[1]).intValue());
+                }
+            }
+        }
+
         return exams.stream().map(exam -> {
-            int questionCount = examQuestionRepository.countByIdExamId(exam.getId());
+            int questionCount = questionCounts.getOrDefault(exam.getId(), 0);
             return com.hango.hango_backend.dto.TrainerExamResponseDTO.builder()
                     .id(exam.getId())
                     .title(exam.getTitle())
