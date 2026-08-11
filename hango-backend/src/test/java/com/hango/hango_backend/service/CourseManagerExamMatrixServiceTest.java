@@ -112,7 +112,7 @@ class CourseManagerExamMatrixServiceTest {
         SystemParameter skill = param(1L, "Reading");
         SystemParameter diff = param(2L, "Medium");
         QuestionCategory cat = category(1L, "Multiple Choice");
-        when(examMatrixRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(m));
+        when(examMatrixRepository.findAllByIsPublicTrueOrderByCreatedAtDesc()).thenReturn(List.of(m));
         when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of(detail(1L, m, skill, diff, cat, 5)));
 
         List<ExamMatrixDTO> result = service.getAllExamMatrices();
@@ -126,9 +126,37 @@ class CourseManagerExamMatrixServiceTest {
 
     @Test
     void getAllExamMatricesShouldReturnEmptyListWhenNoMatrices() {
-        when(examMatrixRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(examMatrixRepository.findAllByIsPublicTrueOrderByCreatedAtDesc()).thenReturn(List.of());
 
         List<ExamMatrixDTO> result = service.getAllExamMatrices();
+
+        assertTrue(result.isEmpty());
+    }
+
+    // =================================================================
+    // getAllMatricesForManager
+    // =================================================================
+
+    @Test
+    void getAllMatricesForManagerShouldIncludePrivateMatricesUnlikeGetAllExamMatrices() {
+        User creator = user(1L, "trainer@example.com");
+        ExamMatrix m = matrix(1L, "Draft Matrix", creator);
+        m.setIsPublic(false);
+        when(examMatrixRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(m));
+        when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of());
+
+        List<ExamMatrixDTO> result = service.getAllMatricesForManager();
+
+        assertEquals(1, result.size());
+        assertEquals("Draft Matrix", result.get(0).getTitle());
+        assertEquals(false, result.get(0).getIsPublic());
+    }
+
+    @Test
+    void getAllMatricesForManagerShouldReturnEmptyListWhenNoMatrices() {
+        when(examMatrixRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+
+        List<ExamMatrixDTO> result = service.getAllMatricesForManager();
 
         assertTrue(result.isEmpty());
     }
@@ -207,7 +235,7 @@ class CourseManagerExamMatrixServiceTest {
     }
 
     @Test
-    void createExamMatrixShouldThrowWhenCategoryNotFound() {
+    void createExamMatrixShouldTolerateCategoryNotFoundAndLeaveDetailCategoryNull() {
         User creator = user(1L, "trainer@example.com");
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(creator));
         when(examMatrixRepository.save(any(ExamMatrix.class))).thenReturn(matrix(1L, "Matrix", creator));
@@ -215,9 +243,12 @@ class CourseManagerExamMatrixServiceTest {
         when(systemParameterRepository.findById(2L)).thenReturn(Optional.of(param(2L, "Medium")));
         when(questionCategoryRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class,
-                () -> service.createExamMatrix("trainer@example.com",
-                        createRequest("Matrix", List.of(detailRequest(1L, 2L, 99L, 5)))));
+        service.createExamMatrix("trainer@example.com",
+                createRequest("Matrix", List.of(detailRequest(1L, 2L, 99L, 5))));
+
+        ArgumentCaptor<ExamMatrixDetail> captor = ArgumentCaptor.forClass(ExamMatrixDetail.class);
+        verify(examMatrixDetailRepository).save(captor.capture());
+        assertEquals(null, captor.getValue().getCategory());
     }
 
     @Test
@@ -269,9 +300,9 @@ class CourseManagerExamMatrixServiceTest {
             e.setId(500L);
             return e;
         });
-        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 1L, 3))
+        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, null, 1L, 3))
                 .thenReturn(List.of(question(11L), question(12L), question(13L)));
-        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 1L, 2))
+        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, null, 1L, 2))
                 .thenReturn(List.of(question(14L), question(15L)));
         Long examId = service.generateExamFromMatrix(1L, "My Custom Exam", null, null, null, null, "trainer@example.com");
 
@@ -316,7 +347,7 @@ class CourseManagerExamMatrixServiceTest {
             e.setId(500L);
             return e;
         });
-        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 1L, 1L, 5))
+        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, null, 1L, 5))
                 .thenReturn(List.of(question(11L), question(12L)));
 
         RuntimeException ex = assertThrows(RuntimeException.class,
@@ -341,5 +372,104 @@ class CourseManagerExamMatrixServiceTest {
 
         verify(questionRepository, never()).findRandomQuestionsByCriteria(any(), any(), any(), any(), anyInt());
         verify(examQuestionRepository, never()).save(any());
+    }
+
+    // =================================================================
+    // toggleMatrixStatus
+    // =================================================================
+
+    @Test
+    void toggleMatrixStatusShouldThrowWhenMatrixNotFound() {
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.toggleMatrixStatus(1L));
+    }
+
+    @Test
+    void toggleMatrixStatusShouldFlipPublicToPrivate() {
+        ExamMatrix m = matrix(1L, "Matrix", user(1L, "trainer@example.com"));
+        m.setIsPublic(true);
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+
+        service.toggleMatrixStatus(1L);
+
+        assertEquals(false, m.getIsPublic());
+        verify(examMatrixRepository).save(m);
+    }
+
+    @Test
+    void toggleMatrixStatusShouldFlipPrivateToPublic() {
+        ExamMatrix m = matrix(1L, "Matrix", user(1L, "trainer@example.com"));
+        m.setIsPublic(false);
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+
+        service.toggleMatrixStatus(1L);
+
+        assertEquals(true, m.getIsPublic());
+    }
+
+    // =================================================================
+    // updateExamMatrix
+    // =================================================================
+
+    @Test
+    void updateExamMatrixShouldThrowWhenMatrixNotFound() {
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class,
+                () -> service.updateExamMatrix(1L, createRequest("Updated", List.of())));
+    }
+
+    @Test
+    void updateExamMatrixShouldUpdateTitleAndDescription() {
+        ExamMatrix m = matrix(1L, "Old Title", user(1L, "trainer@example.com"));
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+        when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of());
+
+        service.updateExamMatrix(1L, createRequest("New Title", List.of()));
+
+        assertEquals("New Title", m.getTitle());
+        assertEquals("desc", m.getDescription());
+        verify(examMatrixRepository).save(m);
+    }
+
+    @Test
+    void updateExamMatrixShouldDeleteAllOldDetailsBeforeAddingNewOnes() {
+        ExamMatrix m = matrix(1L, "Matrix", user(1L, "trainer@example.com"));
+        ExamMatrixDetail oldDetail = detail(9L, m, param(1L, "Reading"), param(2L, "Medium"), null, 1);
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+        when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of(oldDetail));
+        when(systemParameterRepository.findById(1L)).thenReturn(Optional.of(param(1L, "Reading")));
+        when(systemParameterRepository.findById(2L)).thenReturn(Optional.of(param(2L, "Medium")));
+
+        service.updateExamMatrix(1L, createRequest("Matrix", List.of(detailRequest(1L, 2L, null, 7))));
+
+        verify(examMatrixDetailRepository).deleteAll(List.of(oldDetail));
+        ArgumentCaptor<ExamMatrixDetail> captor = ArgumentCaptor.forClass(ExamMatrixDetail.class);
+        verify(examMatrixDetailRepository).save(captor.capture());
+        assertEquals(7, captor.getValue().getQuantity());
+        assertEquals(m, captor.getValue().getMatrix());
+    }
+
+    @Test
+    void updateExamMatrixShouldThrowWhenSkillParamNotFound() {
+        ExamMatrix m = matrix(1L, "Matrix", user(1L, "trainer@example.com"));
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+        when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of());
+        when(systemParameterRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class,
+                () -> service.updateExamMatrix(1L, createRequest("Matrix", List.of(detailRequest(99L, 2L, null, 5)))));
+    }
+
+    @Test
+    void updateExamMatrixShouldLeaveNoDetailsWhenDetailsListIsNull() {
+        ExamMatrix m = matrix(1L, "Matrix", user(1L, "trainer@example.com"));
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+        when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of());
+
+        service.updateExamMatrix(1L, createRequest("Matrix", null));
+
+        verify(examMatrixDetailRepository, never()).save(any());
     }
 }
