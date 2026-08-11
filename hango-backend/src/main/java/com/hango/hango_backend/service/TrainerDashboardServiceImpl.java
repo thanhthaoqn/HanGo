@@ -37,6 +37,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final NotificationService notificationService;
     private final CloudinaryService cloudinaryService;
 
+    private String getBaseCode(String code, Long id) {
+        if (code == null || code.isBlank()) return String.valueOf(id);
+        return code.replaceAll("-V\\d+$", "").toUpperCase();
+    }
+lo
     @Override
     @Transactional(readOnly = true)
     public TrainerDashboardSummaryDTO getTrainerDashboardSummary(String email) {
@@ -44,7 +49,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         Long trainerId = user.getId();
 
-        long coursesCount = courseRepository.countByCreatorIdAndDeletedAtIsNull(trainerId);
         long learnersCount = enrollmentRepository.countDistinctStudentsByCourseCreatorId(trainerId);
         long examsCount = examRepository.countByCreatedByIdAndDeletedAtIsNull(trainerId);
 
@@ -60,20 +64,33 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         List<TrainerCourseDetailProjection> baseProjections = courseRepository.findTrainerCoursesDetailBase(trainerId,
                 "ALL", null);
-        Map<Long, List<TrainerCourseDetailProjection>> groupedById = baseProjections.stream()
-                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
+        
+        Map<String, List<TrainerCourseDetailProjection>> groupedByCode = baseProjections.stream()
+                .collect(Collectors.groupingBy(p -> getBaseCode(p.getCode(), p.getId())));
 
-        List<TrainerCourseDTO> courses = groupedById.values().stream()
+        long coursesCount = groupedByCode.values().stream()
+                .filter(group -> group.stream().anyMatch(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus())))
+                .count();
+
+        List<TrainerCourseDTO> courses = groupedByCode.values().stream()
                 .map(group -> {
+                    // Try to find the latest PUBLISHED version
                     TrainerCourseDetailProjection latest = group.stream()
+                            .filter(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus()))
                             .max((p1, p2) -> {
-                                if (p1.getCreatedAt() == null)
-                                    return -1;
-                                if (p2.getCreatedAt() == null)
-                                    return 1;
+                                if (p1.getCreatedAt() == null) return -1;
+                                if (p2.getCreatedAt() == null) return 1;
                                 return p1.getCreatedAt().compareTo(p2.getCreatedAt());
                             })
-                            .orElse(group.get(0));
+                            // If no PUBLISHED version, fallback to the latest version of ANY status
+                            .orElseGet(() -> group.stream()
+                                    .max((p1, p2) -> {
+                                        if (p1.getCreatedAt() == null) return -1;
+                                        if (p2.getCreatedAt() == null) return 1;
+                                        return p1.getCreatedAt().compareTo(p2.getCreatedAt());
+                                    }).orElse(group.get(0))
+                            );
+                            
                     return TrainerCourseDTO.builder()
                             .id(latest.getId())
                             .title(latest.getTitle())
@@ -188,11 +205,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         List<TrainerCourseDetailProjection> allProjections = courseRepository.findTrainerCoursesDetailBase(trainerId,
                 "ALL", null);
 
-        // 2. Group by Root ID and get the Latest Version for each course
-        Map<Long, List<TrainerCourseDetailProjection>> groupedById = allProjections.stream()
-                .collect(Collectors.groupingBy(p -> p.getParentId() != null ? p.getParentId() : p.getId()));
+        // 2. Group by Root Code and get the Latest Version for each course
+        Map<String, List<TrainerCourseDetailProjection>> groupedByCode = allProjections.stream()
+                .collect(Collectors.groupingBy(p -> getBaseCode(p.getCode(), p.getId())));
 
-        List<TrainerCourseDetailProjection> latestProjections = groupedById.values().stream()
+        List<TrainerCourseDetailProjection> latestProjections = groupedByCode.values().stream()
                 .map(group -> group.stream()
                         .max((p1, p2) -> {
                             if (p1.getCreatedAt() == null)
