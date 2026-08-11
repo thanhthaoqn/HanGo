@@ -41,7 +41,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         if (code == null || code.isBlank()) return String.valueOf(id);
         return code.replaceAll("-V\\d+$", "").toUpperCase();
     }
-lo
+
     @Override
     @Transactional(readOnly = true)
     public TrainerDashboardSummaryDTO getTrainerDashboardSummary(String email) {

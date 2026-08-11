@@ -453,6 +453,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
           }
           _courseStatus = data['status'] ?? 'DRAFT';
           _versionController.text = data['version'] ?? 'v1.0';
+          _codeController.text = data['code'] ?? '';
+          _suggestedPrice = data['suggestedPrice'];
         });
       }
     } catch (e) {
@@ -2099,7 +2101,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ? 'Course re-submitted for review!'
               : 'Course submitted for review successfully!',
         );
-        await _loadCourseDetail(); // Reload to reflect new PENDING_APPROVAL status
+        Navigator.pop(context, true); // Close edit page and return true to refresh list
       } else {
         final data = jsonDecode(response.body);
         final errorMsg = data['error'] ?? response.body;
