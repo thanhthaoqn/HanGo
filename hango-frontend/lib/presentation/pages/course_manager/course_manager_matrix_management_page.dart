@@ -25,6 +25,9 @@ class _CourseManagerMatrixManagementPageState
   String _selectedStatus = 'ALL';
   String _sortBy = 'NEWEST';
 
+  int _currentPage = 1;
+  final int _itemsPerPage = 10;
+
   List<Map<String, dynamic>> get _displayedMatrices {
     var filtered = _allMatrices.where((m) {
       final matchesSearch = _searchQuery.isEmpty ||
@@ -62,6 +65,7 @@ class _CourseManagerMatrixManagementPageState
         setState(() {
           _allMatrices = data;
           _isLoading = false;
+          _currentPage = 1;
         });
       }
     } catch (e) {
@@ -251,7 +255,10 @@ class _CourseManagerMatrixManagementPageState
     final searchField = SizedBox(
       height: 48,
       child: TextField(
-        onChanged: (value) => setState(() => _searchQuery = value),
+        onChanged: (value) => setState(() {
+          _searchQuery = value;
+          _currentPage = 1;
+        }),
         decoration: InputDecoration(
           hintText: 'Search by title...',
           prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF94A3B8)),
@@ -303,7 +310,10 @@ class _CourseManagerMatrixManagementPageState
                 ),
               ],
               onChanged: (val) {
-                setState(() => _selectedStatus = val ?? 'ALL');
+                setState(() {
+                  _selectedStatus = val ?? 'ALL';
+                  _currentPage = 1;
+                });
               },
             ),
           ),
@@ -343,7 +353,12 @@ class _CourseManagerMatrixManagementPageState
                 );
               }).toList(),
               onChanged: (val) {
-                if (val != null) setState(() => _sortBy = val == 'Newest' ? 'NEWEST' : 'OLDEST');
+                if (val != null) {
+                  setState(() {
+                    _sortBy = val == 'Newest' ? 'NEWEST' : 'OLDEST';
+                    _currentPage = 1;
+                  });
+                }
               },
             ),
           ),
@@ -400,21 +415,47 @@ class _CourseManagerMatrixManagementPageState
   }
 
   Widget _buildMatrixTable() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.02),
-            blurRadius: 10,
-            offset: Offset(0, 2),
+    final allMatrices = _displayedMatrices;
+    int totalItems = allMatrices.length;
+    int totalPages = (totalItems / _itemsPerPage).ceil();
+    if (totalPages == 0) totalPages = 1;
+    if (_currentPage > totalPages) _currentPage = totalPages;
+
+    int startIndex = (_currentPage - 1) * _itemsPerPage;
+    int endIndex = startIndex + _itemsPerPage;
+    if (endIndex > totalItems) endIndex = totalItems;
+
+    List<Map<String, dynamic>> pageMatrices = allMatrices.isEmpty
+        ? []
+        : allMatrices.sublist(startIndex, endIndex);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color.fromRGBO(0, 0, 0, 0.02),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: LayoutBuilder(
+          child: _buildDataTable(pageMatrices),
+        ),
+        const SizedBox(height: 16),
+        _buildPaginationFooter(totalItems, startIndex, endIndex, totalPages),
+      ],
+    );
+  }
+
+  Widget _buildDataTable(List<Map<String, dynamic>> pageMatrices) {
+    return LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -474,7 +515,7 @@ class _CourseManagerMatrixManagementPageState
             ),
           ),
         ],
-        rows: _displayedMatrices.map((matrix) {
+        rows: pageMatrices.map((matrix) {
           bool isPublic = matrix['isPublic'] == true;
 
           return DataRow(
@@ -710,6 +751,117 @@ class _CourseManagerMatrixManagementPageState
             ),
           );
         },
+    );
+  }
+
+  Widget _buildPaginationFooter(
+    int totalItems,
+    int startIndex,
+    int endIndex,
+    int totalPages,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          Text(
+            'Showing ${totalItems == 0 ? 0 : startIndex + 1} to $endIndex of $totalItems entries',
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 14,
+              fontFamily: 'Outfit',
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildPaginationButton(
+                  Icons.chevron_left,
+                  onPressed: _currentPage > 1
+                      ? () => setState(() => _currentPage--)
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                ...List.generate(totalPages, (index) {
+                  int pageNum = index + 1;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: _buildPaginationNumber(
+                      pageNum.toString(),
+                      isActive: pageNum == _currentPage,
+                      onPressed: () => setState(() => _currentPage = pageNum),
+                    ),
+                  );
+                }),
+                _buildPaginationButton(
+                  Icons.chevron_right,
+                  onPressed: _currentPage < totalPages
+                      ? () => setState(() => _currentPage++)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaginationButton(IconData icon, {VoidCallback? onPressed}) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: onPressed == null ? const Color(0xFFF8FAFC) : Colors.white,
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onPressed == null
+              ? const Color(0xFFCBD5E1)
+              : const Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationNumber(
+    String text, {
+    bool isActive = false,
+    VoidCallback? onPressed,
+  }) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF0F766E) : Colors.white,
+          border: Border.all(
+            color: isActive ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+          ),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isActive ? Colors.white : const Color(0xFF64748B),
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
       ),
     );
   }

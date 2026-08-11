@@ -7,6 +7,8 @@ import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../course_manager/course_manager_create_exam_page.dart';
 import '../course_manager/course_manager_edit_exam_page.dart';
+import '../course_manager/exam_review_dashboard_dialog.dart';
+import '../course_manager/exam_history_dialog.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -27,8 +29,10 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   bool _isCourseManager = false;
   bool _isCreatingExam = false;
   Map<String, dynamic>? _editingExamData;
+  int? _currentUserId;
 
   bool _isLoading = true;
+  List<dynamic> _allLoadedExams = [];
   List<dynamic> _examsList = [];
 
   int _currentPage = 1;
@@ -75,10 +79,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     super.dispose();
   }
 
+  String _statusOf(dynamic exam) =>
+      exam['status']?.toString().toUpperCase() ?? '';
+
   Future<void> _fetchExamsData() async {
     setState(() {
       _isLoading = true;
-      _currentPage = 1;
     });
 
     try {
@@ -87,19 +93,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         throw Exception('Authentication token not found');
       }
 
-      final searchVal = _searchController.text.trim();
-      final queryParams = <String, String>{
-        'status': _selectedStatus,
-        'sortBy': _selectedSortBy,
-        'timePeriod': _selectedTimePeriod,
-      };
-      if (searchVal.isNotEmpty) {
-        queryParams['search'] = searchVal;
-      }
-
-      final uri = Uri.parse(
-        '$apiBaseUrl/trainer/exams',
-      ).replace(queryParameters: queryParams);
+      final uri = Uri.parse('$apiBaseUrl/trainer/exams');
       final response = await http.get(
         uri,
         headers: {
@@ -110,133 +104,29 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final allData = data is Map
+            ? (data['exams'] ?? []) as List<dynamic>
+            : (data is List ? data : <dynamic>[]);
+
         if (mounted) {
           setState(() {
-            if (data is Map) {
-              _allCount = (data['allCount'] ?? 0) as int;
-              _draftCount = (data['draftCount'] ?? 0) as int;
-              _publishedCount = (data['publishedCount'] ?? 0) as int;
-              _hiddenCount = (data['hiddenCount'] ?? 0) as int;
-              _pendingCount = (data['pendingCount'] ?? 0) as int;
-              _examsList = data['exams'] ?? [];
-            } else if (data is List) {
-              final allData = data;
-              _allCount = allData.length;
-              _draftCount = allData.where((e) {
-                final s = e['status']?.toString().toUpperCase() ?? '';
-                return s == 'DRAFT';
-              }).length;
-              _publishedCount = allData.where((e) {
-                final s = e['status']?.toString().toUpperCase() ?? '';
-                return s == 'PUBLISHED' || s == 'APPROVED' || s == 'PUBLIC';
-              }).length;
-              _hiddenCount = allData.where((e) {
-                final s = e['status']?.toString().toUpperCase() ?? '';
-                return s == 'HIDDEN';
-              }).length;
-              _pendingCount = allData.where((e) {
-                final s = e['status']?.toString().toUpperCase() ?? '';
-                return s == 'SUBMITTED';
-              }).length;
-              _rejectedCount = allData.where((e) {
-                final s = e['status']?.toString().toUpperCase() ?? '';
-                return s == 'REJECTED';
-              }).length;
-
-              var filtered = allData;
-              if (_selectedStatus != 'ALL') {
-                filtered = filtered.where((e) {
-                  final s = e['status']?.toString().toUpperCase() ?? '';
-                  if (_selectedStatus == 'PUBLISHED') {
-                    return s == 'PUBLISHED' || s == 'APPROVED' || s == 'PUBLIC';
-                  } else if (_selectedStatus == 'SUBMITTED') {
-                    return s == 'SUBMITTED';
-                  } else if (_selectedStatus == 'DRAFT') {
-                    return s == 'DRAFT';
-                  } else if (_selectedStatus == 'HIDDEN') {
-                    return s == 'HIDDEN';
-                  } else if (_selectedStatus == 'REJECTED') {
-                    return s == 'REJECTED';
-                  }
-                  return s == _selectedStatus;
-                }).toList();
-              }
-
-              final searchVal = _searchController.text.trim().toLowerCase();
-              if (searchVal.isNotEmpty) {
-                filtered = filtered
-                    .where(
-                      (e) => (e['title']?.toString().toLowerCase() ?? '')
-                          .contains(searchVal),
-                    )
-                    .toList();
-              }
-
-              if (_selectedTimePeriod == 'THIS_WEEK') {
-                final now = DateTime.now();
-                final startOfWeek = now.subtract(
-                  Duration(days: now.weekday - 1),
-                );
-                filtered = filtered.where((e) {
-                  DateTime d =
-                      DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  return d.isAfter(startOfWeek);
-                }).toList();
-              } else if (_selectedTimePeriod == 'THIS_MONTH') {
-                final now = DateTime.now();
-                filtered = filtered.where((e) {
-                  DateTime d =
-                      DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  return d.year == now.year && d.month == now.month;
-                }).toList();
-              }
-
-              filtered.sort((a, b) {
-                if (_selectedSortBy == 'STATUS') {
-                  final statusA = a['status']?.toString().toUpperCase() ?? '';
-                  final statusB = b['status']?.toString().toUpperCase() ?? '';
-                  final priorityA = _getStatusPriority(statusA);
-                  final priorityB = _getStatusPriority(statusB);
-                  if (priorityA != priorityB)
-                    return priorityA.compareTo(priorityB);
-
-                  DateTime d1 =
-                      DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  DateTime d2 =
-                      DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  return d2.compareTo(d1);
-                } else if (_selectedSortBy == 'NEWEST') {
-                  DateTime d1 =
-                      DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  DateTime d2 =
-                      DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  return d2.compareTo(d1);
-                } else if (_selectedSortBy == 'OLDEST') {
-                  DateTime d1 =
-                      DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  DateTime d2 =
-                      DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-                      DateTime(2000);
-                  return d1.compareTo(d2);
-                } else if (_selectedSortBy == 'ALPHABETICAL') {
-                  String t1 = a['title']?.toString() ?? '';
-                  String t2 = b['title']?.toString() ?? '';
-                  return t1.compareTo(t2);
-                }
-                return 0;
-              });
-
-              _examsList = filtered;
-            }
+            _allLoadedExams = allData;
+            _allCount = allData.length;
+            _draftCount = allData.where((e) => _statusOf(e) == 'DRAFT').length;
+            _publishedCount = allData.where((e) {
+              final s = _statusOf(e);
+              return s == 'PUBLISHED' || s == 'APPROVED' || s == 'PUBLIC';
+            }).length;
+            _hiddenCount = allData.where((e) => _statusOf(e) == 'HIDDEN').length;
+            _pendingCount = allData
+                .where((e) => _statusOf(e) == 'SUBMITTED')
+                .length;
+            _rejectedCount = allData
+                .where((e) => _statusOf(e) == 'REJECTED')
+                .length;
             _isLoading = false;
           });
+          _applyFilters();
         }
       } else {
         throw Exception('Failed to load exams data: ${response.statusCode}');
@@ -250,6 +140,92 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         _loadMockFallback();
       }
     }
+  }
+
+  void _applyFilters() {
+    setState(() {
+      var filtered = List<dynamic>.from(_allLoadedExams);
+
+      if (_selectedStatus != 'ALL') {
+        filtered = filtered.where((e) {
+          final s = _statusOf(e);
+          if (_selectedStatus == 'PUBLISHED') {
+            return s == 'PUBLISHED' || s == 'APPROVED' || s == 'PUBLIC';
+          }
+          return s == _selectedStatus;
+        }).toList();
+      }
+
+      final searchVal = _searchController.text.trim().toLowerCase();
+      if (searchVal.isNotEmpty) {
+        filtered = filtered
+            .where(
+              (e) => (e['title']?.toString().toLowerCase() ?? '').contains(
+                searchVal,
+              ),
+            )
+            .toList();
+      }
+
+      if (_selectedTimePeriod == 'THIS_WEEK') {
+        final now = DateTime.now();
+        final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+        filtered = filtered.where((e) {
+          DateTime d =
+              DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          return d.isAfter(startOfWeek);
+        }).toList();
+      } else if (_selectedTimePeriod == 'THIS_MONTH') {
+        final now = DateTime.now();
+        filtered = filtered.where((e) {
+          DateTime d =
+              DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          return d.year == now.year && d.month == now.month;
+        }).toList();
+      }
+
+      filtered.sort((a, b) {
+        if (_selectedSortBy == 'STATUS') {
+          final priorityA = _getStatusPriority(_statusOf(a));
+          final priorityB = _getStatusPriority(_statusOf(b));
+          if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+
+          DateTime d1 =
+              DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          DateTime d2 =
+              DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          return d2.compareTo(d1);
+        } else if (_selectedSortBy == 'NEWEST') {
+          DateTime d1 =
+              DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          DateTime d2 =
+              DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          return d2.compareTo(d1);
+        } else if (_selectedSortBy == 'OLDEST') {
+          DateTime d1 =
+              DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          DateTime d2 =
+              DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+              DateTime(2000);
+          return d1.compareTo(d2);
+        } else if (_selectedSortBy == 'ALPHABETICAL') {
+          String t1 = a['title']?.toString() ?? '';
+          String t2 = b['title']?.toString() ?? '';
+          return t1.compareTo(t2);
+        }
+        return 0;
+      });
+
+      _examsList = filtered;
+      _currentPage = 1;
+    });
   }
 
   Future<void> _updateExamVisibility(int examId, String newVisibility) async {
@@ -319,7 +295,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       _hiddenCount = 0;
       _pendingCount = 0;
       _rejectedCount = 0;
-      _examsList = [
+      _allLoadedExams = [
         {
           'id': 1,
           'title':
@@ -330,6 +306,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           'status': 'public',
         },
       ];
+      _examsList = List<dynamic>.from(_allLoadedExams);
     });
   }
 
@@ -364,6 +341,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         _trainerName = fullName;
         _trainerInitials = initials;
         _trainerAvatarUrl = avatarUrl;
+        _currentUserId = prefs.getInt('user_id');
 
         _isCourseManager = roles.any(
           (r) =>
@@ -575,7 +553,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
               final searchField = TextField(
                 controller: _searchController,
-                onChanged: (val) => _fetchExamsData(),
+                onChanged: (val) => _applyFilters(),
                 decoration: InputDecoration(
                   hintText: 'Search for exams...',
                   hintStyle: const TextStyle(
@@ -631,7 +609,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _selectedSortBy = val);
-                    _fetchExamsData();
+                    _applyFilters();
                   }
                 },
               );
@@ -655,7 +633,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _selectedTimePeriod = val);
-                    _fetchExamsData();
+                    _applyFilters();
                   }
                 },
               );
@@ -697,7 +675,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     return InkWell(
       onTap: () {
         setState(() => _selectedStatus = statusKey);
-        _fetchExamsData();
+        _applyFilters();
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
@@ -924,6 +902,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
   Widget _buildExamRow(Map<String, dynamic> exam) {
     final status = exam['status']?.toString().toUpperCase() ?? '';
+    final creatorId = exam['creatorId'] as int?;
+    final isOwnExam = _currentUserId != null && creatorId == _currentUserId;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
@@ -1093,23 +1073,71 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   ),
                 IconButton(
                   icon: Icon(
-                    (status == 'DRAFT' || status == 'REJECTED')
+                    status == 'DRAFT'
                         ? Icons.edit_outlined
                         : Icons.remove_red_eye_outlined,
-                    color: (status == 'DRAFT' || status == 'REJECTED')
+                    color: status == 'DRAFT'
                         ? const Color(0xFF64748B)
                         : const Color(0xFF20B486),
                     size: 20,
                   ),
                   onPressed: () {
-                    setState(() {
-                      _editingExamData = exam as Map<String, dynamic>;
-                    });
+                    if (status == 'DRAFT') {
+                      setState(() {
+                        _editingExamData = exam as Map<String, dynamic>;
+                      });
+                    } else {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => ExamReviewDashboardDialog(
+                          examId: exam['id'] as int,
+                          examTitle: exam['title'] ?? 'Untitled Exam',
+                          examExpectedCount:
+                              exam['expectedQuestionCount'] as int? ?? 10,
+                          status: status,
+                          isCourseManager: false,
+                          creatorId: creatorId,
+                          creatorName: exam['creatorName']?.toString(),
+                          currentUserId: _currentUserId,
+                          onActionSuccess: () {
+                            _fetchExamsData();
+                          },
+                          onEditExam: isOwnExam && status == 'REJECTED'
+                              ? () {
+                                  setState(() {
+                                    _editingExamData = exam;
+                                  });
+                                }
+                              : null,
+                        ),
+                      );
+                    }
                   },
                   splashRadius: 20,
                   constraints: const BoxConstraints(),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
+                if (_isCourseManager || isOwnExam)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.history,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    tooltip: 'View history',
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => ExamHistoryDialog(
+                          examId: exam['id'] as int,
+                          examTitle: exam['title'] ?? 'Untitled Exam',
+                        ),
+                      );
+                    },
+                    splashRadius: 20,
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
               ],
             ),
           ),

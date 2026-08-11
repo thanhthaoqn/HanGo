@@ -22,4 +22,5 @@ public class TrainerExamResponseDTO {
     private Integer expectedQuestionCount;
     private String thumbnailUrl;
     private Long creatorId;
+    private String creatorName;
 }

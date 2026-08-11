@@ -4,6 +4,7 @@ import com.hango.hango_backend.dto.TrainerDashboardSummaryDTO;
 import com.hango.hango_backend.dto.TrainerCoursesResponseDTO;
 import com.hango.hango_backend.dto.CourseImportResultDTO;
 import com.hango.hango_backend.service.CourseImportService;
+import com.hango.hango_backend.service.ExamHistoryService;
 import com.hango.hango_backend.service.TrainerDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -36,6 +37,7 @@ public class TrainerDashboardController {
     private final TrainerDashboardService trainerDashboardService;
     private final CloudinaryService cloudinaryService;
     private final CourseImportService courseImportService;
+    private final ExamHistoryService examHistoryService;
 
     @PostMapping("/courses/upload")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
@@ -255,6 +257,24 @@ public class TrainerDashboardController {
             }
             java.util.List<com.hango.hango_backend.dto.TrainerExamResponseDTO> response = trainerDashboardService.getTrainerExams(userDetails.getUsername());
             return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/exams/{id}/history")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('COURSE_MANAGER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getExamHistory(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            java.util.List<com.hango.hango_backend.dto.ExamHistoryLogDTO> history = examHistoryService
+                    .getHistory(id, userDetails.getUsername());
+            return ResponseEntity.ok(history);
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(403).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

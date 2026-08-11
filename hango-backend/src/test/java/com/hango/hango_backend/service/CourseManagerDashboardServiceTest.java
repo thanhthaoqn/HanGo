@@ -56,6 +56,8 @@ class CourseManagerDashboardServiceTest {
     private SectionRepository sectionRepository;
     @Mock
     private LessonRepository lessonRepository;
+    @Mock
+    private ExamHistoryService examHistoryService;
 
     @InjectMocks
     private CourseManagerDashboardServiceImpl service;

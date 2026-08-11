@@ -90,6 +90,8 @@ class TrainerDashboardServiceImplTest {
     private com.hango.hango_backend.repository.PaymentRepository paymentRepository;
     @Mock
     private com.hango.hango_backend.repository.CourseRatingRepository courseRatingRepository;
+    @Mock
+    private ExamHistoryService examHistoryService;
 
     @InjectMocks
     private TrainerDashboardServiceImpl service;

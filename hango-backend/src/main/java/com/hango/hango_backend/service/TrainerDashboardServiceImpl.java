@@ -1,11 +1,13 @@
 package com.hango.hango_backend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.TrainerCourseDTO;
 import com.hango.hango_backend.dto.TrainerDashboardSummaryDTO;
 import com.hango.hango_backend.dto.TrainerCourseDetailDTO;
 import com.hango.hango_backend.dto.TrainerCoursesResponseDTO;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.*;
+import com.hango.hango_backend.util.ExamQuestionDiffUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final YouTubeTranscriptService youtubeTranscriptService;
     private final NotificationService notificationService;
     private final CloudinaryService cloudinaryService;
+    private final ExamHistoryService examHistoryService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional(readOnly = true)
@@ -810,6 +814,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .visibility(exam.getVisibility() != null ? exam.getVisibility() : "PRIVATE")
                     .thumbnailUrl(exam.getThumbnailUrl())
                     .creatorId(exam.getCreatedBy() != null ? exam.getCreatedBy().getId() : null)
+                    .creatorName(exam.getCreatedBy() != null ? exam.getCreatedBy().getFullName() : "Unknown")
                     .build();
         }).collect(Collectors.toList());
     }
@@ -846,6 +851,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         exam.setCreatedBy(user);
 
         exam = examRepository.save(exam);
+        examHistoryService.log(exam, ExamHistoryService.ACTION_CREATED, null, "DRAFT", null, null);
         return exam.getId();
     }
 
@@ -859,6 +865,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         if (!exam.getCreatedBy().getEmail().equals(email)) {
             throw new RuntimeException("Unauthorized to edit this exam");
         }
+
+        List<com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO> oldBlocks = buildBlocksFromQuestions(examId);
 
         examQuestionRepository.deleteByIdExamId(examId);
 
@@ -881,14 +889,34 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 }
             }
         }
+
+        logExamEdit(exam, oldBlocks, request.getBlocks());
+    }
+
+    private void logExamEdit(com.hango.hango_backend.entity.Exam exam,
+            List<com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO> oldBlocks,
+            List<com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO> newBlocks) {
+        String diffJson;
+        try {
+            diffJson = objectMapper.writeValueAsString(ExamQuestionDiffUtil.diff(oldBlocks, newBlocks));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            diffJson = null;
+        }
+        examHistoryService.log(exam, ExamHistoryService.ACTION_EDITED, null, null, null, diffJson);
     }
 
     @Override
     @Transactional(readOnly = true)
     public com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO getExamQuestions(Long examId, String email) {
-        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+        examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
 
+        com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO response = new com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO();
+        response.setBlocks(buildBlocksFromQuestions(examId));
+        return response;
+    }
+
+    private List<com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO> buildBlocksFromQuestions(Long examId) {
         List<com.hango.hango_backend.entity.Question> questions = questionRepository
                 .findByExamIdOrderByQuestionOrder(examId);
 
@@ -940,9 +968,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             currentBlock.getSubQuestions().add(subQ);
         }
 
-        com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO response = new com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO();
-        response.setBlocks(blocks);
-        return response;
+        return blocks;
     }
 
     @Override
@@ -977,8 +1003,28 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     "Only managers can publish, approve, or reject exams");
         }
 
+        String oldStatus = exam.getStatus();
         exam.setStatus(status);
         examRepository.save(exam);
+        examHistoryService.log(exam, mapStatusChangeToAction(oldStatus, status), oldStatus, status, null, null);
+    }
+
+    private String mapStatusChangeToAction(String oldStatus, String newStatus) {
+        String upper = newStatus != null ? newStatus.toUpperCase() : "";
+        if ("SUBMITTED".equals(upper)) {
+            return ExamHistoryService.ACTION_SUBMITTED;
+        }
+        if ("HIDDEN".equals(upper)) {
+            return ExamHistoryService.ACTION_HIDDEN;
+        }
+        if ("REJECTED".equals(upper)) {
+            return ExamHistoryService.ACTION_REJECTED;
+        }
+        if ("PUBLISHED".equals(upper) || "APPROVED".equals(upper)) {
+            return "HIDDEN".equalsIgnoreCase(oldStatus) ? ExamHistoryService.ACTION_UNHIDDEN
+                    : ExamHistoryService.ACTION_PUBLISHED;
+        }
+        return upper;
     }
 
     @Override

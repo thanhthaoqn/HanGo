@@ -250,9 +250,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (BuildContext innerContext, StateSetter setState) {
             return AlertDialog(
               title: const Text(
                 'Rejection Checklist',
@@ -385,7 +385,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(innerContext),
                   child: const Text(
                     'Cancel',
                     style: TextStyle(color: Color(0xFF64748B)),
@@ -427,7 +427,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     
                     String finalReason = reasons.join("\n\n");
                     
-                    Navigator.pop(context);
+                    Navigator.pop(innerContext);
                     
                     try {
                       await CourseManagerApi().rejectExam(

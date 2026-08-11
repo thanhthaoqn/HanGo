@@ -13,6 +13,7 @@ import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.service.CourseManagerDashboardService;
+import com.hango.hango_backend.service.ExamHistoryService;
 import com.hango.hango_backend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     private final LessonRepository lessonRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final NotificationService notificationService;
+    private final ExamHistoryService examHistoryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -280,6 +282,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     .durationMinutes(exam.getDurationMinutes())
                     .thumbnailUrl(exam.getThumbnailUrl())
                     .rejectionReason(exam.getRejectionReason())
+                    .createdAt(exam.getCreatedAt())
                     .build();
         }).collect(Collectors.toList());
     }
@@ -295,9 +298,11 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             throw new RuntimeException("Only exams in PENDING_APPROVAL or SUBMITTED status can be published");
         }
 
+        String oldStatus = exam.getStatus();
         exam.setStatus("PUBLISHED");
         exam.setRejectionReason(null);
         examRepository.save(exam);
+        examHistoryService.log(exam, ExamHistoryService.ACTION_PUBLISHED, oldStatus, "PUBLISHED", null, null);
 
         notificationService.notifyUser(exam.getCreatedBy(), NotificationService.TYPE_CONTENT_APPROVED,
                 "Exam published",
@@ -315,9 +320,11 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             throw new RuntimeException("Only exams in PENDING_APPROVAL or SUBMITTED status can be returned to draft");
         }
 
+        String oldStatus = exam.getStatus();
         exam.setStatus("REJECTED");
         exam.setRejectionReason(reason);
         examRepository.save(exam);
+        examHistoryService.log(exam, ExamHistoryService.ACTION_REJECTED, oldStatus, "REJECTED", reason, null);
 
         notificationService.notifyUser(exam.getCreatedBy(), NotificationService.TYPE_CONTENT_REJECTED,
                 "Exam rejected",

@@ -18,4 +18,5 @@ public class ExamResponseDTO {
     private String learnerCountFormatted;
     private String thumbnailUrl;
     private String rejectionReason;
+    private java.time.LocalDateTime createdAt;
 }
