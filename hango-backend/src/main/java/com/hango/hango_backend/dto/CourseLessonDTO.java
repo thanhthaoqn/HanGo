@@ -39,4 +39,6 @@ public class CourseLessonDTO {
     
     @Size(max = 1000, message = "Learning objectives cannot exceed 1000 characters")
     private String learningObjectives;
+    
+    private String videoTranscript;
 }

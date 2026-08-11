@@ -623,7 +623,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setDescription(lDto.getDescription());
                 lesson.setContent(lDto.getQuestionText());
 
-                if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
+                if (lDto.getVideoTranscript() != null && !lDto.getVideoTranscript().isBlank()) {
+                    lesson.setVideoTranscript(lDto.getVideoTranscript());
+                } else if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
                     String transcript = youtubeTranscriptService.fetchTranscript(lDto.getQuestionText());
                     lesson.setVideoTranscript(transcript);
                 } else {

@@ -46,6 +46,16 @@ public class GeminiGenerateRequest {
     @AllArgsConstructor
     public static class Part {
         private String text;
+        private FileData fileData;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FileData {
+        private String mimeType;
+        private String fileUri;
     }
 
     @Data

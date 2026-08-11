@@ -86,6 +86,8 @@ class LessonDetail {
   final String? learningObjectives;
   final String? mediaFileUrl;
   final String? mediaType;
+  final String? itemType;
+  final String? videoTranscript;
 
   LessonDetail({
     required this.id,
@@ -104,6 +106,8 @@ class LessonDetail {
     this.learningObjectives,
     this.mediaFileUrl,
     this.mediaType,
+    this.itemType,
+    this.videoTranscript,
   });
 
   factory LessonDetail.fromJson(Map<String, dynamic> json) {
@@ -130,6 +134,50 @@ class LessonDetail {
       learningObjectives: json['learningObjectives'] as String?,
       mediaFileUrl: json['mediaFileUrl'] as String?,
       mediaType: json['mediaType'] as String?,
+      itemType: json['itemType'] as String?,
+      videoTranscript: json['videoTranscript'] as String?,
+    );
+  }
+
+  LessonDetail copyWith({
+    int? id,
+    String? title,
+    String? content,
+    int? sectionId,
+    int? courseId,
+    List<LessonComment>? comments,
+    List<QuizQuestion>? questions,
+    bool? isCompleted,
+    int? estimatedTime,
+    String? lessonCode,
+    int? mediaDurationSeconds,
+    int? mediaSizeBytes,
+    int? estimatedTimeMinutes,
+    String? learningObjectives,
+    String? mediaFileUrl,
+    String? mediaType,
+    String? itemType,
+    String? videoTranscript,
+  }) {
+    return LessonDetail(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      sectionId: sectionId ?? this.sectionId,
+      courseId: courseId ?? this.courseId,
+      comments: comments ?? this.comments,
+      questions: questions ?? this.questions,
+      isCompleted: isCompleted ?? this.isCompleted,
+      estimatedTime: estimatedTime ?? this.estimatedTime,
+      lessonCode: lessonCode ?? this.lessonCode,
+      mediaDurationSeconds: mediaDurationSeconds ?? this.mediaDurationSeconds,
+      mediaSizeBytes: mediaSizeBytes ?? this.mediaSizeBytes,
+      estimatedTimeMinutes: estimatedTimeMinutes ?? this.estimatedTimeMinutes,
+      learningObjectives: learningObjectives ?? this.learningObjectives,
+      mediaFileUrl: mediaFileUrl ?? this.mediaFileUrl,
+      mediaType: mediaType ?? this.mediaType,
+      itemType: itemType ?? this.itemType,
+      videoTranscript: videoTranscript ?? this.videoTranscript,
     );
   }
 }

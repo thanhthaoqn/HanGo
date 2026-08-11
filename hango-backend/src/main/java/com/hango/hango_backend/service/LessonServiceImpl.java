@@ -122,6 +122,8 @@ public class LessonServiceImpl implements LessonService {
                 .learningObjectives(lesson.getLearningObjectives())
                 .mediaFileUrl(lesson.getPdfName())
                 .mediaType(lesson.getPdfName() != null && !lesson.getPdfName().isEmpty() ? "pdf" : null)
+                .itemType(lesson.getLessonType())
+                .videoTranscript(lesson.getVideoTranscript())
                 .build();
     }
 

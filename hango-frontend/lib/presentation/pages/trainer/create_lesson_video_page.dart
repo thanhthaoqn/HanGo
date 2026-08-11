@@ -8,8 +8,9 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+
 import 'package:dio/dio.dart' as dio;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../widgets/trainer_action_required_card.dart';
@@ -55,6 +56,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
   final TextEditingController _mediaSizeController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
   final TextEditingController _videoUrlController = TextEditingController();
+  final TextEditingController _videoTranscriptController = TextEditingController();
   final TextEditingController _estimatedTimeController =
       TextEditingController();
 
@@ -66,6 +68,8 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
   bool _isUploadingVideo = false;
   String _uploadStatusText = '';
   double _uploadProgress = 0.0;
+  
+  bool _isGeneratingTranscript = false;
 
   @override
   void initState() {
@@ -84,6 +88,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
       _mediaSizeController.text = lesson['mediaSizeBytes']?.toString() ?? '';
       _descController.text = lesson['description'] ?? '';
       _videoUrlController.text = lesson['videoUrl'] ?? lesson['content'] ?? '';
+      _videoTranscriptController.text = lesson['videoTranscript'] ?? '';
       _estimatedTimeController.text =
           lesson['estimatedTimeMinutes']?.toString() ?? '';
 
@@ -163,6 +168,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
         setState(() {
           _titleController.text = detail.title;
           _videoUrlController.text = detail.content;
+          if (detail.videoTranscript != null) _videoTranscriptController.text = detail.videoTranscript!;
           if (detail.lessonCode != null) _codeController.text = detail.lessonCode!;
           if (detail.learningObjectives != null) _learningObjectivesController.text = detail.learningObjectives!;
           if (detail.mediaDurationSeconds != null) _mediaDurationController.text = detail.mediaDurationSeconds.toString();
@@ -188,6 +194,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
     _mediaSizeController.dispose();
     _descController.dispose();
     _videoUrlController.dispose();
+    _videoTranscriptController.dispose();
     _estimatedTimeController.dispose();
     super.dispose();
   }
@@ -275,6 +282,65 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
     }
   }
 
+  Future<void> _generateTranscript() async {
+    final videoUrl = _videoUrlController.text.trim();
+    if (videoUrl.isEmpty) {
+      ToastHelper.showError(context, 'Please upload a video first.');
+      return;
+    }
+
+    setState(() {
+      _isGeneratingTranscript = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? prefs.getString('jwt_token');
+      
+      final dioClient = dio.Dio();
+      final response = await dioClient.post(
+        'http://localhost:8080/api/v1/trainer/courses/generate-transcript',
+        data: {'videoUrl': videoUrl},
+        options: dio.Options(
+          headers: {
+            if (token != null) 'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (mounted) {
+          setState(() {
+            _videoTranscriptController.text = data['transcript'] ?? '';
+            _isGeneratingTranscript = false;
+          });
+          ToastHelper.showSuccess(context, 'Transcript generated successfully!');
+        }
+      } else {
+        final errorMessage = response.data is Map && response.data.containsKey('error') 
+            ? response.data['error'] 
+            : 'Failed with status: ${response.statusCode}';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGeneratingTranscript = false;
+        });
+        String errorMessage = e.toString();
+        if (e is dio.DioException && e.response?.data != null) {
+          final errorData = e.response!.data;
+          if (errorData is Map && errorData.containsKey('error')) {
+            errorMessage = errorData['error'];
+          }
+        }
+        ToastHelper.showError(context, 'Error generating transcript: $errorMessage');
+      }
+    }
+  }
+
   void _saveLesson() async {
     final title = _titleController.text.trim();
     final code = _codeController.text.trim();
@@ -283,6 +349,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
     final mediaSize = int.tryParse(_mediaSizeController.text.trim()) ?? 0;
     final desc = _descController.text.trim();
     final videoUrl = _videoUrlController.text.trim();
+    final videoTranscript = _videoTranscriptController.text.trim();
     final estimatedTimeText = _estimatedTimeController.text.trim();
     final estimatedTimeMinutes = int.tryParse(estimatedTimeText) ?? 0;
 
@@ -366,6 +433,8 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
         'textContentHtml': '',
         'version': 'v1.0',
         'isLocallyModified': true,
+
+        'videoTranscript': videoTranscript,
 
         // Keep old keys (compatibility)
         'itemType': 'video',
@@ -1235,6 +1304,88 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 24),
           // Video Preview section
           _buildVideoPreview(),
+          const SizedBox(height: 24),
+          // Estimated Time input
+          // Video Transcript Input
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Video Transcript / Subtitles',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4B5563),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _isGeneratingTranscript ? null : _generateTranscript,
+                icon: _isGeneratingTranscript
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.auto_awesome, size: 16),
+                label: Text(
+                  _isGeneratingTranscript ? 'Generating with AI...' : 'Auto Generate',
+                  style: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB), // Blue for AI feature
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _videoTranscriptController,
+            maxLines: 8,
+            decoration: InputDecoration(
+              hintText: 'Enter or auto-generate the video transcript here. This helps the AI Assistant understand the video.',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0xFF20B486),
+                  width: 1.5,
+                ),
+              ),
+            ),
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+              height: 1.5,
+            ),
+          ),
           const SizedBox(height: 24),
           // Estimated Time input
           const Text(

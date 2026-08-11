@@ -136,7 +136,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         _courseDetail = course;
         _lessonDetail = lesson;
-        _itemType = foundItemType;
+        _itemType = lesson.itemType ?? foundItemType;
         _mockAttempts = parsedAttempts;
         _attemptsAnswers = parsedAnswers;
         _isLoading = false;
@@ -216,7 +216,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       setState(() {
         _currentLessonId = lessonId;
         _lessonDetail = newLesson;
-        _itemType = foundItemType;
+        _itemType = newLesson.itemType ?? foundItemType;
         _mockAttempts = parsedAttempts;
         _attemptsAnswers = parsedAnswers;
         _isNavigatingLesson = false;
@@ -2342,16 +2342,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         // Passed quiz! Update local completed state
         setState(() {
           if (_lessonDetail != null) {
-            _lessonDetail = LessonDetail(
-              id: _lessonDetail!.id,
-              title: _lessonDetail!.title,
-              content: _lessonDetail!.content,
-              sectionId: _lessonDetail!.sectionId,
-              courseId: _lessonDetail!.courseId,
-              comments: _lessonDetail!.comments,
-              questions: _lessonDetail!.questions,
-              isCompleted: true,
-            );
+            _lessonDetail = _lessonDetail!.copyWith(isCompleted: true);
           }
           if (_courseDetail != null) {
             final updatedSessions = _courseDetail!.sessions.map((session) {
@@ -4402,16 +4393,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       // Update local state
       setState(() {
         if (_lessonDetail != null) {
-          _lessonDetail = LessonDetail(
-            id: _lessonDetail!.id,
-            title: _lessonDetail!.title,
-            content: _lessonDetail!.content,
-            sectionId: _lessonDetail!.sectionId,
-            courseId: _lessonDetail!.courseId,
-            comments: _lessonDetail!.comments,
-            questions: _lessonDetail!.questions,
-            isCompleted: true,
-          );
+          _lessonDetail = _lessonDetail!.copyWith(isCompleted: true);
         }
         _isMarkingCompleted = false;
       });
