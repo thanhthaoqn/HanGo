@@ -33,6 +33,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     private final LessonRepository lessonRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final NotificationService notificationService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional(readOnly = true)
@@ -218,6 +219,40 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                                     .pdfName(lesson.getPdfName())
                                     .questionImageUrl(lesson.getQuestionImageUrl())
                                     .estimatedTime(lesson.getEstimatedTime())
+                                    .lessonCode(lesson.getCode())
+                                    .mediaDurationSeconds(lesson.getMediaDurationSeconds())
+                                    .mediaSizeBytes(lesson.getMediaSizeBytes())
+                                    .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes())
+                                    .learningObjectives(lesson.getLearningObjectives())
+                                    .videoTranscript(lesson.getVideoTranscript())
+                                    .questions("quiz".equalsIgnoreCase(lesson.getLessonType()) && lesson.getExam() != null ? 
+                                            jdbcTemplate.query(
+                                                "SELECT q.id, q.passage, q.question_text, q.explanation, q.options_json, q.correct_index " +
+                                                "FROM questions q " +
+                                                "JOIN exam_questions eq ON q.id = eq.question_id " +
+                                                "WHERE eq.exam_id = ? " +
+                                                "ORDER BY eq.order_index ASC",
+                                                (rs, rowNum) -> {
+                                                    String optionsJson = rs.getString("options_json");
+                                                    java.util.List<String> options = new java.util.ArrayList<>();
+                                                    if (optionsJson != null) {
+                                                        try {
+                                                            options = new com.fasterxml.jackson.databind.ObjectMapper().readValue(optionsJson, java.util.List.class);
+                                                        } catch (Exception e) {}
+                                                    }
+                                                    return com.hango.hango_backend.dto.QuizQuestionDTO.builder()
+                                                            .id(rs.getLong("id"))
+                                                            .passage(rs.getString("passage"))
+                                                            .questionText(rs.getString("question_text"))
+                                                            .explanation(rs.getString("explanation"))
+                                                            .options(options)
+                                                            .correctIndex(rs.getInt("correct_index"))
+                                                            .build();
+                                                },
+                                                lesson.getExam().getId()
+                                            )
+                                            : null
+                                    )
                                     .build())
                             .collect(Collectors.toList());
                     return CourseSessionDTO.builder()

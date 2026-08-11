@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../utils/toast_helper.dart';
 
@@ -907,7 +908,13 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
 
   Widget _buildVideoLesson() {
     final description = _selectedLessonData!['description']?.toString() ?? '';
-    final estimatedTime = _selectedLessonData!['estimatedTime']?.toString() ?? '10';
+    final estimatedTime = _selectedLessonData!['estimatedTimeMinutes']?.toString() 
+                       ?? _selectedLessonData!['estimatedTime']?.toString() 
+                       ?? '0';
+    final mediaDuration = _selectedLessonData!['mediaDurationSeconds'];
+    final mediaSize = _selectedLessonData!['mediaSizeBytes'];
+    final transcript = _selectedLessonData!['videoTranscript']?.toString() ?? '';
+    final objectives = _selectedLessonData!['learningObjectives']?.toString() ?? '';
 
     final videoUrl = _selectedLessonData!['videoUrl']?.toString() ?? 
                      _selectedLessonData!['content']?.toString() ?? 
@@ -934,16 +941,73 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
               ),
             ),
         const SizedBox(height: 24),
-        Row(
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
           children: [
-            const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF64748B)),
-            const SizedBox(width: 8),
-            Text(
-              'Estimated Time: $estimatedTime mins',
-              style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
-            ),
+            if (estimatedTime != '0')
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Estimated: $estimatedTime mins',
+                    style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            if (mediaDuration != null && mediaDuration is num)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.play_circle_outline, size: 18, color: Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Duration: ${(mediaDuration as num) ~/ 60}m ${(mediaDuration as num) % 60}s',
+                    style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            if (mediaSize != null && mediaSize is num)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.data_usage, size: 18, color: Color(0xFF64748B)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Size: ${((mediaSize as num) / (1024 * 1024)).toStringAsFixed(1)} MB',
+                    style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
           ],
         ),
+        if (objectives.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.track_changes, size: 18, color: Color(0xFF64748B)),
+                    SizedBox(width: 8),
+                    Text('Learning Objectives', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(objectives, style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF334155), height: 1.5)),
+              ],
+            ),
+          ),
+        ],
         if (description.isNotEmpty) ...[
           const SizedBox(height: 24),
           const Text(
@@ -956,6 +1020,26 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
             style: const TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF334155), height: 1.6),
           ),
         ],
+        if (transcript.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const Text(
+            'Transcript',
+            style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Text(
+              transcript,
+              style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF334155), height: 1.6),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -963,6 +1047,7 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
   Widget _buildTextLesson() {
     final content = _selectedLessonData!['questionText']?.toString() ?? _selectedLessonData!['content']?.toString() ?? '';
     final description = _selectedLessonData!['description']?.toString() ?? '';
+    final pdfName = _selectedLessonData!['pdfName']?.toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -977,6 +1062,64 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
               fontWeight: FontWeight.w500,
               fontStyle: FontStyle.italic,
               height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
+        if (pdfName != null && pdfName.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.picture_as_pdf, color: Color(0xFFEF4444), size: 32),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Attached File',
+                        style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        pdfName.split('/').last,
+                        style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF64748B), fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final url = Uri.parse(pdfName);
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    } else {
+                      if (context.mounted) {
+                        ToastHelper.showError(context, 'Could not open the file.');
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.download, size: 18, color: Colors.white),
+                  label: const Text(
+                    'Download',
+                    style: TextStyle(fontFamily: 'Outfit', color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 32),
@@ -998,80 +1141,106 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
   }
 
   Widget _buildQuizLesson() {
-    final content = _selectedLessonData!['questionText']?.toString() ?? '';
-    final description = _selectedLessonData!['description']?.toString() ?? '';
+    final questionsList = _selectedLessonData!['questions'] as List?;
+    if (questionsList == null || questionsList.isEmpty) {
+      return const Center(child: Text('No questions available for this quiz.'));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDBEAFE),
-                      borderRadius: BorderRadius.circular(8),
+      children: questionsList.asMap().entries.map((entry) {
+        final index = entry.key;
+        final question = entry.value as Map<String, dynamic>;
+        final questionText = question['questionText']?.toString() ?? '';
+        final options = List<String>.from(question['options'] ?? []);
+        final correctIndex = question['correctIndex'] as int? ?? 0;
+        final explanation = question['explanation']?.toString();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDBEAFE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'QUESTION ${index + 1}',
+                        style: const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E40AF)),
+                      ),
                     ),
-                    child: const Text(
-                      'QUESTION',
-                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E40AF)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (questionText.isNotEmpty)
+                  Text(
+                    questionText,
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                      height: 1.5,
+                    ),
+                  )
+                else
+                  const Text(
+                    'No question text provided.',
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                  ),
+                const SizedBox(height: 24),
+                const Divider(color: Color(0xFFE2E8F0)),
+                const SizedBox(height: 16),
+                ...options.asMap().entries.map((optEntry) {
+                  final optIndex = optEntry.key;
+                  final optText = optEntry.value;
+                  final letter = String.fromCharCode(65 + optIndex);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildMockQuizOption(letter, optText, isCorrect: optIndex == correctIndex),
+                  );
+                }),
+                if (explanation != null && explanation.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.lightbulb_outline, color: Color(0xFFD97706), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Explanation: $explanation',
+                            style: const TextStyle(fontFamily: 'Outfit', color: Color(0xFF92400E), fontSize: 14),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              if (content.isNotEmpty)
-                Text(
-                  content,
-                  style: const TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
-                    height: 1.5,
-                  ),
-                )
-              else
-                const Text(
-                  'No question text provided.',
-                  style: TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
-                ),
-              if (description.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 15,
-                    color: Color(0xFF475569),
-                    height: 1.5,
-                  ),
-                ),
               ],
-              const SizedBox(height: 24),
-              const Divider(color: Color(0xFFE2E8F0)),
-              const SizedBox(height: 16),
-              _buildMockQuizOption('A', 'Mock Option 1'),
-              const SizedBox(height: 12),
-              _buildMockQuizOption('B', 'Mock Option 2', isCorrect: true),
-              const SizedBox(height: 12),
-              _buildMockQuizOption('C', 'Mock Option 3'),
-              const SizedBox(height: 12),
-              _buildMockQuizOption('D', 'Mock Option 4'),
-            ],
+            ),
           ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 
