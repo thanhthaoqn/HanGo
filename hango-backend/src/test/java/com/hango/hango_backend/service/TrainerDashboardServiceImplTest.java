@@ -92,6 +92,8 @@ class TrainerDashboardServiceImplTest {
     private com.hango.hango_backend.repository.CourseRatingRepository courseRatingRepository;
     @Mock
     private ExamHistoryService examHistoryService;
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private TrainerDashboardServiceImpl service;
@@ -128,15 +130,20 @@ class TrainerDashboardServiceImplTest {
     void getTrainerDashboardSummaryShouldMapCountsAndCourses() {
         User user = trainer(1L, "trainer@example.com");
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(user));
-        when(courseRepository.countByCreatorIdAndDeletedAtIsNull(1L)).thenReturn(3L);
         when(enrollmentRepository.countDistinctStudentsByCourseCreatorId(1L)).thenReturn(20L);
         when(examRepository.countByCreatedByIdAndDeletedAtIsNull(1L)).thenReturn(2L);
         when(paymentRepository.sumRevenueByTrainerId(1L)).thenReturn(new java.math.BigDecimal("1000000"));
         when(courseRatingRepository.getAverageRatingByTrainerId(1L)).thenReturn(4.5);
-        TrainerCourseDetailProjection projection = detailProjection(10L, "Course A", LocalDateTime.now());
-        when(projection.getLearnersCount()).thenReturn(null);
-        when(projection.getLessonsCount()).thenReturn(5L);
-        when(courseRepository.findTrainerCoursesDetailBase(1L, "ALL", null)).thenReturn(List.of(projection));
+        TrainerCourseDetailProjection projectionA = detailProjection(10L, "Course A", LocalDateTime.now());
+        when(projectionA.getStatus()).thenReturn("PUBLISHED");
+        when(projectionA.getLearnersCount()).thenReturn(null);
+        when(projectionA.getLessonsCount()).thenReturn(5L);
+        TrainerCourseDetailProjection projectionB = detailProjection(11L, "Course B", LocalDateTime.now());
+        when(projectionB.getStatus()).thenReturn("PUBLISHED");
+        TrainerCourseDetailProjection projectionC = detailProjection(12L, "Course C", LocalDateTime.now());
+        when(projectionC.getStatus()).thenReturn("PUBLISHED");
+        when(courseRepository.findTrainerCoursesDetailBase(1L, "ALL", null))
+                .thenReturn(List.of(projectionA, projectionB, projectionC));
         when(paymentRepository.getRevenueByMonthForCurrentYear(1L)).thenReturn(List.of());
         when(paymentRepository.findTop5ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(1L, "SUCCESS")).thenReturn(List.of());
         when(enrollmentRepository.findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(1L)).thenReturn(List.of());
@@ -149,7 +156,7 @@ class TrainerDashboardServiceImplTest {
         assertEquals(2L, result.getExamsCount());
         assertEquals(new java.math.BigDecimal("1000000"), result.getTotalRevenue());
         assertEquals(4.5, result.getAverageRating());
-        assertEquals(1, result.getCourses().size());
+        assertEquals(3, result.getCourses().size());
         assertEquals(0L, result.getCourses().get(0).getLearnersCount());
     }
 
@@ -528,6 +535,22 @@ class TrainerDashboardServiceImplTest {
         assertEquals(2L, resultId);
     }
 
+    @Test
+    void updateTrainerCourseShouldThrowWhenNewCodeAlreadyUsedByAnotherCourse() {
+        Course c = course(1L, trainer(1L, "trainer@example.com"));
+        c.setCode("ENG-101");
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        when(systemParameterRepository.findByParamTypeAndParamKey("COURSE_CATEGORY", "GRAMMAR")).thenReturn(Optional.of(param(1L, "Grammar")));
+        when(systemParameterRepository.findByParamTypeAndParamKey("ACADEMIC_LEVEL", "MEDIUM")).thenReturn(Optional.of(param(2L, "Medium")));
+        when(courseRepository.existsByCodeIgnoreCaseAndIdNot("ENG-202", 1L)).thenReturn(true);
+        TrainerCreateCourseRequestDTO request = createCourseRequest("GRAMMAR", "MEDIUM");
+        request.setCode("ENG-202");
+
+        assertThrows(RuntimeException.class,
+                () -> service.updateTrainerCourse(1L, "trainer@example.com", request));
+        verify(courseRepository, never()).save(any());
+    }
+
     // =================================================================
     // getTrainerExams
     // =================================================================
@@ -548,7 +571,8 @@ class TrainerDashboardServiceImplTest {
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(user));
         when(examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(1L))
                 .thenReturn(new java.util.ArrayList<>(List.of(exam)));
-        when(examQuestionRepository.countByIdExamId(1L)).thenReturn(5);
+        when(examQuestionRepository.countQuestionsByExamIds(List.of(1L)))
+                .thenReturn(List.<Object[]>of(new Object[] { 1L, 5 }));
 
         List<TrainerExamResponseDTO> result = service.getTrainerExams("trainer@example.com");
 
@@ -603,6 +627,11 @@ class TrainerDashboardServiceImplTest {
     @Test
     void createTrainerExamShouldSaveAsDraftAndPrivate() {
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(examRepository.save(any(Exam.class))).thenAnswer(inv -> {
+            Exam saved = inv.getArgument(0);
+            saved.setId(99L);
+            return saved;
+        });
 
         service.createTrainerExam("trainer@example.com", TrainerCreateExamRequestDTO.builder().title("Exam A").build());
 
@@ -829,6 +858,62 @@ class TrainerDashboardServiceImplTest {
         verify(examRepository).save(exam);
     }
 
+    @Test
+    void updateExamStatusShouldSetNewStatusForNonPrivilegedStatusWhenOwnerIsNotManager() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        service.updateExamStatus(1L, "trainer@example.com", "DRAFT");
+
+        assertEquals("DRAFT", exam.getStatus());
+        verify(examRepository).save(exam);
+    }
+
+    @Test
+    void updateExamStatusShouldThrowWhenNonManagerOwnerTriesToPublish() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.updateExamStatus(1L, "trainer@example.com", "PUBLISHED"));
+        verify(examRepository, never()).save(any());
+    }
+
+    @Test
+    void updateExamStatusShouldThrowWhenNonManagerOwnerTriesToApprove() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.updateExamStatus(1L, "trainer@example.com", "APPROVED"));
+        verify(examRepository, never()).save(any());
+    }
+
+    @Test
+    void updateExamStatusShouldAllowManagerToPublishAnotherTrainersExamDirectly() {
+        User manager = trainer(1L, "manager@example.com");
+        manager.setRoles(java.util.Set.of(Role.builder().roleName("COURSE_MANAGER").build()));
+        when(userRepository.findByEmail("manager@example.com")).thenReturn(Optional.of(manager));
+        Exam exam = new Exam();
+        exam.setId(2L);
+        exam.setCreatedBy(trainer(2L, "trainer@example.com"));
+        when(examRepository.findById(2L)).thenReturn(Optional.of(exam));
+
+        service.updateExamStatus(2L, "manager@example.com", "PUBLISHED");
+
+        assertEquals("PUBLISHED", exam.getStatus());
+        verify(examRepository).save(exam);
+    }
+
     // =================================================================
     // deleteTrainerExam
     // =================================================================
@@ -1013,14 +1098,81 @@ class TrainerDashboardServiceImplTest {
     }
 
     @Test
-    void deleteTrainerCourseShouldSetDeletedAtWhenOwner() {
+    void deleteTrainerCourseShouldThrowWhenStatusNotDraftOrRejected() {
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
         Course c = course(1L, trainer(1L, "trainer@example.com"));
+        c.setStatus("PUBLISHED");
         when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        assertThrows(RuntimeException.class, () -> service.deleteTrainerCourse(1L, "trainer@example.com"));
+        verify(courseRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteTrainerCourseShouldHardDeleteSectionsAndCourseWhenOwnerAndDraft() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Course c = course(1L, trainer(1L, "trainer@example.com"));
+        c.setStatus("DRAFT");
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        Section section = Section.builder().id(50L).course(c).build();
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(1L)).thenReturn(List.of(section));
 
         service.deleteTrainerCourse(1L, "trainer@example.com");
 
-        assertTrue(c.getDeletedAt() != null);
+        verify(sectionRepository).deleteAll(List.of(section));
+        verify(courseRepository).delete(c);
+    }
+
+    // =================================================================
+    // reEvaluateCoursePrice
+    // =================================================================
+
+    @Test
+    void reEvaluateCoursePriceShouldThrowWhenCourseNotFound() {
+        when(courseRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.reEvaluateCoursePrice(1L, "trainer@example.com"));
+    }
+
+    @Test
+    void reEvaluateCoursePriceShouldThrowWhenNotOwner() {
+        Course c = course(1L, trainer(1L, "owner@example.com"));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+
+        assertThrows(RuntimeException.class, () -> service.reEvaluateCoursePrice(1L, "intruder@example.com"));
+    }
+
+    @Test
+    void reEvaluateCoursePriceShouldSumProfessionalCertifiedTrainerAdvancedDifficultyAndLessonCount() {
+        User owner = trainer(1L, "trainer@example.com");
+        Course c = course(1L, owner);
+        c.setDifficulty(SystemParameter.builder().id(9L).paramKey("ADVANCED").build());
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        TrainerProfile profile = TrainerProfile.builder().userId(1L).trainerType("PROFESSIONAL")
+                .scoreReportUrl("https://example.com/ielts.pdf").build();
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(profile));
+        Section section = Section.builder().id(20L).build();
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(1L)).thenReturn(List.of(section));
+        when(lessonRepository.findBySectionIdOrderByDisplayOrderAsc(20L))
+                .thenReturn(List.of(new Lesson(), new Lesson()));
+
+        service.reEvaluateCoursePrice(1L, "trainer@example.com");
+
+        assertEquals(0, java.math.BigDecimal.valueOf(670000).compareTo(c.getSuggestedPrice()));
+        verify(courseRepository).save(c);
+    }
+
+    @Test
+    void reEvaluateCoursePriceShouldTreatMissingTrainerProfileAndDifficultyAsZeroBaseContribution() {
+        User owner = trainer(1L, "trainer@example.com");
+        Course c = course(1L, owner);
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(1L)).thenReturn(List.of());
+
+        service.reEvaluateCoursePrice(1L, "trainer@example.com");
+
+        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(c.getSuggestedPrice()));
         verify(courseRepository).save(c);
     }
 
