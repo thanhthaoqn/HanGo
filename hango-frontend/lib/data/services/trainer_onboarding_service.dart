@@ -109,6 +109,10 @@ class TrainerOnboardingService {
     }
   }
 
+  Future<Map<String, dynamic>> submitProfileForReview(Map<String, dynamic> profileData) async {
+    return submitProfile(profileData);
+  }
+
   // 5. Get Trainer profiles for Admin review
   Future<Map<String, dynamic>> getTrainerProfilesForAdmin({String? search, String status = 'ALL'}) async {
     try {
@@ -156,6 +160,85 @@ class TrainerOnboardingService {
         final err = jsonDecode(response.body);
         return {'success': false, 'message': err['error'] ?? 'Xét duyệt hồ sơ thất bại'};
       }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // 7. Analyze Document Image using Gemini Vision AI
+  Future<Map<String, dynamic>> analyzeDocumentUrl(String imageUrl) async {
+    try {
+      final headers = await _getHeaders();
+      final uri = Uri.parse('$baseUrl/trainers/analyze-document-url');
+      final response = await http.post(
+        uri,
+        headers: headers,
+        body: jsonEncode({'imageUrl': imageUrl}),
+      );
+
+      if (response.statusCode == 200) {
+        var rawStr = utf8.decode(response.bodyBytes).trim();
+        if (rawStr.startsWith('```json')) {
+          rawStr = rawStr.substring(7);
+        } else if (rawStr.startsWith('```')) {
+          rawStr = rawStr.substring(3);
+        }
+        if (rawStr.endsWith('```')) {
+          rawStr = rawStr.substring(0, rawStr.length - 3);
+        }
+        rawStr = rawStr.trim();
+
+        final decoded = jsonDecode(rawStr);
+        if (decoded is Map<String, dynamic>) {
+          return {'success': true, 'data': decoded};
+        } else if (decoded is String) {
+          final innerDecoded = jsonDecode(decoded);
+          if (innerDecoded is Map<String, dynamic>) {
+            return {'success': true, 'data': innerDecoded};
+          }
+        }
+      }
+      return {'success': false, 'message': 'AI Vision analysis failed'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // 8. Analyze Document Bytes using Gemini Vision AI (Multipart upload)
+  Future<Map<String, dynamic>> analyzeDocumentFileBytes(Uint8List bytes, String filename) async {
+    try {
+      final token = await _authService.getToken();
+      final uri = Uri.parse('$baseUrl/trainers/analyze-document');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer ${token ?? ""}'
+        ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        var rawStr = responseBody.trim();
+        if (rawStr.startsWith('```json')) {
+          rawStr = rawStr.substring(7);
+        } else if (rawStr.startsWith('```')) {
+          rawStr = rawStr.substring(3);
+        }
+        if (rawStr.endsWith('```')) {
+          rawStr = rawStr.substring(0, rawStr.length - 3);
+        }
+        rawStr = rawStr.trim();
+
+        final decoded = jsonDecode(rawStr);
+        if (decoded is Map<String, dynamic>) {
+          return {'success': true, 'data': decoded};
+        } else if (decoded is String) {
+          final innerDecoded = jsonDecode(decoded);
+          if (innerDecoded is Map<String, dynamic>) {
+            return {'success': true, 'data': innerDecoded};
+          }
+        }
+      }
+      return {'success': false, 'message': 'AI Vision analysis failed'};
     } catch (e) {
       return {'success': false, 'message': e.toString()};
     }

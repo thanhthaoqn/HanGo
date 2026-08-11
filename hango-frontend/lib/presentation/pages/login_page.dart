@@ -355,6 +355,18 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               );
             }
+          } else if (agreementSigned != true) {
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TrainerOnboardingAgreementPage(
+                    profilePayload: profile,
+                    trainerType: trainerType,
+                  ),
+                ),
+              );
+            }
           } else {
             if (mounted) {
               Navigator.pushReplacement(

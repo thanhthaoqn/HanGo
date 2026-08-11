@@ -245,6 +245,8 @@ class AuthService {
     await prefs.remove(_userFullNameKey);
     await prefs.remove(_userRolesKey);
     await prefs.remove(_userAvatarUrlKey);
+    await prefs.remove('user_phone');
+    await prefs.remove('user_gender');
     await prefs.remove('cart_course_ids');
 
     cachedFullName = null;

@@ -5,6 +5,7 @@ import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
 import 'trainer_onboarding_shell_page.dart';
+import 'trainer_onboarding_status_page.dart';
 import '../trainer_dashboard_page.dart';
 import '../../login_page.dart';
 
@@ -19,7 +20,8 @@ class TrainerPayoutDetailsPage extends StatefulWidget {
   });
 
   @override
-  State<TrainerPayoutDetailsPage> createState() => _TrainerPayoutDetailsPageState();
+  State<TrainerPayoutDetailsPage> createState() =>
+      _TrainerPayoutDetailsPageState();
 }
 
 class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
@@ -37,10 +39,10 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
 
-  bool _bankNameError = false;
-  bool _bankAccountError = false;
-  bool _bankAccountNameError = false;
-  bool _taxCodeError = false;
+  String? _bankNameErrorText;
+  String? _bankAccountErrorText;
+  String? _bankAccountNameErrorText;
+  String? _taxCodeErrorText;
 
   final List<String> _bankSuggestions = [
     'Vietcombank (VCB)',
@@ -115,6 +117,93 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     }
   }
 
+  bool _isDummyNumber(String input) {
+    if (input.isEmpty) return true;
+    final allSame = RegExp(r'^(\d)\1+$').hasMatch(input);
+    final dummySeq =
+        input == '1234567890' ||
+        input == '1234567890123' ||
+        input == '0123456789';
+    return allSame || dummySeq;
+  }
+
+  String? _validateBankName(String bankName, bool isVi) {
+    if (bankName.isEmpty) {
+      return isVi
+          ? 'Vui lòng chọn ngân hàng thụ hưởng.'
+          : 'Please select a beneficiary bank.';
+    }
+    return null;
+  }
+
+  String? _validateBankAccount(String bankAccount, bool isVi) {
+    final numRegex = RegExp(r'^\d+$');
+
+    if (bankAccount.isEmpty) {
+      return isVi
+          ? 'Vui lòng nhập số tài khoản ngân hàng.'
+          : 'Please enter the bank account number.';
+    }
+    if (!numRegex.hasMatch(bankAccount)) {
+      return isVi
+          ? 'Số tài khoản chỉ được chứa chữ số.'
+          : 'Bank account number must contain digits only.';
+    }
+    if (bankAccount.length < 6 || bankAccount.length > 19) {
+      return isVi
+          ? 'Số tài khoản phải có từ 6 đến 19 chữ số.'
+          : 'Bank account number must be between 6 and 19 digits.';
+    }
+    if (_isDummyNumber(bankAccount)) {
+      return isVi
+          ? 'Số tài khoản không được là dãy số giả như 000000 hoặc 1234567890.'
+          : 'Bank account number cannot be a dummy sequence like 000000 or 1234567890.';
+    }
+    return null;
+  }
+
+  String? _validateBankAccountName(String bankAccountName, bool isVi) {
+    final nameRegex = RegExp(r'^[A-Z]+(?: [A-Z]+)*$');
+
+    if (bankAccountName.isEmpty) {
+      return isVi
+          ? 'Vui lòng nhập tên chủ tài khoản.'
+          : 'Please enter the account owner name.';
+    }
+    if (!nameRegex.hasMatch(bankAccountName)) {
+      return isVi
+          ? 'Tên chủ tài khoản phải viết HOA, không dấu và chỉ gồm chữ cái, ví dụ: NGUYEN VAN A.'
+          : 'Account owner name must be UPPERCASE, unaccented, and letters only, for example: NGUYEN VAN A.';
+    }
+    return null;
+  }
+
+  String? _validateTaxCode(String taxCode, bool isVi) {
+    final numRegex = RegExp(r'^\d+$');
+
+    if (taxCode.isEmpty) {
+      return isVi
+          ? 'Vui lòng nhập mã số thuế hoặc số CCCD.'
+          : 'Please enter the Tax ID or Citizen ID number.';
+    }
+    if (!numRegex.hasMatch(taxCode)) {
+      return isVi
+          ? 'Mã số thuế hoặc CCCD chỉ được chứa chữ số.'
+          : 'Tax ID or Citizen ID must contain digits only.';
+    }
+    if (taxCode.length != 10 && taxCode.length != 13) {
+      return isVi
+          ? 'Mã số thuế hoặc CCCD phải có đúng 10 hoặc 13 chữ số.'
+          : 'Tax ID or Citizen ID must be exactly 10 or 13 digits.';
+    }
+    if (_isDummyNumber(taxCode)) {
+      return isVi
+          ? 'Mã số thuế hoặc CCCD không được là dãy số giả như 0000000000.'
+          : 'Tax ID or Citizen ID cannot be a dummy sequence like 0000000000.';
+    }
+    return null;
+  }
+
   bool _validateFields() {
     final isVi = LanguageManager.isVi;
     final bankName = _bankNameController.text.trim();
@@ -122,48 +211,20 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     final bankAccountName = _bankAccountNameController.text.trim();
     final taxCode = _taxCodeController.text.trim();
 
-    final numRegex = RegExp(r'^\d+$');
-    final nameRegex = RegExp(r'^[A-Z ]+$');
-
     setState(() {
-      _bankNameError = bankName.isEmpty;
-      _bankAccountError = bankAccount.isEmpty || bankAccount.length < 6 || bankAccount.length > 20 || !numRegex.hasMatch(bankAccount);
-      _bankAccountNameError = bankAccountName.isEmpty || !nameRegex.hasMatch(bankAccountName);
-      _taxCodeError = taxCode.isEmpty || taxCode.length < 10 || taxCode.length > 13 || !numRegex.hasMatch(taxCode);
+      _bankNameErrorText = _validateBankName(bankName, isVi);
+      _bankAccountErrorText = _validateBankAccount(bankAccount, isVi);
+      _bankAccountNameErrorText = _validateBankAccountName(
+        bankAccountName,
+        isVi,
+      );
+      _taxCodeErrorText = _validateTaxCode(taxCode, isVi);
     });
 
-    if (_bankNameError) {
-      ToastHelper.showError(context, isVi ? 'Vui lòng chọn ngân hàng thụ hưởng.' : 'Please select a beneficiary bank.');
-      return false;
-    }
-    if (_bankAccountError) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Số tài khoản ngân hàng không hợp lệ (Phải từ 6-20 chữ số).'
-            : 'Bank account number must be 6 to 20 digits.',
-      );
-      return false;
-    }
-    if (_bankAccountNameError) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Tên chủ tài khoản phải viết VIẾT HOA KHÔNG DẤU (Ví dụ: NGUYEN VAN A).'
-            : 'Account owner name must be UPPERCASE without accents (e.g. NGUYEN VAN A).',
-      );
-      return false;
-    }
-    if (_taxCodeError) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Mã số thuế / Số CCCD không hợp lệ (Phải đúng 10 đến 13 chữ số).'
-            : 'Tax ID / National ID must be 10 to 13 digits.',
-      );
-      return false;
-    }
-    return true;
+    return _bankNameErrorText == null &&
+        _bankAccountErrorText == null &&
+        _bankAccountNameErrorText == null &&
+        _taxCodeErrorText == null;
   }
 
   void _handleComplete() async {
@@ -176,7 +237,9 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     final payload = Map<String, dynamic>.from(widget.initialProfile);
     payload['bankName'] = _bankNameController.text.trim();
     payload['bankAccount'] = _bankAccountController.text.trim();
-    payload['bankAccountName'] = _bankAccountNameController.text.trim().toUpperCase();
+    payload['bankAccountName'] = _bankAccountNameController.text
+        .trim()
+        .toUpperCase();
     payload['taxCode'] = _taxCodeController.text.trim();
     payload['citizenId'] = _taxCodeController.text.trim();
     payload['agreementSigned'] = true;
@@ -191,17 +254,19 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
       if (result['success'] == true) {
         ToastHelper.showSuccess(
           context,
-          LanguageManager.isVi
-              ? 'Hoàn thành cấu hình thông tin thanh toán!'
-              : 'Payout configuration completed successfully!',
+          'Payout details saved successfully! Welcome to your Trainer Dashboard.',
         );
+
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
           (route) => false,
         );
       } else {
-        ToastHelper.showError(context, result['message'] ?? 'Lỗi lưu thông tin thanh toán.');
+        ToastHelper.showError(
+          context,
+          result['message'] ?? 'Failed to save payout details.',
+        );
       }
     }
   }
@@ -272,7 +337,9 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                isVi ? 'Thông tin thanh toán & CCCD' : 'Payout & Identity Info',
+                                isVi
+                                    ? 'Thông tin thanh toán & CCCD'
+                                    : 'Payout & Identity Info',
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -282,7 +349,9 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                isVi ? 'Nhập tài khoản nhận tiền và mã định danh' : 'Enter payment bank account and identity ID',
+                                isVi
+                                    ? 'Nhập tài khoản nhận tiền và mã định danh'
+                                    : 'Enter payment bank account and identity ID',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF64748B),
@@ -298,166 +367,286 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                     const Divider(color: Color(0xFFE2E8F0)),
                     const SizedBox(height: 24),
 
-                      // Bank Name
-                      Text(
-                        isVi ? 'Tên Ngân hàng thụ hưởng *' : 'Beneficiary Bank Name *',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Color(0xFF334155),
-                          fontFamily: 'Outfit',
+                    // Bank Name
+                    Text(
+                      isVi
+                          ? 'Tên Ngân hàng thụ hưởng *'
+                          : 'Beneficiary Bank Name *',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF334155),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _bankSuggestions.contains(_bankNameController.text)
+                          ? _bankNameController.text
+                          : null,
+                      dropdownColor: Colors.white,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        fillColor: Colors.white,
+                        filled: true,
+                        errorText: _bankNameErrorText,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF28B79B),
+                            width: 2,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _bankSuggestions.contains(_bankNameController.text) ? _bankNameController.text : null,
-                        dropdownColor: Colors.white,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          fillColor: Colors.white,
-                          filled: true,
-                          errorText: _bankNameError ? (isVi ? 'Vui lòng chọn ngân hàng' : 'Bank name required') : null,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 2),
-                          ),
-                        ),
-                        hint: Text(isVi ? 'Chọn ngân hàng thụ hưởng' : 'Select beneficiary bank'),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-                        items: _bankSuggestions.map((String b) {
-                          return DropdownMenuItem<String>(
-                            value: b,
-                            child: Text(b),
+                      hint: Text(
+                        isVi
+                            ? 'Chọn ngân hàng thụ hưởng'
+                            : 'Select beneficiary bank',
+                      ),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Color(0xFF64748B),
+                      ),
+                      items: _bankSuggestions.map((String b) {
+                        return DropdownMenuItem<String>(
+                          value: b,
+                          child: Text(b),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _bankNameController.text = val;
+                            _bankNameErrorText = _validateBankName(val, isVi);
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Bank Account Number
+                    Text(
+                      isVi
+                          ? 'Số tài khoản ngân hàng *'
+                          : 'Bank Account Number *',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF334155),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _bankAccountController,
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        setState(() {
+                          _bankAccountErrorText = _validateBankAccount(
+                            value.trim(),
+                            isVi,
                           );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _bankNameController.text = val;
-                              _bankNameError = false;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Bank Account Number
-                      Text(
-                        isVi ? 'Số tài khoản ngân hàng *' : 'Bank Account Number *',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Color(0xFF334155),
-                          fontFamily: 'Outfit',
+                        });
+                      },
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _bankAccountController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          errorText: _bankAccountError ? (isVi ? 'Số tài khoản không hợp lệ' : 'Invalid bank account') : null,
-                          hintText: isVi ? 'Chỉ nhập số, ví dụ: 1023928129' : 'Digits only, example: 1023928129',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        fillColor: Colors.white,
+                        filled: true,
+                        errorText: _bankAccountErrorText,
+                        hintText: isVi
+                            ? 'Chỉ nhập số, ví dụ: 1023928129'
+                            : 'Digits only, example: 1023928129',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Bank Account Owner Name
-                      Text(
-                        isVi ? 'Tên chủ tài khoản (Viết hoa không dấu) *' : 'Account Owner Name (UPPERCASE) *',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Color(0xFF334155),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _bankAccountNameController,
-                        onChanged: (val) {
-                          _bankAccountNameController.value = _bankAccountNameController.value.copyWith(
-                            text: val.toUpperCase(),
-                            selection: TextSelection.collapsed(offset: val.length),
-                          );
-                        },
-                        decoration: InputDecoration(
-                          errorText: _bankAccountNameError ? (isVi ? 'Tên không hợp lệ' : 'Invalid name') : null,
-                          hintText: isVi ? 'Ví dụ: NGUYEN VAN A' : 'Example: NGUYEN VAN A',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Tax Identification Number (Tax ID)
-                      Text(
-                        isVi ? 'Mã số thuế (Tax ID) *' : 'Tax Identification Number (Tax ID) *',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Color(0xFF334155),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _taxCodeController,
-                        keyboardType: TextInputType.number,
-                        maxLength: 13,
-                        decoration: InputDecoration(
-                          errorText: _taxCodeError ? (isVi ? 'Mã số thuế không hợp lệ' : 'Invalid Tax ID number') : null,
-                          counterText: '',
-                          hintText: '8019283710',
-                          fillColor: Colors.white,
-                          filled: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-
-                      // Submit button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting ? null : _handleComplete,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF28B79B),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF64748B),
                           ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
-                              : Text(
-                                  isVi ? 'Hoàn tất cấu hình' : 'Complete Setup',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    fontFamily: 'Outfit',
-                                  ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF28B79B),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Bank Account Owner Name
+                    Text(
+                      isVi
+                          ? 'Tên chủ tài khoản (Viết hoa không dấu) *'
+                          : 'Account Owner Name (UPPERCASE) *',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF334155),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _bankAccountNameController,
+                      onChanged: (val) {
+                        _bankAccountNameController.value =
+                            _bankAccountNameController.value.copyWith(
+                              text: val.toUpperCase(),
+                              selection: TextSelection.collapsed(
+                                offset: val.length,
+                              ),
+                            );
+                        setState(() {
+                          _bankAccountNameErrorText = _validateBankAccountName(
+                            val.trim().toUpperCase(),
+                            isVi,
+                          );
+                        });
+                      },
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        fillColor: Colors.white,
+                        filled: true,
+                        errorText: _bankAccountNameErrorText,
+                        hintText: isVi
+                            ? 'Ví dụ: NGUYEN VAN A'
+                            : 'Example: NGUYEN VAN A',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF28B79B),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Tax Identification Number (Tax ID)
+                    Text(
+                      isVi
+                          ? 'Mã số thuế (Tax ID) *'
+                          : 'Tax Identification Number (Tax ID) *',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF334155),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _taxCodeController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 13,
+                      onChanged: (value) {
+                        setState(() {
+                          _taxCodeErrorText = _validateTaxCode(
+                            value.trim(),
+                            isVi,
+                          );
+                        });
+                      },
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        errorText: _taxCodeErrorText,
+                        counterText: '',
+                        hintText: '8019283710',
+                        fillColor: Colors.white,
+                        filled: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF28B79B),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 36),
+
+                    // Submit button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _handleComplete,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
                                 ),
-                        ),
+                              )
+                            : Text(
+                                isVi ? 'Hoàn tất cấu hình' : 'Complete Setup',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSidebar(BuildContext context) {
@@ -472,9 +661,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
               children: [
-
                 Image.network(
-
                   'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
 
                   height: 36,
@@ -482,45 +669,34 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                   fit: BoxFit.contain,
 
                   errorBuilder: (context, error, stackTrace) {
-
                     return Row(
-
                       children: [
-
                         Container(
-
                           width: 32,
 
                           height: 32,
 
                           decoration: const BoxDecoration(
-
                             color: Color(0xFFE6FFFA),
 
                             shape: BoxShape.circle,
-
                           ),
 
                           child: const Icon(
-
                             Icons.school,
 
                             size: 18,
 
                             color: Color(0xFF20B486),
-
                           ),
-
                         ),
 
                         const SizedBox(width: 8),
 
                         const Text(
-
                           'HanGo',
 
                           style: TextStyle(
-
                             fontSize: 20,
 
                             fontWeight: FontWeight.bold,
@@ -528,45 +704,78 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                             color: Color(0xFF1F2937),
 
                             fontFamily: 'Outfit',
-
                           ),
-
                         ),
-
                       ],
-
                     );
-
                   },
-
                 ),
-
               ],
             ),
           ),
           const SizedBox(height: 40),
-          _buildSidebarItem(Icons.dashboard_outlined, isVi ? 'Bảng điều khiển' : 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.book_outlined, isVi ? 'Khóa học' : 'Courses', isEnabled: false),
-          _buildSidebarItem(Icons.assignment_outlined, isVi ? 'Đề thi' : 'Exam', isEnabled: false),
-          _buildSidebarItem(Icons.people_outline, isVi ? 'Học sinh' : 'Learner', isEnabled: false),
-          _buildSidebarItem(Icons.question_answer_outlined, isVi ? 'Ngân hàng câu hỏi' : 'Question Bank', isEnabled: false),
+          _buildSidebarItem(
+            Icons.dashboard_outlined,
+            isVi ? 'Bảng điều khiển' : 'Dashboard',
+            isActive: true,
+          ),
+          _buildSidebarItem(
+            Icons.book_outlined,
+            isVi ? 'Khóa học' : 'Courses',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.assignment_outlined,
+            isVi ? 'Đề thi' : 'Exam',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.people_outline,
+            isVi ? 'Học sinh' : 'Learner',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            isVi ? 'Ngân hàng câu hỏi' : 'Question Bank',
+            isEnabled: false,
+          ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, isVi ? 'Đăng xuất' : 'Logout', color: Colors.redAccent, isEnabled: true, onTap: _handleLogout),
+          _buildSidebarItem(
+            Icons.logout,
+            isVi ? 'Đăng xuất' : 'Logout',
+            color: Colors.redAccent,
+            isEnabled: true,
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, bool isEnabled = true, Color? color, VoidCallback? onTap}) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    bool isEnabled = true,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: InkWell(
-        onTap: isEnabled ? (onTap ?? () {}) : () {
-          ToastHelper.show(context, LanguageManager.isVi ? 'Tài khoản của bạn đang chờ phê duyệt' : 'Your account is awaiting approval');
-        },
+        onTap: isEnabled
+            ? (onTap ?? () {})
+            : () {
+                ToastHelper.show(
+                  context,
+                  LanguageManager.isVi
+                      ? 'Tài khoản của bạn đang chờ phê duyệt'
+                      : 'Your account is awaiting approval',
+                );
+              },
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -578,14 +787,22 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF4B5563)) : Colors.grey.shade400),
+                color: isActive
+                    ? Colors.white
+                    : (isEnabled
+                          ? (color ?? const Color(0xFF4B5563))
+                          : Colors.grey.shade400),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF1F2937)) : Colors.grey.shade400),
+                  color: isActive
+                      ? Colors.white
+                      : (isEnabled
+                            ? (color ?? const Color(0xFF1F2937))
+                            : Colors.grey.shade400),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',

@@ -7,7 +7,14 @@ import '../pages/login_page.dart';
 import '../pages/learner/learner_home_page.dart';
 import '../pages/trainer/trainer_profile_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
+import '../pages/trainer/onboarding/trainer_onboarding_shell_page.dart';
+import '../pages/trainer/onboarding/trainer_onboarding_details_page.dart';
+import '../pages/trainer/onboarding/trainer_onboarding_agreement_page.dart';
+import '../pages/trainer/onboarding/trainer_type_selection_page.dart';
+import '../pages/trainer/onboarding/trainer_onboarding_status_page.dart';
+import '../../../data/services/trainer_onboarding_service.dart';
 import '../../utils/toast_helper.dart';
+import '../../utils/language_manager.dart';
 
 class InternalAppHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isMobile;
@@ -189,7 +196,17 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
     }
   }
 
-  void _navigateToProfile() {
+  void _navigateToProfile() async {
+    if (TrainerOnboardingShellPage.of(context) != null) {
+      ToastHelper.showInfo(
+        context,
+        LanguageManager.isVi
+            ? 'Vui lòng hoàn tất nộp hồ sơ Trainer trước khi truy cập trang Profile chính thức.'
+            : 'Please complete your Trainer onboarding application before accessing the full Profile.',
+      );
+      return;
+    }
+
     if (_userRoles.contains('ROLE_COURSE_MANAGER') || _userRoles.contains('COURSE_MANAGER')) {
       Navigator.pushReplacement(
         context,
@@ -197,10 +214,60 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
             builder: (context) => const CourseManagerMyInformationPage()),
       );
     } else if (_userRoles.contains('ROLE_TRAINER') || _userRoles.contains('TRAINER')) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
-      );
+      final onboardingService = TrainerOnboardingService();
+      final res = await onboardingService.getTrainerProfile();
+      if (res['success'] == true) {
+        final data = res['data'] ?? {};
+        final status = (data['status'] ?? '').toString().toUpperCase();
+        final agreementSigned = data['agreementSigned'] ?? false;
+        final trainerType = data['trainerType'];
+
+        if (status == 'ONBOARDING' || status == 'DRAFT' || status == 'REJECTED' || status == 'PENDING_VERIFICATION' || status.isEmpty) {
+          if (mounted) {
+            Widget initialBody;
+            if (trainerType == null) {
+              initialBody = const TrainerTypeSelectionPage(isEmbedded: true);
+            } else if (agreementSigned != true) {
+              initialBody = TrainerOnboardingAgreementPage(
+                profilePayload: data,
+                trainerType: trainerType,
+                isEmbedded: true,
+              );
+            } else {
+              initialBody = TrainerOnboardingDetailsPage(initialProfile: data, isEmbedded: true);
+            }
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TrainerOnboardingShellPage(
+                  initialBody: initialBody,
+                ),
+              ),
+            );
+          }
+          return;
+        } else if (status == 'AWAITING_APPROVAL' || status == 'PENDING_REVIEW' || status == 'SUSPENDED') {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TrainerOnboardingShellPage(
+                  initialBody: TrainerOnboardingStatusPage(initialProfile: data, isEmbedded: true),
+                ),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+        );
+      }
     }
   }
 

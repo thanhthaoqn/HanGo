@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
+import 'trainer_onboarding_agreement_page.dart';
 import 'trainer_onboarding_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
 
@@ -95,8 +96,9 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
         }
         initialProfile['trainerType'] = _selectedType;
 
-        final nextPage = TrainerOnboardingDetailsPage(
-          initialProfile: initialProfile,
+        final nextPage = TrainerOnboardingAgreementPage(
+          profilePayload: initialProfile,
+          trainerType: _selectedType!,
           isEmbedded: true,
         );
 
@@ -112,7 +114,10 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
           );
         }
       } else {
-        ToastHelper.showError(context, result['message'] ?? 'Lỗi không xác định');
+        ToastHelper.showError(
+          context,
+          result['message'] ?? (LanguageManager.isVi ? 'Lỗi không xác định' : 'An unexpected error occurred'),
+        );
       }
     }
   }

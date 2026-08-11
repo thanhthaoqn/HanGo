@@ -1,5 +1,17 @@
 package com.hango.hango_backend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hango.hango_backend.dto.LoginResponse;
+import com.hango.hango_backend.dto.TrainerDocumentDTO;
+import com.hango.hango_backend.dto.TrainerProfileDTO;
+import com.hango.hango_backend.dto.TrainerReviewRequest;
+import com.hango.hango_backend.entity.Role;
+import com.hango.hango_backend.entity.TrainerProfile;
+import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.repository.RoleRepository;
+import com.hango.hango_backend.repository.TrainerProfileRepository;
+import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.util.JwtUtils;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -21,18 +33,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Spy;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-
-import com.hango.hango_backend.dto.LoginResponse;
-import com.hango.hango_backend.dto.TrainerProfileDTO;
-import com.hango.hango_backend.dto.TrainerReviewRequest;
-import com.hango.hango_backend.entity.Role;
-import com.hango.hango_backend.entity.TrainerProfile;
-import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.repository.RoleRepository;
-import com.hango.hango_backend.repository.TrainerProfileRepository;
-import com.hango.hango_backend.repository.UserRepository;
-import com.hango.hango_backend.util.JwtUtils;
 
 @ExtendWith(MockitoExtension.class)
 class TrainerOnboardingServiceTest {
@@ -47,6 +49,12 @@ class TrainerOnboardingServiceTest {
     private JwtUtils jwtUtils;
     @Mock
     private EmailService emailService;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private TrainerOnboardingServiceImpl service;
@@ -322,6 +330,90 @@ class TrainerOnboardingServiceTest {
         verify(userRepository).save(user);
     }
 
+    @Test
+    void saveProfileDraftShouldNormalizeTypedDocumentsAndDeriveLegacyFields() {
+        User user = learnerUser(1L, "known@example.com");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        TrainerProfile existing = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainerProfileDTO dto = new TrainerProfileDTO();
+        dto.setCertificates(List.of(
+                TrainerDocumentDTO.builder()
+                        .type("TEACHING_CV")
+                        .name("Professional Teaching CV / Resume")
+                        .url("https://cloudinary.example/cv.pdf")
+                        .build(),
+                TrainerDocumentDTO.builder()
+                        .type("LANGUAGE_PROFICIENCY")
+                        .name("IELTS / Proficiency Certificate")
+                        .url("https://cloudinary.example/ielts.pdf")
+                        .build(),
+                TrainerDocumentDTO.builder()
+                        .type("PEDAGOGICAL_DEGREE")
+                        .name("Bachelor of English Pedagogy Degree")
+                        .url("https://cloudinary.example/degree.pdf")
+                        .build()));
+
+        TrainerProfileDTO result = service.saveProfileDraft("known@example.com", dto);
+
+        assertTrue(result.getScoreReportUrl().startsWith("["));
+        assertEquals("https://cloudinary.example/degree.pdf", result.getPedagogicalDegreeUrl());
+        assertEquals("https://cloudinary.example/cv.pdf", result.getCvUrl());
+        assertNotNull(result.getCertificates());
+        assertEquals(3, result.getCertificates().size());
+    }
+
+    @Test
+    void saveProfileDraftShouldCorrectWrongDegreeTypeWhenNameClearlyShowsTeflCertificate() {
+        User user = learnerUser(1L, "known@example.com");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        TrainerProfile existing = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainerProfileDTO dto = new TrainerProfileDTO();
+        dto.setCertificates(List.of(
+                TrainerDocumentDTO.builder()
+                        .type("PEDAGOGICAL_DEGREE")
+                        .name("TEFL International TESOL Certification")
+                        .issuingInstitution("Harvard University")
+                        .url("https://cloudinary.example/tefl.pdf")
+                        .build()));
+
+        TrainerProfileDTO result = service.saveProfileDraft("known@example.com", dto);
+
+        assertEquals("TEACHING_CERTIFICATE", result.getCertificates().get(0).getType());
+        assertEquals("https://cloudinary.example/tefl.pdf", result.getPedagogicalDegreeUrl());
+    }
+
+    @Test
+    void saveProfileDraftShouldKeepManualDocumentTypeSelectedByUser() {
+        User user = learnerUser(1L, "known@example.com");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        TrainerProfile existing = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainerProfileDTO dto = new TrainerProfileDTO();
+        dto.setCertificates(List.of(
+                TrainerDocumentDTO.builder()
+                        .type("TEACHING_CERTIFICATE")
+                        .name("Bachelor of English Pedagogy Degree")
+                        .url("https://cloudinary.example/manual-choice.pdf")
+                        .source("trainer_profile_manual")
+                        .build()));
+
+        TrainerProfileDTO result = service.saveProfileDraft("known@example.com", dto);
+
+        assertEquals("TEACHING_CERTIFICATE", result.getCertificates().get(0).getType());
+        assertEquals("https://cloudinary.example/manual-choice.pdf", result.getPedagogicalDegreeUrl());
+    }
+
     // =================================================================
     // submitProfileForReview
     // =================================================================
@@ -390,14 +482,55 @@ class TrainerOnboardingServiceTest {
     }
 
     @Test
+    void submitProfileForReviewShouldRejectTeacherWithoutPedagogicalDegree() {
+        User user = learnerUser(1L, "known@example.com");
+        user.setPhoneNumber("0909123456");
+        user.setGender("MALE");
+        user.setAvatarUrl("https://cloudinary.example/avatar.png");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        TrainerProfile teacherProfile = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        teacherProfile.setBio("Experienced teacher with over 5 years of IELTS academic teaching history");
+        teacherProfile.setScoreReportUrl("https://cloudinary.example/ielts.pdf");
+        // pedagogicalDegreeUrl is NULL
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(teacherProfile));
+        when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.submitProfileForReview("known@example.com", new TrainerProfileDTO()));
+        assertTrue(ex.getMessage().toLowerCase().contains("pedagogical"));
+    }
+
+    @Test
+    void submitProfileForReviewShouldAcceptTeacherWhenTeachingCvExists() {
+        User user = learnerUser(1L, "known@example.com");
+        user.setPhoneNumber("0909123456");
+        user.setGender("MALE");
+        user.setAvatarUrl("https://cloudinary.example/avatar.png");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        TrainerProfile teacherProfile = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        teacherProfile.setBio("Experienced teacher with over 5 years of IELTS academic teaching history");
+        teacherProfile.setScoreReportUrl("""
+                [{"type":"TEACHING_CV","name":"Professional Teaching CV / Resume","url":"https://cloudinary.example/cv.pdf"}]
+                """.trim());
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(teacherProfile));
+        when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainerProfileDTO result = service.submitProfileForReview("known@example.com", new TrainerProfileDTO());
+
+        assertEquals("AWAITING_APPROVAL", result.getStatus());
+    }
+
+    @Test
     void submitProfileForReviewShouldRejectMissingAllCertificationDocuments() {
         User user = learnerUser(1L, "known@example.com");
         user.setPhoneNumber("0909123456");
         user.setGender("MALE");
         user.setAvatarUrl("https://cloudinary.example/avatar.png");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
-        TrainerProfile incomplete = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
-        incomplete.setBio("Experienced teacher with over 5 years of IELTS academic teaching history");
+        TrainerProfile incomplete = profile(1L, "PENDING_VERIFICATION", "PEER_TUTOR");
+        incomplete.setBio("Experienced tutor with over 5 years of IELTS academic teaching history");
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(incomplete));
         when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -416,6 +549,7 @@ class TrainerOnboardingServiceTest {
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         TrainerProfile complete = completeProfile(1L);
         complete.setBio("Experienced teacher with over 5 years of IELTS academic teaching history");
+        complete.setPedagogicalDegreeUrl("https://cloudinary.example/pedagogy_degree.pdf");
         complete.setAdminNotes("previous rejection reason");
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(complete));
         when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -513,20 +647,19 @@ class TrainerOnboardingServiceTest {
     }
 
     @Test
-    void reviewTrainerProfileShouldUseAdminProvidedRevenueShareWhenVerifying() {
+    void reviewTrainerProfileShouldAutomaticallySetFixedRevenueShareForTeacher() {
         TrainerProfile p = profile(1L, "AWAITING_APPROVAL", "PROFESSIONAL");
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(p));
         when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(inv -> inv.getArgument(0));
 
         TrainerReviewRequest req = new TrainerReviewRequest();
         req.setStatus("VERIFIED");
-        req.setRevenueShare(0.75);
-        req.setAdminNotes("Custom rate approved");
+        req.setAdminNotes("Credentials verified");
 
         TrainerProfileDTO result = service.reviewTrainerProfile(1L, req);
 
         assertEquals("VERIFIED", result.getStatus());
-        assertEquals(0.75, result.getRevenueShare());
+        assertEquals(0.70, result.getRevenueShare());
         assertNotNull(p.getReviewedAt());
         verify(emailService, never()).sendTrainerStatusNotificationEmail(anyString(), anyString(), any());
     }

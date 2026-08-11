@@ -38,6 +38,12 @@ public class TrainerProfile {
     @Column(name = "score_report_url", columnDefinition = "LONGTEXT")
     private String scoreReportUrl;
 
+    @Column(name = "pedagogical_degree_url", columnDefinition = "LONGTEXT")
+    private String pedagogicalDegreeUrl;
+
+    @Column(name = "cv_url", columnDefinition = "LONGTEXT")
+    private String cvUrl;
+
     // payout settings
     @Column(name = "bank_name", length = 100)
     private String bankName;

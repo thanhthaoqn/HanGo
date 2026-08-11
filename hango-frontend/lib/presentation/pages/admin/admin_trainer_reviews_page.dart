@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
@@ -17,6 +18,9 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
   bool _isLoading = true;
   String _statusFilter = 'AWAITING_APPROVAL'; // ALL | AWAITING_APPROVAL | VERIFIED | SUSPENDED
   String _searchQuery = '';
+
+  int _currentPage = 1;
+  int _pageSize = 10;
 
   @override
   void initState() {
@@ -39,6 +43,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
     if (mounted) {
       setState(() {
         _isLoading = false;
+        _currentPage = 1;
         if (result['success'] == true) {
           _applications = result['data'] ?? [];
         } else {
@@ -89,10 +94,10 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: const [
-              Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 28),
+              Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 28),
               SizedBox(width: 12),
               Text(
-                'Request Revisions',
+                'Reject Application',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
@@ -102,7 +107,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Enter required edits & feedback for the trainer:',
+                'Enter detailed rejection reason for the applicant (Visible to Trainer):',
                 style: TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
               ),
               const SizedBox(height: 12),
@@ -111,12 +116,12 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                 maxLines: 4,
                 style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Example: IELTS certificate scan is blurry, please re-upload a clear image...',
+                  hintText: 'Example: Pedagogical degree is missing or IELTS certificate scan is unreadable. Please re-upload clear credentials...',
                   hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFD97706), width: 2),
+                    borderSide: const BorderSide(color: Colors.redAccent, width: 2),
                   ),
                 ),
               ),
@@ -134,20 +139,20 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
               onPressed: () {
                 final notes = noteController.text.trim();
                 if (notes.isEmpty) {
-                  ToastHelper.showError(context, 'Please enter requested edits');
+                  ToastHelper.showError(context, 'Please enter a rejection reason.');
                   return;
                 }
                 Navigator.pop(context);
                 _handleReview(userId, 'PENDING_VERIFICATION', notes, null);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD97706),
+                backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
               child: const Text(
-                'Request Revisions',
+                'Reject Application',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ),
@@ -160,8 +165,6 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
   void _showApproveDialog(int userId, String trainerType) {
     final isPro = trainerType == 'PROFESSIONAL';
     final double defaultRate = isPro ? 0.70 : 0.60;
-    
-    final splitController = TextEditingController(text: defaultRate.toString());
 
     showDialog(
       context: context,
@@ -174,7 +177,7 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
               Icon(Icons.check_circle_outline_rounded, color: Color(0xFF28B79B), size: 28),
               SizedBox(width: 12),
               Text(
-                'Approve Trainer',
+                'Approve Trainer Application',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
@@ -184,28 +187,28 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Approving account: ${isPro ? "Teacher" : "Tutor"}.',
+                'Are you sure you want to approve this trainer application?',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Trainer Revenue Share (0.50 - 0.95) *',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: splitController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: '0.70',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFF28B79B), width: 2),
-                  ),
-                  suffixText: 'Trainer Share',
-                  suffixStyle: const TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Color(0xFF64748B)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6FDF9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: Color(0xFF059669), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Account Type: ${isPro ? "Professional Teacher (70/30 Split)" : "Peer Tutor (60/40 Split)"}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF065F46), fontFamily: 'Outfit'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -220,22 +223,17 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                final rate = double.tryParse(splitController.text);
-                if (rate == null || rate < 0.50 || rate > 0.95) {
-                  ToastHelper.showError(context, 'Trainer revenue share must be between 0.50 (50%) and 0.95 (95%)');
-                  return;
-                }
                 Navigator.pop(context);
-                _handleReview(userId, 'VERIFIED', 'Verified credentials valid', rate);
+                _handleReview(userId, 'VERIFIED', 'Verified credentials valid', defaultRate);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
               child: const Text(
-                'Approve',
+                'Approve Application',
                 style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ),
@@ -340,175 +338,354 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
     final status = app['status'] ?? 'PENDING_VERIFICATION';
     
     final scoreUrl = app['scoreReportUrl'] as String?;
-
-    final bankName = app['bankName'] ?? '';
-    final bankAcct = app['bankAccount'] ?? '';
-    final bankOwner = app['bankAccountName'] ?? '';
-    final taxCode = app['taxCode'] ?? '';
-    final citizenId = app['citizenId'] ?? 'N/A';
     final avatarUrl = app['avatarUrl'] as String?;
+
+    final bioRejectController = TextEditingController();
+    final certRejectController = TextEditingController();
+    bool isRejectingMode = false;
 
     showDialog(
       context: context,
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 800),
-            padding: const EdgeInsets.all(28),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title Header with Avatar
-                  Row(
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 800),
+                padding: const EdgeInsets.all(28),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: const Color(0xFFE2E8F0),
-                        backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                            ? NetworkImage(avatarUrl)
-                            : null,
-                        child: (avatarUrl == null || avatarUrl.isEmpty)
-                            ? Text(
-                                fullName.isNotEmpty ? fullName[0].toUpperCase() : 'T',
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Trainer Profile: $fullName',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                                fontFamily: 'Outfit',
-                              ),
+                      // Title Header with Avatar
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor: const Color(0xFFE2E8F0),
+                            backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: (avatarUrl == null || avatarUrl.isEmpty)
+                                ? Text(
+                                    fullName.isNotEmpty ? fullName[0].toUpperCase() : 'T',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Trainer Profile: $fullName',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$email • $phone',
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$email • $phone',
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
-                            ),
-                          ],
-                        ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
+                      const SizedBox(height: 16),
+                      const Divider(color: Color(0xFFE2E8F0)),
+                      const SizedBox(height: 16),
+
+                      // Bio Section
+                      const Text(
+                        'Teacher Introduction & Bio:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit'),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(color: Color(0xFFE2E8F0)),
-                  const SizedBox(height: 16),
-
-                  // Bio
-                  const Text(
-                    'Teacher Introduction & Bio:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit'),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    bio.isNotEmpty ? bio : 'No Bio provided.',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4, fontFamily: 'Outfit'),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Qualifications & Proof images
-                  const Text(
-                    'Qualifications & Competency Proofs (Click to zoom):',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit'),
-                  ),
-                  const SizedBox(height: 12),
-                  Builder(
-                    builder: (context) {
-                      List<Map<String, String>> certList = [];
-                      final rawCerts = app['certificates'];
-                      if (rawCerts != null && rawCerts is List && rawCerts.isNotEmpty) {
-                        certList = (rawCerts as List).map((c) => Map<String, String>.from(c as Map)).toList();
-                      } else if (scoreUrl != null && scoreUrl.isNotEmpty) {
-                        if (scoreUrl.startsWith('[')) {
-                          try {
-                            final List parsed = jsonDecode(scoreUrl);
-                            certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
-                          } catch (_) {}
-                        } else {
-                          certList.add({'name': 'Credential Proof', 'url': scoreUrl});
-                        }
-                      }
-
-
-                      if (certList.isEmpty) {
-                        return const Text(
-                          'No certificates uploaded.',
-                          style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
-                        );
-                      }
-
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: certList.map((item) {
-                          final label = item['name'] ?? 'Proof';
-                          final url = item['url'] ?? '';
-                          return SizedBox(
-                            width: 220,
-                            child: _buildProofImageCard(label, url),
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-                  
-                  if (status == 'AWAITING_APPROVAL') ...[
-                    const SizedBox(height: 32),
-                    const Divider(color: Color(0xFFE2E8F0)),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showRejectDialog(userId);
-                          },
-                          icon: const Icon(Icons.edit_note_rounded, size: 16, color: Color(0xFFD97706)),
-                          label: const Text('Request Revisions'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFD97706),
-                            side: const BorderSide(color: Color(0xFFD97706)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      const SizedBox(height: 4),
+                      Text(
+                        bio.isNotEmpty ? bio : 'No Bio provided.',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4, fontFamily: 'Outfit'),
+                      ),
+                      if (isRejectingMode) ...[
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: bioRejectController,
+                          maxLines: 2,
+                          style: const TextStyle(fontFamily: 'Outfit', fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Enter rejection reason for Bio (e.g. Bio lacks teaching experience details)...',
+                            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                            fillColor: const Color(0xFFFEF2F2),
+                            filled: true,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.redAccent, width: 2)),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showApproveDialog(userId, type);
-                          },
-                          icon: const Icon(Icons.check_circle_rounded, size: 16),
-                          label: const Text('Approve Application'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF28B79B),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ] else if (status != 'VERIFIED' && app['adminNotes'] != null && app['adminNotes'].toString().trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFCA5A5)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, color: Colors.redAccent, size: 16),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Previous Rejection Reason: ${app['adminNotes']}',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B), fontFamily: 'Outfit'),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
-                  ],
-                ],
+                      const SizedBox(height: 24),
+
+                      // Qualifications & Proof images
+                      const Text(
+                        'Qualifications & Competency Proofs (Click to zoom):',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Outfit'),
+                      ),
+                      const SizedBox(height: 12),
+                      Builder(
+                        builder: (context) {
+                          List<Map<String, String>> certList = [];
+                          final rawCerts = app['certificates'];
+                          if (rawCerts != null && rawCerts is List && rawCerts.isNotEmpty) {
+                            certList = (rawCerts as List).map((c) => Map<String, String>.from(c as Map)).toList();
+                          } else if (scoreUrl != null && scoreUrl.isNotEmpty) {
+                            if (scoreUrl.startsWith('[')) {
+                              try {
+                                final List parsed = jsonDecode(scoreUrl);
+                                certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
+                              } catch (_) {}
+                            } else {
+                              certList.add({'name': 'Credential Proof', 'url': scoreUrl});
+                            }
+                          }
+
+                          if (certList.isEmpty) {
+                            return const Text(
+                              'No certificates uploaded.',
+                              style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
+                            );
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 12,
+                                children: certList.map((item) {
+                                  final label = item['name'] ?? 'Proof';
+                                  final url = item['url'] ?? '';
+                                  return SizedBox(
+                                    width: 220,
+                                    child: _buildProofImageCard(label, url),
+                                  );
+                                }).toList(),
+                              ),
+                              if (isRejectingMode) ...[
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: certRejectController,
+                                  maxLines: 2,
+                                  style: const TextStyle(fontFamily: 'Outfit', fontSize: 13),
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter rejection reason for Credentials & Certificates (e.g. Missing pedagogical degree)...',
+                                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                    fillColor: const Color(0xFFFEF2F2),
+                                    filled: true,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.redAccent, width: 2)),
+                                  ),
+                                ),
+                              ] else if (status != 'VERIFIED' && app['adminNotes'] != null && app['adminNotes'].toString().trim().isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.info_outline, color: Colors.redAccent, size: 16),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'Rejection Note on Credentials: ${app['adminNotes']}',
+                                          style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B), fontFamily: 'Outfit'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+                      
+                      if (status == 'AWAITING_APPROVAL') ...[
+                        const SizedBox(height: 32),
+                        const Divider(color: Color(0xFFE2E8F0)),
+                        const SizedBox(height: 16),
+                        if (isRejectingMode)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  setModalState(() {
+                                    isRejectingMode = false;
+                                  });
+                                },
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  final bioNote = bioRejectController.text.trim();
+                                  final certNote = certRejectController.text.trim();
+                                  if (bioNote.isEmpty && certNote.isEmpty) {
+                                    ToastHelper.showError(context, 'Please enter a rejection reason for Bio or Certificates.');
+                                    return;
+                                  }
+                                  String combined = '';
+                                  if (bioNote.isNotEmpty && certNote.isNotEmpty) {
+                                    combined = 'Bio: $bioNote | Certificates: $certNote';
+                                  } else if (bioNote.isNotEmpty) {
+                                    combined = 'Bio: $bioNote';
+                                  } else {
+                                    combined = 'Certificates: $certNote';
+                                  }
+                                  Navigator.pop(context);
+                                  _handleReview(userId, 'PENDING_VERIFICATION', combined, null);
+                                },
+                                icon: const Icon(Icons.cancel_outlined, size: 16),
+                                label: const Text('Reject Application'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  setModalState(() {
+                                    isRejectingMode = true;
+                                  });
+                                },
+                                icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.redAccent),
+                                label: const Text('Reject Application'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.redAccent,
+                                  side: const BorderSide(color: Colors.redAccent),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _showApproveDialog(userId, type);
+                                },
+                                icon: const Icon(Icons.check_circle_rounded, size: 16),
+                                label: const Text('Approve Application'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF28B79B),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ] else ...[
+                        const SizedBox(height: 32),
+                        const Divider(color: Color(0xFFE2E8F0)),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _getStatusBgColor(status),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    status == 'VERIFIED' ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                    size: 16,
+                                    color: _getStatusTextColor(status),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Status: ${_getStatusText(status)}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: _getStatusTextColor(status),
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close_rounded, size: 16),
+                              label: const Text('Close'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF64748B),
+                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -551,151 +728,166 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
     final isPro = type == 'PROFESSIONAL';
     final typeDisplay = isPro ? 'Teacher' : 'Tutor';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
-      child: Row(
-        children: [
-          // Radio indicator
-          Icon(
-            Icons.radio_button_checked_rounded,
-            size: 16,
-            color: status == 'AWAITING_APPROVAL' ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
-          ),
-          const SizedBox(width: 16),
-          
-          // Name and email
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fullName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF0F172A),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                Text(
-                  email,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ],
+    return InkWell(
+      onTap: () => _showDetailDialog(app),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+        ),
+        child: Row(
+          children: [
+            // Radio indicator
+            Icon(
+              Icons.radio_button_checked_rounded,
+              size: 16,
+              color: status == 'AWAITING_APPROVAL' ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
             ),
-          ),
-          
-          // Specialization Type
-          Expanded(
-            flex: 2,
-            child: Text(
-              typeDisplay,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF334155),
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ),
-          
-          // Proof Document status badge
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.attachment_rounded, size: 14, color: Color(0xFF64748B)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Credentials Attached',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF475569),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Submission Date
-          Expanded(
-            flex: 2,
-            child: Text(
-              dateStr,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF64748B),
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ),
-          
-          // Actions
-          Expanded(
-            flex: 2,
-            child: status == 'AWAITING_APPROVAL'
-                ? SizedBox(
-                    height: 32,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _showDetailDialog(app),
-                      icon: const Icon(Icons.rate_review_outlined, size: 14),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF28B79B),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                      ),
-                      label: const Text(
-                        'Review Application',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                      ),
+            const SizedBox(width: 16),
+            
+            // Name and email
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fullName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF0F172A),
+                      fontFamily: 'Outfit',
                     ),
-                  )
-                : Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _getStatusBgColor(status),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _getStatusText(status),
+                  ),
+                  Text(
+                    email,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Specialization Type
+            Expanded(
+              flex: 2,
+              child: Text(
+                typeDisplay,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF334155),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ),
+            
+            // Proof Document status badge
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.attachment_rounded, size: 14, color: Color(0xFF64748B)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Credentials Attached',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: _getStatusTextColor(status),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF475569),
                             fontFamily: 'Outfit',
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-          ),
-        ],
+                ],
+              ),
+            ),
+            
+            // Submission Date
+            Expanded(
+              flex: 2,
+              child: Text(
+                dateStr,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ),
+            
+            // Actions
+            Expanded(
+              flex: 2,
+              child: status == 'AWAITING_APPROVAL'
+                  ? SizedBox(
+                      height: 32,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showDetailDialog(app),
+                        icon: const Icon(Icons.rate_review_outlined, size: 14),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                        ),
+                        label: const Text(
+                          'Review Application',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                        ),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        InkWell(
+                          onTap: () => _showDetailDialog(app),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _getStatusBgColor(status),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: _getStatusTextColor(status).withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _getStatusText(status),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: _getStatusTextColor(status),
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(Icons.visibility_outlined, size: 14, color: _getStatusTextColor(status)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -828,6 +1020,13 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final totalItems = _applications.length;
+    final totalPages = totalItems > 0 ? (totalItems / _pageSize).ceil() : 1;
+    final safeCurrentPage = _currentPage.clamp(1, totalPages);
+    final startIndex = totalItems > 0 ? (safeCurrentPage - 1) * _pageSize : 0;
+    final endIndex = math.min(startIndex + _pageSize, totalItems);
+    final pagedApplications = totalItems > 0 ? _applications.sublist(startIndex, endIndex) : [];
+
     return Container(
       color: const Color(0xFFF8FAFC),
       padding: const EdgeInsets.all(28.0),
@@ -889,24 +1088,20 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                     },
                     items: const [
                       DropdownMenuItem(
+                        value: 'ALL',
+                        child: Text('All Applications'),
+                      ),
+                      DropdownMenuItem(
                         value: 'AWAITING_APPROVAL',
                         child: Text('Awaiting Review'),
                       ),
                       DropdownMenuItem(
                         value: 'VERIFIED',
-                        child: Text('Verified Trainers'),
+                        child: Text('Approved Applications'),
                       ),
                       DropdownMenuItem(
-                        value: 'PENDING_VERIFICATION',
-                        child: Text('Draft / Revisions Required'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'SUSPENDED',
-                        child: Text('Suspended'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'ALL',
-                        child: Text('All Statuses'),
+                        value: 'REJECTED',
+                        child: Text('Rejected Applications'),
                       ),
                     ],
                   ),
@@ -1025,10 +1220,80 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _applications.length,
+                            itemCount: pagedApplications.length,
                             itemBuilder: (context, index) {
-                              return _buildApplicationRow(_applications[index]);
+                              return _buildApplicationRow(pagedApplications[index]);
                             },
+                          ),
+
+                          // Pagination controls footer bar
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF8FAFC),
+                              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Showing ${totalItems > 0 ? startIndex + 1 : 0} to $endIndex of $totalItems entries',
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                                ),
+                                Row(
+                                  children: [
+                                    const Text('Rows per page: ', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                                    DropdownButtonHideUnderline(
+                                      child: DropdownButton<int>(
+                                        value: _pageSize,
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                                        onChanged: (val) {
+                                          if (val != null) {
+                                            setState(() {
+                                              _pageSize = val;
+                                              _currentPage = 1;
+                                            });
+                                          }
+                                        },
+                                        items: const [10, 20, 50].map((size) {
+                                          return DropdownMenuItem<int>(
+                                            value: size,
+                                            child: Text('$size'),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    OutlinedButton(
+                                      onPressed: safeCurrentPage > 1
+                                          ? () => setState(() => _currentPage = safeCurrentPage - 1)
+                                          : null,
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      ),
+                                      child: const Text('Previous', style: TextStyle(fontSize: 12, fontFamily: 'Outfit')),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Page $safeCurrentPage of $totalPages',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    OutlinedButton(
+                                      onPressed: safeCurrentPage < totalPages
+                                          ? () => setState(() => _currentPage = safeCurrentPage + 1)
+                                          : null,
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      ),
+                                      child: const Text('Next', style: TextStyle(fontSize: 12, fontFamily: 'Outfit')),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
