@@ -8,8 +8,10 @@ import '../../../../utils/language_manager.dart';
 import '../../../widgets/shared_header.dart';
 import '../../../widgets/shared_footer.dart';
 import 'trainer_onboarding_status_page.dart';
+import 'trainer_onboarding_details_page.dart';
 import 'trainer_payout_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
+import '../../learner/learner_home_page.dart';
 import '../../login_page.dart';
 
 class TrainerOnboardingAgreementPage extends StatefulWidget {
@@ -64,21 +66,10 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
   }
 
   void _handleSubmit() async {
-    if (!_agreementSigned) {
-      ToastHelper.showError(
-        context,
-        LanguageManager.isVi
-            ? 'Bạn phải xác nhận đồng ý với điều khoản để tiếp tục.'
-            : 'You must check the agreement box to proceed.',
-      );
-      return;
-    }
-
     setState(() {
       _isSubmitting = true;
     });
 
-    // Add agreement check to payload
     final finalPayload = Map<String, dynamic>.from(widget.profilePayload);
     finalPayload['agreementSigned'] = true;
 
@@ -90,14 +81,7 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
 
     if (mounted) {
       if (result['success'] == true) {
-        ToastHelper.showSuccess(
-          context,
-          LanguageManager.isVi
-              ? 'Ký thỏa thuận thành công!'
-              : 'Agreement signed successfully!',
-        );
-        
-        final nextPage = TrainerPayoutDetailsPage(
+        final nextPage = TrainerOnboardingDetailsPage(
           initialProfile: result['data'] ?? finalPayload,
           isEmbedded: true,
         );
@@ -114,7 +98,7 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
           );
         }
       } else {
-        ToastHelper.showError(context, result['message'] ?? 'Lỗi lưu thỏa thuận.');
+        ToastHelper.showError(context, result['message'] ?? 'Error proceeding.');
       }
     }
   }
@@ -167,6 +151,8 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
 
     final isVi = LanguageManager.isVi;
     final isPro = widget.trainerType == 'PROFESSIONAL';
+    final roleName = isPro ? 'Teacher' : 'Tutor';
+    final roleNameLower = isPro ? 'teacher' : 'tutor';
 
     final splitText = isVi
         ? (isPro ? '70% doanh thu dành cho Giáo viên (30% phí nền tảng HanGo)' : '60% doanh thu dành cho Gia sư (40% phí nền tảng HanGo)')
@@ -181,7 +167,7 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                isVi ? 'Bản thỏa thuận hợp tác điện tử' : 'E-Cooperation Agreement',
+                'System Rules & Policies',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -191,15 +177,13 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
               ),
               const SizedBox(height: 12),
               Text(
-                isVi
-                    ? 'Vui lòng đọc kỹ các điều khoản chia sẻ doanh thu và quy định trước khi nộp hồ sơ giảng dạy.'
-                    : 'Please read the revenue split terms and compliance guidelines before signing.',
+                'Please review the platform rules regarding revenue share, introductory course requirements, and content policies for $roleName Applications.',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
               ),
               const SizedBox(height: 32),
               // Agreement Terms Box
               Container(
-                height: 350,
+                height: 380,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -216,111 +200,81 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTermTitle(isVi ? 'ĐIỀU 1: PHÂN CHIA DOANH THU' : 'ARTICLE 1: REVENUE SHARE'),
+                          _buildTermTitle('ARTICLE 1: REVENUE SHARE & SETTLEMENT'),
                           _buildTermText(
-                            isVi
-                                ? 'Dựa trên phân loại tài khoản: ${isPro ? "Giáo viên (Chia 70/30)" : "Gia sư (Chia 60/40)"}.\n- Tỷ lệ thỏa thuận chia sẻ: $splitText.\n- Hệ thống sẽ tự động đối soát thanh toán và kết chuyển phần tiền tương ứng vào Tài khoản Ngân hàng đã liên kết của Giáo viên sau khi khấu trừ 10% thuế TNCN theo quy định pháp luật.'
-                                : 'Based on selected profile: ${isPro ? "Teacher (70/30 split)" : "Tutor (60/40 split)"}.\n- Revenue Split Ratio: $splitText.\n- Payments are automatically consolidated and transferred to the configured bank account after deducting a mandatory 10% personal income tax.',
+                            'Based on selected profile: ${isPro ? "Professional Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Contracted Revenue Split Ratio: $splitText.\n- Consolidated payouts are processed monthly to the configured bank account after deducting a mandatory 10% Personal Income Tax as per tax regulations.',
                           ),
                           const SizedBox(height: 16),
-                          _buildTermTitle(isVi ? 'ĐIỀU 2: BẢO MẬT & BẢN QUYỀN NỘI DUNG' : 'ARTICLE 2: CONTENT COPYRIGHTS'),
+                          _buildTermTitle('ARTICLE 2: FIRST COURSE FREE POLICY'),
                           _buildTermText(
-                            isVi
-                                ? 'Giáo viên cam kết tự biên soạn nội dung bài giảng, đề thi và câu hỏi. Không sao chép hay sử dụng các nội dung của bên thứ ba chưa được cấp phép. Mọi tranh chấp liên quan đến bản quyền nội dung, giáo viên sẽ chịu trách nhiệm hoàn toàn trước pháp luật.'
-                                : 'Trainers guarantee original ownership of syllabus, exams, and quizzes. No unlicensed duplication of third-party assets is permitted. The trainer assumes full legal responsibility for any copyrights violations.',
+                            'To establish initial teaching credentials and contribute to the HanGo community ecosystem, all newly onboarded ${roleName}s agree to publish their very first course for free (0 VND).',
                           ),
-                                  const SizedBox(height: 16),
-                                  _buildTermTitle(isVi ? 'ĐIỀU 3: CHÍNH SÁCH HOÀN TIỀN' : 'ARTICLE 3: REFUNDS POLICY'),
-                                  _buildTermText(
-                                    isVi
-                                        ? 'Nhằm bảo vệ trải nghiệm của Học viên, HanGo áp dụng chính sách hoàn trả học phí trong vòng 7 ngày đầu kể từ lúc đăng ký nếu nội dung giảng dạy không đúng mô tả hoặc gặp lỗi hệ thống do chất lượng video bài học.'
-                                        : 'To protect learners, HanGo enforces a 7-day refund warranty. If course contents violate descriptions or video streaming fails, students are entitled to a full refund.',
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      if (!_hasScrolledToBottom)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFFDE68A)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  isVi
-                                      ? 'Vui lòng cuộn xuống dưới cùng của khung điều khoản để mở khóa xác nhận.'
-                                      : 'Please scroll all the way to the bottom of the terms container to unlock agreement.',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E), fontFamily: 'Outfit'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-                      // Agreement checkbox
-                      CheckboxListTile(
-                        title: Text(
-                          isVi
-                              ? 'Tôi cam đoan thông tin bằng cấp là thật và đồng ý với Bản thỏa thuận hợp tác này.'
-                              : 'I certify that my credentials are true and agree to this contract.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: _hasScrolledToBottom ? const Color(0xFF334155) : const Color(0xFF94A3B8),
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                        value: _agreementSigned,
-                        activeColor: const Color(0xFF28B79B),
-                        onChanged: _hasScrolledToBottom
-                            ? (val) {
-                                setState(() {
-                                  _agreementSigned = val ?? false;
-                                });
-                              }
-                            : null,
-                      ),
-                      const SizedBox(height: 32),
-                      // Submit action
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _isSubmitting ? null : _handleSubmit,
-                            icon: const Icon(Icons.draw_rounded, size: 16),
-                            label: _isSubmitting
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                  )
-                                : Text(isVi ? 'Ký thỏa thuận & Gửi duyệt' : 'Sign & Submit Application'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF28B79B),
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: const Color(0xFF28B79B).withOpacity(0.5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-                              elevation: 4,
-                            ),
+                          const SizedBox(height: 16),
+                          _buildTermTitle('ARTICLE 3: CONTENT COPYRIGHTS & COMPLIANCE'),
+                          _buildTermText(
+                            '${roleName}s guarantee original ownership of syllabus, exams, and quizzes. No unlicensed duplication of third-party assets is permitted. The $roleNameLower assumes full legal responsibility for any copyrights violations.',
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (!_hasScrolledToBottom)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          isVi
+                              ? 'Vui lòng cuộn xuống dưới cùng của khung điều khoản để xác nhận đã đọc xong.'
+                              : 'Please scroll all the way to the bottom of the terms container to unlock the button.',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E), fontFamily: 'Outfit'),
+                        ),
                       ),
                     ],
                   ),
                 ),
+              const SizedBox(height: 24),
+              // Submit action
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: (_hasScrolledToBottom && !_isSubmitting) ? _handleSubmit : null,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.arrow_forward_rounded, size: 16),
+                    label: Text(isVi ? 'Tiếp tục hoàn thiện hồ sơ' : 'Continue to Profile'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF28B79B),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFF28B79B).withOpacity(0.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                      elevation: 4,
+                    ),
+                  ),
+                ],
               ),
-            );
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSidebar(BuildContext context) {

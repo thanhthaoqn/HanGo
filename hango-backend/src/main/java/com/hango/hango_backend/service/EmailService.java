@@ -78,30 +78,30 @@ public class EmailService {
         if ("VERIFIED".equalsIgnoreCase(status)) {
             subject = "HanGo - Trainer Profile Approved!";
             contentText = "Congratulations!\n\n" +
-                    "Your Trainer application on HanGo has been APPROVED by our administration team. " +
-                    "You can now access your Trainer Dashboard, create high-quality courses, and publish exams.\n\n" +
-                    (adminNotes != null && !adminNotes.trim().isEmpty() ? "Admin Notes: " + adminNotes + "\n\n" : "") +
-                    "Access your Trainer Dashboard now: https://hangog92.online/login\n\n" +
+                    "Your Trainer application on HanGo has been APPROVED. " +
+                    "You can now complete your payout setup to access your Trainer Dashboard, create courses, and publish exams.\n\n" +
+                    (adminNotes != null && !adminNotes.trim().isEmpty() ? "Notes: " + adminNotes + "\n\n" : "") +
+                    "Access your account now: https://hangog92.online/login\n\n" +
                     "Thank you for joining HanGo!\n\n" +
                     "Best regards,\n" +
-                    "HanGo Admin Team";
+                    "HanGo EdTech Team";
         } else if ("SUSPENDED".equalsIgnoreCase(status)) {
             subject = "HanGo - Trainer Profile Status Update (Suspended)";
             contentText = "Hello,\n\n" +
                     "Your Trainer account status on HanGo has been set to SUSPENDED.\n\n" +
-                    (adminNotes != null && !adminNotes.trim().isEmpty() ? "Reason / Notes: " + adminNotes + "\n\n" : "") +
+                    (adminNotes != null && !adminNotes.trim().isEmpty() ? "Reason: " + adminNotes + "\n\n" : "") +
                     "If you believe this is an error, please contact support at https://hangog92.online\n\n" +
                     "Best regards,\n" +
-                    "HanGo Admin Team";
+                    "HanGo EdTech Team";
         } else {
-            subject = "HanGo - Trainer Profile Revisions Requested";
+            subject = "HanGo - Trainer Application Rejected";
             contentText = "Hello,\n\n" +
-                    "Our administration team has reviewed your Trainer application. Additional information or modifications are required:\n\n" +
-                    (adminNotes != null && !adminNotes.trim().isEmpty() ? "Admin Notes / Requested Edits: " + adminNotes + "\n\n" : "Please log into HanGo to view requested edits.\n\n") +
-                    "Please click the link below to log into your account, update your profile, and resubmit:\n" +
+                    "Your Trainer application on HanGo has been REJECTED by the Administrator.\n\n" +
+                    (adminNotes != null && !adminNotes.trim().isEmpty() ? "Rejection Reason & Required Edits: " + adminNotes + "\n\n" : "Please log into HanGo to view rejection details.\n\n") +
+                    "Please log into your account, update your profile details and certificates as requested, and resubmit:\n" +
                     "https://hangog92.online/login\n\n" +
                     "Best regards,\n" +
-                    "HanGo Admin Team";
+                    "HanGo EdTech Team";
         }
 
         message.setSubject(subject);

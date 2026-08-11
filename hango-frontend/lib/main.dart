@@ -154,10 +154,21 @@ class _TrainerRouteGateState extends State<TrainerRouteGate> {
           );
         } else {
           // PENDING_VERIFICATION (Draft)
+          final agreementSigned = profile['agreementSigned'] ?? false;
           if (trainerType == null) {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const TrainerTypeSelectionPage()),
+            );
+          } else if (agreementSigned != true) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TrainerOnboardingAgreementPage(
+                  profilePayload: profile,
+                  trainerType: trainerType,
+                ),
+              ),
             );
           } else {
             Navigator.pushReplacement(

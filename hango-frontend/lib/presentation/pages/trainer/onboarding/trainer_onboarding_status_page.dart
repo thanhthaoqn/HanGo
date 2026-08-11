@@ -836,16 +836,25 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     }
 
     if (status == 'PENDING_VERIFICATION') {
+      final agreementSigned = widget.initialProfile['agreementSigned'] ?? false;
+      final trainerType = widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
+
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           viewApplicationButton,
           ElevatedButton.icon(
             onPressed: () {
-              final nextPage = TrainerOnboardingDetailsPage(
-                initialProfile: widget.initialProfile,
-                isEmbedded: true,
-              );
+              final nextPage = (!agreementSigned)
+                  ? TrainerOnboardingAgreementPage(
+                      profilePayload: widget.initialProfile,
+                      trainerType: trainerType,
+                      isEmbedded: true,
+                    )
+                  : TrainerOnboardingDetailsPage(
+                      initialProfile: widget.initialProfile,
+                      isEmbedded: true,
+                    );
               if (shellState != null) {
                 shellState.updateBody(nextPage);
               } else {
@@ -857,8 +866,10 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                 );
               }
             },
-            icon: const Icon(Icons.edit_rounded, size: 16),
-            label: Text(isVi ? 'Chỉnh sửa hồ sơ' : 'Edit profile'),
+            icon: Icon(!agreementSigned ? Icons.draw_rounded : Icons.edit_rounded, size: 16),
+            label: Text(!agreementSigned
+                ? (isVi ? 'Ký thỏa thuận' : 'Sign Agreement')
+                : (isVi ? 'Chỉnh sửa hồ sơ' : 'Edit profile')),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF28B79B),
               foregroundColor: Colors.white,
