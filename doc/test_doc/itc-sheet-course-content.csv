@@ -89,7 +89,7 @@ COURSECONTENT_FT18,"Creating a group question with a blank passage and no sub-qu
 2. Prepare POST /api/v1/trainer/questions/group body {""sectionId"":<id>,""passageText"":"""",""subQuestions"":[]}.
 3. Send the request.
 4. Inspect the response body and confirm a question_groups row was actually created despite the empty content.","1. 200 OK {""message"":""Group question created successfully"",""id"":<groupId>,""questionIds"":[]} — a question_groups row is created despite having no real content.","- Logged in; valid sectionId."
-COURSECONTENT_FT19,"If one sub-question in a multi-sub-question group fails to insert after earlier ones already succeeded, the already-created group and prior sub-questions are NOT rolled back — a partial/broken group persists despite the \"error\" response.","1. Log in as any eligible role and prepare a group payload with 2+ subQuestions, where the FIRST is valid and a LATER one has data that causes an insert failure (e.g. an invalid categoryId).
+COURSECONTENT_FT19,"If one sub-question in a multi-sub-question group fails to insert after earlier ones already succeeded, the already-created group and prior sub-questions are NOT rolled back — a partial/broken group persists despite the ""error"" response.","1. Log in as any eligible role and prepare a group payload with 2+ subQuestions, where the FIRST is valid and a LATER one has data that causes an insert failure (e.g. an invalid categoryId).
 2. Prepare and send POST /api/v1/trainer/questions/group with that payload.
 3. Inspect the response status/message.
 4. Re-fetch the question bank / query the database to check whether the group row and the earlier successful sub-question(s) still exist.","1. Step 3: 400 {""error"":""Failed to save sub question: ...""}.

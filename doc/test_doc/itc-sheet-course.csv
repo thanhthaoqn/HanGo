@@ -61,7 +61,7 @@ COURSE_FT13,"A learner can unenroll from a course they are currently enrolled in
 2. Prepare and send DELETE /api/v1/courses/{id}/enroll.
 3. Inspect the response message.
 4. Confirm the Enrollment row is gone.","1. 200 OK {""message"": ""Unenrollment successful""}; the Enrollment row is removed.","- Learner is currently enrolled in the target course."
-COURSE_FT14,"Unenrolling using the original/parent course id after switching to a newer version incorrectly reports \"not enrolled\" (documented gap).","1. Log in as a learner and enroll in course V1 (id=10).
+COURSE_FT14,"Unenrolling using the original/parent course id after switching to a newer version incorrectly reports ""not enrolled"" (documented gap).","1. Log in as a learner and enroll in course V1 (id=10).
 2. Switch to the newer version V2 (id=20) via COURSE_FT15.
 3. Prepare and send DELETE /api/v1/courses/10/enroll (the OLD id).
 4. Inspect the response status and message.","1. Step 3-4: 400 Bad Request, body {""error"": ""User is not enrolled in this course""} — even though the learner is still enrolled in the course family (now under id=20). Unenroll checks the raw path id, unlike enroll/switch-version which resolve to the latest-version id.","- Learner switched from V1 to V2 as in COURSE_FT15."
@@ -191,7 +191,7 @@ COURSE_FT44,"A plain trainer's submit moves an owned DRAFT course to PENDING_APP
 2. Prepare and send POST /api/v1/trainer/courses/{id}/submit.
 3. Inspect the response message.
 4. Confirm the course's status and that course managers received a notification.","1. 200 OK {""message"": ""Course submitted for review""}; course status becomes PENDING_APPROVAL; a TYPE_COURSE_SUBMITTED notification is sent to course managers.","- Plain TRAINER, owns a DRAFT course."
-COURSE_FT45,"A course creator who ALSO holds COURSE_MANAGER or ADMINISTRATOR self-publishes immediately on \"submit\", completely bypassing review (highest-priority gap in this module).","1. Log in as a user holding TRAINER + COURSE_MANAGER (or ADMINISTRATOR).
+COURSE_FT45,"A course creator who ALSO holds COURSE_MANAGER or ADMINISTRATOR self-publishes immediately on ""submit"", completely bypassing review (highest-priority gap in this module).","1. Log in as a user holding TRAINER + COURSE_MANAGER (or ADMINISTRATOR).
 2. Create a DRAFT course under that same account.
 3. Prepare and send POST /api/v1/trainer/courses/{id}/submit.
 4. Inspect the response message and the course's ACTUAL persisted status.","1. 200 OK — SAME success message ({""message"": ""Course submitted for review""}) as COURSE_FT44 — but the course's actual status is immediately PUBLISHED (publishedAt stamped, latestVersionId updated), with NO PENDING_APPROVAL step and no notification to anyone. The response gives no indication which outcome occurred.","- Caller's account holds both an authoring role and COURSE_MANAGER/ADMINISTRATOR, and is the creator of the target course."

@@ -50,7 +50,7 @@ EXAM_FT10,"Submitting an attempt against a non-existent exam id returns a masked
 2. Prepare POST /api/v1/exams/999999/submit with any body.
 3. Send the request.
 4. Inspect the response status and message.","1. 500 Internal Server Error, generic body ""An internal system error occurred. Please try again later."" — the real ""Exam not found"" reason is not surfaced to the client.","- Logged in; id 999999 unused."
-EXAM_FT11,"Submitting an answer as a letter (e.g. \"A\") instead of a numeric option-index string causes that question to silently disappear from the returned answers/correctness maps.","1. Open the actual HanGo frontend's exam-taking screen with DevTools/Network open and observe the real submit payload shape (numeric indices vs letters).
+EXAM_FT11,"Submitting an answer as a letter (e.g. ""A"") instead of a numeric option-index string causes that question to silently disappear from the returned answers/correctness maps.","1. Open the actual HanGo frontend's exam-taking screen with DevTools/Network open and observe the real submit payload shape (numeric indices vs letters).
 2. Log in as a learner and prepare POST /api/v1/exams/{id}/submit with at least one answer value that is a non-numeric string (e.g. ""A"").
 3. Send the request.
 4. Prepare and send GET /api/v1/exams/{id}/attempts and inspect the returned answers/correctness maps for that attempt.","1. Step 4: the letter-answered question is silently missing from answers/correctness in the response, even though score still counted it as wrong and the raw row was persisted in DB.","- Logged in; exam exists. Requires first confirming the real client payload shape via DevTools."
@@ -72,7 +72,7 @@ EXAM_FT15,"Saving an exam's question blocks requires ownership even for otherwis
 2. Prepare POST /api/v1/trainer/exams/{id}/questions with any valid blocks payload, for the exam owned by a different trainer.
 3. Send the request.
 4. Inspect the response status and message.","1. 400 Bad Request, {""error"": ""Unauthorized to edit this exam""} — even a COURSE_MANAGER cannot use this endpoint to edit another user's exam (no manager override on this specific action).","- An exam exists owned by a different user."
-EXAM_FT16,"Saving exam questions with an empty or omitted \"blocks\" array wipes all existing questions on that exam, rather than being rejected as a no-op.","1. Log in as the owning trainer and confirm the target exam already has ≥1 saved question block.
+EXAM_FT16,"Saving exam questions with an empty or omitted ""blocks"" array wipes all existing questions on that exam, rather than being rejected as a no-op.","1. Log in as the owning trainer and confirm the target exam already has ≥1 saved question block.
 2. Prepare POST /api/v1/trainer/exams/{id}/questions body {""blocks"": []} (or omit the key).
 3. Send the request.
 4. Prepare and send GET /api/v1/trainer/exams/{id}/questions to confirm the question list is now empty.","1. 200 OK {""message"": ""Exam questions saved successfully""}; a subsequent GET of the exam's questions returns an EMPTY list — all prior questions were deleted with nothing to replace them.","- Owned exam with existing saved questions."
@@ -85,7 +85,7 @@ EXAM_FT18,"Viewing an exam's answer key from the trainer side has no ownership c
 3. Inspect the response status and whether isCorrect is included for each option.
 4. Compare against EXAM_FT15's write-side ownership rejection on the same resource.","1. 200 OK; the full question set INCLUDING isCorrect for every option is returned to Trainer B, despite B not owning the exam — contrast with EXAM_FT15's write-side ownership enforcement on the same resource.","- An exam exists owned by Trainer A; Trainer B holds an authorized exam-management authority but is not the owner."
 Update Exam Status / Visibility / Delete,,,,
-EXAM_FT19,"A manager who also creates their own exam self-publishes it immediately upon \"submitting\", bypassing any separate review step entirely.","1. Log in as a user holding COURSE_MANAGER or ADMINISTRATOR and create an exam under their own account.
+EXAM_FT19,"A manager who also creates their own exam self-publishes it immediately upon ""submitting"", bypassing any separate review step entirely.","1. Log in as a user holding COURSE_MANAGER or ADMINISTRATOR and create an exam under their own account.
 2. Prepare PATCH /api/v1/trainer/exams/{id}/status body {""status"":""SUBMITTED""}.
 3. Send the request.
 4. Inspect the exam's resulting status.","1. 200 OK; exam status becomes PUBLISHED immediately (not SUBMITTED/PENDING), bypassing any review queue.","- Caller holds COURSE_MANAGER/ADMINISTRATOR and owns the target exam."
@@ -122,12 +122,12 @@ EXAM_FT26,"A validation failure partway through the file (e.g. row 5 of 10 has a
 EXAM_FT27,"A non-numeric value in a numeric Excel column (QuestionCount/PassingScore/Time) surfaces as a raw parser exception message rather than a friendly validation message.","1. Prepare a workbook whose ""Time"" column contains text (e.g. ""fifty"") instead of a number.
 2. Log in and prepare/send POST /api/v1/trainer/exams/import-excel-multiple with that file.
 3. Inspect the response status and error message.
-4. Compare the wording against the dedicated ""Time is required""/""must be greater than 0"" messages.","1. 400 Bad Request, {""error"": ""Failed to parse Excel: For input string: \""fifty\""...""} — a raw NumberFormatException message, distinct wording from the dedicated ""Time is required""/""must be greater than 0"" messages.","- Workbook prepared with a non-numeric Time value."
+4. Compare the wording against the dedicated ""Time is required""/""must be greater than 0"" messages.","1. 400 Bad Request, {""error"": ""Failed to parse Excel: For input string: """fifty"""...""} — a raw NumberFormatException message, distinct wording from the dedicated ""Time is required""/""must be greater than 0"" messages.","- Workbook prepared with a non-numeric Time value."
 EXAM_FT28,"An unrecognized Skill Type, Difficulty, or Group Type value in the QUESTIONS sheet is rejected outright, unlike Course import's silent-fallback policy for the same kind of input.","1. Prepare a workbook whose QUESTIONS sheet has a SkillType value not in the recognized/remappable set (e.g. ""Astrology"").
 2. Log in and prepare/send POST /api/v1/trainer/exams/import-excel-multiple with that file.
 3. Inspect the response status and error message.
 4. Confirm no new exams/questions from this file were committed (per EXAM_FT26's caveat about earlier rows in the same file).","1. 400 Bad Request, {""error"": ""Failed to parse Excel: Invalid Skill Type 'Astrology' at Exam <code>""}; no exams/questions from this file are new (though per EXAM_FT26, any earlier-processed exam rows in the SAME file may still have been committed).","- Workbook prepared with an invalid SkillType value."
-EXAM_FT29,"A legacy/deprecated label (e.g. \"Grammar\", \"Sentence Meaning\") in the Excel sheet is silently remapped to its current equivalent during import, with no warning of the substitution.","1. Prepare a workbook whose SkillType column uses the legacy label ""Grammar"".
+EXAM_FT29,"A legacy/deprecated label (e.g. ""Grammar"", ""Sentence Meaning"") in the Excel sheet is silently remapped to its current equivalent during import, with no warning of the substitution.","1. Prepare a workbook whose SkillType column uses the legacy label ""Grammar"".
 2. Log in and prepare/send POST /api/v1/trainer/exams/import-excel-multiple with that file.
 3. Inspect the response status.
 4. Query the imported question's persisted skill parameter and compare it against the literal ""Grammar"" label.","1. Step 3: 200 OK, import succeeds.
@@ -157,7 +157,7 @@ EXAM_FT34,"A matrix's Category criterion is silently ignored during generation �
 EXAM_FT35,"Generating from a matrix with zero criteria rows silently succeeds, producing a valid but 0-question exam rather than an error.","1. Log in as COURSE_MANAGER and identify a matrix created with an empty details list (per EXAM_FT31).
 2. Prepare and send POST /api/v1/course-manager/matrices/{id}/generate.
 3. Inspect the response and the resulting exam's question count.","1. 200 OK, {""examId"": <id>, ""message"": ""Exam generated successfully""} — the created exam has zero attached questions, no error.","- A matrix with zero detail rows exists."
-EXAM_FT36,"The count-available endpoint's \"catId\" parameter actually filters by group-type internally rather than category — a naming/semantics mismatch, reproducible on both the manager and trainer variants.","1. Log in as COURSE_MANAGER and identify a known category id and a known group-type id.
+EXAM_FT36,"The count-available endpoint's ""catId"" parameter actually filters by group-type internally rather than category — a naming/semantics mismatch, reproducible on both the manager and trainer variants.","1. Log in as COURSE_MANAGER and identify a known category id and a known group-type id.
 2. Prepare and send GET /api/v1/course-manager/matrices/count-available?skillId=X&diffId=Y&catId=Z where Z is the real CATEGORY id; note the returned count.
 3. Repeat the same call with Z set to the real GROUP-TYPE id instead; note the returned count.
 4. Compare both counts to see which one actually changes the filtering.","1. Step 2: the count returned does not reflect filtering by the category Z — it behaves as if no category filter (or an unmatched group-type filter) was applied.
@@ -171,7 +171,7 @@ EXAM_FT38,"A Course Manager can toggle a matrix between public and private; the 
 2. Prepare and send PUT /api/v1/course-manager/matrices/{id}/toggle-public; inspect the response and the matrix's isPublic flag afterward.
 3. Prepare and send GET /api/v1/course-manager/matrices/count-available?skillId=X (diffId and catId both omitted).
 4. Inspect the response status/shape and compare it against this controller's other hand-rolled error bodies.","1. Step 2: 200 OK, {""message"": ""Exam matrix status toggled successfully""}; matrix.isPublic flips.
-2. Step 3-4: 400 Bad Request via the standard ApiErrorDTO shape, ""Missing required parameter: diffId"" — a different, cleaner error envelope than this controller's other hand-rolled {\"error\":...} responses, since Spring's own MissingServletRequestParameterException fires before the method body runs.","- COURSE_MANAGER logged in; a matrix exists."
+2. Step 3-4: 400 Bad Request via the standard ApiErrorDTO shape, ""Missing required parameter: diffId"" — a different, cleaner error envelope than this controller's other hand-rolled {""error"":...} responses, since Spring's own MissingServletRequestParameterException fires before the method body runs.","- COURSE_MANAGER logged in; a matrix exists."
 View Exams for Review / Publish / Reject (Course Manager),,,,
 EXAM_FT39,"A Course Manager can view the exam review queue, both with the default status filter and with ALL.","1. Log in as COURSE_MANAGER/ADMINISTRATOR in an environment with exams in multiple statuses.
 2. Prepare and send GET /api/v1/course-manager/exams/review (default status); inspect the returned list.

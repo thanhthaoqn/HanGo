@@ -42,11 +42,11 @@ PAYMENT_FT08,"A mixed multi-course checkout — one course already owned, one no
 2. Prepare POST /api/v1/payment/create body {""courseIds"":[<owned>,<not owned, paid>]}.
 3. Send the request and inspect the returned totalAmount.
 4. Inspect the underlying PayOS orderCode/description for whether both course ids are referenced.","1. 200 OK; totalAmount reflects only the NOT-owned course's price, but the resulting PayOS orderCode/description still references both course ids in courseIdsStr — worth confirming this doesn't double-charge or silently drop the owned course from the record.","- Logged in; one owned + one unowned paid course."
-PAYMENT_FT09,"Polling payment status for a transaction belonging to a different user returns 404 with a generic \"Unauthorized\" body rather than 403.","1. Log in as User A and create a payment; note its txnRef.
+PAYMENT_FT09,"Polling payment status for a transaction belonging to a different user returns 404 with a generic ""Unauthorized"" body rather than 403.","1. Log in as User A and create a payment; note its txnRef.
 2. Log out and log in as unrelated User B.
 3. Prepare and send GET /api/v1/payment/status/{txnRefBelongingToUserA} as User B.
 4. Inspect the response status and message.","1. 404 Not Found, {""error"":""Unauthorized""} — a 404 status is used for both ""not found"" and ""not yours"" cases uniformly.","- A payment record belonging to User A exists; caller is User B."
-PAYMENT_FT10,"Polling a completely non-existent txnRef returns 404 with a distinct \"Payment not found\" message.","1. Log in as any role.
+PAYMENT_FT10,"Polling a completely non-existent txnRef returns 404 with a distinct ""Payment not found"" message.","1. Log in as any role.
 2. Prepare GET /api/v1/payment/status/GARBAGE-REF (a txnRef confirmed not to exist).
 3. Send the request.
 4. Inspect the response status and message, comparing it against PAYMENT_FT09's wording.","1. 404 Not Found, {""error"":""Payment not found""}.","- ""GARBAGE-REF"" unused."

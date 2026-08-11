@@ -10,9 +10,12 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
+// Manual dev tool, not part of the automated suite (one-off data-fix script against a real
+// "local" DB) — excluded from `mvnw test` by not matching Surefire's Test*/*Test/*Tests
+// naming pattern; still runnable from an IDE.
 @SpringBootTest(classes = HangoBackendApplication.class)
 @ActiveProfiles("local")
-public class FixImportedCoursesTest {
+public class FixImportedCoursesManualTool {
 
     @Autowired
     private LessonRepository lessonRepository;

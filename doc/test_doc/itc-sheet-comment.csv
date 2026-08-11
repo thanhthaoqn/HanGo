@@ -24,11 +24,11 @@ COMMENT_FT03,"A comment with clean, unremarkable text is automatically approved 
 COMMENT_FT04,"A comment containing a blacklisted profanity keyword is auto-rejected by the rule engine, with the detection reason recorded on the row.","1. Log in as any authenticated role.
 2. Prepare POST /api/v1/comments/lesson/{lessonId} with content containing a known blacklisted profanity term.
 3. Send the request.
-4. Inspect the returned comment's status and detectionReason.","1. 200 OK (the POST itself succeeds); the comment's status is REJECTED, with detectionReason ""Blacklist keyword detected: \""<word>\"""".","- Logged in."
+4. Inspect the returned comment's status and detectionReason.","1. 200 OK (the POST itself succeeds); the comment's status is REJECTED, with detectionReason ""Blacklist keyword detected: """<word>""""".","- Logged in."
 COMMENT_FT05,"A comment containing a mild/suspicious (not blacklisted) keyword is held for review instead of being auto-approved or auto-rejected.","1. Log in as any authenticated role.
 2. Prepare POST /api/v1/comments/lesson/{lessonId} with content containing a mild insult keyword (e.g. ""ngu"", ""stupid"", ""idiot"").
 3. Send the request.
-4. Inspect the returned comment's status and detectionReason.","1. Comment status=PENDING, detectionReason ""Suspicious keyword detected: \""<word>\"""".","- Logged in."
+4. Inspect the returned comment's status and detectionReason.","1. Comment status=PENDING, detectionReason ""Suspicious keyword detected: """<word>""""".","- Logged in."
 COMMENT_FT06,"A comment containing a phone number, URL, email, or off-platform-contact phrase is also flagged for review rather than auto-approved.","1. Log in as any authenticated role.
 2. Prepare POST /api/v1/comments/lesson/{lessonId} with content containing a Vietnamese phone-number pattern (e.g. ""0912345678"") or the word ""zalo""/""inbox"".
 3. Send the request.

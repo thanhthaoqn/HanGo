@@ -27,7 +27,7 @@ TICKET_FT04,"Viewing a ticket's full detail (including message thread) is allowe
 3. Log in as an unrelated LEARNER (not the owner, not staff) and repeat the same GET.
 4. Compare all three response statuses.","1. Steps 1-2: 200 OK, full detail with messages[].
 2. Step 3: 500 Internal Server Error, generic masked body — the real ""Access denied"" RuntimeException is not surfaced as a clean 403.","- A ticket exists; an unrelated LEARNER account is available for step 3."
-TICKET_FT05,"A learner can list their own tickets, filterable by status including the special \"PROCESSED\" alias that maps to both terminal states.","1. Log in as a learner with tickets in multiple statuses (some APPROVED, some REJECTED, some still PENDING/PROCESSING).
+TICKET_FT05,"A learner can list their own tickets, filterable by status including the special ""PROCESSED"" alias that maps to both terminal states.","1. Log in as a learner with tickets in multiple statuses (some APPROVED, some REJECTED, some still PENDING/PROCESSING).
 2. Prepare and send GET /api/v1/tickets/my-tickets?status=PROCESSED.
 3. Inspect the returned list.
 4. Confirm every returned ticket's status is either APPROVED or REJECTED, and none are PENDING/PROCESSING.","1. 200 OK; only tickets whose status is APPROVED or REJECTED are returned (PROCESSED is a virtual filter mapping to both terminal states).","- Logged in; tickets in multiple statuses exist for the caller."

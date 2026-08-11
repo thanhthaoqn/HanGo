@@ -11,8 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+// Manual dev tool, not part of the automated suite (mutates a real DB via @Rollback(false)
+// against hardcoded matrix id 21) — excluded from `mvnw test` by not matching Surefire's
+// Test*/*Test/*Tests naming pattern; still runnable from an IDE.
 @SpringBootTest(classes = HangoBackendApplication.class)
-public class MatrixDataGenTest {
+public class MatrixDataGenManualTool {
 
     @Autowired private JdbcTemplate jdbcTemplate;
 

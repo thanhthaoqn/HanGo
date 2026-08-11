@@ -174,7 +174,7 @@ AUTHENTICATION_FT32,"Resetting the password with an OTP that has already expired
 2. Open the Reset Password page (or prepare POST /api/auth/reset-password) and submit that expired otpCode with a new password.
 3. Inspect the response, then confirm the OTP row is gone and the password is unchanged.","1. 400 Bad Request, message: ""OTP code has expired. Please request a new one.""
 2. The expired OTP row is deleted; password not changed.","- An expired OTP row exists for the email."
-AUTHENTICATION_FT33,"Resetting the password with a fabricated OTP code that never matches any stored OTP is rejected with a generic message that doesn't distinguish \"no OTP exists\" from \"wrong code\".","1. Choose an email with no active OTP row (or an active OTP for a different code).
+AUTHENTICATION_FT33,"Resetting the password with a fabricated OTP code that never matches any stored OTP is rejected with a generic message that doesn't distinguish ""no OTP exists"" from ""wrong code"".","1. Choose an email with no active OTP row (or an active OTP for a different code).
 2. Open the Reset Password page (or prepare POST /api/auth/reset-password) and submit a made-up otpCode with a new password.
 3. Inspect the response.","1. 400 Bad Request, message: ""Invalid or expired OTP code."" — the same generic message whether the OTP row doesn't exist at all or a real OTP exists but the code just doesn't match; the caller cannot distinguish the two.","- None, or an OTP row exists for a different code than the one submitted."
 Verify Account (email link),,,,
@@ -184,7 +184,7 @@ AUTHENTICATION_FT34,"Clicking a valid, unexpired verification link marks the acc
 4. Inspect the rendered page, then attempt a login with that account to confirm it now works.","1. Step 3: 200 OK; HTML success page (""Account Verified Successfully!"") rendered.
 2. The user's isVerified becomes true and status becomes ACTIVE; the verification token is cleared so it cannot be reused.
 3. Step 4: the account can now log in (no longer blocked by AUTHENTICATION_FT05's unverified check).","- A freshly registered, unverified account with a valid (not yet expired, 12h validity) verification token exists."
-AUTHENTICATION_FT35,"Re-visiting an already-consumed verification link shows a friendly \"already verified\" confirmation instead of a confusing error.","1. Complete AUTHENTICATION_FT34 to fully verify an account via its link.
+AUTHENTICATION_FT35,"Re-visiting an already-consumed verification link shows a friendly ""already verified"" confirmation instead of a confusing error.","1. Complete AUTHENTICATION_FT34 to fully verify an account via its link.
 2. Open the SAME link (GET /api/auth/verify?token=<the same, now-cleared token>) a second time.
 3. Inspect the rendered HTML page and compare it against a genuine invalid-link error page.","1. 200 OK; HTML page titled ""Already Verified"" — distinct, friendlier wording from a genuine error, since the account is already in the desired end state.","- Verification already completed via the same link/token."
 AUTHENTICATION_FT36,"Visiting the verify link with a missing, blank, or completely invalid token shows a clear error page rather than a server error.","1. Open GET /api/auth/verify with no token query parameter at all.

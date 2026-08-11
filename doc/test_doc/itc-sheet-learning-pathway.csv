@@ -48,7 +48,7 @@ PATHWAY_FT10,"Requesting the active pathway when the learner has none (or all ar
 2. Prepare and send GET /api/v1/pathways/me.
 3. Inspect the response status and message.","1. 404 Not Found, ""No active learning pathway found"".","- Learner with zero pathways (or all archived)."
 Reroute Pathway (legacy simple form),,,,
-PATHWAY_FT11,"Rerouting appears to unconditionally re-lock all downstream (non-completed) nodes regardless of whether the latest exam score was good or bad — verify this holds even for a HIGH-scoring student, where the messaging implies \"no action needed.\"","1. Log in and arrange the caller's most recent exam attempt to score ≥60.
+PATHWAY_FT11,"Rerouting appears to unconditionally re-lock all downstream (non-completed) nodes regardless of whether the latest exam score was good or bad — verify this holds even for a HIGH-scoring student, where the messaging implies ""no action needed.""","1. Log in and arrange the caller's most recent exam attempt to score ≥60.
 2. Note the current status of every downstream (non-completed) node in the pathway.
 3. Prepare and send PUT /api/v1/pathways/{id}/reroute.
 4. Inspect the mentor summary text AND re-check every downstream node's status/progress for any changes.","1. Step 3-4: 200 OK; mentor summary says the plan is fine, BUT the node-locking loop still runs — confirm whether downstream nodes are still reset/locked despite the ""no changes needed"" messaging (documents a possible mismatch between text and actual state mutation).","- Own pathway with a recent exam attempt scoring ≥60."
@@ -95,7 +95,7 @@ PATHWAY_FT21,"A node completed with an exact 100.0 score, whose next node isn't 
 PATHWAY_FT22,"The suggestions endpoint hits the SAME 500-instead-of-403/404 bug as the progress-snapshot endpoint, and is reachable by an ownership mismatch alone.","1. Log in and identify another student's pathway id.
 2. Prepare and send POST /api/v1/pathways/{anotherStudentsPathwayId}/reroute/suggestions.
 3. Inspect the response status and body.","1. 500 Internal Server Error, generic masked body — NOT the expected 403, since this endpoint calls the same progress-snapshot service first, before any of its own checks run.","- Another student's pathway exists."
-PATHWAY_FT23,"Accepting a FAST_TRACK suggestion correctly marks the node skipped and writes an audit event; accepting a DETOUR_REQUIRED suggestion instead inserts the pathway's FIRST course as a \"remedial\" step regardless of what skill is actually weak.","1. Obtain a FAST_TRACK_ELIGIBLE suggestion (per PATHWAY_FT21), then prepare and send POST /api/v1/pathways/{id}/reroute/accept; inspect the resulting node and audit log.
+PATHWAY_FT23,"Accepting a FAST_TRACK suggestion correctly marks the node skipped and writes an audit event; accepting a DETOUR_REQUIRED suggestion instead inserts the pathway's FIRST course as a ""remedial"" step regardless of what skill is actually weak.","1. Obtain a FAST_TRACK_ELIGIBLE suggestion (per PATHWAY_FT21), then prepare and send POST /api/v1/pathways/{id}/reroute/accept; inspect the resulting node and audit log.
 2. Separately, obtain a DETOUR_REQUIRED suggestion (per PATHWAY_FT20), then prepare and send POST /api/v1/pathways/{id}/reroute/accept; inspect the newly inserted node.
 3. Compare the inserted ""remedial"" course's identity against the pathway's very first course.","1. Step 1: 200 OK; the target node becomes status=COMPLETED, nodeType=FAST_TRACK_SKIPPED, isOptional=true; the next LOCKED node unlocks; a PathwayEvent audit record is written.
 2. Step 2: 200 OK; a new ""remedial"" node is inserted that is literally a copy of the pathway's own FIRST course — even if that course has nothing to do with the actual failing skill — subsequent nodes shift down by one stepOrder; a PathwayEvent is also written.","- Suggestions obtained per PATHWAY_FT20/21 respectively."
@@ -105,7 +105,7 @@ PATHWAY_FT24,"Declining a suggestion is a pure no-op, so the identical suggestio
 4. Compare the second suggestion's node_type/reason against the first.","1. Step 2: 200 OK, just re-returns the current pathway state.
 2. Step 3-4: the SAME suggestion (same node_type/reason) is returned again — nothing was recorded to suppress it.","- A pending suggestion exists as of step 1."
 Mentor Action,,,,
-PATHWAY_FT25,"An unrecognized actionType is not rejected — it returns 200 with a generic \"don't know how to handle it\" message instead of a validation error.","1. Log in with an own pathway.
+PATHWAY_FT25,"An unrecognized actionType is not rejected — it returns 200 with a generic ""don't know how to handle it"" message instead of a validation error.","1. Log in with an own pathway.
 2. Prepare POST /api/v1/pathways/{id}/mentor-action body {""actionType"":""NOT_A_REAL_ACTION""}.
 3. Send the request.
 4. Inspect the response status and mentor_summary text.","1. 200 OK; mentor_summary is a generic fallback acknowledging the unknown action — no 400/422.","- Own pathway exists."
@@ -114,7 +114,7 @@ PATHWAY_FT26,"Sending a non-numeric hoursPerWeek inside the ADJUST_SCHEDULE payl
 3. Send the request.
 4. Inspect the response status.","1. 500 Internal Server Error — the unguarded ((Number) payload.get(""hoursPerWeek"")).intValue() cast throws a ClassCastException for a non-numeric JSON value.","- Own pathway exists, ideally already has a targetDate/hoursPerWeek set."
 Chat with Pathway Mentor,,,,
-PATHWAY_FT27,"An ordinary off-topic question that matches neither the \"learning\" nor the \"off-topic\" keyword lists is treated as in-scope by default and forwarded to the live LLM — a looser guardrail than the lesson-level AI Assistant's embedding-based check.","1. Log in with an own pathway.
+PATHWAY_FT27,"An ordinary off-topic question that matches neither the ""learning"" nor the ""off-topic"" keyword lists is treated as in-scope by default and forwarded to the live LLM — a looser guardrail than the lesson-level AI Assistant's embedding-based check.","1. Log in with an own pathway.
 2. Prepare POST /api/v1/pathways/{id}/chat body {""message"":""What's 2+2?""} (a message matching neither keyword list).
 3. Send the request.
 4. Inspect the response's was_out_of_scope flag and reply content.","1. 200 OK; was_out_of_scope=false — the message is forwarded to the live LLM despite arguably being off-topic, since the keyword pre-filter only catches a short hardcoded list (bitcoin/crypto/weather/recipe/football/etc.).","- Logged in; own pathway exists."

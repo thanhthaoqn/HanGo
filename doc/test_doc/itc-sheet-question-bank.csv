@@ -8,7 +8,7 @@ Round 3,0,0,20,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 View Trainer Question List,,,,
-QUESTIONBANK_FT01,"The default list call, with the type parameter omitted, returns questions of every status rather than only \"quiz-type\" ones as the default's name misleadingly implies.","1. Log in as a trainer who has authored questions in ≥2 different statuses.
+QUESTIONBANK_FT01,"The default list call, with the type parameter omitted, returns questions of every status rather than only ""quiz-type"" ones as the default's name misleadingly implies.","1. Log in as a trainer who has authored questions in ≥2 different statuses.
 2. Prepare and send GET /api/v1/trainer/question-bank with no type query parameter.
 3. Inspect the returned list's status values.
 4. Confirm questions of every status are present, not just one.","1. 200 OK; questions of ALL statuses are returned — the default ""type=QUIZ"" behaves identically to ""type=ALL"", not as a status filter.","- Caller has authored questions in ≥2 different statuses."
@@ -70,7 +70,7 @@ QUESTIONBANK_FT14,"Any authenticated role — not just Trainer/Course Manager �
 2. Prepare POST /api/v1/trainer/questions/ai/generate body {""mode"":""SINGLE"",""topicSeed"":""past simple tense"",""sectionId"":<id>}.
 3. Send the request.
 4. Inspect the response status, confirming it is not 403.","1. 200 OK — the LEARNER successfully triggers a real (presumably billed) Gemini call, with no 403 — worth flagging as a cost-control/abuse gap even though it ""works.""","- Logged in as LEARNER; a valid sectionId (its actual ownership is never checked, only interpolated into the prompt)."
-QUESTIONBANK_FT15,"A mode value other than exactly \"SINGLE\" is silently treated as the MULTIPLE/group branch rather than being rejected.","1. Log in as an eligible role.
+QUESTIONBANK_FT15,"A mode value other than exactly ""SINGLE"" is silently treated as the MULTIPLE/group branch rather than being rejected.","1. Log in as an eligible role.
 2. Prepare POST /api/v1/trainer/questions/ai/generate body {""mode"":""FOO"",""topicSeed"":""grammar"",""sectionId"":<id>}.
 3. Send the request.
 4. Inspect the response shape (SINGLE vs MULTIPLE).","1. 200 OK; the response comes back in MULTIPLE-mode shape (""group"" populated), since anything not literally ""SINGLE"" falls into that branch — no 400 for the nonsensical mode value.","- Logged in as an eligible role."
