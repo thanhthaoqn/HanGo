@@ -250,10 +250,7 @@ class CourseRatingServiceTest {
 
         courseRatingService.addCourseReview(1L, 1L, (short) 4, "Good");
 
-        ArgumentCaptor<Course> captor = ArgumentCaptor.forClass(Course.class);
-        verify(courseRepository).save(captor.capture());
-        assertEquals(4.5, captor.getValue().getAverageRating());
-        assertEquals(2, captor.getValue().getTotalRatings());
+        verify(courseRepository).updateCourseStats(1L, 4.5, 2);
     }
 
     // =================================================================
@@ -396,9 +393,6 @@ class CourseRatingServiceTest {
         courseRatingService.deleteCourseReview(1L, 1L);
 
         verify(courseRatingRepository).delete(existing);
-        ArgumentCaptor<Course> captor = ArgumentCaptor.forClass(Course.class);
-        verify(courseRepository).save(captor.capture());
-        assertEquals(1, captor.getValue().getTotalRatings());
-        assertEquals(4.0, captor.getValue().getAverageRating());
+        verify(courseRepository).updateCourseStats(1L, 4.0, 1);
     }
 }

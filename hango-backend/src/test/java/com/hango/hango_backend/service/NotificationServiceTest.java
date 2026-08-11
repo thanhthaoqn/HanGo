@@ -25,6 +25,7 @@ import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Notification;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.NotificationRepository;
+import com.hango.hango_backend.repository.UserRepository;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +35,8 @@ class NotificationServiceTest {
 
     @Mock
     private NotificationRepository notificationRepository;
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private NotificationService notificationService;
@@ -49,12 +52,16 @@ class NotificationServiceTest {
     @Test
     void notifyCourseManagersShouldSaveNotificationAddressedToTheCourseManagerRole() {
         Course course = Course.builder().id(1L).title("English Grammar Mastery").build();
+        User manager = user(2L);
+        when(userRepository.findByRoleNames(List.of("COURSE_MANAGER", "COURSE_MANAGER", "ADMINISTRATOR")))
+                .thenReturn(List.of(manager));
 
         notificationService.notifyCourseManagers(NotificationService.TYPE_LOW_RATING,
                 "Low Course Rating Detected", "Course: English Grammar Mastery\nLearner Rating: 2 Stars", course);
 
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());
+        assertEquals(manager, captor.getValue().getUser());
         assertEquals(NotificationService.RECIPIENT_COURSE_MANAGER, captor.getValue().getRecipientRole());
         assertEquals(NotificationService.TYPE_LOW_RATING, captor.getValue().getType());
         assertEquals("Low Course Rating Detected", captor.getValue().getTitle());
@@ -75,7 +82,7 @@ class NotificationServiceTest {
                 "Payment successful", "Your payment was successful", course);
 
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository).save(captor.capture());
+        verify(notificationRepository).saveAndFlush(captor.capture());
         assertEquals(recipient, captor.getValue().getUser());
         assertEquals(NotificationService.TYPE_PURCHASE_SUCCESS, captor.getValue().getType());
         assertEquals(course, captor.getValue().getCourse());
@@ -85,7 +92,7 @@ class NotificationServiceTest {
     void notifyUserShouldDoNothingWhenUserIsNull() {
         notificationService.notifyUser(null, NotificationService.TYPE_NEW_ENROLLMENT, "title", "message", null);
 
-        verify(notificationRepository, never()).save(any());
+        verify(notificationRepository, never()).saveAndFlush(any());
     }
 
     // =================================================================

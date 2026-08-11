@@ -112,13 +112,14 @@ class ExamServiceTest {
     }
 
     @Test
-    void getAllExamsShouldAlwaysReturnEmptyWhenNonPublishedStatusRequested() {
+    void getAllExamsShouldReturnExamsMatchingTheRequestedNonPublishedStatus() {
         Exam draftExam = exam(2L, "Draft Exam", "DRAFT", 40, null);
         when(examRepository.findByDeletedAtIsNullAndStatus("DRAFT")).thenReturn(List.of(draftExam));
 
         List<ExamResponseDTO> result = examService.getAllExams("DRAFT");
 
-        assertTrue(result.isEmpty());
+        assertEquals(1, result.size());
+        assertEquals("Draft Exam", result.get(0).getTitle());
     }
 
     @Test
@@ -135,7 +136,8 @@ class ExamServiceTest {
     void getAllExamsShouldReturnDistinctStudentCountAsLearnerCountFormatted() {
         Exam e = exam(4L, "Popular Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
         when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
-        when(examAttemptRepository.countDistinctStudentsByExamId(4L)).thenReturn(1000L);
+        when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(4L)))
+                .thenReturn(java.util.Collections.singletonList(new Object[] { 4L, 1000L }));
 
         List<ExamResponseDTO> result = examService.getAllExams(null);
 
@@ -146,7 +148,8 @@ class ExamServiceTest {
     void getAllExamsShouldDefaultLearnerCountToZeroWhenCountIsZero() {
         Exam e = exam(5L, "New Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
         when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
-        when(examAttemptRepository.countDistinctStudentsByExamId(5L)).thenReturn(0L);
+        when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(5L)))
+                .thenReturn(java.util.Collections.singletonList(new Object[] { 5L, 0L }));
 
         List<ExamResponseDTO> result = examService.getAllExams(null);
 
@@ -154,10 +157,10 @@ class ExamServiceTest {
     }
 
     @Test
-    void getAllExamsShouldDefaultLearnerCountToZeroWhenCountIsNull() {
+    void getAllExamsShouldDefaultLearnerCountToZeroWhenNoAttemptRowReturned() {
         Exam e = exam(6L, "Fresh Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
         when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
-        when(examAttemptRepository.countDistinctStudentsByExamId(6L)).thenReturn(null);
+        when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(6L))).thenReturn(List.of());
 
         List<ExamResponseDTO> result = examService.getAllExams(null);
 
@@ -318,8 +321,9 @@ class ExamServiceTest {
         when(questionRepository.findByExamIdOrderByQuestionOrder(1L)).thenReturn(List.of(q0, q1));
         when(examAttemptRepository.save(any(ExamAttempt.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        // Answer keys are 1-indexed (question 1 -> q0, question 2 -> q1).
         // q0: selects option index 1 (correct). q1: selects option index 1 (incorrect) -> 1 of 2 correct.
-        Map<String, Object> answers = Map.of("0", "1", "1", "1");
+        Map<String, Object> answers = Map.of("1", "1", "2", "1");
 
         ExamAttemptResponseDTO response = examService.saveExamAttempt(1L, 1L,
                 ExamAttemptRequestDTO.builder().answers(answers).build());
@@ -344,27 +348,32 @@ class ExamServiceTest {
     }
 
     @Test
-    void saveExamAttemptShouldPersistEnrichedAnswersAsJsonArrayButEchoBackEmptyAnswersDueToTypeMismatch() {
+    void saveExamAttemptShouldPersistEnrichedAnswersAsJsonArrayAndCorrectlyEchoBackAnswersOnRoundTrip() {
+        // GAP-EXM-01 (reading the persisted JSON array back via Map.class) is fixed:
+        // mapToAttemptDTO now reads answersJson back via List.class, so a numeric
+        // selectedOption round-trips correctly instead of coming back empty.
         Exam e = exam(1L, "Exam A", "PUBLISHED", 50, null);
         User student = user(1L, "learner@example.com", "Learner A");
+        Question q0 = new Question();
+        q0.setId(10L);
+        q0.setOptions(List.of(questionOption(100L, false), questionOption(101L, true)));
         when(examRepository.findById(1L)).thenReturn(Optional.of(e));
         when(userRepository.findById(1L)).thenReturn(Optional.of(student));
         when(examAttemptRepository.countByExamIdAndStudentId(1L, 1L)).thenReturn(0);
-        when(questionRepository.findByExamIdOrderByQuestionOrder(1L)).thenReturn(List.of());
+        when(questionRepository.findByExamIdOrderByQuestionOrder(1L)).thenReturn(List.of(q0));
         ArgumentCaptor<ExamAttempt> captor = ArgumentCaptor.forClass(ExamAttempt.class);
         when(examAttemptRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
 
-        Map<String, Object> rawAnswer = Map.of("selectedOption", "A", "isCorrect", true, "skill", "Reading", "topic", "Detail");
+        Map<String, Object> rawAnswer = Map.of("selectedOption", "1");
         ExamAttemptResponseDTO response = examService.saveExamAttempt(1L, 1L,
                 ExamAttemptRequestDTO.builder().score(new BigDecimal("7.0")).answers(Map.of("1", rawAnswer)).build());
 
         String persistedJson = captor.getValue().getAnswersJson();
         assertTrue(persistedJson.trim().startsWith("["), "answersJson persisted to DB should be a JSON array: " + persistedJson);
-        assertTrue(persistedJson.contains("\"questionId\":1"));
+        assertTrue(persistedJson.contains("\"questionId\":0"));
 
-        assertTrue(response.getAnswers() == null || response.getAnswers().isEmpty(),
-                "GAP-EXM-01: mapToAttemptDTO reads answersJson back as Map.class, but it's actually a JSON array — "
-                        + "Jackson throws internally (caught) and answers silently comes back empty despite being correctly persisted.");
+        assertEquals(1, response.getAnswers().get("1"));
+        assertTrue(response.getCorrectness().get("1"));
     }
 
     @Test

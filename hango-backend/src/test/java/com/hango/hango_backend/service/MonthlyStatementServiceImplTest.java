@@ -237,11 +237,14 @@ class MonthlyStatementServiceImplTest {
 
     @Test
     void generateMonthlyCutoffShouldGroupPendingPaymentsByTrainerComputeTaxAndNotify() {
+        // Amounts must reach trainer gross >= 2,000,000 VND: per Circular 111/2013/TT-BTC
+        // (see MonthlyStatementServiceImpl#generateMonthlyCutoff), PIT is only withheld once
+        // total income for the period is 2,000,000 VND or more.
         User creator = trainer(2L, "trainer@example.com");
-        Payment p1 = payment(creator, new BigDecimal("100000"), "PENDING", LocalDateTime.now());
-        p1.setPlatformFee(new BigDecimal("30000"));
-        p1.setTrainerEarnings(new BigDecimal("70000"));
-        Payment p2 = payment(creator, new BigDecimal("50000"), null, LocalDateTime.now());
+        Payment p1 = payment(creator, new BigDecimal("10000000"), "PENDING", LocalDateTime.now());
+        p1.setPlatformFee(new BigDecimal("3000000"));
+        p1.setTrainerEarnings(new BigDecimal("7000000"));
+        Payment p2 = payment(creator, new BigDecimal("5000000"), null, LocalDateTime.now());
         when(paymentRepository.findAll()).thenReturn(List.of(p1, p2));
         when(trainerProfileRepository.findById(2L)).thenReturn(Optional.of(
                 TrainerProfile.builder().userId(2L).trainerType("PROFESSIONAL").build()));
@@ -257,11 +260,11 @@ class MonthlyStatementServiceImplTest {
         assertEquals(1, result.size());
         MonthlyStatementDTO dto = result.get(0);
         assertEquals(2, dto.getTotalOrders());
-        // p1 gross 70000 + p2 fallback gross (50000 * 0.70 = 35000) = 105000 trainer gross
-        assertEquals(new BigDecimal("105000.00"), dto.getTotalTrainerGross());
-        // PIT tax = 10% of trainer gross = 10500; net payout = 94500
-        assertEquals(new BigDecimal("10500.00"), dto.getPitTaxAmount());
-        assertEquals(new BigDecimal("94500.00"), dto.getNetPayoutAmount());
+        // p1 gross 7000000 + p2 fallback gross (5000000 * 0.70 = 3500000) = 10500000 trainer gross
+        assertEquals(new BigDecimal("10500000.00"), dto.getTotalTrainerGross());
+        // trainer gross >= 2,000,000 -> PIT tax = 10% of trainer gross = 1050000; net payout = 9450000
+        assertEquals(new BigDecimal("1050000.00"), dto.getPitTaxAmount());
+        assertEquals(new BigDecimal("9450000.00"), dto.getNetPayoutAmount());
 
         verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_STATEMENT_READY), any(), any(), any());
         verify(paymentRepository, times(2)).save(any());
@@ -364,7 +367,8 @@ class MonthlyStatementServiceImplTest {
         when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
 
-        MonthlyStatementDTO result = statementService.settleStatement(1L, "TXN-123", "Paid via bank transfer");
+        MonthlyStatementDTO result = statementService.settleStatement(1L, "TXN-123", "Paid via bank transfer",
+                "https://example.com/receipts/txn-123.png");
 
         assertEquals("PAID", result.getStatus());
         assertEquals("TXN-123", statement.getBankTxnRef());
