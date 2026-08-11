@@ -55,7 +55,7 @@ HanGo **không tự sản xuất nội dung**; nền tảng kết nối Trainer 
 
 ### 1.3 Ngoài phạm vi (Out-of-scope, v1)
 
-Ứng dụng mobile app native (làm sau nếu còn thời gian), refund/hoàn tiền tự động (yêu cầu hoàn tiền hiện đi qua Ticket nhưng **chưa** có hành động backend nào thật sự đảo trạng thái Payment/Enrollment — xem §22), tự động payout cho Trainer (vẫn chuyển khoản thủ công), giới hạn & tính phí AI theo hạn mức, đa ngôn ngữ giao diện, GroupType trong course-authoring (v1 chỉ dùng GroupType để hiển thị và tạo câu hỏi trong Exam Matrix/Question Bank), pass-score cho Quiz, lớp học trực tiếp, nhắn tin trực tiếp, forum, gamification, chứng chỉ hoàn thành, hỗ trợ môn khác ngoài Tiếng Anh THPT.
+Ứng dụng mobile app native (làm sau nếu còn thời gian), refund/hoàn tiền tự động (yêu cầu hoàn tiền hiện đi qua Ticket nhưng **chưa** có hành động backend nào thật sự đảo trạng thái Payment/Enrollment — xem §22), tự động payout cho Trainer (vẫn chuyển khoản thủ công), giới hạn & tính phí AI theo hạn mức, đa ngôn ngữ giao diện, GroupType trong course-authoring (v1 chỉ dùng GroupType để hiển thị và tạo câu hỏi trong Exam Matrix/Question Bank), pass-score cho Quiz, lớp học trực tiếp, nhắn tin trực tiếp, forum, gamification, hỗ trợ môn khác ngoài Tiếng Anh THPT.
 
 ---
 
@@ -380,7 +380,7 @@ FE-19 Dashboard
 ```
 
 > **Ghi chú đối chiếu code — các mục trong Feature Map trên chưa xác nhận độc lập/khác thiết kế ở đợt audit này (không tự ý bỏ hay đổi so với danh sách team cung cấp, chỉ ghi chú để dùng khi viết FR chi tiết ở §7):**
-> - *View course certificate* (FE-13): **không tìm thấy** entity/endpoint "Certificate" nào trong code hiện tại — HanGo không có khái niệm chứng chỉ hoàn thành ở v1 (khớp §1.3 out-of-scope "chứng chỉ hoàn thành"). Cần xác nhận lại với team đây là placeholder cho tương lai hay cần bỏ khỏi Feature Map.
+> - *View course certificate* (FE-13): đã được xác nhận đưa vào phạm vi v1 ngày 2026-08-11. Code hiện có entity/API `Certificate` và màn hình completion hiển thị certificate khi Learner hoàn thành 100% lesson của Course.
 > - *Download course's material curriculum* xuất hiện ở cả FE-07 và FE-13 — chưa tìm thấy một API tải "trọn bộ tài liệu Course" (Cloudinary URL từng Lesson thì có, download hàng loạt thì chưa xác nhận).
 > - *View Attempt Exam* (FE-09) và *View quiz history* (FE-13) là 2 tính năng riêng biệt trong code (Exam Attempt vs Lesson Quiz Attempt, hai bảng khác nhau) — không phải trùng lặp.
 
@@ -935,12 +935,12 @@ Bất kỳ role nào: Send Ticket (chọn category) → staff (Course Manager, h
 | Import | Excel (.xlsx) — Course dùng parser XML tự viết, Exam/Question Bank dùng Apache POI thật |
 | Retake | không giới hạn |
 | Doanh thu | Course Manager (và Admin có thể thay thế) quản lý & chi trả; kỳ hiện tại là **thủ công theo yêu cầu**, chưa phải cron tự động cho phần generate (dù có 1 scheduler tự động chạy song song nhắm tháng trước — 2 đường default lệch nhau, xem §22) |
+| Course Certificate | Learner được cấp `Certificate` khi hoàn thành 100% lesson của Course; bảng `certificates` lưu `user_id`, `course_id`, `credential_id`, `issued_at` |
 | UI language | English |
 | Login | email/mật khẩu và Google OAuth2 (JIT provisioning, role mặc định Learner) |
 
 ### 14.2 Còn mở — nên xác nhận lại với team trước khi code tiếp
 
-- Feature Map (§6) liệt kê "View course certificate" nhưng code hiện không có khái niệm Certificate — xác nhận đây là placeholder tương lai hay bỏ khỏi phạm vi.
 - Mức độ "public" thật sự của Trainer Profile (FR-PROF-05) — Guest xem được không cần đăng nhập hay chỉ user đã login mới xem.
 - Danh sách các mục *Future phase* cụ thể (mobile app, refund/auto-payout, AI usage limit & cost model, pass-score cho Quiz, đa ngôn ngữ, price-tier chi tiết hơn, role Finance riêng) vẫn giữ nguyên định hướng ngoài v1 như trước, nhưng **không còn tài liệu Roadmap riêng** — theo yêu cầu team, các hạng mục ưu tiên kỹ thuật cụ thể được gói gọn trực tiếp ở §23 thay vì file rời.
 

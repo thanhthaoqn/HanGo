@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,6 +41,7 @@ public class LessonServiceImpl implements LessonService {
     private final UserRepository userRepository;
     private final LessonProgressRepository lessonProgressRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final CertificateService certificateService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -61,39 +64,62 @@ public class LessonServiceImpl implements LessonService {
                     String explanation = rs.getString("explanation");
                     String passage = rs.getString("passage");
 
-                    List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
-                            "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
-                            qId
-                    );
-
-                    List<String> options = new java.util.ArrayList<>();
-                    Integer correctIndex = 0;
-                    for (int i = 0; i < optionsRows.size(); i++) {
-                        Map<String, Object> row = optionsRows.get(i);
-                        options.add((String) row.get("option_text"));
-                        Object isCorrectObj = row.get("is_correct");
-                        boolean isCorrect = false;
-                        if (isCorrectObj instanceof Boolean) {
-                            isCorrect = (Boolean) isCorrectObj;
-                        } else if (isCorrectObj instanceof Number) {
-                            isCorrect = ((Number) isCorrectObj).intValue() == 1;
-                        }
-                        if (isCorrect) {
-                            correctIndex = i;
-                        }
-                    }
-
                     return QuizQuestionDTO.builder()
                             .id(qId)
                             .passage(passage)
                             .questionText(questionText)
                             .explanation(explanation)
-                            .options(options)
-                            .correctIndex(correctIndex)
+                            .options(new ArrayList<>())
+                            .correctIndex(0)
                             .build();
                 },
                 lessonId
         );
+        if (questions == null) {
+            questions = new ArrayList<>();
+        }
+
+        List<Long> questionIds = questions.stream()
+                .map(QuizQuestionDTO::getId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+        if (!questionIds.isEmpty()) {
+            String placeholders = questionIds.stream().map(id -> "?").collect(Collectors.joining(", "));
+            List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
+                    "SELECT question_id, option_text, is_correct FROM question_options " +
+                    "WHERE question_id IN (" + placeholders + ") ORDER BY question_id ASC, id ASC",
+                    questionIds.toArray()
+            );
+
+            if (optionsRows != null) {
+                Map<Long, List<String>> optionsByQuestionId = new HashMap<>();
+                Map<Long, Integer> correctIndexByQuestionId = new HashMap<>();
+                for (Map<String, Object> row : optionsRows) {
+                    Long questionId = ((Number) row.get("question_id")).longValue();
+                    List<String> options = optionsByQuestionId.computeIfAbsent(questionId, k -> new ArrayList<>());
+                    options.add((String) row.get("option_text"));
+
+                    Object isCorrectObj = row.get("is_correct");
+                    boolean isCorrect = false;
+                    if (isCorrectObj instanceof Boolean) {
+                        isCorrect = (Boolean) isCorrectObj;
+                    } else if (isCorrectObj instanceof Number) {
+                        isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                    }
+                    if (isCorrect) {
+                        correctIndexByQuestionId.put(questionId, options.size() - 1);
+                    }
+                }
+
+                for (QuizQuestionDTO question : questions) {
+                    List<String> options = optionsByQuestionId.get(question.getId());
+                    if (options != null) {
+                        question.setOptions(options);
+                        question.setCorrectIndex(correctIndexByQuestionId.getOrDefault(question.getId(), 0));
+                    }
+                }
+            }
+        }
 
         boolean isCompleted = false;
         if (userId != null) {
@@ -238,6 +264,7 @@ public class LessonServiceImpl implements LessonService {
                     if (completedLessons == totalLessons) {
                         enrollment.setStatus("COMPLETED");
                         enrollment.setCompletedAt(LocalDateTime.now());
+                        certificateService.generateCertificateIfNotExists(userId, courseId);
                     } else {
                         enrollment.setStatus("ENROLLED");
                         enrollment.setCompletedAt(null);

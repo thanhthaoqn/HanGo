@@ -249,4 +249,25 @@ class CourseRepository {
       throw Exception('Error fetching version history: $e');
     }
   }
+
+  Future<Map<String, dynamic>?> fetchCertificate(int courseId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/certificates/courses/$courseId');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.get(
+        uri,
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(utf8.decode(response.bodyBytes));
+      }
+
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }

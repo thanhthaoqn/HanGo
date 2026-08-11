@@ -34,6 +34,7 @@ import com.hango.hango_backend.entity.Section;
 import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.entity.TrainerProfile;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.repository.CourseRatingRepository;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
@@ -59,7 +60,11 @@ class CourseServiceTest {
     @Mock
     private LessonProgressRepository lessonProgressRepository;
     @Mock
+    private CourseRatingRepository courseRatingRepository;
+    @Mock
     private TrainerProfileRepository trainerProfileRepository;
+    @Mock
+    private EmailService emailService;
     @Mock
     private NotificationService notificationService;
 

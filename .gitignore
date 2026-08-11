@@ -56,6 +56,7 @@ hango-backend/src/main/resources/application-local.properties
 
 # File backup dữ liệu hoặc log của MySQL
 *.sql
+!hango-backend/db/create_certificates_table.sql
 *.log
 
 # -------------------------------------------------------------------------

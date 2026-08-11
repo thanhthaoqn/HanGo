@@ -37,4 +37,17 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
     @Query("SELECT COUNT(DISTINCT e.user.id) FROM Enrollment e WHERE e.course.id IN :courseIds")
     int countDistinctUsersByCourseIdIn(@Param("courseIds") List<Long> courseIds);
+
+    @Query(value = "SELECT REGEXP_REPLACE(UPPER(c.code), '-V[0-9]+$', '') AS base_code, " +
+            "COUNT(DISTINCT e.user_id) AS learners_count " +
+            "FROM enrollments e " +
+            "JOIN courses c ON c.id = e.course_id " +
+            "WHERE c.code IS NOT NULL " +
+            "AND REGEXP_REPLACE(UPPER(c.code), '-V[0-9]+$', '') IN (:baseCodes) " +
+            "GROUP BY REGEXP_REPLACE(UPPER(c.code), '-V[0-9]+$', '')",
+            nativeQuery = true)
+    List<Object[]> countDistinctUsersByCourseBaseCodes(@Param("baseCodes") List<String> baseCodes);
+
+    @Query("SELECT e.course.id, COUNT(DISTINCT e.user.id) FROM Enrollment e WHERE e.course.id IN :courseIds GROUP BY e.course.id")
+    List<Object[]> countDistinctUsersByCourseIdsGrouped(@Param("courseIds") List<Long> courseIds);
 }

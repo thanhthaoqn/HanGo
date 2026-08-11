@@ -91,6 +91,51 @@ public class CourseServiceImpl implements CourseService {
             categoryMap.computeIfAbsent(courseId, k -> new ArrayList<>()).add(categoryName);
         }
 
+        Set<String> baseCodes = new HashSet<>();
+        List<Long> coursesWithoutCode = new ArrayList<>();
+        for (CourseSummaryDTO dto : dtos) {
+            if (dto.getCode() != null && !dto.getCode().isBlank()) {
+                baseCodes.add(toBaseCourseCode(dto.getCode()));
+            } else {
+                coursesWithoutCode.add(dto.getId());
+            }
+        }
+
+        Map<String, Long> learnersByBaseCode = new HashMap<>();
+        Map<String, Double> ratingByBaseCode = new HashMap<>();
+        if (!baseCodes.isEmpty()) {
+            List<String> baseCodeList = new ArrayList<>(baseCodes);
+            List<Object[]> learnerRows = enrollmentRepository.countDistinctUsersByCourseBaseCodes(baseCodeList);
+            if (learnerRows != null) {
+                for (Object[] row : learnerRows) {
+                    learnersByBaseCode.put((String) row[0], toLong(row[1]));
+                }
+            }
+            List<Object[]> ratingRows = courseRatingRepository.getRatingStatsByCourseBaseCodes(baseCodeList);
+            if (ratingRows != null) {
+                for (Object[] row : ratingRows) {
+                    ratingByBaseCode.put((String) row[0], toDouble(row[1]));
+                }
+            }
+        }
+
+        Map<Long, Long> learnersByCourseId = new HashMap<>();
+        Map<Long, Double> ratingByCourseId = new HashMap<>();
+        if (!coursesWithoutCode.isEmpty()) {
+            List<Object[]> learnerRows = enrollmentRepository.countDistinctUsersByCourseIdsGrouped(coursesWithoutCode);
+            if (learnerRows != null) {
+                for (Object[] row : learnerRows) {
+                    learnersByCourseId.put(toLong(row[0]), toLong(row[1]));
+                }
+            }
+            List<Object[]> ratingRows = courseRatingRepository.getRatingStatsByCourseIds(coursesWithoutCode);
+            if (ratingRows != null) {
+                for (Object[] row : ratingRows) {
+                    ratingByCourseId.put(toLong(row[0]), toDouble(row[1]));
+                }
+            }
+        }
+
         for (CourseSummaryDTO dto : dtos) {
             List<String> catNames = categoryMap.getOrDefault(dto.getId(), new ArrayList<>());
             
@@ -101,14 +146,14 @@ public class CourseServiceImpl implements CourseService {
             dto.setCategories(catNames);
             dto.setCategoryName(catNames.isEmpty() ? "" : String.join(", ", catNames));
 
-            // Populate learnersCount and rating using course family logic
-            String baseCode = dto.getCode() != null ? dto.getCode().replaceAll("-V\\d+$", "").toUpperCase() : String.valueOf(dto.getId());
-            List<Long> familyIds = courseRepository.findFamilyCourseIdsByBaseCode(baseCode);
-            int learnersCount = enrollmentRepository.countDistinctUsersByCourseIdIn(familyIds);
-            dto.setLearnersCount((long) learnersCount);
-            
-            Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
-            dto.setRating(avgRating != null ? avgRating : 0.0);
+            if (dto.getCode() != null && !dto.getCode().isBlank()) {
+                String baseCode = toBaseCourseCode(dto.getCode());
+                dto.setLearnersCount(learnersByBaseCode.getOrDefault(baseCode, 0L));
+                dto.setRating(ratingByBaseCode.getOrDefault(baseCode, 0.0));
+            } else {
+                dto.setLearnersCount(learnersByCourseId.getOrDefault(dto.getId(), 0L));
+                dto.setRating(ratingByCourseId.getOrDefault(dto.getId(), 0.0));
+            }
         }
 
         return dtos;
@@ -181,6 +226,19 @@ public class CourseServiceImpl implements CourseService {
         List<Lesson> allLessons = lessonRepository.findByCourseIdOrdered(id);
         java.util.Map<Long, List<Lesson>> lessonsBySectionId = allLessons.stream()
                 .collect(Collectors.groupingBy(l -> l.getSection().getId()));
+        Map<Long, Integer> questionCountsByLessonId = new HashMap<>();
+        List<Long> quizLessonIds = allLessons.stream()
+                .filter(l -> "quiz".equalsIgnoreCase(l.getLessonType()) || "practice".equalsIgnoreCase(l.getLessonType()))
+                .map(Lesson::getId)
+                .collect(Collectors.toList());
+        if (!quizLessonIds.isEmpty()) {
+            List<Object[]> questionCountRows = lessonRepository.countQuestionsByLessonIds(quizLessonIds);
+            if (questionCountRows != null) {
+                for (Object[] row : questionCountRows) {
+                    questionCountsByLessonId.put(toLong(row[0]), toLong(row[1]).intValue());
+                }
+            }
+        }
         
         List<CourseSessionDTO> sessionDTOs = sections.stream().map(section -> {
             List<Lesson> lessons = lessonsBySectionId.getOrDefault(section.getId(), new ArrayList<>());
@@ -188,7 +246,7 @@ public class CourseServiceImpl implements CourseService {
                     Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
                     int qCount = 0;
                     if ("quiz".equalsIgnoreCase(lesson.getLessonType()) || "practice".equalsIgnoreCase(lesson.getLessonType())) {
-                        qCount = lessonRepository.countQuestionsByLessonId(lesson.getId());
+                        qCount = questionCountsByLessonId.getOrDefault(lesson.getId(), 0);
                     }
                     int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime() 
                                   : ("quiz".equalsIgnoreCase(lesson.getLessonType()) ? (10 + qCount * 2) : 15);
@@ -224,8 +282,13 @@ public class CourseServiceImpl implements CourseService {
         }).collect(Collectors.toList());
 
         // For Learners Count and Rating
-        String baseCode = course.getCode() != null ? course.getCode().replaceAll("-V\\d+$", "").toUpperCase() : String.valueOf(course.getId());
-        List<Long> familyIds = courseRepository.findFamilyCourseIdsByBaseCode(baseCode);
+        String baseCode = course.getCode() != null && !course.getCode().isBlank() ? toBaseCourseCode(course.getCode()) : String.valueOf(course.getId());
+        List<Long> familyIds = course.getCode() != null && !course.getCode().isBlank()
+                ? courseRepository.findFamilyCourseIdsByBaseCode(baseCode)
+                : List.of(course.getId());
+        if (familyIds == null || familyIds.isEmpty()) {
+            familyIds = List.of(course.getId());
+        }
         int learnersCount = enrollmentRepository.countDistinctUsersByCourseIdIn(familyIds);
         
         String creatorName = "Unknown Trainer";
@@ -269,9 +332,12 @@ public class CourseServiceImpl implements CourseService {
 
         // Average rating / total ratings are cached on Course by CourseRatingServiceImpl, but for V7 they are 0.
         // We must aggregate across the entire family.
+        long totalRatingsCount = courseRatingRepository.countByCourseIdIn(familyIds);
         Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
-        double averageRating = avgRating != null ? avgRating : 0.0;
-        int totalRatings = courseRatingRepository.findByCourseIdIn(familyIds).size();
+        double averageRating = avgRating != null && totalRatingsCount > 0 ? avgRating
+                : (course.getAverageRating() != null ? course.getAverageRating() : 0.0);
+        int totalRatings = totalRatingsCount > 0 ? Math.toIntExact(totalRatingsCount)
+                : (course.getTotalRatings() != null ? course.getTotalRatings() : 0);
 
         int estimatedDuration = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 12;
         return CourseDetailDTO.builder()
@@ -305,6 +371,27 @@ public class CourseServiceImpl implements CourseService {
                 .price(course.getPrice())
                 .sessions(sessionDTOs)
                 .build();
+    }
+
+    private String toBaseCourseCode(String code) {
+        return code.replaceAll("-V\\d+$", "").toUpperCase();
+    }
+
+    private Long toLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.valueOf(String.valueOf(value));
+    }
+
+    private Double toDouble(Object value) {
+        if (value == null) {
+            return 0.0;
+        }
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return Double.valueOf(String.valueOf(value));
     }
 
     @Override

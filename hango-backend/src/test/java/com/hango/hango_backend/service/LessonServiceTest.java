@@ -60,6 +60,8 @@ class LessonServiceTest {
     private LessonProgressRepository lessonProgressRepository;
     @Mock
     private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private CertificateService certificateService;
 
     @InjectMocks
     private LessonServiceImpl lessonService;
@@ -147,6 +149,7 @@ class LessonServiceTest {
         verify(enrollmentRepository).save(captor.capture());
         assertEquals("COMPLETED", captor.getValue().getStatus());
         assertTrue(captor.getValue().getProgressPercentage().doubleValue() == 100.0);
+        verify(certificateService).generateCertificateIfNotExists(1L, 10L);
     }
 
     @Test

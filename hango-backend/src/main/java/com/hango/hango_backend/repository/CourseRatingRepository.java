@@ -25,4 +25,19 @@ public interface CourseRatingRepository extends JpaRepository<CourseRating, Long
     Double getAverageRatingByCourseIds(@org.springframework.data.repository.query.Param("courseIds") List<Long> courseIds);
 
     List<CourseRating> findByCourseIdIn(List<Long> courseIds);
+
+    long countByCourseIdIn(List<Long> courseIds);
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT REGEXP_REPLACE(UPPER(c.code), '-V[0-9]+$', '') AS base_code, " +
+            "AVG(cr.rating) AS average_rating, COUNT(cr.id) AS total_ratings " +
+            "FROM course_ratings cr " +
+            "JOIN courses c ON c.id = cr.course_id " +
+            "WHERE c.code IS NOT NULL " +
+            "AND REGEXP_REPLACE(UPPER(c.code), '-V[0-9]+$', '') IN (:baseCodes) " +
+            "GROUP BY REGEXP_REPLACE(UPPER(c.code), '-V[0-9]+$', '')",
+            nativeQuery = true)
+    List<Object[]> getRatingStatsByCourseBaseCodes(@org.springframework.data.repository.query.Param("baseCodes") List<String> baseCodes);
+
+    @org.springframework.data.jpa.repository.Query("SELECT cr.course.id, AVG(cr.rating), COUNT(cr.id) FROM CourseRating cr WHERE cr.course.id IN :courseIds GROUP BY cr.course.id")
+    List<Object[]> getRatingStatsByCourseIds(@org.springframework.data.repository.query.Param("courseIds") List<Long> courseIds);
 }
