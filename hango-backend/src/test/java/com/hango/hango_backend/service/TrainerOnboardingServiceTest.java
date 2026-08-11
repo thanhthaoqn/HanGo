@@ -276,7 +276,7 @@ class TrainerOnboardingServiceTest {
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> service.saveProfileDraft("known@example.com", new TrainerProfileDTO()));
-        assertTrue(ex.getMessage().contains("chờ duyệt"));
+        assertTrue(ex.getMessage().contains("awaiting approval"));
     }
 
     @Test
@@ -287,7 +287,7 @@ class TrainerOnboardingServiceTest {
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> service.saveProfileDraft("known@example.com", new TrainerProfileDTO()));
-        assertTrue(ex.getMessage().contains("đình chỉ"));
+        assertTrue(ex.getMessage().contains("suspended"));
     }
 
     @Test
@@ -569,7 +569,9 @@ class TrainerOnboardingServiceTest {
     @Test
     void getTrainerProfilesForAdminShouldReturnAllWhenStatusIsAll() {
         TrainerProfile p1 = profile(1L, "VERIFIED", "PROFESSIONAL");
+        p1.setUser(learnerUser(1L, "user1@example.com"));
         TrainerProfile p2 = profile(2L, "PENDING_VERIFICATION", "PEER_TUTOR");
+        p2.setUser(learnerUser(2L, "user2@example.com"));
         when(trainerProfileRepository.findAll()).thenReturn(List.of(p1, p2));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin(null, "ALL");
@@ -580,7 +582,9 @@ class TrainerOnboardingServiceTest {
     @Test
     void getTrainerProfilesForAdminShouldFilterByStatus() {
         TrainerProfile p1 = profile(1L, "VERIFIED", "PROFESSIONAL");
+        p1.setUser(learnerUser(1L, "user1@example.com"));
         TrainerProfile p2 = profile(2L, "PENDING_VERIFICATION", "PEER_TUTOR");
+        p2.setUser(learnerUser(2L, "user2@example.com"));
         when(trainerProfileRepository.findAll()).thenReturn(List.of(p1, p2));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin(null, "VERIFIED");
@@ -619,10 +623,13 @@ class TrainerOnboardingServiceTest {
     @Test
     void getTrainerProfilesForAdminShouldSortNewestSubmittedFirstAndPushNullsLast() {
         TrainerProfile older = profile(1L, "AWAITING_APPROVAL", "PROFESSIONAL");
+        older.setUser(learnerUser(1L, "user1@example.com"));
         older.setSubmittedAt(LocalDateTime.now().minusDays(2));
         TrainerProfile newer = profile(2L, "AWAITING_APPROVAL", "PROFESSIONAL");
+        newer.setUser(learnerUser(2L, "user2@example.com"));
         newer.setSubmittedAt(LocalDateTime.now());
         TrainerProfile neverSubmitted = profile(3L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        neverSubmitted.setUser(learnerUser(3L, "user3@example.com"));
         when(trainerProfileRepository.findAll()).thenReturn(List.of(older, neverSubmitted, newer));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin(null, "ALL");
