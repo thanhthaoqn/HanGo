@@ -379,10 +379,10 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.85,
       children: [
-        _buildPremiumCard(title: 'Total Revenue', value: _formatCurrency(_totalRevenue), trend: '+12.5%', accentColor: const Color(0xFF20B486), subtitle: 'vs last month'),
-        _buildPremiumCard(title: 'Total Learners', value: '$_learnersCount', trend: '+5.2%', accentColor: const Color(0xFF3B82F6), subtitle: 'active students'),
-        _buildPremiumCard(title: 'Active Courses', value: '$_coursesCount', trend: '0.0%', accentColor: const Color(0xFF8B5CF6), subtitle: 'published modules'),
-        _buildPremiumCard(title: 'Avg Rating', value: _averageRating.toStringAsFixed(1), trend: '+0.1', accentColor: const Color(0xFFF59E0B), subtitle: 'out of 5.0 stars'),
+        _buildPremiumCard(title: 'Total Revenue', value: _formatCurrency(_totalRevenue), trend: '', accentColor: const Color(0xFF20B486), subtitle: 'All time earnings'),
+        _buildPremiumCard(title: 'Total Learners', value: '$_learnersCount', trend: '', accentColor: const Color(0xFF3B82F6), subtitle: 'Unique enrolled students'),
+        _buildPremiumCard(title: 'Active Courses', value: '$_coursesCount', trend: '', accentColor: const Color(0xFF8B5CF6), subtitle: 'Published course families'),
+        _buildPremiumCard(title: 'Avg Rating', value: _averageRating.toStringAsFixed(1), trend: '', accentColor: const Color(0xFFF59E0B), subtitle: 'Out of 5.0 stars'),
       ],
     );
   }
@@ -408,11 +408,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                   Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontFamily: 'Outfit')),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: isPositive ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
-                child: Text(trend, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isPositive ? const Color(0xFF15803D) : const Color(0xFF475569), fontFamily: 'Outfit')),
-              ),
+              if (trend.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: isPositive ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
+                  child: Text(trend, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isPositive ? const Color(0xFF15803D) : const Color(0xFF475569), fontFamily: 'Outfit')),
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -617,6 +618,10 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     final title = course['title'] ?? 'Untitled Course';
     final int learners = (course['learnersCount'] ?? 0) as int;
     final int versions = (course['versionsCount'] ?? 1) as int;
+    final int lessons = (course['lessonsCount'] ?? 0) as int;
+    final double rating = (course['rating'] ?? 0.0) as double;
+    final num priceValue = course['price'] ?? 0;
+    final String priceText = priceValue > 0 ? _formatCurrency(priceValue.toDouble()) : 'Free';
     final thumbnail = course['thumbnailUrl'] ?? '';
     final double maxReference = _learnersCount > 0 ? _learnersCount.toDouble() : 150.0;
     final double popularityRatio = (learners / maxReference).clamp(0.05, 1.0);
@@ -640,12 +645,21 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
-                const SizedBox(height: 10),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    Expanded(child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontFamily: 'Outfit'), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    Text(priceText, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF20B486), fontFamily: 'Outfit')),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.star, size: 12, color: Color(0xFFF59E0B)), const SizedBox(width: 4), Text(rating.toStringAsFixed(1), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706), fontFamily: 'Outfit'))])),
                     Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(20)), child: Text('$learners Students', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF2563EB), fontFamily: 'Outfit'))),
-                    const SizedBox(width: 8),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(20)), child: Text('$lessons Lessons', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF16A34A), fontFamily: 'Outfit'))),
                     Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)), child: Text('$versions Versions', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569), fontFamily: 'Outfit'))),
                   ],
                 ),

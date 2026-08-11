@@ -16,4 +16,6 @@ public class TrainerCourseDTO {
     private long lessonsCount;
     private String thumbnailUrl;
     private long versionsCount;
+    private java.math.BigDecimal price;
+    private Double rating;
 }

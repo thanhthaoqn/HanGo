@@ -91,16 +91,27 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                                     }).orElse(group.get(0))
                             );
                             
+                    List<Long> familyIds = group.stream().map(com.hango.hango_backend.repository.TrainerCourseDetailProjection::getId).collect(Collectors.toList());
+                    Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
+                    
                     return TrainerCourseDTO.builder()
                             .id(latest.getId())
                             .title(latest.getTitle())
-                            .learnersCount(latest.getLearnersCount() != null ? latest.getLearnersCount() : 0L)
+                            .learnersCount(group.stream().mapToLong(p -> p.getLearnersCount() != null ? p.getLearnersCount() : 0L).sum())
                             .lessonsCount(latest.getLessonsCount() != null ? latest.getLessonsCount() : 0L)
                             .thumbnailUrl(latest.getThumbnailUrl())
                             .versionsCount((long) group.size())
+                            .price(latest.getPrice() != null ? latest.getPrice() : java.math.BigDecimal.ZERO)
+                            .rating(avgRating != null ? avgRating : 0.0)
                             .build();
                 })
-                .sorted((c1, c2) -> c2.getId().compareTo(c1.getId()))
+                .sorted((c1, c2) -> {
+                    int learnerCompare = Long.compare(c2.getLearnersCount(), c1.getLearnersCount());
+                    if (learnerCompare != 0) return learnerCompare;
+                    int ratingCompare = Double.compare(c2.getRating() != null ? c2.getRating() : 0.0, c1.getRating() != null ? c1.getRating() : 0.0);
+                    if (ratingCompare != 0) return ratingCompare;
+                    return c2.getId().compareTo(c1.getId());
+                })
                 .collect(Collectors.toList());
 
         // Monthly Revenues
