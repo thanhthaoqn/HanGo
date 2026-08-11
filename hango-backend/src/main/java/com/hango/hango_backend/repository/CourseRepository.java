@@ -16,10 +16,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     @Query("SELECT new com.hango.hango_backend.dto.CourseSummaryDTO(" +
            "c.id, cat.paramValue, c.title, u.fullName, " +
-           "CAST(COALESCE((SELECT AVG(cr.rating) FROM CourseRating cr WHERE cr.course.id = c.id OR cr.course.parentId = c.id OR cr.course.id = c.parentId OR (c.parentId IS NOT NULL AND cr.course.parentId = c.parentId)), 0.0) AS double), " +
-           "(SELECT COUNT(DISTINCT e.id) FROM Enrollment e WHERE e.course.id = c.id OR e.course.parentId = c.id OR e.course.id = c.parentId OR (c.parentId IS NOT NULL AND e.course.parentId = c.parentId)), " +
+           "0.0, 0L, " + // rating, learnersCount placeholders
            "diff.paramKey, c.thumbnailUrl, c.price, " +
-           "(SELECT e2.progressPercentage FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId)) " +
+           "(SELECT e2.progressPercentage FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId), " +
+           "c.code) " +
            "FROM Course c " +
            "LEFT JOIN c.category cat " +
            "LEFT JOIN c.difficulty diff " +
@@ -48,6 +48,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<Course> findPublishedByCodeOrderByPublishedAtDesc(@Param("code") String code);
 
     Optional<Course> findFirstByCodeAndStatusOrderByPublishedAtDesc(String code, String status);
+
+    @Query("SELECT c.id FROM Course c WHERE c.code = :baseCode OR c.code LIKE CONCAT(:baseCode, '-V%')")
+    List<Long> findFamilyCourseIdsByBaseCode(@Param("baseCode") String baseCode);
 
     @Query("SELECT COUNT(c) FROM Course c WHERE c.creator.id = :creatorId AND c.deletedAt IS NULL")
     long countByCreatorIdAndDeletedAtIsNull(@Param("creatorId") Long creatorId);

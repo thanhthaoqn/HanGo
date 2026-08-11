@@ -20,4 +20,9 @@ public interface CourseRatingRepository extends JpaRepository<CourseRating, Long
     Double getAverageRatingByTrainerId(@org.springframework.data.repository.query.Param("trainerId") Long trainerId);
 
     List<CourseRating> findTop5ByCourseCreatorIdOrderByCreatedAtDesc(Long creatorId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT AVG(cr.rating) FROM CourseRating cr WHERE cr.course.id IN :courseIds")
+    Double getAverageRatingByCourseIds(@org.springframework.data.repository.query.Param("courseIds") List<Long> courseIds);
+
+    List<CourseRating> findByCourseIdIn(List<Long> courseIds);
 }
