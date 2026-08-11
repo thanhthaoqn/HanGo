@@ -337,7 +337,7 @@ public class GeminiClientService {
                                                                                                         .build())
                                                                                         .build(),
                                                                         GeminiGenerateRequest.Part.builder()
-                                                                                        .text("Please generate a detailed transcript in the language of this video. Answer with the direct content only, without any greetings or additional explanations.")
+                                                                                        .text("Please generate a detailed transcript in the language of this video. You MUST format the output EXACTLY as a valid WebVTT (.vtt) file, including the 'WEBVTT' header and accurate timestamps (e.g., 00:00:00.000 --> 00:00:05.000) for every spoken sentence. Answer with the direct VTT content only, without any greetings or markdown blocks.")
                                                                                         .build()))
                                                         .build()))
                                         .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()

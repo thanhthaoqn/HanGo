@@ -196,6 +196,12 @@ public class CourseServiceImpl implements CourseService {
                         .pdfName(lesson.getPdfName())
                         .questionImageUrl(lesson.getQuestionImageUrl())
                         .estimatedTime(estTime)
+                        .lessonCode(lesson.getCode())
+                        .mediaDurationSeconds(lesson.getMediaDurationSeconds())
+                        .mediaSizeBytes(lesson.getMediaSizeBytes())
+                        .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes() != null ? lesson.getEstimatedTimeMinutes() : estTime)
+                        .learningObjectives(lesson.getLearningObjectives())
+                        .videoTranscript(lesson.getVideoTranscript())
                         .build();
                 }).collect(Collectors.toList());
 

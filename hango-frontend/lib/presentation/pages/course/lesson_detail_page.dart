@@ -338,27 +338,207 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       final isHttp = trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://');
       
       if (!isHtml && isHttp) {
-        try {
-          _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(trimmedUrl));
-          _videoPlayerController!.initialize().then((_) {
-            setState(() {
-              _chewieController = ChewieController(
-                videoPlayerController: _videoPlayerController!,
-                autoPlay: false,
-                looping: false,
-                aspectRatio: _videoPlayerController!.value.aspectRatio,
-              );
-            });
-          }).catchError((error) {
-            debugPrint('Video Player initialization error: $error');
-          });
-        } catch (e) {
-          debugPrint('Invalid video URL: $e');
-        }
+        _initializePlayerWithQuality(trimmedUrl, 'sp_hd');
       } else {
         debugPrint('Unsupported video format or iframe snippet: $trimmedUrl');
       }
     }
+  }
+
+  String _currentQualityToken = 'sp_hd';
+
+  Future<void> _initializePlayerWithQuality(String url, String resolutionToken) async {
+    _currentQualityToken = resolutionToken;
+    try {
+      String finalUrl = url;
+      if (url.contains('res.cloudinary.com') && url.endsWith('.mp4')) {
+        if (resolutionToken == 'sp_hd') {
+          finalUrl = url.replaceFirst('/upload/', '/upload/sp_hd/').replaceAll('.mp4', '.m3u8');
+        } else {
+          finalUrl = url.replaceFirst('/upload/', '/upload/q_auto,$resolutionToken/');
+        }
+      }
+
+      final position = _videoPlayerController?.value.position ?? Duration.zero;
+      
+      // Temporarily store state to avoid calling _disposePlayers completely losing UI state
+      final wasPlaying = _videoPlayerController?.value.isPlaying ?? false;
+      _videoPlayerController?.dispose();
+      _chewieController?.dispose();
+      
+      setState(() {
+        _chewieController = null;
+        _videoPlayerController = null;
+      });
+
+      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(finalUrl));
+      
+      try {
+        await _videoPlayerController!.initialize();
+      } catch (e) {
+        debugPrint('Error with quality $resolutionToken: $e. Falling back to original URL.');
+        if (finalUrl != url) {
+          _videoPlayerController?.dispose();
+          _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(url));
+          await _videoPlayerController!.initialize();
+        } else {
+          rethrow;
+        }
+      }
+      
+      if (position > Duration.zero) {
+        await _videoPlayerController!.seekTo(position);
+      }
+      
+      setState(() {
+        _chewieController = ChewieController(
+          videoPlayerController: _videoPlayerController!,
+          autoPlay: position > Duration.zero ? wasPlaying : false,
+          looping: false,
+          aspectRatio: _videoPlayerController!.value.aspectRatio,
+          subtitle: _parseVttSubtitles(_lessonDetail?.videoTranscript ?? ''),
+          subtitleBuilder: (context, dynamic subtitle) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              subtitle.toString(),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontFamily: 'Outfit'),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          additionalOptions: _buildQualityOptions(url),
+        );
+      });
+    } catch (e) {
+      debugPrint('Invalid video URL: $e');
+    }
+  }
+
+  List<OptionItem> Function(BuildContext) _buildQualityOptions(String originalUrl) {
+    if (!originalUrl.contains('res.cloudinary.com')) {
+      return (context) => [];
+    }
+
+    final qualityNames = {
+      'sp_hd': 'Auto (HLS)',
+      'h_1080': '1080p',
+      'h_720': '720p',
+      'h_480': '480p',
+    };
+
+    return (context) {
+      return [
+        OptionItem(
+          onTap: (ctx) {
+            Navigator.pop(ctx);
+            _showQualityPicker(context, originalUrl);
+          },
+          iconData: Icons.high_quality,
+          title: 'Video Quality',
+          subtitle: qualityNames[_currentQualityToken] ?? 'Auto (HLS)',
+        ),
+      ];
+    };
+  }
+
+  void _showQualityPicker(BuildContext context, String originalUrl) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('Video Quality',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              _buildQualityTile('sp_hd', 'Auto (HLS)', originalUrl, ctx),
+              _buildQualityTile('h_1080', '1080p', originalUrl, ctx),
+              _buildQualityTile('h_720', '720p', originalUrl, ctx),
+              _buildQualityTile('h_480', '480p', originalUrl, ctx),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQualityTile(String token, String name, String url, BuildContext ctx) {
+    final isSelected = _currentQualityToken == token;
+    return ListTile(
+      leading: isSelected ? const Icon(Icons.check, color: Colors.blue) : const SizedBox(width: 24),
+      title: Text(
+        name,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? Colors.blue : null,
+        ),
+      ),
+      onTap: () {
+        Navigator.pop(ctx);
+        if (!isSelected) {
+          _initializePlayerWithQuality(url, token);
+        }
+      },
+    );
+  }
+
+  Subtitles? _parseVttSubtitles(String transcript) {
+    if (transcript.isEmpty || !transcript.trim().startsWith('WEBVTT')) {
+      return null;
+    }
+    List<Subtitle> parsedSubtitles = [];
+    final lines = transcript.split('\n');
+    int i = 0;
+    while (i < lines.length) {
+      if (lines[i].contains('-->')) {
+        final times = lines[i].split('-->');
+        if (times.length == 2) {
+          final start = _parseVttTime(times[0].trim());
+          final end = _parseVttTime(times[1].trim());
+          
+          String text = '';
+          i++;
+          while (i < lines.length && lines[i].trim().isNotEmpty) {
+            text += lines[i] + '\n';
+            i++;
+          }
+          parsedSubtitles.add(Subtitle(index: parsedSubtitles.length, start: start, end: end, text: text.trim()));
+        }
+      }
+      i++;
+    }
+    if (parsedSubtitles.isEmpty) return null;
+    return Subtitles(parsedSubtitles);
+  }
+
+  Duration _parseVttTime(String time) {
+    try {
+      final parts = time.split(':');
+      if (parts.length == 3) {
+        final secsAndMillis = parts[2].split('.');
+        if (secsAndMillis.length == 2) {
+          return Duration(
+            hours: int.parse(parts[0]),
+            minutes: int.parse(parts[1]),
+            seconds: int.parse(secsAndMillis[0]),
+            milliseconds: int.parse(secsAndMillis[1]),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing VTT time: $e');
+    }
+    return Duration.zero;
   }
 
   @override

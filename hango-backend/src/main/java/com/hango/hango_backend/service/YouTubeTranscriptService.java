@@ -106,23 +106,38 @@ public class YouTubeTranscriptService {
                     
             if (xmlCaptions == null) return null;
 
-            // 5. Parse XML to extract text (simple regex for <text> tags)
+            // 5. Parse XML to extract text and timestamps to build WebVTT
             StringBuilder transcriptBuilder = new StringBuilder();
-            Pattern textTagPattern = Pattern.compile("<text[^>]*>(.*?)</text>");
+            transcriptBuilder.append("WEBVTT\n\n");
+            
+            // Typical YouTube timed text XML: <text start="0" dur="4.25">...</text>
+            Pattern textTagPattern = Pattern.compile("<text\\s+start=\"([^\"]+)\"(?:\\s+dur=\"([^\"]+)\")?[^>]*>(.*?)</text>");
             Matcher textMatcher = textTagPattern.matcher(xmlCaptions);
+            
+            int counter = 1;
             while (textMatcher.find()) {
-                String line = textMatcher.group(1);
+                String startStr = textMatcher.group(1);
+                String durStr = textMatcher.group(2);
+                String line = textMatcher.group(3);
+                
+                double start = Double.parseDouble(startStr);
+                double dur = (durStr != null && !durStr.isEmpty()) ? Double.parseDouble(durStr) : 2.0; // default duration
+                double end = start + dur;
+
                 // Unescape basic XML entities
                 line = line.replace("&amp;", "&")
                            .replace("&quot;", "\"")
                            .replace("&#39;", "'")
                            .replace("&lt;", "<")
                            .replace("&gt;", ">");
-                transcriptBuilder.append(line).append(" ");
+                           
+                transcriptBuilder.append(counter++).append("\n");
+                transcriptBuilder.append(formatVttTime(start)).append(" --> ").append(formatVttTime(end)).append("\n");
+                transcriptBuilder.append(line).append("\n\n");
             }
 
             String finalTranscript = transcriptBuilder.toString().trim();
-            if (finalTranscript.isEmpty()) {
+            if (finalTranscript.equals("WEBVTT")) {
                 return null;
             }
             
@@ -133,6 +148,14 @@ public class YouTubeTranscriptService {
             log.error("Failed to fetch transcript for video {}: {}", videoId, e.getMessage());
             return null;
         }
+    }
+
+    private String formatVttTime(double totalSeconds) {
+        int hours = (int) (totalSeconds / 3600);
+        int minutes = (int) ((totalSeconds % 3600) / 60);
+        int seconds = (int) (totalSeconds % 60);
+        int milliseconds = (int) ((totalSeconds - (int) totalSeconds) * 1000);
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, milliseconds);
     }
 
     private String extractJson(String html, String marker) {
