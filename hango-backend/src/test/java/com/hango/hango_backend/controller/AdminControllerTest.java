@@ -5,17 +5,22 @@ import java.util.List;
 import java.util.Optional;
 
 import com.hango.hango_backend.dto.AdminUserUpdateRequest;
+import com.hango.hango_backend.dto.PermissionDTO;
 import com.hango.hango_backend.dto.RegisterRequest;
+import com.hango.hango_backend.dto.RoleDTO;
+import com.hango.hango_backend.dto.RolePermissionsUpdateRequest;
 import com.hango.hango_backend.dto.UserResponse;
 import com.hango.hango_backend.entity.AiUsageLog;
 import com.hango.hango_backend.entity.AuditLog;
 import com.hango.hango_backend.entity.Course;
+import com.hango.hango_backend.entity.Permission;
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.AiUsageLogRepository;
 import com.hango.hango_backend.repository.AuditLogRepository;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
+import com.hango.hango_backend.repository.PermissionRepository;
 import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.TopCourseProjection;
 import com.hango.hango_backend.repository.UserRepository;
@@ -58,6 +63,8 @@ class AdminControllerTest {
     private CourseRepository courseRepository;
     @Mock
     private EnrollmentRepository enrollmentRepository;
+    @Mock
+    private PermissionRepository permissionRepository;
 
     @InjectMocks
     private AdminController adminController;
@@ -615,5 +622,158 @@ class AdminControllerTest {
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
         assertEquals(0.0, body.get("successRate"));
+    }
+
+    // =================================================================
+    // getAllPermissions
+    // =================================================================
+
+    @Test
+    void getAllPermissionsShouldReturnMappedPermissionList() {
+        Permission p = Permission.builder().code("MANAGE_OWN_COURSES").name("Manage own courses")
+                .description("desc").module("Course Management").coreForRoles("TRAINER").restrictedForRoles(null)
+                .build();
+        when(permissionRepository.findAll()).thenReturn(List.of(p));
+
+        ResponseEntity<?> response = adminController.getAllPermissions();
+
+        assertEquals(200, response.getStatusCode().value());
+        @SuppressWarnings("unchecked")
+        List<PermissionDTO> body = (List<PermissionDTO>) response.getBody();
+        assertEquals(1, body.size());
+        assertEquals("MANAGE_OWN_COURSES", body.get(0).getCode());
+        assertEquals("TRAINER", body.get(0).getCoreForRoles());
+    }
+
+    @Test
+    void getAllPermissionsShouldReturn400OnRepositoryError() {
+        when(permissionRepository.findAll()).thenThrow(new RuntimeException("db down"));
+
+        ResponseEntity<?> response = adminController.getAllPermissions();
+
+        assertEquals(400, response.getStatusCode().value());
+    }
+
+    // =================================================================
+    // getAllRolesWithPermissions
+    // =================================================================
+
+    @Test
+    void getAllRolesWithPermissionsShouldMapEachRoleWithItsPermissions() {
+        Permission p = Permission.builder().code("MANAGE_OWN_COURSES").name("Manage own courses").build();
+        Role trainerRole = Role.builder().id(1L).roleName("TRAINER").permissions(java.util.Set.of(p)).build();
+        when(roleRepository.findAll()).thenReturn(List.of(trainerRole));
+
+        ResponseEntity<?> response = adminController.getAllRolesWithPermissions();
+
+        assertEquals(200, response.getStatusCode().value());
+        @SuppressWarnings("unchecked")
+        List<RoleDTO> body = (List<RoleDTO>) response.getBody();
+        assertEquals(1, body.size());
+        assertEquals("TRAINER", body.get(0).getRoleName());
+        assertEquals(1, body.get(0).getPermissions().size());
+        assertEquals("MANAGE_OWN_COURSES", body.get(0).getPermissions().get(0).getCode());
+    }
+
+    @Test
+    void getAllRolesWithPermissionsShouldReturnEmptyPermissionsListWhenRoleHasNone() {
+        Role learnerRole = Role.builder().id(1L).roleName("LEARNER").permissions(null).build();
+        when(roleRepository.findAll()).thenReturn(List.of(learnerRole));
+
+        ResponseEntity<?> response = adminController.getAllRolesWithPermissions();
+
+        @SuppressWarnings("unchecked")
+        List<RoleDTO> body = (List<RoleDTO>) response.getBody();
+        assertTrue(body.get(0).getPermissions().isEmpty());
+    }
+
+    // =================================================================
+    // updateRolePermissions
+    // =================================================================
+
+    @Test
+    void updateRolePermissionsShouldReturn404WhenRoleNotFound() {
+        when(roleRepository.findByRoleName("TRAINER")).thenReturn(Optional.empty());
+
+        ResponseEntity<?> response = adminController.updateRolePermissions("trainer",
+                new RolePermissionsUpdateRequest(List.of()), mock(UserDetails.class));
+
+        assertEquals(404, response.getStatusCode().value());
+        verify(roleRepository, never()).save(any());
+    }
+
+    @Test
+    void updateRolePermissionsShouldDropRequestedPermissionRestrictedForThisRole() {
+        Role trainerRole = Role.builder().id(1L).roleName("TRAINER").permissions(new java.util.HashSet<>()).build();
+        Permission restricted = Permission.builder().code("REFUND_REQUEST").restrictedForRoles("TRAINER,LEARNER").build();
+        when(roleRepository.findByRoleName("TRAINER")).thenReturn(Optional.of(trainerRole));
+        when(permissionRepository.findByCode("REFUND_REQUEST")).thenReturn(Optional.of(restricted));
+        when(permissionRepository.findAll()).thenReturn(List.of(restricted));
+
+        adminController.updateRolePermissions("TRAINER",
+                new RolePermissionsUpdateRequest(List.of("REFUND_REQUEST")), mock(UserDetails.class));
+
+        assertTrue(trainerRole.getPermissions().isEmpty());
+    }
+
+    @Test
+    void updateRolePermissionsShouldForceAddCorePermissionEvenIfNotRequested() {
+        Role trainerRole = Role.builder().id(1L).roleName("TRAINER").permissions(new java.util.HashSet<>()).build();
+        Permission core = Permission.builder().code("MANAGE_OWN_COURSES").coreForRoles("TRAINER").build();
+        when(roleRepository.findByRoleName("TRAINER")).thenReturn(Optional.of(trainerRole));
+        when(permissionRepository.findAll()).thenReturn(List.of(core));
+
+        adminController.updateRolePermissions("TRAINER",
+                new RolePermissionsUpdateRequest(List.of()), mock(UserDetails.class));
+
+        assertEquals(1, trainerRole.getPermissions().size());
+        assertTrue(trainerRole.getPermissions().contains(core));
+    }
+
+    @Test
+    void updateRolePermissionsShouldIgnoreUnknownPermissionCode() {
+        Role trainerRole = Role.builder().id(1L).roleName("TRAINER").permissions(new java.util.HashSet<>()).build();
+        when(roleRepository.findByRoleName("TRAINER")).thenReturn(Optional.of(trainerRole));
+        when(permissionRepository.findByCode("NOT_A_REAL_CODE")).thenReturn(Optional.empty());
+        when(permissionRepository.findAll()).thenReturn(List.of());
+
+        ResponseEntity<?> response = adminController.updateRolePermissions("TRAINER",
+                new RolePermissionsUpdateRequest(List.of("NOT_A_REAL_CODE")), mock(UserDetails.class));
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(trainerRole.getPermissions().isEmpty());
+    }
+
+    @Test
+    void updateRolePermissionsShouldSaveGrantedPermissionAndLogAudit() {
+        Role trainerRole = Role.builder().id(1L).roleName("TRAINER").permissions(new java.util.HashSet<>()).build();
+        Permission granted = Permission.builder().code("MANAGE_OWN_COURSES").restrictedForRoles(null).build();
+        when(roleRepository.findByRoleName("TRAINER")).thenReturn(Optional.of(trainerRole));
+        when(permissionRepository.findByCode("MANAGE_OWN_COURSES")).thenReturn(Optional.of(granted));
+        when(permissionRepository.findAll()).thenReturn(List.of(granted));
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(targetUser(1L, "admin@example.com")));
+
+        ResponseEntity<?> response = adminController.updateRolePermissions("TRAINER",
+                new RolePermissionsUpdateRequest(List.of("MANAGE_OWN_COURSES")), adminPrincipal("admin@example.com"));
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(trainerRole.getPermissions().contains(granted));
+        verify(roleRepository).save(trainerRole);
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("UPDATE_ROLE_PERMISSIONS", captor.getValue().getActionType());
+    }
+
+    @Test
+    void updateRolePermissionsShouldUppercaseRoleNameForLookup() {
+        Role role = Role.builder().id(1L).roleName("TRAINER").permissions(new java.util.HashSet<>()).build();
+        when(roleRepository.findByRoleName("TRAINER")).thenReturn(Optional.of(role));
+        when(permissionRepository.findAll()).thenReturn(List.of());
+
+        ResponseEntity<?> response = adminController.updateRolePermissions("trainer",
+                new RolePermissionsUpdateRequest(List.of()), mock(UserDetails.class));
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(roleRepository).findByRoleName("TRAINER");
     }
 }

@@ -159,6 +159,46 @@ class PaymentServiceImplTest {
         verify(paymentRepository, never()).save(any());
     }
 
+    @Test
+    void createPaymentShouldAutoEnrollAndSendFreeConfirmationEmailWhenTotalPriceIsZero() {
+        User buyer = user(10L, "Alice");
+        User creator = user(2L, "Trainer Bob");
+        Course freeCourse = course(5L, "Free Course", BigDecimal.ZERO, creator);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(buyer));
+        com.hango.hango_backend.dto.PaymentRequestDTO request = new com.hango.hango_backend.dto.PaymentRequestDTO();
+        request.setCourseId(5L);
+        when(courseRepository.findAllById(any())).thenReturn(List.of(freeCourse));
+        when(enrollmentRepository.existsByUserIdAndCourseId(10L, 5L)).thenReturn(false);
+
+        com.hango.hango_backend.dto.PaymentResponseDTO response =
+                paymentService.createPayment(request, 10L, "127.0.0.1", "http://localhost");
+
+        assertEquals("FREE_SUCCESS", response.getPaymentUrl());
+        verify(enrollmentRepository).save(any());
+        verify(cartItemRepository).deleteByUserIdAndCourseId(10L, 5L);
+        verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_NEW_ENROLLMENT), any(), any(), eq(freeCourse));
+        verify(emailService).sendEnrollmentSuccessEmail(buyer.getEmail(), buyer.getFullName(), "Free Course", "Free");
+    }
+
+    @Test
+    void createPaymentShouldStillReturnFreeSuccessWhenConfirmationEmailFails() {
+        User buyer = user(10L, "Alice");
+        Course freeCourse = course(5L, "Free Course", BigDecimal.ZERO, null);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(buyer));
+        com.hango.hango_backend.dto.PaymentRequestDTO request = new com.hango.hango_backend.dto.PaymentRequestDTO();
+        request.setCourseId(5L);
+        when(courseRepository.findAllById(any())).thenReturn(List.of(freeCourse));
+        when(enrollmentRepository.existsByUserIdAndCourseId(10L, 5L)).thenReturn(false);
+        org.mockito.Mockito.doThrow(new RuntimeException("SMTP down"))
+                .when(emailService).sendEnrollmentSuccessEmail(any(), any(), any(), any());
+
+        com.hango.hango_backend.dto.PaymentResponseDTO response =
+                paymentService.createPayment(request, 10L, "127.0.0.1", "http://localhost");
+
+        assertEquals("FREE_SUCCESS", response.getPaymentUrl());
+        verify(enrollmentRepository).save(any());
+    }
+
     // =================================================================
     // handlePayOSWebhook
     // =================================================================
