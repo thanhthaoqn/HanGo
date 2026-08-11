@@ -1152,6 +1152,7 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
         final index = entry.key;
         final question = entry.value as Map<String, dynamic>;
         final questionText = question['questionText']?.toString() ?? '';
+        final passage = question['passage']?.toString() ?? '';
         final options = List<String>.from(question['options'] ?? []);
         final correctIndex = question['correctIndex'] as int? ?? 0;
         final explanation = question['explanation']?.toString();
@@ -1184,6 +1185,18 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (passage.isNotEmpty) ...[
+                  Text(
+                    passage,
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 16,
+                      color: Color(0xFF334155),
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 if (questionText.isNotEmpty)
                   Text(
                     questionText,

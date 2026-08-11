@@ -225,31 +225,52 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                                     .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes())
                                     .learningObjectives(lesson.getLearningObjectives())
                                     .videoTranscript(lesson.getVideoTranscript())
-                                    .questions("quiz".equalsIgnoreCase(lesson.getLessonType()) && lesson.getExam() != null ? 
+                                    .questions("quiz".equalsIgnoreCase(lesson.getLessonType()) ? 
                                             jdbcTemplate.query(
-                                                "SELECT q.id, q.passage, q.question_text, q.explanation, q.options_json, q.correct_index " +
-                                                "FROM questions q " +
-                                                "JOIN exam_questions eq ON q.id = eq.question_id " +
-                                                "WHERE eq.exam_id = ? " +
-                                                "ORDER BY eq.order_index ASC",
+                                                "SELECT q.id AS question_id, q.question_text, q.explanation, qg.context_text AS passage " +
+                                                "FROM lesson_quizzes lq " +
+                                                "JOIN questions q ON lq.question_id = q.id " +
+                                                "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
+                                                "WHERE lq.lesson_id = ? " +
+                                                "ORDER BY lq.display_order ASC",
                                                 (rs, rowNum) -> {
-                                                    String optionsJson = rs.getString("options_json");
+                                                    Long qId = rs.getLong("question_id");
+                                                    String questionText = rs.getString("question_text");
+                                                    String explanation = rs.getString("explanation");
+                                                    String passage = rs.getString("passage");
+                                                    
+                                                    java.util.List<java.util.Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
+                                                            "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                                                            qId
+                                                    );
+                                                    
                                                     java.util.List<String> options = new java.util.ArrayList<>();
-                                                    if (optionsJson != null) {
-                                                        try {
-                                                            options = new com.fasterxml.jackson.databind.ObjectMapper().readValue(optionsJson, java.util.List.class);
-                                                        } catch (Exception e) {}
+                                                    Integer correctIndex = 0;
+                                                    for (int i = 0; i < optionsRows.size(); i++) {
+                                                        java.util.Map<String, Object> row = optionsRows.get(i);
+                                                        options.add((String) row.get("option_text"));
+                                                        Object isCorrectObj = row.get("is_correct");
+                                                        boolean isCorrect = false;
+                                                        if (isCorrectObj instanceof Boolean) {
+                                                            isCorrect = (Boolean) isCorrectObj;
+                                                        } else if (isCorrectObj instanceof Number) {
+                                                            isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                                                        }
+                                                        if (isCorrect) {
+                                                            correctIndex = i;
+                                                        }
                                                     }
+                                                    
                                                     return com.hango.hango_backend.dto.QuizQuestionDTO.builder()
-                                                            .id(rs.getLong("id"))
-                                                            .passage(rs.getString("passage"))
-                                                            .questionText(rs.getString("question_text"))
-                                                            .explanation(rs.getString("explanation"))
+                                                            .id(qId)
+                                                            .passage(passage)
+                                                            .questionText(questionText)
+                                                            .explanation(explanation)
                                                             .options(options)
-                                                            .correctIndex(rs.getInt("correct_index"))
+                                                            .correctIndex(correctIndex)
                                                             .build();
                                                 },
-                                                lesson.getExam().getId()
+                                                lesson.getId()
                                             )
                                             : null
                                     )
