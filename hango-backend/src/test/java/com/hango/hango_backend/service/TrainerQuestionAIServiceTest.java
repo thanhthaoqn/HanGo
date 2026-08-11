@@ -1,8 +1,10 @@
 package com.hango.hango_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hango.hango_backend.dto.CreateTrainerExamAIResponseDTO;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIRequestDTO;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIResponseDTO;
+import com.hango.hango_backend.dto.TrainerExamChatRequestDTO;
 import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.SystemParameterRepository;
@@ -283,5 +285,104 @@ class TrainerQuestionAIServiceTest {
 
         org.mockito.Mockito.verify(systemParameterRepository, org.mockito.Mockito.never())
                 .findByParamTypeAndIsActiveTrue(anyString());
+    }
+
+    private TrainerExamChatRequestDTO.Message message(String role, String text) {
+        return TrainerExamChatRequestDTO.Message.builder().role(role).text(text).build();
+    }
+
+    // =================================================================
+    // handleExamChat
+    // =================================================================
+
+    @Test
+    void handleExamChatShouldThrowWhenRequestNull() {
+        assertThrows(ApiException.class, () -> service.handleExamChat(null));
+    }
+
+    @Test
+    void handleExamChatShouldThrowWhenHistoryNullOrEmpty() {
+        assertThrows(ApiException.class,
+                () -> service.handleExamChat(TrainerExamChatRequestDTO.builder().history(List.of()).build()));
+    }
+
+    @Test
+    void handleExamChatShouldForwardHistoryAndReturnRawAiReply() {
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("What's the exam title?");
+
+        String reply = service.handleExamChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("user", "I want to create a grammar exam"))).build());
+
+        assertEquals("What's the exam title?", reply);
+    }
+
+    @Test
+    void handleExamChatShouldMapUnknownRoleToUserRole() {
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("ok");
+
+        service.handleExamChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("system", "weird role"))).build());
+
+        ArgumentCaptor<List> historyCaptor = ArgumentCaptor.forClass(List.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(anyString(), historyCaptor.capture());
+        String role = ((com.hango.hango_backend.dto.GeminiGenerateRequest.Content) historyCaptor.getValue().get(0)).getRole();
+        assertEquals("user", role);
+    }
+
+    // =================================================================
+    // generateExamFromChat
+    // =================================================================
+
+    @Test
+    void generateExamFromChatShouldThrowWhenRequestNull() {
+        assertThrows(ApiException.class, () -> service.generateExamFromChat(null));
+    }
+
+    @Test
+    void generateExamFromChatShouldThrowWhenHistoryEmpty() {
+        assertThrows(ApiException.class,
+                () -> service.generateExamFromChat(TrainerExamChatRequestDTO.builder().history(List.of()).build()));
+    }
+
+    @Test
+    void generateExamFromChatShouldAppendFinalGenerateJsonPromptToHistory() {
+        String json = "{\"title\":\"Grammar Basics\",\"description\":\"d\",\"durationMinutes\":30,"
+                + "\"passingScore\":50.0,\"expectedQuestionCount\":5,\"blocks\":[]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        service.generateExamFromChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("user", "Make a 5-question grammar exam"))).build());
+
+        ArgumentCaptor<List> historyCaptor = ArgumentCaptor.forClass(List.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(anyString(), historyCaptor.capture());
+        assertEquals(2, historyCaptor.getValue().size());
+        String lastText = ((com.hango.hango_backend.dto.GeminiGenerateRequest.Content) historyCaptor.getValue().get(1))
+                .getParts().get(0).getText();
+        assertTrue(lastText.contains("Please generate the JSON"));
+    }
+
+    @Test
+    void generateExamFromChatShouldStripMarkdownFenceAndParseExamJson() {
+        String fenced = "```json\n{\"title\":\"Grammar Basics\",\"description\":\"d\",\"durationMinutes\":30,"
+                + "\"passingScore\":50.0,\"expectedQuestionCount\":1,\"blocks\":["
+                + "{\"isQuestionGroup\":false,\"passageText\":\"\",\"categoryId\":1,\"difficultyId\":14,"
+                + "\"questions\":[{\"questionText\":\"2+2?\",\"options\":[]}]}]}\n```";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(fenced);
+
+        CreateTrainerExamAIResponseDTO result = service.generateExamFromChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("user", "go"))).build());
+
+        assertEquals("Grammar Basics", result.getTitle());
+        assertEquals(1, result.getBlocks().size());
+        assertEquals("2+2?", result.getBlocks().get(0).getQuestions().get(0).getQuestionText());
+    }
+
+    @Test
+    void generateExamFromChatShouldThrowBadGatewayWhenAiReturnsInvalidJson() {
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("not json");
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.generateExamFromChat(
+                TrainerExamChatRequestDTO.builder().history(List.of(message("user", "go"))).build()));
+        assertEquals(502, ex.getStatus().value());
     }
 }
