@@ -170,7 +170,7 @@ class _CartPageState extends State<CartPage> {
       await CartManager.updateCount();
       
       if (mounted) {
-        ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Đăng ký khóa học thành công!' : 'Enrolled successfully!');
+        ToastHelper.showSuccess(context, 'Enrolled successfully!');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -197,7 +197,7 @@ class _CartPageState extends State<CartPage> {
     final token = prefs.getString('auth_token');
     if (token == null || token.isEmpty) {
       if (mounted) {
-        ToastHelper.show(context, LanguageManager.isVi ? 'Vui lòng đăng nhập để thực hiện thanh toán.' : 'Please log in to check out.');
+        ToastHelper.show(context, 'Please log in to check out.');
         Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginPage()));
       }
       return;
@@ -207,7 +207,7 @@ class _CartPageState extends State<CartPage> {
     final freeCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price <= 0).toList();
 
     if (unpaidCourses.isEmpty && freeCourses.isEmpty) {
-      ToastHelper.show(context, LanguageManager.isVi ? 'Bạn đã sở hữu tất cả khóa học trong giỏ hàng' : 'All courses in cart are already enrolled');
+      ToastHelper.show(context, 'All courses in cart are already enrolled');
       return;
     }
 
@@ -232,7 +232,7 @@ class _CartPageState extends State<CartPage> {
       }
       await CartManager.setCartIds(cartIds);
       await CartManager.updateCount();
-      ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Đăng ký thành công các khóa học miễn phí!' : 'Free courses enrolled successfully!');
+      ToastHelper.showSuccess(context, 'Free courses enrolled successfully!');
       _loadCart();
     }
   }
@@ -240,7 +240,7 @@ class _CartPageState extends State<CartPage> {
   void _payPaidCourses(List<Course> courses, double totalPrice) {
     final courseIds = courses.map((c) => c.id).toList();
     final title = courses.length > 1
-        ? (LanguageManager.isVi ? 'Thanh toán ${courses.length} khóa học trong giỏ hàng' : 'Checkout ${courses.length} courses in cart')
+        ? 'Checkout ${courses.length} courses in cart'
         : courses.first.title;
 
     showDialog(
@@ -262,7 +262,7 @@ class _CartPageState extends State<CartPage> {
           await CartManager.updateCount();
 
           if (mounted) {
-            ToastHelper.showSuccess(context, LanguageManager.isVi ? 'Thanh toán thành công! Các khóa học đã được mở khóa.' : 'Payment successful! Courses unlocked.');
+            ToastHelper.showSuccess(context, 'Payment successful! Courses unlocked.');
             _loadCart();
           }
         },

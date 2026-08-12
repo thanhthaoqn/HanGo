@@ -2096,7 +2096,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                             );
                           });
                           _showNotification(
-                            '🎉 Thanh toán thành công! Khóa học đã được mở khóa.',
+                            '🎉 Payment successful! Course unlocked.',
                           );
                           _loadCourseDetail();
                         },

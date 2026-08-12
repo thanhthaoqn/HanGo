@@ -123,7 +123,7 @@ class _CourseCardState extends State<CourseCard> {
           _isEnrolled = true;
           _isLoadingEnroll = false;
         });
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đăng ký khóa học thành công!' : 'Enrolled successfully!');
+        ToastHelper.show(context, 'Enrolled successfully!');
         if (widget.onStateChanged != null) {
           widget.onStateChanged!();
         }
@@ -133,7 +133,7 @@ class _CourseCardState extends State<CourseCard> {
         setState(() {
           _isLoadingEnroll = false;
         });
-        ToastHelper.showError(context, LanguageManager.isVi ? 'Đăng ký thất bại. Vui lòng thử lại.' : 'Enrollment failed. Please try again.');
+        ToastHelper.showError(context, 'Enrollment failed. Please try again.');
       }
     }
   }
