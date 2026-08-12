@@ -205,58 +205,27 @@ public class SectionQuestionController {
             Long groupTypeParamId = rs.getObject("group_type_param_id") != null ? rs.getLong("group_type_param_id") : null;
             Long difficultyParamId = rs.getObject("difficulty_param_id") != null ? rs.getLong("difficulty_param_id") : null;
 
-            // Check if it has sub-questions
-            List<Map<String, Object>> subQuestions = new ArrayList<>();
-            if (groupId != null) {
-                // If it's a header question representing the group
-                subQuestions = jdbcTemplate.queryForList(
-                        "SELECT id FROM questions WHERE group_id = ? AND id != ?",
-                        groupId, qId
-                );
-            } else {
-                // Keep the old buggy logic just in case there are legacy things relying on it
-                subQuestions = jdbcTemplate.queryForList(
-                        "SELECT id FROM questions WHERE group_id = ?",
-                        qId
-                );
-            }
-
             List<String> options = new ArrayList<>();
             int correctIndex = 0;
 
-            if (subQuestions != null && !subQuestions.isEmpty()) {
-                categoryName = "Multiple Choice";
-                // Get options of all sub-questions to count them
-                for (Map<String, Object> subQ : subQuestions) {
-                    Long subQId = ((Number) subQ.get("id")).longValue();
-                    List<Map<String, Object>> subOpts = jdbcTemplate.queryForList(
-                            "SELECT option_text FROM question_options WHERE question_id = ? ORDER BY id ASC",
-                            subQId
-                    );
-                    for (Map<String, Object> opt : subOpts) {
-                        options.add((String) opt.get("option_text"));
-                    }
-                }
-            } else {
-                // Fetch options
-                List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
-                        "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
-                        qId
-                );
+            // Fetch options normally for all questions
+            List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
+                    "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                    qId
+            );
 
-                for (int i = 0; i < optionsRows.size(); i++) {
-                    Map<String, Object> row = optionsRows.get(i);
-                    options.add((String) row.get("option_text"));
-                    Object isCorrectObj = row.get("is_correct");
-                    boolean isCorrect = false;
-                    if (isCorrectObj instanceof Boolean) {
-                        isCorrect = (Boolean) isCorrectObj;
-                    } else if (isCorrectObj instanceof Number) {
-                        isCorrect = ((Number) isCorrectObj).intValue() == 1;
-                    }
-                    if (isCorrect) {
-                        correctIndex = i;
-                    }
+            for (int i = 0; i < optionsRows.size(); i++) {
+                Map<String, Object> row = optionsRows.get(i);
+                options.add((String) row.get("option_text"));
+                Object isCorrectObj = row.get("is_correct");
+                boolean isCorrect = false;
+                if (isCorrectObj instanceof Boolean) {
+                    isCorrect = (Boolean) isCorrectObj;
+                } else if (isCorrectObj instanceof Number) {
+                    isCorrect = ((Number) isCorrectObj).intValue() == 1;
+                }
+                if (isCorrect) {
+                    correctIndex = i;
                 }
             }
 
@@ -276,7 +245,11 @@ public class SectionQuestionController {
             qMap.put("groupTypeParamId", groupTypeParamId);
             qMap.put("difficultyParamId", difficultyParamId);
             if (groupId != null) {
-                qMap.put("questionGroup", Map.of("id", groupId));
+                Map<String, Object> groupMap = new HashMap<>();
+                groupMap.put("id", groupId);
+                groupMap.put("groupTypeParamId", groupTypeParamId);
+                groupMap.put("contextText", passageText);
+                qMap.put("questionGroup", groupMap);
             }
             return qMap;
         }, params.toArray());
@@ -448,7 +421,7 @@ public class SectionQuestionController {
         }
 
         try {
-            int updatedRows = jdbcTemplate.update(
+            jdbcTemplate.update(
                     "UPDATE questions SET question_text = ?, explanation = ?, skill_param_id = ?, difficulty_param_id = ? WHERE id = ?",
                     request.getQuestionText(),
                     request.getExplanation(),
@@ -457,7 +430,9 @@ public class SectionQuestionController {
                     id
             );
 
-            if (updatedRows == 0) {
+            // Verify existence just in case
+            Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM questions WHERE id = ?", Integer.class, id);
+            if (count == null || count == 0) {
                 return ResponseEntity.status(404).body(Map.of("error", "Question not found"));
             }
             

@@ -823,7 +823,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         payload["skillParamId"] = currentSkillParamId;
                       }
                       if (currentDifficultyParamId != null) {
-                        payload["difficultyParamId"] = currentDifficultyParamId;
+                        payload["difficultyId"] = currentDifficultyParamId;
                       }
                       
                       final response = await http.put(

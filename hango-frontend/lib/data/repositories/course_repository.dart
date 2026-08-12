@@ -216,6 +216,16 @@ class CourseRepository {
       );
 
       if (response.statusCode != 200) {
+        try {
+          final errorBody = json.decode(utf8.decode(response.bodyBytes));
+          if (errorBody['error'] != null) {
+            throw Exception(errorBody['error']);
+          }
+        } catch (e) {
+          if (e is Exception && !e.toString().contains('FormatException')) {
+            rethrow;
+          }
+        }
         throw Exception('Failed to switch version: ${response.statusCode}');
       }
     } catch (e) {

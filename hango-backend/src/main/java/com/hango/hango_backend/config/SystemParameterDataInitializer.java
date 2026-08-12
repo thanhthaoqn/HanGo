@@ -29,32 +29,35 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
     public void run(String... args) {
         log.info("Ensuring Skill/Category/GroupType System Parameters exist...");
 
-        // --- STEP 0: Clean up orphaned FK references left by previous destructive runs ---
+        // --- STEP 0: Clean up orphaned FK references left by previous destructive runs
+        // ---
         try {
             jdbcTemplate.update(
-                "DELETE FROM course_categories WHERE category_param_id NOT IN (SELECT id FROM system_parameters)");
+                    "DELETE FROM course_categories WHERE category_param_id NOT IN (SELECT id FROM system_parameters)");
             jdbcTemplate.update(
-                "UPDATE courses SET category_param_id = NULL WHERE category_param_id IS NOT NULL AND category_param_id NOT IN (SELECT id FROM system_parameters)");
+                    "UPDATE courses SET category_param_id = NULL WHERE category_param_id IS NOT NULL AND category_param_id NOT IN (SELECT id FROM system_parameters)");
             jdbcTemplate.update(
-                "UPDATE courses SET difficulty_param_id = NULL WHERE difficulty_param_id IS NOT NULL AND difficulty_param_id NOT IN (SELECT id FROM system_parameters)");
+                    "UPDATE courses SET difficulty_param_id = NULL WHERE difficulty_param_id IS NOT NULL AND difficulty_param_id NOT IN (SELECT id FROM system_parameters)");
             jdbcTemplate.update(
-                "UPDATE questions SET skill_param_id = NULL WHERE skill_param_id IS NOT NULL AND skill_param_id NOT IN (SELECT id FROM system_parameters)");
+                    "UPDATE questions SET skill_param_id = NULL WHERE skill_param_id IS NOT NULL AND skill_param_id NOT IN (SELECT id FROM system_parameters)");
             jdbcTemplate.update(
-                "UPDATE questions SET difficulty_param_id = NULL WHERE difficulty_param_id IS NOT NULL AND difficulty_param_id NOT IN (SELECT id FROM system_parameters)");
+                    "UPDATE questions SET difficulty_param_id = NULL WHERE difficulty_param_id IS NOT NULL AND difficulty_param_id NOT IN (SELECT id FROM system_parameters)");
             jdbcTemplate.update(
-                "UPDATE question_groups SET group_type_param_id = NULL WHERE group_type_param_id IS NOT NULL AND group_type_param_id NOT IN (SELECT id FROM system_parameters)");
-            
+                    "UPDATE question_groups SET group_type_param_id = NULL WHERE group_type_param_id IS NOT NULL AND group_type_param_id NOT IN (SELECT id FROM system_parameters)");
+
             // First unlink courses that are using the obsolete categories
             jdbcTemplate.update(
-                "UPDATE courses SET category_param_id = NULL WHERE category_param_id IN " +
-                "(SELECT id FROM system_parameters WHERE param_type = 'COURSE_CATEGORY' AND param_key NOT IN " +
-                "('READING_COMPREHENSION', 'VOCABULARY', 'GRAMMAR', 'WRITING_STRUCTURE', 'PRONUNCIATION', 'TEST_PREPARATION'))");
+                    "UPDATE courses SET category_param_id = NULL WHERE category_param_id IN " +
+                            "(SELECT id FROM system_parameters WHERE param_type = 'COURSE_CATEGORY' AND param_key NOT IN "
+                            +
+                            "('READING_COMPREHENSION', 'VOCABULARY', 'GRAMMAR', 'WRITING_STRUCTURE', 'PRONUNCIATION', 'TEST_PREPARATION'))");
 
-            // Cleanup obsolete COURSE_CATEGORY that are actually skills (from previous structure)
+            // Cleanup obsolete COURSE_CATEGORY that are actually skills (from previous
+            // structure)
             jdbcTemplate.update(
-                "DELETE FROM system_parameters WHERE param_type = 'COURSE_CATEGORY' AND param_key NOT IN " +
-                "('READING_COMPREHENSION', 'VOCABULARY', 'GRAMMAR', 'WRITING_STRUCTURE', 'PRONUNCIATION', 'TEST_PREPARATION')");
-                
+                    "DELETE FROM system_parameters WHERE param_type = 'COURSE_CATEGORY' AND param_key NOT IN " +
+                            "('READING_COMPREHENSION', 'VOCABULARY', 'GRAMMAR', 'WRITING_STRUCTURE', 'PRONUNCIATION', 'TEST_PREPARATION')");
+
             log.info("Orphaned FK references cleaned up.");
         } catch (Exception e) {
             log.warn("Could not cleanup orphaned references (tables may not exist yet): {}", e.getMessage());
@@ -98,7 +101,7 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         skills.put("INFERENCE_QUESTION", "Inference question");
 
         // --- STEP 1.2: Ensure 25 Skill Types exist for SKILL_TYPE and SKILL ---
-        String[] skillParamTypes = {"SKILL_TYPE", "SKILL"};
+        String[] skillParamTypes = { "SKILL_TYPE", "SKILL" };
         for (String paramType : skillParamTypes) {
             for (Map.Entry<String, String> entry : skills.entrySet()) {
                 ensureExistsBulk(toCreate, existingParams, paramType, entry.getKey(), entry.getValue());
@@ -113,7 +116,7 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         courseCategories.put("WRITING_STRUCTURE", "Writing & Structure");
         courseCategories.put("PRONUNCIATION", "Pronunciation");
         courseCategories.put("TEST_PREPARATION", "Test Preparation");
-        
+
         for (Map.Entry<String, String> entry : courseCategories.entrySet()) {
             ensureExistsBulk(toCreate, existingParams, "COURSE_CATEGORY", entry.getKey(), entry.getValue());
         }
@@ -159,7 +162,8 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         log.info("System parameters initialization complete.");
     }
 
-    private void ensureExistsBulk(List<SystemParameter> toCreate, Map<String, String> existingParams, String paramType, String paramKey, String paramValue) {
+    private void ensureExistsBulk(List<SystemParameter> toCreate, Map<String, String> existingParams, String paramType,
+            String paramKey, String paramValue) {
         String cacheKey = paramType + ":" + paramKey;
         if (!existingParams.containsKey(cacheKey)) {
             SystemParameter param = SystemParameter.builder()

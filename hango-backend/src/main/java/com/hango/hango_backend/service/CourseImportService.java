@@ -102,7 +102,7 @@ public class CourseImportService {
         if (courseTitle == null || courseTitle.isBlank()) {
             throw new IllegalArgumentException("COURSE sheet is missing required value: Title");
         }
-        
+
         List<String> warnings = new ArrayList<>();
         if (courseRepository.existsByTitleIgnoreCaseAndDeletedAtIsNull(courseTitle)) {
             throw new IllegalArgumentException("Course with title '" + courseTitle + "' already exists.");
@@ -112,7 +112,7 @@ public class CourseImportService {
         if (courseCodeRaw == null || courseCodeRaw.isBlank()) {
             throw new IllegalArgumentException("COURSE sheet is missing required value: Course Code");
         }
-        
+
         Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
         String persistedCourseCode = resolveUniqueCourseCode(courseCodeRaw, reservedPersistedCourseCodes, warnings);
 
@@ -120,18 +120,17 @@ public class CourseImportService {
                 "COURSE_CATEGORY",
                 valueOrDefault(courseData, "Category", "GRAMMAR"),
                 "GRAMMAR",
-                warnings
-        );
+                warnings);
         SystemParameter difficulty = resolveParameter(
                 "ACADEMIC_LEVEL",
                 valueOrDefault(courseData, "Academic Level", "BASIC"),
                 "BASIC",
-                warnings
-        );
+                warnings);
 
         String requestedStatus = valueOrDefault(courseData, "Status", "DRAFT").toUpperCase(Locale.ROOT);
         if (!"DRAFT".equals(requestedStatus)) {
-            warnings.add("Course " + persistedCourseCode + " was imported as DRAFT because trainer imports still require review before publishing.");
+            warnings.add("Course " + persistedCourseCode
+                    + " was imported as DRAFT because trainer imports still require review before publishing.");
         }
 
         int lessonCount = 0;
@@ -144,7 +143,8 @@ public class CourseImportService {
             }
         }
 
-        BigDecimal calculatedPrice = calculateCoursePrice(trainer.getId(), persistedCourseCode, trainerProfile, difficulty, lessonCount, durationMinutes);
+        BigDecimal calculatedPrice = calculateCoursePrice(trainer.getId(), persistedCourseCode, trainerProfile,
+                difficulty, lessonCount, durationMinutes);
 
         Course course = Course.builder()
                 .title(courseTitle)
@@ -208,7 +208,8 @@ public class CourseImportService {
                 String contentUrl = valueOrDefault(row, "Content / Media URL", "");
 
                 String videoTranscript = null;
-                if ("video".equalsIgnoreCase(lessonType) && contentUrl != null && contentUrl.toLowerCase().contains("youtu")) {
+                if ("video".equalsIgnoreCase(lessonType) && contentUrl != null
+                        && contentUrl.toLowerCase().contains("youtu")) {
                     try {
                         videoTranscript = youtubeTranscriptService.fetchTranscript(contentUrl);
                     } catch (Exception ignored) {
@@ -257,14 +258,15 @@ public class CourseImportService {
 
             Lesson targetLesson = lessonsByTitle.get(questionTitle.toLowerCase(Locale.ROOT));
             if (targetLesson == null) {
-                warnings.add("Question row skipped because lesson with title '" + questionTitle + "' was not found in SYLLABUS.");
+                warnings.add("Question row skipped because lesson with title '" + questionTitle
+                        + "' was not found in SYLLABUS.");
                 continue;
             }
 
             String groupName = valueOrDefault(questionRow, "Group", "").trim();
             String passageText = valueOrDefault(questionRow, "Passage Text", "").trim();
             com.hango.hango_backend.entity.QuestionGroup questionGroup = null;
-            
+
             if (!groupName.isEmpty() && !passageText.isEmpty()) {
                 String groupKey = groupName.toLowerCase(Locale.ROOT);
                 questionGroup = questionGroupsByPassage.get(groupKey);
@@ -282,7 +284,8 @@ public class CourseImportService {
             question.setCode("Q_" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
             question.setCategory(resolveQuestionCategory(valueOrDefault(questionRow, "Category", ""), warnings));
             question.setQuestionText(questionText);
-            question.setExplanation(valueOrDefault(questionRow, "Explaination", valueOrDefault(questionRow, "Explanation", "")));
+            question.setExplanation(
+                    valueOrDefault(questionRow, "Explaination", valueOrDefault(questionRow, "Explanation", "")));
             question.setDifficulty(resolveQuestionDifficulty(questionRow, difficulty, warnings));
             question.setSkillParam(resolveQuestionSkill(questionRow, category, warnings));
             question.setSection(targetLesson.getSection());
@@ -297,8 +300,7 @@ public class CourseImportService {
                     "INSERT INTO lesson_quizzes (lesson_id, question_id, display_order) VALUES (?, ?, ?)",
                     targetLesson.getId(),
                     savedQuestion.getId(),
-                    displayOrder
-            );
+                    displayOrder);
             importedQuestions++;
         }
 
@@ -328,8 +330,7 @@ public class CourseImportService {
                 Paths.get("doc", "specs", "templates", TEMPLATE_FILE_NAME),
                 Paths.get("..", "doc", "specs", "templates", TEMPLATE_FILE_NAME),
                 Paths.get("doc", "templates", TEMPLATE_FILE_NAME),
-                Paths.get("..", "doc", "templates", TEMPLATE_FILE_NAME)
-        );
+                Paths.get("..", "doc", "templates", TEMPLATE_FILE_NAME));
     }
 
     private void validateWorkbookFile(MultipartFile file) {
@@ -611,7 +612,8 @@ public class CourseImportService {
                     return category;
                 }
             }
-            warnings.add("Unknown question category '" + rawValue + "' was replaced with " + categories.get(0).getName() + ".");
+            warnings.add("Unknown question category '" + rawValue + "' was replaced with " + categories.get(0).getName()
+                    + ".");
         }
         return categories.get(0);
     }
@@ -619,16 +621,14 @@ public class CourseImportService {
     private SystemParameter resolveQuestionDifficulty(
             Map<String, String> questionRow,
             SystemParameter fallbackDifficulty,
-            List<String> warnings
-    ) {
+            List<String> warnings) {
         String rawDifficulty = valueOrDefault(questionRow, "Difficulty", "");
         if (!rawDifficulty.isBlank()) {
             return resolveParameter(
                     "DIFFICULTY",
                     rawDifficulty,
                     fallbackDifficulty != null ? fallbackDifficulty.getParamKey() : "EASY",
-                    warnings
-            );
+                    warnings);
         }
         if (fallbackDifficulty != null) {
             return fallbackDifficulty;
@@ -638,44 +638,46 @@ public class CourseImportService {
 
     private SystemParameter resolveQuestionSkill(
             Map<String, String> questionRow,
-            SystemParameter fallbackSkill,
-            List<String> warnings
-    ) {
+            SystemParameter courseCategory,
+            List<String> warnings) {
         String rawSkill = valueOrDefault(questionRow, "Skill Type", "");
-        if (!rawSkill.isBlank()) {
-            return resolveParameter(
-                    "SKILL",
-                    rawSkill,
-                    fallbackSkill != null ? fallbackSkill.getParamKey() : "GRAMMAR",
-                    warnings
-            );
+
+        if (rawSkill.isBlank()) {
+            throw new IllegalArgumentException("Question row is missing required value: Skill Type");
         }
-        if (fallbackSkill != null) {
-            return fallbackSkill;
-        }
-        return resolveParameter("SKILL", "GRAMMAR", "GRAMMAR", warnings);
+
+        String normalizedSkill = normalizeParameterKey(rawSkill);
+        
+        // We pass the normalizedSkill as the fallbackKey. 
+        // If it's not found in the DB (or in the aliases), resolveParameter will throw: 
+        // "System parameter not found: SKILL/[NORMALIZED_SKILL]"
+        // This gives the exact error message requested.
+        return resolveParameter(
+                "SKILL",
+                rawSkill,
+                normalizedSkill,
+                warnings);
     }
 
     private SystemParameter resolveGroupType(
             Map<String, String> questionRow,
-            List<String> warnings
-    ) {
+            List<String> warnings) {
         String rawGroupType = valueOrDefault(questionRow, "Group Type", "");
         if (!rawGroupType.isBlank()) {
             return resolveParameter(
                     "GROUP_TYPE",
                     rawGroupType,
                     "READING_COMPREHENSION_8_QUESTIONS",
-                    warnings
-            );
+                    warnings);
         }
-        return resolveParameter("GROUP_TYPE", "READING_COMPREHENSION_8_QUESTIONS", "READING_COMPREHENSION_8_QUESTIONS", warnings);
+        return resolveParameter("GROUP_TYPE", "READING_COMPREHENSION_8_QUESTIONS", "READING_COMPREHENSION_8_QUESTIONS",
+                warnings);
     }
 
     private void saveQuestionOptions(Question question, Map<String, String> questionRow) {
         String correctAnswer = valueOrDefault(questionRow, "Correct Answer", "A").trim();
-        String[] optionColumns = {"Option A", "Option B", "Option C", "Option D"};
-        String[] optionKeys = {"A", "B", "C", "D"};
+        String[] optionColumns = { "Option A", "Option B", "Option C", "Option D" };
+        String[] optionKeys = { "A", "B", "C", "D" };
 
         for (int i = 0; i < optionColumns.length; i++) {
             String optionText = valueOrDefault(questionRow, optionColumns[i], "");
@@ -708,12 +710,15 @@ public class CourseImportService {
     private SystemParameter resolveParameter(String type, String rawValue, String fallbackKey, List<String> warnings) {
         String normalizedKey = normalizeParameterKey(rawValue);
         return systemParameterRepository.findByParamTypeAndParamKey(type, normalizedKey)
-                .or(() -> systemParameterRepository.findByParamTypeAndParamKey(type, aliasParameterKey(type, normalizedKey)))
+                .or(() -> systemParameterRepository.findByParamTypeAndParamKey(type,
+                        aliasParameterKey(type, normalizedKey)))
                 .or(() -> systemParameterRepository.findByParamTypeAndParamKey(type, fallbackKey))
                 .map(parameter -> {
                     String selectedKey = parameter.getParamKey();
-                    if (!selectedKey.equals(normalizedKey) && !selectedKey.equals(aliasParameterKey(type, normalizedKey))) {
-                        warnings.add("Unknown " + type + " value '" + rawValue + "' was replaced with " + fallbackKey + ".");
+                    if (!selectedKey.equals(normalizedKey)
+                            && !selectedKey.equals(aliasParameterKey(type, normalizedKey))) {
+                        warnings.add(
+                                "Unknown " + type + " value '" + rawValue + "' was replaced with " + fallbackKey + ".");
                     }
                     return parameter;
                 })
@@ -721,9 +726,12 @@ public class CourseImportService {
     }
 
     private String normalizeParameterKey(String value) {
-        return value == null ? "" : value.trim()
+        if (value == null) return "";
+        return value.trim()
                 .replace('-', '_')
-                .replace(' ', '_')
+                .replace('/', '_')
+                .replaceAll("\\s+", "_")
+                .replaceAll("_+", "_")
                 .toUpperCase(Locale.ROOT);
     }
 
@@ -809,8 +817,7 @@ public class CourseImportService {
     private String resolveUniqueCourseCode(
             String requestedCode,
             Set<String> reservedCodes,
-            List<String> warnings
-    ) {
+            List<String> warnings) {
         String baseCode = trimToMaxLength(requestedCode.trim(), 100);
         String candidate = baseCode;
         int suffix = 2;
@@ -848,7 +855,7 @@ public class CourseImportService {
             return defaultValue;
         }
     }
- 
+
     private Integer parseInteger(String value, Integer defaultValue) {
         if (value == null || value.isBlank()) {
             return defaultValue;
@@ -859,7 +866,7 @@ public class CourseImportService {
             return defaultValue;
         }
     }
- 
+
     private Long parseLong(String value, Long defaultValue) {
         if (value == null || value.isBlank()) {
             return defaultValue;
@@ -870,8 +877,9 @@ public class CourseImportService {
             return defaultValue;
         }
     }
- 
-    private BigDecimal calculateCoursePrice(Long creatorId, String courseCode, TrainerProfile profile, SystemParameter difficulty, int lessonCount, int durationMinutes) {
+
+    private BigDecimal calculateCoursePrice(Long creatorId, String courseCode, TrainerProfile profile,
+            SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
             if ("PROFESSIONAL".equalsIgnoreCase(profile.getTrainerType())) {
@@ -895,14 +903,14 @@ public class CourseImportService {
         }
         price += (lessonCount * 10000L);
         price += (durationMinutes * 1000L);
-        
+
         if (courseRepository.isEligibleForFirstCoursePromotion(creatorId, courseCode)) {
             return BigDecimal.ZERO;
         }
-        
+
         return BigDecimal.valueOf(price);
     }
- 
+
     private record WorkbookData(Map<String, List<Map<String, String>>> rowsBySheet) {
     }
 }
