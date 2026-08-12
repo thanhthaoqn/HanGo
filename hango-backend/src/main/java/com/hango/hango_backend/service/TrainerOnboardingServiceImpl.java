@@ -192,7 +192,12 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         if (u != null) {
             if (dto.getPhoneNumber() != null) u.setPhoneNumber(dto.getPhoneNumber());
             if (dto.getGender() != null) u.setGender(dto.getGender());
-            if (dto.getUsername() != null) u.setUsername(dto.getUsername());
+            if (dto.getUsername() != null && !dto.getUsername().equalsIgnoreCase(u.getUsername())) {
+                if (userRepository.existsByUsername(dto.getUsername())) {
+                    throw new IllegalArgumentException("Error: Username is already in use!");
+                }
+                u.setUsername(dto.getUsername());
+            }
             if (dto.getDateOfBirth() != null) u.setDateOfBirth(dto.getDateOfBirth());
             if (dto.getAddress() != null) u.setAddress(dto.getAddress());
             if (dto.getAvatarUrl() != null) {

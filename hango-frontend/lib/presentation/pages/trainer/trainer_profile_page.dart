@@ -360,6 +360,14 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     payload['workplace'] = _workplaceController.text.trim();
     payload['gender'] = _gender;
     payload['avatarUrl'] = _avatarUrl ?? '';
+    payload['username'] = _usernameController.text.trim();
+    payload['address'] = _addressController.text.trim();
+    if (_dobController.text.trim().isNotEmpty) {
+      final parts = _dobController.text.split('/');
+      if (parts.length == 3) {
+        payload['dateOfBirth'] = '${parts[2]}-${parts[1]}-${parts[0]}';
+      }
+    }
     payload['bankName'] = _selectedBank ?? '';
     payload['bankAccount'] = _bankAccountController.text.trim();
     payload['bankAccountName'] = _bankAccountNameController.text
