@@ -827,7 +827,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                       }
                       
                       final response = await http.put(
-                        Uri.parse('$apiBaseUrl/sections/questions/$qId'),
+                        Uri.parse('$apiBaseUrl/trainer/questions/$qId'),
                         headers: {
                           'Content-Type': 'application/json',
                           'Authorization': 'Bearer $token',
