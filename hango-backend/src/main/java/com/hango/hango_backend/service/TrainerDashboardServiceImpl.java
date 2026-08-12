@@ -76,6 +76,26 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .filter(group -> group.stream().anyMatch(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus())))
                 .count();
 
+        List<Long> allFamilyIds = baseProjections.stream()
+                .map(com.hango.hango_backend.repository.TrainerCourseDetailProjection::getId)
+                .collect(Collectors.toList());
+                
+        Map<Long, Double> sumMap = new java.util.HashMap<>();
+        Map<Long, Long> countMap = new java.util.HashMap<>();
+        
+        if (!allFamilyIds.isEmpty()) {
+            List<Object[]> ratingStats = courseRatingRepository.getRatingStatsByCourseIds(allFamilyIds);
+            for (Object[] stat : ratingStats) {
+                Long courseId = (Long) stat[0];
+                Double avg = (Double) stat[1];
+                Long cnt = (Long) stat[2];
+                if (avg != null && cnt != null && cnt > 0) {
+                    sumMap.put(courseId, avg * cnt);
+                    countMap.put(courseId, cnt);
+                }
+            }
+        }
+
         List<TrainerCourseDTO> courses = groupedByCode.values().stream()
                 .map(group -> {
                     // Try to find the latest PUBLISHED version
@@ -96,7 +116,15 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                             );
                             
                     List<Long> familyIds = group.stream().map(com.hango.hango_backend.repository.TrainerCourseDetailProjection::getId).collect(Collectors.toList());
-                    Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
+                    double totalSum = 0;
+                    long totalCount = 0;
+                    for (Long fid : familyIds) {
+                        if (sumMap.containsKey(fid)) {
+                            totalSum += sumMap.get(fid);
+                            totalCount += countMap.get(fid);
+                        }
+                    }
+                    Double avgRating = totalCount > 0 ? totalSum / totalCount : 0.0;
                     
                     return TrainerCourseDTO.builder()
                             .id(latest.getId())
@@ -106,7 +134,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                             .thumbnailUrl(latest.getThumbnailUrl())
                             .versionsCount((long) group.size())
                             .price(latest.getPrice() != null ? latest.getPrice() : java.math.BigDecimal.ZERO)
-                            .rating(avgRating != null ? avgRating : 0.0)
+                            .rating(avgRating)
                             .build();
                 })
                 .sorted((c1, c2) -> {
