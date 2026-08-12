@@ -34,6 +34,7 @@ class CreateSectionPage extends StatefulWidget {
 class _CreateSectionPageState extends State<CreateSectionPage> {
   late List<dynamic> _localSections;
   int? _editingIndex;
+  final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
@@ -78,13 +79,12 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
   }
 
   void _addSection() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final name = _nameController.text.trim();
     final code = _codeController.text.trim();
     final desc = _descController.text.trim();
-    if (name.isEmpty) {
-      ToastHelper.showError(context, 'Please enter a section name');
-      return;
-    }
 
     setState(() {
       final newIndex = _localSections.length;
@@ -108,13 +108,12 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
   }
 
   void _updateSection() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final name = _nameController.text.trim();
     final code = _codeController.text.trim();
     final desc = _descController.text.trim();
-    if (name.isEmpty) {
-      ToastHelper.showError(context, 'Please enter a section name');
-      return;
-    }
 
     if (_editingIndex != null && _editingIndex! < _localSections.length) {
       setState(() {
@@ -183,6 +182,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const SizedBox(height: 12),
         _buildFormCard(),
         const SizedBox(height: 24),
         _buildSectionsContainer(),
@@ -209,7 +209,9 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
             top: 28,
             bottom: 20,
           ),
-          child: Column(
+          child: Form(
+            key: _formKey,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
@@ -225,6 +227,12 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a section name';
+                  }
+                  return null;
+                },
                 decoration: InputDecoration(
                   hintText: 'Section 1: Introduction to English Grammar',
                   hintStyle: const TextStyle(
@@ -446,6 +454,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                 ],
               ),
             ],
+          ),
           ),
         ),
         Positioned(
