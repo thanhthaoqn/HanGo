@@ -14,6 +14,7 @@ import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
 import '../../widgets/admin/role/role_matrix_tab.dart';
 import '../../widgets/admin/role/role_detail_drawer.dart';
+import '../../../utils/file_picker_helper.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   final int initialIndex;
@@ -4995,29 +4996,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  Future<void> _saveProfileChanges() async {
+  Future<void> _saveProfileChanges(Map<String, dynamic> profileData) async {
     setState(() {
       _isLoadingProfile = true;
     });
 
     try {
-      String? formattedDob;
-      if (_profileDobController.text.isNotEmpty) {
-        final parts = _profileDobController.text.split('/');
-        if (parts.length == 3) {
-          formattedDob = '${parts[2]}-${parts[1]}-${parts[0]}';
-        }
-      }
-
-      final profileData = {
-        'fullName': _profileNameController.text.trim(),
-        'email': _profileEmailController.text.trim(),
-        'phoneNumber': _profilePhoneController.text.trim(),
-        'avatarUrl': _profileAvatarController.text.trim(),
-        'gender': _profileGender,
-        if (formattedDob != null) 'dateOfBirth': formattedDob,
-      };
-
       final res = await _authService.updateProfile(profileData);
       if (res['success'] == true) {
         final data = res['data'];
@@ -5090,14 +5074,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
         const SizedBox(height: 16),
         // Title
-        const Text(
-          'Profile',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-            fontFamily: 'Outfit',
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Profile',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937),
+                fontFamily: 'Outfit',
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: _showUpdateProfileModal,
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Update'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF28B79B),
+                side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 24),
 
@@ -5167,27 +5174,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ),
                       ),
-                      // Pencil edit button overlay on bottom right
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: _showAvatarEditDialog,
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF28B79B),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.edit,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
+                      // No edit button here, moved to modal
                     ],
                   ),
                   const SizedBox(width: 24),
@@ -5212,7 +5199,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               const SizedBox(height: 32),
 
-              // Form fields grid/layout matching the mockup exactly
+              // Read-only Form fields grid/layout matching the mockup exactly
               LayoutBuilder(
                 builder: (context, constraints) {
                   final formWidth = constraints.maxWidth;
@@ -5223,52 +5210,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       // Row 1: FullName & Username
                       _buildFormRow(
                         isWide,
-                        _buildTextFieldNoIcon(
-                          'FullName',
-                          _profileNameController,
-                        ),
-                        _buildTextFieldNoIcon(
-                          'Username',
-                          _profileUsernameController,
-                          onChanged: (val) {
-                            final emailVal = _profileEmailController.text
-                                .trim();
-                            final parts = emailVal.split('@');
-                            final domain = parts.length > 1
-                                ? parts.last
-                                : 'hango.edu.vn';
-                            _profileEmailController.text =
-                                '${val.trim()}@$domain';
-                          },
-                        ),
+                        _buildReadOnlyField('FullName', _profileNameController.text),
+                        _buildReadOnlyField('Username', _profileUsernameController.text),
                       ),
                       const SizedBox(height: 24),
 
                       // Row 2: Email & Phone Number
                       _buildFormRow(
                         isWide,
-                        _buildTextFieldWithEmailIcon(
-                          'Email',
-                          _profileEmailController,
-                          onChanged: (val) {
-                            final parts = val.trim().split('@');
-                            if (parts.isNotEmpty) {
-                              _profileUsernameController.text = parts.first;
-                            }
-                          },
-                        ),
-                        _buildTextFieldNoIcon(
-                          'Phone Number',
-                          _profilePhoneController,
-                        ),
+                        _buildReadOnlyField('Email', _profileEmailController.text),
+                        _buildReadOnlyField('Phone Number', _profilePhoneController.text.isNotEmpty ? _profilePhoneController.text : 'Not provided'),
                       ),
                       const SizedBox(height: 24),
 
                       // Row 3: Date of Birth & Gender
                       _buildFormRow(
                         isWide,
-                        _buildDatePickerField(context),
-                        _buildGenderRadioGroup(),
+                        _buildReadOnlyField('Date of Birth', _profileDobController.text.isNotEmpty ? _profileDobController.text : '--/--/----'),
+                        _buildReadOnlyField('Gender', _profileGender),
                       ),
                       const SizedBox(height: 24),
 
@@ -5281,67 +5240,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ],
                   );
                 },
-              ),
-
-              const SizedBox(height: 40),
-              const Divider(color: Color(0xFFE5E7EB)),
-              const SizedBox(height: 24),
-
-              // Bottom Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: _saveProfileChanges,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 28,
-                        vertical: 16,
-                      ),
-                      side: const BorderSide(color: Color(0xFF28B79B)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Update',
-                      style: TextStyle(
-                        color: Color(0xFF28B79B),
-                        fontFamily: 'Outfit',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedMenuIndex = 0; // Go back to dashboard
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF28B79B),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 28,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Back',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Outfit',
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
@@ -5393,6 +5291,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+
   Widget _buildFormRow(bool isWide, Widget left, Widget right) {
     if (isWide) {
       return Row(
@@ -5407,6 +5306,29 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [left, const SizedBox(height: 20), right],
+    );
+  }
+
+
+  void _showUpdateProfileModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _UpdateAdminProfileModal(
+        initialFullName: _profileNameController.text,
+        initialUsername: _profileUsernameController.text,
+        initialEmail: _profileEmailController.text,
+        initialPhone: _profilePhoneController.text,
+        initialDob: _profileDobController.text,
+        initialGender: _profileGender,
+        initialAvatarUrl: _profileAvatarController.text,
+        initials: _adminInitials,
+        onSave: (updatedData) async {
+          await _saveProfileChanges(updatedData);
+          // Update controllers with new values so UI updates
+          _fetchAdminProfile();
+        },
+      ),
     );
   }
 
@@ -5870,5 +5792,550 @@ class LineChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant LineChartPainter oldDelegate) {
     return oldDelegate.values != values || oldDelegate.labels != labels;
+  }
+}
+
+// ------------------------------------------------------------------------
+// MODAL DIALOG STATEFUL WIDGET FOR ADMIN PROFILE
+// ------------------------------------------------------------------------
+class _UpdateAdminProfileModal extends StatefulWidget {
+  final String initialFullName;
+  final String initialUsername;
+  final String initialEmail;
+  final String initialPhone;
+  final String initialDob;
+  final String initialGender;
+  final String initialAvatarUrl;
+  final String initials;
+  final Function(Map<String, dynamic>) onSave;
+
+  const _UpdateAdminProfileModal({
+    super.key,
+    required this.initialFullName,
+    required this.initialUsername,
+    required this.initialEmail,
+    required this.initialPhone,
+    required this.initialDob,
+    required this.initialGender,
+    required this.initialAvatarUrl,
+    required this.initials,
+    required this.onSave,
+  });
+
+  @override
+  State<_UpdateAdminProfileModal> createState() => _UpdateAdminProfileModalState();
+}
+
+class _UpdateAdminProfileModalState extends State<_UpdateAdminProfileModal> {
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _nameController;
+  late TextEditingController _usernameController;
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+  late TextEditingController _dobController;
+  late String _gender;
+  late String _avatarUrl;
+  bool _isUploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialFullName);
+    _usernameController = TextEditingController(text: widget.initialUsername);
+    _emailController = TextEditingController(text: widget.initialEmail);
+    _phoneController = TextEditingController(text: widget.initialPhone);
+    _dobController = TextEditingController(text: widget.initialDob);
+    _gender = widget.initialGender;
+    _avatarUrl = widget.initialAvatarUrl;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _usernameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _dobController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      final pickedFile = await pickImage();
+      if (pickedFile == null) return;
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'hango_preset'
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          pickedFile.bytes,
+          filename: pickedFile.name,
+        ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(responseBody);
+        final secureUrl = data['secure_url'] ?? data['url'];
+        setState(() {
+          _avatarUrl = secureUrl ?? '';
+        });
+        ToastHelper.showSuccess(context, 'Avatar uploaded successfully!');
+      } else {
+        ToastHelper.showError(context, 'Avatar upload failed.');
+      }
+    } catch (e) {
+      ToastHelper.showError(context, 'Error uploading avatar: $e');
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 16,
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Update Profile',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Scrollable content
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      // Avatar
+                      Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+                              ),
+                              child: ClipOval(
+                                child: _avatarUrl.isNotEmpty
+                                    ? Image.network(
+                                        _avatarUrl,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Container(
+                                        color: const Color(0xFFE6FFFA),
+                                        child: Center(
+                                          child: Text(
+                                            widget.initials,
+                                            style: const TextStyle(
+                                              color: Color(0xFF28B79B),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 32,
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            if (_isUploading)
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.4),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: InkWell(
+                                onTap: _isUploading ? null : _pickAndUploadAvatar,
+                                customBorder: const CircleBorder(),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF28B79B),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+
+                      _buildFieldsRow([
+                        _buildInputField(
+                          label: 'Full name*',
+                          controller: _nameController,
+                          validator: (v) => v == null || v.isEmpty ? 'Please enter your full name' : null,
+                        ),
+                        _buildInputField(
+                          label: 'Username*',
+                          controller: _usernameController,
+                          validator: (v) => v == null || v.isEmpty ? 'Please enter a username' : null,
+                        ),
+                      ]),
+                      const SizedBox(height: 20),
+
+                      _buildFieldsRow([
+                        _buildInputField(
+                          label: 'Email*',
+                          controller: _emailController,
+                          readOnly: true,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Please enter your email address';
+                            if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(v)) {
+                              return 'Please enter a valid email (e.g. name@example.com)';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildInputField(
+                          label: 'Phone number*',
+                          controller: _phoneController,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Please enter your phone number';
+                            if (!RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$').hasMatch(v)) {
+                              return 'Please enter a valid 10-digit Vietnamese phone number (e.g. 0912345678)';
+                            }
+                            return null;
+                          },
+                        ),
+                      ]),
+                      const SizedBox(height: 20),
+
+                      _buildFieldsRow([
+                        _buildInputField(
+                          label: 'Date of birth*',
+                          controller: _dobController,
+                          hint: 'DD/MM/YYYY',
+                          readOnly: true,
+                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                          onTap: () async {
+                            DateTime initialDate = DateTime.now().subtract(const Duration(days: 365 * 18));
+                            if (_dobController.text.isNotEmpty) {
+                              final parts = _dobController.text.split('/');
+                              if (parts.length == 3) {
+                                final parsed = DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+                                if (parsed != null) {
+                                  initialDate = parsed;
+                                }
+                              }
+                            }
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initialDate,
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: Color(0xFF28B79B),
+                                      onPrimary: Colors.white,
+                                      onSurface: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              final day = picked.day.toString().padLeft(2, '0');
+                              final month = picked.month.toString().padLeft(2, '0');
+                              final year = picked.year.toString();
+                              _dobController.text = '$day/$month/$year';
+                            }
+                          },
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Please select your date of birth';
+                            final parts = v.split('/');
+                            if (parts.length != 3) return 'Please enter date in DD/MM/YYYY format';
+                            return null;
+                          },
+                        ),
+                        _buildGenderToggle(
+                          value: ['Male', 'Female'].contains(_gender) ? _gender : 'Male',
+                          onChanged: (newVal) {
+                            setState(() {
+                              _gender = newVal;
+                            });
+                          },
+                        ),
+                      ]),
+                      const SizedBox(height: 30),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (_formKey.currentState!.validate()) {
+                              String? formattedDob;
+                              if (_dobController.text.isNotEmpty) {
+                                final parts = _dobController.text.split('/');
+                                if (parts.length == 3) {
+                                  formattedDob = '${parts[2]}-${parts[1]}-${parts[0]}';
+                                }
+                              }
+
+                              final data = {
+                                'fullName': _nameController.text.trim(),
+                                'email': _emailController.text.trim(),
+                                'phoneNumber': _phoneController.text.trim(),
+                                'avatarUrl': _avatarUrl,
+                                'gender': _gender,
+                                if (formattedDob != null) 'dateOfBirth': formattedDob,
+                              };
+                              widget.onSave(data);
+                              Navigator.pop(context);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF28B79B),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Update',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFieldsRow(List<Widget> children) {
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (box.maxWidth > 550) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: children[0]),
+              const SizedBox(width: 20),
+              Expanded(child: children[1]),
+            ],
+          );
+        }
+        return Column(
+          children: [
+            children[0],
+            const SizedBox(height: 20),
+            children[1],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    String? hint,
+    String? Function(String?)? validator,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          readOnly: readOnly,
+          onTap: onTap,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+            suffixIcon: suffixIcon,
+            errorMaxLines: 3,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+            ),
+            filled: true,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderToggle({
+    required String value,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              _buildGenderOption('Male', Icons.male_rounded, value, onChanged),
+              _buildGenderOption('Female', Icons.female_rounded, value, onChanged),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderOption(
+    String label,
+    IconData icon,
+    String selected,
+    ValueChanged<String> onChanged,
+  ) {
+    final isSelected = selected == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF28B79B).withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
