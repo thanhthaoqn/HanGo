@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../pages/login_page.dart';
 import '../../pages/trainer/trainer_shell_page.dart';
-import '../../../data/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/language_manager.dart';
@@ -89,17 +87,7 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
     }
   }
 
-  Future<void> _handleLogout(BuildContext context) async {
-    final authService = AuthService();
-    await authService.logout();
-    if (context.mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -176,8 +164,7 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
           ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildLogoutItem(context),
+
         ],
       ),
     );
@@ -245,37 +232,5 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
       ),
     );
   }
-
-  Widget _buildLogoutItem(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: InkWell(
-        onTap: () => _handleLogout(context),
-        borderRadius: BorderRadius.circular(12),
-        hoverColor: const Color(0xFFEF4444).withValues(alpha: 0.08),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.logout, color: Color(0xFFEF4444), size: 20),
-              const SizedBox(width: 14),
-              const Text(
-                'Logout',
-                style: TextStyle(
-                  color: Color(0xFFEF4444),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
+

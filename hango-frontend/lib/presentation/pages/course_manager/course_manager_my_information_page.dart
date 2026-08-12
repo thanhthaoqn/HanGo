@@ -835,12 +835,12 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                         _buildInputField(
                           label: 'Full name*',
                           controller: _nameController,
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          validator: (v) => v == null || v.isEmpty ? 'Please enter your full name' : null,
                         ),
                         _buildInputField(
                           label: 'Name account*',
                           controller: _usernameController,
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          validator: (v) => v == null || v.isEmpty ? 'Please enter a username' : null,
                         ),
                       ]),
                       const SizedBox(height: 20),
@@ -850,7 +850,13 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                         _buildInputField(
                           label: 'Phone number*',
                           controller: _phoneController,
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Please enter your phone number';
+                            if (!RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$').hasMatch(v)) {
+                              return 'Please enter a valid 10-digit Vietnamese phone number (e.g. 0912345678)';
+                            }
+                            return null;
+                          },
                         ),
                         _buildInputField(
                           label: 'date of birth*',
@@ -895,9 +901,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                             }
                           },
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Required';
+                            if (v == null || v.isEmpty) return 'Please select your date of birth';
                             final parts = v.split('/');
-                            if (parts.length != 3) return 'Format: DD/MM/YYYY';
+                            if (parts.length != 3) return 'Please enter date in DD/MM/YYYY format';
                             return null;
                           },
                         ),
@@ -1034,6 +1040,7 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
             suffixIcon: suffixIcon,
+            errorMaxLines: 3,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),

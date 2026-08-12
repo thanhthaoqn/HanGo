@@ -1676,6 +1676,39 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                     ),
                   ),
+                  const PopupMenuDivider(height: 1),
+                  PopupMenuItem(
+                    value: 'logout',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.logout_rounded,
+                              size: 18,
+                              color: Color(0xFFEF4444),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Logout',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFFEF4444),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1756,25 +1789,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const Divider(color: Color(0xFFE5E7EB)),
                 const SizedBox(height: 12),
 
-                // Bottom Items
-                _buildSidebarBottomItem(
-                  icon: Icons.help_outline,
-                  title: 'Help Center',
-                  onTap: () {
-                    if (isMobileDrawer) Navigator.pop(context);
-                    ToastHelper.showSuccess(context, 'Opening Help Center...');
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildSidebarBottomItem(
-                  icon: Icons.logout,
-                  title: 'Logout',
-                  onTap: () {
-                    if (isMobileDrawer) Navigator.pop(context);
-                    _handleLogout();
-                  },
-                ),
-                const SizedBox(height: 24),
+
               ],
             ),
           ),
@@ -1827,39 +1842,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   color: isSelected ? Colors.white : const Color(0xFF4B5563),
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarBottomItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(icon, color: const Color(0xFF4B5563), size: 20),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFF4B5563),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
                   fontFamily: 'Outfit',
                 ),
               ),
