@@ -495,11 +495,21 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
         int lessonCount = 0;
-        java.util.List<com.hango.hango_backend.entity.Section> sectionsList = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId());
-        for (com.hango.hango_backend.entity.Section sec : sectionsList) {
-            lessonCount += lessonRepository.findBySectionIdOrderByDisplayOrderAsc(sec.getId()).size();
+        int durationMinutes = 0;
+        if (sessionDTOs != null) {
+            for (com.hango.hango_backend.dto.CourseSessionDTO sDto : sessionDTOs) {
+                if (sDto.getLessons() != null) {
+                    lessonCount += sDto.getLessons().size();
+                    for (com.hango.hango_backend.dto.CourseLessonDTO lDto : sDto.getLessons()) {
+                        if (lDto.getEstimatedTimeMinutes() != null) {
+                            durationMinutes += lDto.getEstimatedTimeMinutes();
+                        } else if (lDto.getEstimatedTime() != null) {
+                            durationMinutes += lDto.getEstimatedTime();
+                        }
+                    }
+                }
+            }
         }
-        int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
         java.math.BigDecimal calculatedPrice = calculateCoursePrice(course.getCreator().getId(), course.getCode(), profile, difficulty, lessonCount, durationMinutes);
 
         if (needsNewDraftVersion) {
@@ -534,7 +544,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .priceNote("")
                     .suggestedPrice(calculatedPrice)
                     .version(newVersion)
-                    .estimatedDuration(request.getEstimatedDuration())
+                    .estimatedDuration(durationMinutes)
                     .status("DRAFT")
                     .parentId(course.getId())
                     .build();
@@ -561,7 +571,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setPrice(calculatedPrice);
         course.setSuggestedPrice(calculatedPrice);
         course.setPriceNote("");
-        course.setEstimatedDuration(request.getEstimatedDuration());
+        course.setEstimatedDuration(durationMinutes);
         if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isEmpty()) {
             if (course.getThumbnailUrl() != null && !course.getThumbnailUrl().equals(request.getThumbnailUrl())) {
                 cloudinaryService.deleteFile(course.getThumbnailUrl());
@@ -1232,13 +1242,22 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .findById(course.getCreator().getId()).orElse(null);
 
         int lessonCount = 0;
+        int durationMinutes = 0;
         java.util.List<com.hango.hango_backend.entity.Section> sections = sectionRepository
                 .findByCourseIdOrderByDisplayOrderAsc(course.getId());
         for (com.hango.hango_backend.entity.Section sec : sections) {
-            lessonCount += lessonRepository.findBySectionIdOrderByDisplayOrderAsc(sec.getId()).size();
+            java.util.List<com.hango.hango_backend.entity.Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(sec.getId());
+            lessonCount += lessons.size();
+            for (com.hango.hango_backend.entity.Lesson l : lessons) {
+                if (l.getEstimatedTimeMinutes() != null) {
+                    durationMinutes += l.getEstimatedTimeMinutes();
+                } else if (l.getEstimatedTime() != null) {
+                    durationMinutes += l.getEstimatedTime();
+                }
+            }
         }
 
-        int durationMinutes = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 0;
+        course.setEstimatedDuration(durationMinutes);
         java.math.BigDecimal calculatedPrice = calculateCoursePrice(course.getCreator().getId(), course.getCode(), profile, course.getDifficulty(), lessonCount, durationMinutes);
         
         course.setPrice(calculatedPrice);
