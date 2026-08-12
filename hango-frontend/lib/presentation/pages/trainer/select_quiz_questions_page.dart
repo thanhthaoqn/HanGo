@@ -872,7 +872,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InternalAppHeader(isMobile: false),
+          InternalAppHeader(isMobile: !isDesktop),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,

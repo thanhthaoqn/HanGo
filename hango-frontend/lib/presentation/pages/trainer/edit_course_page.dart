@@ -539,7 +539,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InternalAppHeader(isMobile: false),
+          InternalAppHeader(isMobile: !isDesktop),
           Expanded(
             child: _isLoadingCourse
                 ? const Center(

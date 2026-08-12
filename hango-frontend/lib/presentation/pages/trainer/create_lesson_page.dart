@@ -689,7 +689,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InternalAppHeader(isMobile: false),
+          InternalAppHeader(isMobile: !isDesktop),
           Expanded(
             child: isDesktop
                 ? Column(

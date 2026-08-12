@@ -279,7 +279,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InternalAppHeader(isMobile: false),
+          InternalAppHeader(isMobile: !isDesktop),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),

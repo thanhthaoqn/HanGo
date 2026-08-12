@@ -525,7 +525,7 @@ class _AddMultipleChoiceQuestionPageState
       body: Column(
         children: [
           // Top Header Row
-          InternalAppHeader(isMobile: false),
+          InternalAppHeader(isMobile: MediaQuery.of(context).size.width <= 1024),
           // Main Body
           Expanded(
             child: Row(

@@ -1040,7 +1040,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           // 2. Filters controls row
           LayoutBuilder(
             builder: (context, constraints) {
-              final useRow = constraints.maxWidth > 768;
+              final useRow = constraints.maxWidth > 1000;
 
               final searchField = TextField(
                 controller: _searchController,
@@ -1128,7 +1128,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               if (useRow) {
                 return Row(
                   children: [
-                    Expanded(flex: 3, child: searchField),
+                    Expanded(flex: 2, child: searchField),
                     const SizedBox(width: 16),
                     Expanded(flex: 1, child: sortByDropdown),
                     const SizedBox(width: 16),
@@ -1137,16 +1137,13 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                 );
               } else {
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     searchField,
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: sortByDropdown),
-                        const SizedBox(width: 12),
-                        Expanded(child: timePeriodDropdown),
-                      ],
-                    ),
+                    sortByDropdown,
+                    const SizedBox(height: 12),
+                    timePeriodDropdown,
                   ],
                 );
               }

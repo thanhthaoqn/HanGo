@@ -341,7 +341,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
       body: Column(
         children: [
           // Header Row matching select_quiz_questions_page and create_lesson_page
-          InternalAppHeader(isMobile: false),
+          InternalAppHeader(isMobile: MediaQuery.of(context).size.width <= 1024),
           // Main Body
           Expanded(
             child: Row(

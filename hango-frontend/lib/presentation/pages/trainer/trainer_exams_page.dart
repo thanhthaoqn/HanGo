@@ -544,7 +544,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           const SizedBox(height: 20),
           LayoutBuilder(
             builder: (context, constraints) {
-              final useRow = constraints.maxWidth > 768;
+              final useRow = constraints.maxWidth > 1000;
 
               final searchField = TextField(
                 controller: _searchController,
@@ -636,7 +636,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               if (useRow) {
                 return Row(
                   children: [
-                    Expanded(flex: 3, child: searchField),
+                    Expanded(flex: 2, child: searchField),
                     const SizedBox(width: 16),
                     Expanded(flex: 1, child: sortByDropdown),
                     const SizedBox(width: 16),
@@ -645,16 +645,13 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 );
               } else {
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     searchField,
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: sortByDropdown),
-                        const SizedBox(width: 12),
-                        Expanded(child: timePeriodDropdown),
-                      ],
-                    ),
+                    sortByDropdown,
+                    const SizedBox(height: 12),
+                    timePeriodDropdown,
                   ],
                 );
               }
@@ -767,15 +764,19 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         ? []
         : _examsList.sublist(startIndex, endIndex);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 1000),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           // Table Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -875,6 +876,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           ),
         ],
       ),
+    ),
+    ),
     );
   }
 

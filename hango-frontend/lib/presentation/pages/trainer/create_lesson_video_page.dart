@@ -657,7 +657,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InternalAppHeader(isMobile: false),
+          InternalAppHeader(isMobile: !isDesktop),
           Expanded(
             child: isDesktop
                 ? Column(
