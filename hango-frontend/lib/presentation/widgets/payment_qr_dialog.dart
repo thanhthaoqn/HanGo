@@ -56,6 +56,15 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
   }
 
   Future<void> _createPayment() async {
+    _countdownTimer?.cancel();
+    _pollingTimer?.cancel();
+    setState(() {
+      _secondsRemaining = 15 * 60;
+      _isLoading = true;
+      _isPolling = false;
+      _errorMessage = null;
+    });
+
     try {
       final result = await _paymentRepository.createPayment(
         courseId: widget.courseId,
@@ -75,6 +84,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
         _isLoading = false;
       });
       _startCountdown();
+      _startPolling();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -85,6 +95,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
   }
 
   void _startCountdown() {
+    _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -95,6 +106,9 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
           _secondsRemaining--;
         } else {
           timer.cancel();
+          _pollingTimer?.cancel();
+          _isPolling = false;
+          _errorMessage = 'Payment session expired (15-minute timer ended). Please click "Try Again" to generate a new QR code.';
         }
       });
     });
@@ -104,6 +118,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
     if (_txnRef == null || _isPolling) return;
     setState(() => _isPolling = true);
 
+    _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (!mounted) {
         timer.cancel();
@@ -115,12 +130,14 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
 
         if (paymentStatus == 'SUCCESS') {
           timer.cancel();
+          _countdownTimer?.cancel();
           if (mounted) {
             Navigator.of(context).pop();
             widget.onPaymentSuccess();
           }
         } else if (paymentStatus == 'FAILED') {
           timer.cancel();
+          _countdownTimer?.cancel();
           if (mounted) {
             setState(() {
               _isPolling = false;
@@ -129,15 +146,16 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
           }
         } else if (paymentStatus == 'EXPIRED') {
           timer.cancel();
+          _countdownTimer?.cancel();
           if (mounted) {
             setState(() {
               _isPolling = false;
-              _errorMessage = 'Payment code expired. Please close popup and try again.';
+              _errorMessage = 'Payment session expired. Please click "Try Again" to generate a new QR code.';
             });
           }
         }
       } catch (_) {
-        // Tiếp tục polling nếu lỗi tạm thời
+        // Continue polling on temporary network glitches
       }
     });
   }
@@ -146,8 +164,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
     if (_paymentUrl == null) return;
     final uri = Uri.parse(_paymentUrl!);
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      _startPolling();
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
     }
   }
 

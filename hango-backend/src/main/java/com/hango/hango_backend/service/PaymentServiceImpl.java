@@ -84,7 +84,7 @@ public class PaymentServiceImpl implements PaymentService {
         } else if (request.getCourseId() != null) {
             targetCourseIds.add(request.getCourseId());
         } else {
-            throw new RuntimeException("Không tìm thấy thông tin khóa học thanh toán.");
+            throw new RuntimeException("Course information not found for payment.");
         }
 
         List<Course> courses = courseRepository.findAllById(targetCourseIds);
@@ -209,7 +209,7 @@ public class PaymentServiceImpl implements PaymentService {
         String qrCode = payOSResponse.get("qrCode");
 
         String displayTitle = courses.size() > 1
-                ? ("Thanh toán " + courses.size() + " khóa học trong giỏ hàng")
+                ? ("Payment for " + courses.size() + " courses in cart")
                 : primaryCourse.getTitle();
 
         return PaymentResponseDTO.builder()
@@ -373,7 +373,7 @@ public class PaymentServiceImpl implements PaymentService {
                             try {
                                 String priceText = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
                                         ? String.format("%,.0fđ", c.getPrice())
-                                        : "Miễn phí";
+                                        : "Free";
                                 emailService.sendEnrollmentSuccessEmail(
                                         payment.getUser().getEmail(),
                                         payment.getUser().getFullName(),
@@ -401,16 +401,24 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findByTxnRef(txnRef)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
-        // Bảo mật: chỉ cho xem payment của chính mình
+        // Security check
         if (!payment.getUser().getId().equals(userId)) {
             throw new RuntimeException("Unauthorized");
         }
 
+        String currentStatus = payment.getStatus();
+        if ("PENDING".equalsIgnoreCase(currentStatus) && payment.getCreatedAt() != null
+                && payment.getCreatedAt().isBefore(java.time.LocalDateTime.now().minusMinutes(15))) {
+            payment.setStatus("EXPIRED");
+            paymentRepository.save(payment);
+            currentStatus = "EXPIRED";
+        }
+
         return PaymentStatusDTO.builder()
                 .txnRef(payment.getTxnRef())
-                .status(payment.getStatus())
+                .status(currentStatus)
                 .courseId(payment.getCourse() != null ? payment.getCourse().getId() : null)
-                .courseTitle(payment.getCourse() != null ? payment.getCourse().getTitle() : "Khóa học")
+                .courseTitle(payment.getCourse() != null ? payment.getCourse().getTitle() : "Course")
                 .paidAt(payment.getPaidAt())
                 .build();
     }
@@ -442,14 +450,14 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getCourseIds() != null && !payment.getCourseIds().trim().isEmpty()) {
             String[] ids = payment.getCourseIds().split(",");
             if (ids.length > 1) {
-                title = "Thanh toán " + ids.length + " khóa học trong giỏ hàng";
+                title = "Payment for " + ids.length + " courses in cart";
             }
         }
         if (title == null && payment.getCourse() != null) {
             title = payment.getCourse().getTitle();
         }
         if (title == null) {
-            title = "Khóa học HanGo";
+            title = "HanGo Course";
         }
 
         return PaymentHistoryDTO.builder()

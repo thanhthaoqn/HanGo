@@ -88,11 +88,9 @@ class MonthlyStatementServiceImplTest {
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(
                 TrainerProfile.builder().userId(1L).trainerType("PROFESSIONAL").build()));
 
-        Payment recent = payment(trainer, new BigDecimal("100000"), "PENDING", LocalDateTime.now().minusDays(2));
-        recent.setTrainerEarnings(new BigDecimal("70000"));
-        Payment old = payment(trainer, new BigDecimal("200000"), "PENDING", LocalDateTime.now().minusDays(10));
-        old.setTrainerEarnings(new BigDecimal("140000"));
-        when(paymentRepository.findByCourseCreatorIdAndStatus(1L, "SUCCESS")).thenReturn(List.of(recent, old));
+        Object[] recentRow = new Object[]{new BigDecimal("70000"), new BigDecimal("100000"), "PENDING", java.sql.Timestamp.valueOf(LocalDateTime.now().minusDays(2))};
+        Object[] oldRow = new Object[]{new BigDecimal("140000"), new BigDecimal("200000"), "PENDING", java.sql.Timestamp.valueOf(LocalDateTime.now().minusDays(10))};
+        when(paymentRepository.findRevenueDataByTrainerId(1L)).thenReturn(List.of(recentRow, oldRow));
         when(statementRepository.findByTrainerIdOrderByPeriodMonthDesc(1L)).thenReturn(List.of());
 
         TrainerRevenueSummaryDTO result = statementService.getTrainerRevenueSummary(1L);
@@ -107,8 +105,8 @@ class MonthlyStatementServiceImplTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(trainer));
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(
                 TrainerProfile.builder().userId(1L).trainerType("PEER_TUTOR").build()));
-        Payment noEarningsCached = payment(trainer, new BigDecimal("100000"), "PENDING", LocalDateTime.now().minusDays(10));
-        when(paymentRepository.findByCourseCreatorIdAndStatus(1L, "SUCCESS")).thenReturn(List.of(noEarningsCached));
+        Object[] noEarningsRow = new Object[]{null, new BigDecimal("100000"), "PENDING", java.sql.Timestamp.valueOf(LocalDateTime.now().minusDays(10))};
+        when(paymentRepository.findRevenueDataByTrainerId(1L)).thenReturn(List.<Object[]>of(noEarningsRow));
         when(statementRepository.findByTrainerIdOrderByPeriodMonthDesc(1L)).thenReturn(List.of());
 
         TrainerRevenueSummaryDTO result = statementService.getTrainerRevenueSummary(1L);
@@ -123,7 +121,7 @@ class MonthlyStatementServiceImplTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(trainer));
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(
                 TrainerProfile.builder().userId(1L).trainerType("PROFESSIONAL").build()));
-        when(paymentRepository.findByCourseCreatorIdAndStatus(1L, "SUCCESS")).thenReturn(List.of());
+        when(paymentRepository.findRevenueDataByTrainerId(1L)).thenReturn(List.of());
         MonthlyStatement paid = MonthlyStatement.builder().id(1L).trainer(trainer).periodMonth("2026-06")
                 .status("PAID").netPayoutAmount(new BigDecimal("500000")).build();
         MonthlyStatement unpaid = MonthlyStatement.builder().id(2L).trainer(trainer).periodMonth("2026-07")
@@ -141,9 +139,8 @@ class MonthlyStatementServiceImplTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(trainer));
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(
                 TrainerProfile.builder().userId(1L).trainerType("PROFESSIONAL").build()));
-        Payment settled = payment(trainer, new BigDecimal("100000"), "IN_STATEMENT", LocalDateTime.now().minusDays(2));
-        settled.setTrainerEarnings(new BigDecimal("70000"));
-        when(paymentRepository.findByCourseCreatorIdAndStatus(1L, "SUCCESS")).thenReturn(List.of(settled));
+        Object[] settledRow = new Object[]{new BigDecimal("70000"), new BigDecimal("100000"), "IN_STATEMENT", java.sql.Timestamp.valueOf(LocalDateTime.now().minusDays(2))};
+        when(paymentRepository.findRevenueDataByTrainerId(1L)).thenReturn(List.<Object[]>of(settledRow));
         when(statementRepository.findByTrainerIdOrderByPeriodMonthDesc(1L)).thenReturn(List.of());
 
         TrainerRevenueSummaryDTO result = statementService.getTrainerRevenueSummary(1L);
@@ -157,7 +154,7 @@ class MonthlyStatementServiceImplTest {
         User trainer = trainer(1L, "trainer@example.com");
         when(userRepository.findById(1L)).thenReturn(Optional.of(trainer));
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
-        when(paymentRepository.findByCourseCreatorIdAndStatus(1L, "SUCCESS")).thenReturn(List.of());
+        when(paymentRepository.findRevenueDataByTrainerId(1L)).thenReturn(List.of());
         when(statementRepository.findByTrainerIdOrderByPeriodMonthDesc(1L)).thenReturn(List.of());
 
         TrainerRevenueSummaryDTO result = statementService.getTrainerRevenueSummary(1L);
@@ -374,6 +371,7 @@ class MonthlyStatementServiceImplTest {
         assertEquals("TXN-123", statement.getBankTxnRef());
         assertEquals("Paid via bank transfer", statement.getAdminNotes());
         assertEquals(true, statement.getPaidAt() != null);
+        verify(emailService).sendSettlementPaidEmail(eq("trainer@example.com"), any(), eq("2026-07"), any(), eq("TXN-123"), eq("https://example.com/receipts/txn-123.png"));
     }
 
     // =================================================================
