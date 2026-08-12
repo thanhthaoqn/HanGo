@@ -20,8 +20,10 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
 
   List<TicketModel> _tickets = [];
   bool _isLoading = true;
+  bool _isFetchingBackground = false;
   String _selectedTab = 'ALL'; // ALL, PENDING, PROCESSED
   int _currentPage = 0;
+  int _pageSize = 10;
   int _totalPages = 1;
   int _totalElements = 0;
 
@@ -37,8 +39,12 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
     super.dispose();
   }
 
-  Future<void> _fetchTickets() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchTickets({bool isSilent = false}) async {
+    if (_tickets.isEmpty || !isSilent) {
+      setState(() => _isLoading = true);
+    } else {
+      setState(() => _isFetchingBackground = true);
+    }
 
     String? statusFilter;
     if (_selectedTab == 'PENDING') {
@@ -51,12 +57,13 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
       status: statusFilter,
       keyword: _searchController.text.trim(),
       page: _currentPage,
-      size: 10,
+      size: _pageSize,
     );
 
     if (mounted) {
       setState(() {
         _isLoading = false;
+        _isFetchingBackground = false;
         if (res['success'] == true) {
           _tickets = res['tickets'] as List<TicketModel>;
           _totalPages = res['totalPages'] ?? 1;
@@ -132,25 +139,66 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                     ],
                   ),
 
-                  // Search box
-                  SizedBox(
-                    width: 260,
-                    child: TextField(
-                      controller: _searchController,
-                      onSubmitted: (_) {
-                        setState(() => _currentPage = 0);
-                        _fetchTickets();
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Search code, title, sender...',
-                        hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        fillColor: const Color(0xFFF8FAFC),
-                        filled: true,
+                  // Search box & Page Size Selector
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 240,
+                        child: TextField(
+                          controller: _searchController,
+                          onSubmitted: (_) {
+                            setState(() => _currentPage = 0);
+                            _fetchTickets(isSilent: true);
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Search code, title, sender...',
+                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                            prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            fillColor: const Color(0xFFF8FAFC),
+                            filled: true,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Container(
+                        height: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Text('Show: ', style: TextStyle(color: Color(0xFF6B7280), fontSize: 13, fontFamily: 'Outfit')),
+                            DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                value: _pageSize,
+                                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF4B5563), size: 16),
+                                style: const TextStyle(color: Color(0xFF1F2937), fontSize: 13, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                                onChanged: (int? newValue) {
+                                  if (newValue != null) {
+                                    setState(() {
+                                      _pageSize = newValue;
+                                      _currentPage = 0;
+                                    });
+                                    _fetchTickets(isSilent: true);
+                                  }
+                                },
+                                items: <int>[5, 10, 20, 50].map<DropdownMenuItem<int>>((int value) {
+                                  return DropdownMenuItem<int>(
+                                    value: value,
+                                    child: Text('$value'),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -159,7 +207,7 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
               const SizedBox(height: 16),
 
               // Data Table (Mockup 2 Layout)
-              if (_isLoading)
+              if (_isLoading && _tickets.isEmpty)
                 const SizedBox(
                   height: 300,
                   child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
@@ -172,108 +220,171 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                   ),
                 )
               else
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                        child: DataTable(
-                          columnSpacing: 28,
-                          headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                          columns: const [
-                            DataColumn(label: Text('Ticket Code', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                            DataColumn(label: Text('Title', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                            DataColumn(label: Text('Sender', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                            DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                            DataColumn(label: Text('Created At', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                            DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                          ],
-                          rows: _tickets.map((t) {
-                            final sender = t.userName ?? t.userEmail ?? 'User';
-                            return DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    '#${t.ticketCode}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)),
-                                  ),
-                                ),
-                                DataCell(
-                                  SizedBox(
-                                    width: 280,
-                                    child: Text(
-                                      t.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: Color(0xFF0F172A)),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(Text('$sender (${t.userRole})', style: const TextStyle(fontSize: 13, color: Color(0xFF475569)))),
-                                DataCell(_buildStatusBadge(t.status)),
-                                DataCell(Text(t.createdAt, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
-                                DataCell(
-                                  IconButton(
-                                    icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF0284C7), size: 20),
-                                    tooltip: 'View & Process Ticket',
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => ProcessTicketModal(
-                                          ticket: t,
-                                          onSuccess: _fetchTickets,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
+                Stack(
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                            child: DataTable(
+                              columnSpacing: 28,
+                              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                              columns: const [
+                                DataColumn(label: Text('Ticket Code', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
+                                DataColumn(label: Text('Title', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
+                                DataColumn(label: Text('Sender', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
+                                DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
+                                DataColumn(label: Text('Created At', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
+                                DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
                               ],
-                            );
-                          }).toList(),
+                              rows: _tickets.map((t) {
+                                final sender = t.userName ?? t.userEmail ?? 'User';
+                                return DataRow(
+                                  cells: [
+                                    DataCell(
+                                      Text(
+                                        '#${t.ticketCode}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      SizedBox(
+                                        width: 280,
+                                        child: Text(
+                                          t.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(color: Color(0xFF0F172A)),
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(Text('$sender (${t.userRole})', style: const TextStyle(fontSize: 13, color: Color(0xFF475569)))),
+                                    DataCell(_buildStatusBadge(t.status)),
+                                    DataCell(Text(t.createdAt, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                                    DataCell(
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF0284C7), size: 20),
+                                        tooltip: 'View & Process Ticket',
+                                        onPressed: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => ProcessTicketModal(
+                                              ticket: t,
+                                              onSuccess: () => _fetchTickets(isSilent: true),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    if (_isFetchingBackground)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: const LinearProgressIndicator(
+                          color: Color(0xFF28B79B),
+                          backgroundColor: Colors.transparent,
+                          minHeight: 3,
                         ),
                       ),
-                    );
-                  },
+                  ],
                 ),
 
-              // Footer Pagination Controls
+              // Footer Pagination Controls (Comment Management matching layout)
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total $_totalElements record(s)', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  if (_totalPages > 1)
+              if (_tickets.isNotEmpty)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total $_totalElements ticket(s)',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                    ),
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.chevron_left),
+                          icon: const Icon(Icons.chevron_left, size: 18),
                           onPressed: _currentPage > 0
                               ? () {
                                   setState(() => _currentPage--);
-                                  _fetchTickets();
+                                  _fetchTickets(isSilent: true);
                                 }
                               : null,
                         ),
-                        Text('Page ${_currentPage + 1} / $_totalPages', style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                        const SizedBox(width: 4),
+                        ...List.generate(_totalPages > 0 ? _totalPages : 1, (index) {
+                          final pageNum = index + 1;
+                          final isCurrent = index == _currentPage;
+
+                          return InkWell(
+                            onTap: () {
+                              setState(() => _currentPage = index);
+                              _fetchTickets(isSilent: true);
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: isCurrent ? const Color(0xFF28B79B) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$pageNum',
+                                  style: TextStyle(
+                                    color: isCurrent ? Colors.white : const Color(0xFF4B5563),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(width: 4),
                         IconButton(
-                          icon: const Icon(Icons.chevron_right),
+                          icon: const Icon(Icons.chevron_right, size: 18),
                           onPressed: _currentPage < _totalPages - 1
                               ? () {
                                   setState(() => _currentPage++);
-                                  _fetchTickets();
+                                  _fetchTickets(isSilent: true);
                                 }
                               : null,
                         ),
                       ],
                     ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),
       ],
     );
+
+    if (widget.isEmbedded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildContentHeader(context, isDesktop),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+            child: content,
+          ),
+        ],
+      );
+    }
 
     final Widget bodyContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -287,10 +398,6 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
         ),
       ],
     );
-
-    if (widget.isEmbedded) {
-      return bodyContent;
-    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -339,7 +446,7 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
           _selectedTab = key;
           _currentPage = 0;
         });
-        _fetchTickets();
+        _fetchTickets(isSilent: true);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

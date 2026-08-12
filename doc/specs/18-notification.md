@@ -36,7 +36,7 @@ Notification giữ chân user bằng cách nhắc các sự kiện quan trọng.
 | `TrainerApplicationReviewed` | `TrainerOnboardingServiceImpl.reviewTrainerProfile` | Trainer nộp đơn |
 | `LOW_RATING` | `CourseRatingServiceImpl` (rating ≤3) | Course Manager **và** Administrator |
 | `LOW_AVERAGE_RATING` | `CourseRatingServiceImpl` (avg vượt ngưỡng 4.0 xuống) | Course Manager **và** Administrator |
-| `TicketCreated`/`TicketReviewed` | `TicketServiceImpl` (chuỗi tự do, chưa gộp vào hằng số chung) | Broadcast staff (⚠️ hiện gửi theo tên role cũ `TRAINER_LEAD` — không tới được ai, xem [16-ticket-management.md](16-ticket-management.md)) |
+| `TicketCreated`/`TicketReviewed` | `TicketServiceImpl` | Broadcast `ADMINISTRATOR` cho `TicketCreated`, và Trainer/Learner sở hữu ticket cho `TicketReviewed` |
 
 ## 3. Technical Constraints
 - **Không dùng `ApplicationEventPublisher`** — mỗi service gọi trực tiếp `NotificationService`, khớp behavior thật nhưng khác thiết kế decoupled ban đầu.
