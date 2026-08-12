@@ -294,7 +294,7 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
     @Override
     @Transactional(readOnly = true)
     public List<TrainerProfileDTO> getTrainerProfilesForAdmin(String search, String status) {
-        List<TrainerProfile> all = trainerProfileRepository.findAll();
+        List<TrainerProfile> all = trainerProfileRepository.findAllWithUser();
         List<TrainerProfile> filtered = new ArrayList<>();
 
         for (TrainerProfile p : all) {
