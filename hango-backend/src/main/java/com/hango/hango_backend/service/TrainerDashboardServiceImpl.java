@@ -77,7 +77,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .count();
 
         List<Long> allFamilyIds = baseProjections.stream()
-                .map(com.hango.hango_backend.repository.TrainerCourseDetailProjection::getId)
+                .map(p -> p.getId())
                 .collect(Collectors.toList());
                 
         Map<Long, Double> sumMap = new java.util.HashMap<>();
@@ -846,38 +846,32 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR")
                         || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
-        List<com.hango.hango_backend.entity.Exam> exams;
+        List<Object[]> exams;
         if (isManager) {
-            exams = examRepository.findByDeletedAtIsNullOrderByCreatedAtDesc();
-            // Filter out DRAFT exams that belong to other users
-            exams = exams.stream()
-                    .filter(exam -> {
-                        boolean isDraft = "DRAFT".equalsIgnoreCase(exam.getStatus());
-                        boolean isOwn = exam.getCreatedBy() != null && exam.getCreatedBy().getId().equals(trainerId);
-                        return !isDraft || isOwn;
-                    })
-                    .collect(Collectors.toList());
+            exams = examRepository.findTrainerExamsForManager(trainerId);
         } else {
-            exams = examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(trainerId);
+            exams = examRepository.findTrainerExamsForTrainer(trainerId);
         }
 
         // Sort exams by priority and then by createdAt descending
         exams.sort((e1, e2) -> {
-            int p1 = getExamStatusPriority(e1.getStatus());
-            int p2 = getExamStatusPriority(e2.getStatus());
+            int p1 = getExamStatusPriority((String) e1[5]);
+            int p2 = getExamStatusPriority((String) e2[5]);
             if (p1 != p2) {
                 return Integer.compare(p1, p2);
             }
-            if (e1.getCreatedAt() == null && e2.getCreatedAt() == null)
+            java.time.LocalDateTime d1 = (java.time.LocalDateTime) e1[2];
+            java.time.LocalDateTime d2 = (java.time.LocalDateTime) e2[2];
+            if (d1 == null && d2 == null)
                 return 0;
-            if (e1.getCreatedAt() == null)
+            if (d1 == null)
                 return 1;
-            if (e2.getCreatedAt() == null)
+            if (d2 == null)
                 return -1;
-            return e2.getCreatedAt().compareTo(e1.getCreatedAt());
+            return d2.compareTo(d1);
         });
 
-        List<Long> examIds = exams.stream().map(com.hango.hango_backend.entity.Exam::getId).collect(Collectors.toList());
+        List<Long> examIds = exams.stream().map(e -> (Long) e[0]).collect(Collectors.toList());
         java.util.Map<Long, Integer> questionCounts = new java.util.HashMap<>();
         if (!examIds.isEmpty()) {
             List<Object[]> questionRows = examQuestionRepository.countQuestionsByExamIds(examIds);
@@ -889,19 +883,30 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         return exams.stream().map(exam -> {
-            int questionCount = questionCounts.getOrDefault(exam.getId(), 0);
+            Long id = (Long) exam[0];
+            String title = (String) exam[1];
+            java.time.LocalDateTime createdAt = (java.time.LocalDateTime) exam[2];
+            Integer expectedQuestionCount = (Integer) exam[3];
+            Integer durationMinutes = (Integer) exam[4];
+            String status = (String) exam[5];
+            String visibility = (String) exam[6];
+            String thumbnailUrl = (String) exam[7];
+            Long creatorId = (Long) exam[8];
+            String creatorName = (String) exam[9];
+            
+            int questionCount = questionCounts.getOrDefault(id, 0);
             return com.hango.hango_backend.dto.TrainerExamResponseDTO.builder()
-                    .id(exam.getId())
-                    .title(exam.getTitle())
-                    .createdAt(exam.getCreatedAt())
+                    .id(id)
+                    .title(title)
+                    .createdAt(createdAt)
                     .questionCount(questionCount)
-                    .expectedQuestionCount(exam.getExpectedQuestionCount())
-                    .durationMinutes(exam.getDurationMinutes())
-                    .status(exam.getStatus() != null ? exam.getStatus() : "private")
-                    .visibility(exam.getVisibility() != null ? exam.getVisibility() : "PRIVATE")
-                    .thumbnailUrl(exam.getThumbnailUrl())
-                    .creatorId(exam.getCreatedBy() != null ? exam.getCreatedBy().getId() : null)
-                    .creatorName(exam.getCreatedBy() != null ? exam.getCreatedBy().getFullName() : "Unknown")
+                    .expectedQuestionCount(expectedQuestionCount)
+                    .durationMinutes(durationMinutes)
+                    .status(status != null ? status : "private")
+                    .visibility(visibility != null ? visibility : "PRIVATE")
+                    .thumbnailUrl(thumbnailUrl)
+                    .creatorId(creatorId)
+                    .creatorName(creatorName != null ? creatorName : "Unknown")
                     .build();
         }).collect(Collectors.toList());
     }
