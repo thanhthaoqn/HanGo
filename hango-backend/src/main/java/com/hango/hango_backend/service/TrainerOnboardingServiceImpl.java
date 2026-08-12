@@ -192,6 +192,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         if (u != null) {
             if (dto.getPhoneNumber() != null) u.setPhoneNumber(dto.getPhoneNumber());
             if (dto.getGender() != null) u.setGender(dto.getGender());
+            if (dto.getUsername() != null) u.setUsername(dto.getUsername());
+            if (dto.getDateOfBirth() != null) u.setDateOfBirth(dto.getDateOfBirth());
+            if (dto.getAddress() != null) u.setAddress(dto.getAddress());
             if (dto.getAvatarUrl() != null) {
                 log.info("saveProfileDraft: updating user avatar from {} to {}", u.getAvatarUrl(), dto.getAvatarUrl());
                 u.setAvatarUrl(dto.getAvatarUrl());
@@ -428,6 +431,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         String phoneNumber = "N/A";
         String gender = null;
         String avatarUrl = null;
+        String username = null;
+        java.time.LocalDate dateOfBirth = null;
+        String address = null;
 
         try {
             User user = p.getUser();
@@ -437,6 +443,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 phoneNumber = user.getPhoneNumber() != null ? user.getPhoneNumber() : "N/A";
                 gender = user.getGender();
                 avatarUrl = user.getAvatarUrl();
+                username = user.getUsername();
+                dateOfBirth = user.getDateOfBirth();
+                address = user.getAddress();
             }
         } catch (Exception e) {
             log.warn("Could not load User entity for trainer_profile user_id {}: {}", p.getUserId(), e.getMessage());
@@ -467,6 +476,9 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 .phoneNumber(phoneNumber)
                 .gender(gender)
                 .avatarUrl(avatarUrl)
+                .username(username)
+                .dateOfBirth(dateOfBirth)
+                .address(address)
                 .build();
     }
 

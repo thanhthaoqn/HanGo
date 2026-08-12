@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -46,4 +47,7 @@ public class TrainerProfileDTO {
     private String phoneNumber;
     private String gender;
     private String avatarUrl;
+    private String username;
+    private LocalDate dateOfBirth;
+    private String address;
 }

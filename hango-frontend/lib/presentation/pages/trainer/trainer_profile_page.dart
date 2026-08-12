@@ -38,6 +38,9 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
 
   // Controllers & Form fields
   final _fullNameController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _dobController = TextEditingController();
+  final _addressController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   final _bioController = TextEditingController();
   final _workplaceController = TextEditingController();
@@ -88,6 +91,9 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _usernameController.dispose();
+    _dobController.dispose();
+    _addressController.dispose();
     _phoneNumberController.dispose();
     _bioController.dispose();
     _workplaceController.dispose();
@@ -126,6 +132,9 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       setState(() {
         _profileData = p;
         _fullNameController.text = p['fullName'] ?? fullName;
+        _usernameController.text = p['username'] ?? '';
+        _dobController.text = p['dateOfBirth'] ?? '';
+        _addressController.text = p['address'] ?? '';
         _userEmail = p['email'] ?? '';
         _phoneNumberController.text = p['phoneNumber'] ?? '';
         _bioController.text = p['bio'] ?? '';
@@ -984,115 +993,182 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   }
 
   // Box 1: ThÃ´ng tin cÃ¡ nhÃ¢n
-  Widget _buildBox0PersonalInfo(bool isVi) {
+    Widget _buildBox0PersonalInfo(bool isVi) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE6F4F1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.person_outline_rounded,
-                color: Color(0xFF28B79B),
-                size: 20,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6F4F1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.person_outline_rounded,
+                    color: Color(0xFF28B79B),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  isVi ? '1. Thông tin cá nhân' : '1. Personal Information',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text(
-              isVi ? '1. ThÃ´ng tin cÃ¡ nhÃ¢n' : '1. Personal Information',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
-                fontFamily: 'Outfit',
+            OutlinedButton.icon(
+              onPressed: _showUpdatePersonalInfoModal,
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: Text(isVi ? 'Cập nhật' : 'Update'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF28B79B),
+                side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 24),
-        _buildInputField(
-          isVi ? 'Há» vÃ  tÃªn *' : 'Full Name *',
-          _fullNameController,
-          errorText: _fullNameError
-              ? (isVi ? 'Há» tÃªn khÃ´ng Ä‘Æ°á»£c trá»‘ng' : 'Name required')
-              : null,
-        ),
-        const SizedBox(height: 16),
-        _buildReadOnlyField(
-          isVi ? 'Email liÃªn há»‡' : 'Email Address',
-          _userEmail,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          isVi ? 'Giá»›i tÃ­nh *' : 'Gender *',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Color(0xFF334155),
-            fontFamily: 'Outfit',
-          ),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          dropdownColor: Colors.white,
-          value: _gender,
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            fillColor: Colors.white,
-            filled: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 2),
-            ),
-          ),
-          hint: Text(isVi ? 'Chá»n giá»›i tÃ­nh' : 'Select gender'),
-          icon: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: Color(0xFF64748B),
-          ),
-          items: [
-            DropdownMenuItem(value: 'MALE', child: Text(isVi ? 'Nam' : 'Male')),
-            DropdownMenuItem(
-              value: 'FEMALE',
-              child: Text(isVi ? 'Ná»¯' : 'Female'),
-            ),
-          ],
-          onChanged: (val) {
-            setState(() {
-              _gender = val;
-            });
+        LayoutBuilder(
+          builder: (context, box) {
+            if (box.maxWidth > 550) {
+              return Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildReadOnlyField(
+                          isVi ? 'Họ và tên' : 'Full Name',
+                          _fullNameController.text,
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _buildReadOnlyField(
+                          isVi ? 'Tên đăng nhập' : 'Name account',
+                          _usernameController.text,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildReadOnlyField(
+                          isVi ? 'Số điện thoại' : 'Phone Number',
+                          _phoneNumberController.text,
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _buildReadOnlyField(
+                          isVi ? 'Ngày sinh' : 'Date of birth',
+                          _dobController.text,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildReadOnlyField(
+                          isVi ? 'Địa chỉ' : 'Address',
+                          _addressController.text,
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _buildReadOnlyField(
+                          isVi ? 'Giới tính' : 'Gender',
+                          _gender == 'MALE' ? (isVi ? 'Nam' : 'Male') : (_gender == 'FEMALE' ? (isVi ? 'Nữ' : 'Female') : ''),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            }
+            return Column(
+              children: [
+                _buildReadOnlyField(isVi ? 'Họ và tên' : 'Full Name', _fullNameController.text),
+                const SizedBox(height: 16),
+                _buildReadOnlyField(isVi ? 'Tên đăng nhập' : 'Name account', _usernameController.text),
+                const SizedBox(height: 16),
+                _buildReadOnlyField(isVi ? 'Số điện thoại' : 'Phone Number', _phoneNumberController.text),
+                const SizedBox(height: 16),
+                _buildReadOnlyField(isVi ? 'Ngày sinh' : 'Date of birth', _dobController.text),
+                const SizedBox(height: 16),
+                _buildReadOnlyField(isVi ? 'Địa chỉ' : 'Address', _addressController.text),
+                const SizedBox(height: 16),
+                _buildReadOnlyField(isVi ? 'Giới tính' : 'Gender', _gender == 'MALE' ? (isVi ? 'Nam' : 'Male') : (_gender == 'FEMALE' ? (isVi ? 'Nữ' : 'Female') : '')),
+              ],
+            );
           },
         ),
-        const SizedBox(height: 16),
-        _buildInputField(
-          isVi ? 'Sá»‘ Ä‘iá»‡n thoáº¡i *' : 'Phone Number *',
-          _phoneNumberController,
-          keyboardType: TextInputType.phone,
-          errorText: _phoneNumberError
-              ? (isVi
-                    ? 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng há»£p lá»‡'
-                    : 'Invalid phone')
-              : null,
-        ),
-        const SizedBox(height: 24),
-        _buildSaveButtonRow(isVi),
       ],
+    );
+  }
+
+  void _showUpdatePersonalInfoModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: _UpdateTrainerProfileModal(
+              initialFullName: _fullNameController.text,
+              initialUsername: _usernameController.text,
+              initialDob: _dobController.text,
+              initialPhone: _phoneNumberController.text,
+              initialAddress: _addressController.text,
+              initialGender: _gender ?? '',
+              initialAvatarUrl: _avatarUrl ?? '',
+              onSave: (Map<String, dynamic> data) {
+                setState(() {
+                  _fullNameController.text = data['fullName'];
+                  _usernameController.text = data['username'];
+                  _dobController.text = data['dob'];
+                  _addressController.text = data['address'];
+                  _phoneNumberController.text = data['phone'];
+                  _gender = data['gender'];
+                  if (data['avatarUrl'] != null && data['avatarUrl'].isNotEmpty) {
+                    _avatarUrl = data['avatarUrl'];
+                  }
+                });
+                _handleSave(); // Trigger the API save
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2360,6 +2436,519 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------------------
+// MODAL DIALOG STATEFUL WIDGET FOR TRAINER PROFILE
+// ------------------------------------------------------------------------
+class _UpdateTrainerProfileModal extends StatefulWidget {
+  final String initialFullName;
+  final String initialUsername;
+  final String initialDob;
+  final String initialPhone;
+  final String initialAddress;
+  final String initialGender;
+  final String initialAvatarUrl;
+  final Function(Map<String, dynamic>) onSave;
+
+  const _UpdateTrainerProfileModal({
+    super.key,
+    required this.initialFullName,
+    required this.initialUsername,
+    required this.initialDob,
+    required this.initialPhone,
+    required this.initialAddress,
+    required this.initialGender,
+    required this.initialAvatarUrl,
+    required this.onSave,
+  });
+
+  @override
+  State<_UpdateTrainerProfileModal> createState() => _UpdateTrainerProfileModalState();
+}
+
+class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> {
+  final _formKey = GlobalKey<FormState>();
+
+  late TextEditingController _nameController;
+  late TextEditingController _usernameController;
+  late TextEditingController _dobController;
+  late TextEditingController _phoneController;
+  late TextEditingController _addressController;
+  late String _gender;
+  late String _avatarUrl;
+  bool _isUploadingAvatar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialFullName);
+    _usernameController = TextEditingController(text: widget.initialUsername);
+    _dobController = TextEditingController(text: widget.initialDob);
+    _phoneController = TextEditingController(text: widget.initialPhone);
+    _addressController = TextEditingController(text: widget.initialAddress);
+    _gender = widget.initialGender;
+    _avatarUrl = widget.initialAvatarUrl;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _usernameController.dispose();
+    _dobController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    final pickedFile = await pickImage();
+    if (pickedFile != null) {
+      setState(() => _isUploadingAvatar = true);
+      try {
+        final res = await AuthService().uploadAvatar(pickedFile);
+        if (res['success'] == true && mounted) {
+          setState(() {
+            _avatarUrl = res['data']['avatarUrl'];
+            _isUploadingAvatar = false;
+          });
+        } else {
+          throw Exception('Upload failed');
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isUploadingAvatar = false);
+          ToastHelper.showError(context, 'Lỗi khi tải ảnh lên.');
+        }
+      }
+    }
+  }
+
+  Widget _buildFieldsRow(List<Widget> children) {
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (box.maxWidth > 550) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: children[0]),
+              const SizedBox(width: 20),
+              Expanded(child: children[1]),
+            ],
+          );
+        }
+        return Column(
+          children: [
+            children[0],
+            const SizedBox(height: 20),
+            children[1],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    String? hint,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+    TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
+    VoidCallback? onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          readOnly: readOnly,
+          onTap: onTap,
+          style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+          decoration: InputDecoration(
+            errorMaxLines: 3,
+            hintText: hint,
+            suffixIcon: suffixIcon,
+            hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFEF4444)),
+            ),
+            filled: true,
+            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+          ),
+          validator: validator,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderOption(
+    String label,
+    IconData icon,
+    String selected,
+    ValueChanged<String> onChanged,
+  ) {
+    final isSelected = selected == (label == 'Male' ? 'MALE' : 'FEMALE');
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(label == 'Male' ? 'MALE' : 'FEMALE'),
+        child: Container(
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFF1E293B) : const Color(0xFF64748B),
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              _buildGenderOption('Male', Icons.male_rounded, _gender, (val) => setState(() => _gender = val)),
+              _buildGenderOption('Female', Icons.female_rounded, _gender, (val) => setState(() => _gender = val)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 16,
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Update Profile',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E293B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      splashRadius: 20,
+                    ),
+                  ],
+                ),
+              ),
+              
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      // Avatar
+                      Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFE2E8F0),
+                                border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+                              ),
+                              child: ClipOval(
+                                child: _avatarUrl.isNotEmpty
+                                    ? Image.network(
+                                        _avatarUrl,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Container(
+                                        color: const Color(0xFFE6FFFA),
+                                        child: Center(
+                                          child: Text(
+                                            'T',
+                                            style: const TextStyle(
+                                              color: Color(0xFF28B79B),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 32,
+                                              fontFamily: 'Outfit',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            if (_isUploadingAvatar)
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.4),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: InkWell(
+                                onTap: _isUploadingAvatar ? null : _pickAvatar,
+                                customBorder: const CircleBorder(),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF28B79B),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      
+                      // Input Fields Row 1
+                      _buildFieldsRow([
+                        _buildInputField(
+                          label: 'Full name*',
+                          controller: _nameController,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter your full name' : null,
+                        ),
+                        _buildInputField(
+                          label: 'Name account*',
+                          controller: _usernameController,
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a username' : null,
+                        ),
+                      ]),
+                      const SizedBox(height: 20),
+                      
+                      // Input Fields Row 2
+                      _buildFieldsRow([
+                        _buildInputField(
+                          label: 'Phone number*',
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please enter your phone number';
+                            if (!RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$').hasMatch(v)) {
+                              return 'Please enter a valid 10-digit Vietnamese phone number (e.g. 0912345678)';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildInputField(
+                          label: 'date of birth*',
+                          controller: _dobController,
+                          hint: 'DD/MM/YYYY',
+                          readOnly: true,
+                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                          onTap: () async {
+                            DateTime initialDate = DateTime.now().subtract(const Duration(days: 365 * 18));
+                            if (_dobController.text.isNotEmpty) {
+                              final parts = _dobController.text.split('/');
+                              if (parts.length == 3) {
+                                final parsed = DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+                                if (parsed != null) {
+                                  initialDate = parsed;
+                                }
+                              }
+                            }
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: initialDate,
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: Color(0xFF28B79B),
+                                      onPrimary: Colors.white,
+                                      onSurface: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              final day = picked.day.toString().padLeft(2, '0');
+                              final month = picked.month.toString().padLeft(2, '0');
+                              final year = picked.year.toString();
+                              _dobController.text = '$day/$month/$year';
+                            }
+                          },
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please select your date of birth';
+                            final parts = v.split('/');
+                            if (parts.length != 3) return 'Please enter date in DD/MM/YYYY format';
+                            return null;
+                          },
+                        ),
+                      ]),
+                      const SizedBox(height: 20),
+                      
+                      // Input Fields Row 3
+                      _buildFieldsRow([
+                        _buildInputField(
+                          label: 'Address',
+                          controller: _addressController,
+                        ),
+                        _buildGenderSelector(),
+                      ]),
+                      
+                      const SizedBox(height: 30),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (_formKey.currentState!.validate()) {
+                              widget.onSave({
+                                'fullName': _nameController.text.trim(),
+                                'username': _usernameController.text.trim(),
+                                'dob': _dobController.text.trim(),
+                                'phone': _phoneController.text.trim(),
+                                'address': _addressController.text.trim(),
+                                'gender': _gender,
+                                'avatarUrl': _avatarUrl,
+                              });
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF28B79B),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Update',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Outfit',
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
