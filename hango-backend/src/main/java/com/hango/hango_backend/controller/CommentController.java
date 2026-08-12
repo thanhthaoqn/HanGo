@@ -6,6 +6,7 @@ import com.hango.hango_backend.service.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.hango.hango_backend.security.UserDetailsImpl;
@@ -33,6 +34,7 @@ public class CommentController {
     }
 
     @PostMapping("/lesson/{lessonId}")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<CommentDTO> addComment(@PathVariable Long lessonId, 
                                                  @AuthenticationPrincipal UserDetailsImpl currentUser,
                                                  @RequestBody CommentRequestDTO request) {
@@ -40,6 +42,7 @@ public class CommentController {
     }
 
     @PutMapping("/{commentId}")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<CommentDTO> updateComment(@PathVariable Long commentId,
                                                     @AuthenticationPrincipal UserDetailsImpl currentUser,
                                                     @RequestBody CommentRequestDTO request) {
@@ -47,6 +50,7 @@ public class CommentController {
     }
 
     @DeleteMapping("/{commentId}")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Void> deleteComment(@PathVariable Long commentId,
                                               @AuthenticationPrincipal UserDetailsImpl currentUser) {
         commentService.deleteComment(commentId, currentUser.getId());
@@ -54,12 +58,14 @@ public class CommentController {
     }
 
     @PostMapping("/{commentId}/like")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<CommentDTO> likeComment(@PathVariable Long commentId,
                                                   @AuthenticationPrincipal UserDetailsImpl currentUser) {
         return ResponseEntity.ok(commentService.likeComment(commentId, currentUser.getId()));
     }
 
     @PostMapping("/{commentId}/unlike")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<CommentDTO> unlikeComment(@PathVariable Long commentId,
                                                     @AuthenticationPrincipal UserDetailsImpl currentUser) {
         return ResponseEntity.ok(commentService.unlikeComment(commentId, currentUser.getId()));

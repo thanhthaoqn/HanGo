@@ -205,6 +205,13 @@ class AuthService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_tokenKey, data['token']);
         await prefs.setString(_refreshTokenKey, data['refreshToken']);
+        if (data['roles'] != null) {
+          await prefs.setStringList(
+            _userRolesKey,
+            List<String>.from(data['roles']),
+          );
+          notifyUserChanged();
+        }
         return true;
       }
       return false;

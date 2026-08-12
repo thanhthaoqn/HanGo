@@ -24,9 +24,9 @@ class CourseManagerSidebar extends StatefulWidget {
 }
 
 class _CourseManagerSidebarState extends State<CourseManagerSidebar> {
-  List<String> _userRoles = [];
   bool _canViewDashboard = false;
   bool _canManageExams = false;
+  bool _canManageQuestionBank = false;
 
   @override
   void initState() {
@@ -38,9 +38,9 @@ class _CourseManagerSidebarState extends State<CourseManagerSidebar> {
     final prefs = await SharedPreferences.getInstance();
     final roles = prefs.getStringList('user_roles') ?? [];
     setState(() {
-      _userRoles = roles;
       _canViewDashboard = roles.contains('VIEW_PLATFORM_DASHBOARD') || roles.contains('ROLE_ADMINISTRATOR');
       _canManageExams = roles.contains('CREATE_AND_MANAGE_EXAMS_CM') || roles.contains('ROLE_ADMINISTRATOR');
+      _canManageQuestionBank = roles.contains('MANAGE_QUESTION_BANK') || roles.contains('ROLE_ADMINISTRATOR');
     });
   }
 
@@ -125,6 +125,8 @@ class _CourseManagerSidebarState extends State<CourseManagerSidebar> {
                 }
               },
             ),
+          ],
+          if (_canManageQuestionBank) ...[
             _buildSidebarItem(
               context,
               Icons.question_answer_outlined,

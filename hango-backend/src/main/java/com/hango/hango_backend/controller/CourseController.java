@@ -49,6 +49,7 @@ public class CourseController {
     }
 
     @PostMapping("/{id}/enroll")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> enrollCourse(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
@@ -65,6 +66,7 @@ public class CourseController {
 
 
     @DeleteMapping("/{id}/enroll")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
@@ -80,6 +82,7 @@ public class CourseController {
     }
 
     @PostMapping("/{id}/switch-version")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> switchCourseVersion(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
@@ -104,7 +107,7 @@ public class CourseController {
         }
     }
 
-    @PreAuthorize("hasAuthority('RATE_AND_COMMENT')")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     @PostMapping("/{id}/reviews")
     public ResponseEntity<?> addCourseReview(@PathVariable Long id,
                                              @RequestBody @jakarta.validation.Valid CourseReviewRequestDTO request) {
@@ -121,7 +124,7 @@ public class CourseController {
         }
     }
 
-    @PreAuthorize("hasAuthority('REVIEW_COURSE')")
+    @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MODERATE_COMMENTS') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     @DeleteMapping("/{id}/reviews")
     public ResponseEntity<?> deleteCourseReview(@PathVariable Long id) {
         try {

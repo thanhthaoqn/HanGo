@@ -26,6 +26,7 @@ class TrainerSidebar extends StatefulWidget {
 class _TrainerSidebarState extends State<TrainerSidebar> {
   bool _canManageCourses = false;
   bool _canManageExams = false;
+  bool _canManageQuestionBank = false;
   bool _canViewRevenue = false;
 
   @override
@@ -43,6 +44,9 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
           roles.contains('ROLE_ADMINISTRATOR');
       _canManageExams =
           roles.contains('CREATE_EXAMS_TRAINER') ||
+          roles.contains('ROLE_ADMINISTRATOR');
+      _canManageQuestionBank =
+          roles.contains('MANAGE_QUESTION_BANK') ||
           roles.contains('ROLE_ADMINISTRATOR');
       _canViewRevenue =
           roles.contains('VIEW_OWN_REVENUE') ||
@@ -144,15 +148,15 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
           _buildItem(context, 0, Icons.dashboard_outlined, 'Dashboard'),
           if (_canManageCourses || showAllForOnboarding)
             _buildItem(context, 1, Icons.book_outlined, 'Courses'),
-          if (_canManageExams || showAllForOnboarding) ...[
+          if (_canManageExams || showAllForOnboarding)
             _buildItem(context, 2, Icons.assignment_outlined, 'Exam'),
+          if (_canManageQuestionBank || showAllForOnboarding)
             _buildItem(
               context,
               3,
               Icons.question_answer_outlined,
               'Question Bank',
             ),
-          ],
           if (_canViewRevenue || showAllForOnboarding)
             _buildItem(context, 4, Icons.account_balance_wallet_outlined, 'Revenue'),
           _buildItem(context, 5, Icons.person_outline, 'My Profile'),

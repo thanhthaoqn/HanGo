@@ -31,13 +31,12 @@ public class RolePermissionDataInitializer implements CommandLineRunner {
         Permission aiAssistant = createPermissionIfNotFound("AI_LEARNING_ASSISTANT", "AI Learning Assistant", "Access to AI learning assistant", "Learning & Enrollment", "", "");
 
         Permission manageOwnCourses = createPermissionIfNotFound("MANAGE_OWN_COURSES", "Create & Manage Own Courses", "Create and manage own courses", "Course Management", "TRAINER", "LEARNER");
-        Permission manageQuestionBank = createPermissionIfNotFound("MANAGE_QUESTION_BANK", "Manage Question Bank", "Manage own question bank", "Course Management", "TRAINER", "LEARNER");
-        Permission createExamsTrainer = createPermissionIfNotFound("CREATE_EXAMS_TRAINER", "Create Exams", "Create exams as a trainer", "Course Management", "TRAINER", "LEARNER");
+        Permission manageQuestionBank = createPermissionIfNotFound("MANAGE_QUESTION_BANK", "Manage Question Bank", "Create, edit, import, and organize question bank items", "Course Management", "TRAINER", "LEARNER");
+        Permission createExamsTrainer = createPermissionIfNotFound("CREATE_EXAMS_TRAINER", "Trainer Exam Management", "Create and manage exams as a trainer", "Course Management", "TRAINER", "LEARNER,COURSE_MANAGER");
         Permission viewOwnRevenue = createPermissionIfNotFound("VIEW_OWN_REVENUE", "View Own Revenue", "View own revenue statistics", "Analytics", "TRAINER", "LEARNER");
 
         Permission viewPlatformDashboard = createPermissionIfNotFound("VIEW_PLATFORM_DASHBOARD", "View Platform Dashboard", "View platform dashboard", "Platform", "COURSE_MANAGER,ADMINISTRATOR", "LEARNER,TRAINER");
-        Permission createManageExamsCm = createPermissionIfNotFound("CREATE_AND_MANAGE_EXAMS_CM", "Create & Manage Exams", "Create and manage exams as a course manager", "Course Management", "COURSE_MANAGER", "LEARNER");
-        Permission viewRatingNotifications = createPermissionIfNotFound("VIEW_RATING_NOTIFICATIONS", "View Rating Notifications", "View low rating notifications", "Platform", "", "LEARNER");
+        Permission createManageExamsCm = createPermissionIfNotFound("CREATE_AND_MANAGE_EXAMS_CM", "Course Manager Exam & Matrix", "Create and manage exams and exam matrices as a course manager", "Course Management", "COURSE_MANAGER", "LEARNER,TRAINER");
 
         Permission manageAccountsRoles = createPermissionIfNotFound("MANAGE_ACCOUNTS_ROLES", "Manage Accounts & Roles", "Manage user accounts and roles", "System Settings", "ADMINISTRATOR", "LEARNER,TRAINER,COURSE_MANAGER");
         Permission moderateComments = createPermissionIfNotFound("MODERATE_COMMENTS", "Moderate Comments", "Moderate comments on the platform", "Platform", "ADMINISTRATOR", "LEARNER");
@@ -47,7 +46,7 @@ public class RolePermissionDataInitializer implements CommandLineRunner {
         // Assign to Roles if they don't have permissions yet
         assignPermissionsToRole("LEARNER", Set.of(learnCourses, attemptQuiz, rateAndComment, aiAssistant));
         assignPermissionsToRole("TRAINER", Set.of(manageOwnCourses, manageQuestionBank, createExamsTrainer, viewOwnRevenue));
-        assignPermissionsToRole("COURSE_MANAGER", Set.of(viewPlatformDashboard, createManageExamsCm, viewRatingNotifications));
+        assignPermissionsToRole("COURSE_MANAGER", Set.of(viewPlatformDashboard, createManageExamsCm));
         assignPermissionsToRole("ADMINISTRATOR", Set.of(manageAccountsRoles, moderateComments, reviewTrainerApplications, auditLogAiUsage));
     }
 

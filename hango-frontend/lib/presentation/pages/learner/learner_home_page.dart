@@ -24,6 +24,7 @@ import '../trainer/onboarding/trainer_type_selection_page.dart';
 import '../trainer/onboarding/trainer_onboarding_status_page.dart';
 import '../../../data/services/trainer_onboarding_service.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../utils/permission_utils.dart';
 
 class LearnerHomePage extends StatefulWidget {
   final bool isEmbedded;
@@ -52,6 +53,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   List<Exam> _exams = [];
   bool _isLoadingCourses = true;
   bool _isLoadingExams = true;
+  bool _canEnroll = true;
+  bool _canAttemptExam = true;
 
   Timer? _bannerTimer;
   int _currentBannerIndex = 0;
@@ -99,11 +102,15 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       }
     }
 
+    final roles = prefs.getStringList('user_roles') ?? [];
+
     setState(() {
       _isLoggedIn = token != null;
       _userFullName = fullName;
       _userEmail = email;
       _userInitials = initials;
+      _canEnroll = PermissionUtils.shouldShowEnrollUi(token != null, roles);
+      _canAttemptExam = PermissionUtils.shouldShowExamUi(token != null, roles);
     });
 
     if (_isLoggedIn) {
@@ -115,7 +122,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       _startBannerTimer();
     }
 
-    if (userId != 0) {
+    if (userId != 0 && _canAttemptExam) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _checkEntryExamStatus();
       });
@@ -500,8 +507,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         const SizedBox(height: 60),
 
                         // 3. Exams Section
-                        _buildExamsSection(isDesktop),
-                        const SizedBox(height: 60),
+                        if (_canAttemptExam) ...[
+                          _buildExamsSection(isDesktop),
+                          const SizedBox(height: 60),
+                        ],
 
                         // 4. Trở thành giáo viên Section
                         if (!_isLoggedIn) ...[
@@ -556,17 +565,18 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Exams'),
-            onTap: () {
-              Navigator.pop(context); // close drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ListExamsPage()),
-              );
-            },
-          ),
+          if (_canAttemptExam)
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Exams'),
+              onTap: () {
+                Navigator.pop(context); // close drawer
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                );
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.school_outlined),
             title: const Text('Courses'),
@@ -805,52 +815,53 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       ),
 
                       // Outlined button
-                      OutlinedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ListExamsPage(),
-                            ),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(
-                            color: Colors.white,
-                            width: 1.5,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.assignment_outlined,
-                              size: 16,
+                      if (_canAttemptExam)
+                        OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ListExamsPage(),
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(
                               color: Colors.white,
+                              width: 1.5,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              isVi
-                                  ? 'Luyện đề miễn phí'
-                                  : 'Practice exams free',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Outfit',
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.assignment_outlined,
+                                size: 16,
                                 color: Colors.white,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Text(
+                                isVi
+                                    ? 'Luyện đề miễn phí'
+                                    : 'Practice exams free',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Outfit',
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 36),

@@ -21,7 +21,7 @@ public class TrainerQuestionController {
     private final TrainerQuestionService trainerQuestionService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<QuestionDTO>> getQuestions(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "QUIZ") String type,
@@ -40,7 +40,7 @@ public class TrainerQuestionController {
 
 
     @PostMapping
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> createQuestion(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody CreateGroupQuestionRequestDTO request) {
@@ -52,7 +52,7 @@ public class TrainerQuestionController {
     }
 
     @GetMapping("/detail/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<CreateGroupQuestionRequestDTO> getQuestionDetail(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
@@ -65,7 +65,7 @@ public class TrainerQuestionController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> updateQuestionBankGroup(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
@@ -79,7 +79,7 @@ public class TrainerQuestionController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> toggleQuestionStatus(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id,
@@ -92,7 +92,7 @@ public class TrainerQuestionController {
         return ResponseEntity.ok(Map.of("message", "Status updated successfully"));
     }
     @GetMapping("/import-excel/template")
-    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<byte[]> downloadTemplate() {
         try {
             String fileName = "Hango_Question_Bank_Import_Template.xlsx";

@@ -614,7 +614,13 @@ public class AuthService {
         String newAccessToken = jwtUtils.generateJwtTokenFromUsername(user.getEmail());
         String newRefreshToken = issueRefreshToken(user);
 
-        return new TokenRefreshResponse(newAccessToken, newRefreshToken);
+        List<String> roles = new java.util.ArrayList<>();
+        for (org.springframework.security.core.GrantedAuthority authority : UserDetailsImpl.build(user)
+                .getAuthorities()) {
+            roles.add(authority.getAuthority());
+        }
+
+        return new TokenRefreshResponse(newAccessToken, newRefreshToken, roles);
     }
 
     @org.springframework.transaction.annotation.Transactional

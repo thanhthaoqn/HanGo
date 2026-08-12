@@ -8,6 +8,7 @@ import com.hango.hango_backend.service.ExamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
@@ -34,6 +35,7 @@ public class ExamController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<ExamResponseDTO>> getAllExams(
             @RequestParam(required = false, defaultValue = "All") String status) {
         List<ExamResponseDTO> exams = examService.getAllExams(status);
@@ -41,12 +43,14 @@ public class ExamController {
     }
     
     @GetMapping("/{id}/questions")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<LearnerExamQuestionDTO>> getExamQuestions(@PathVariable Long id) {
         List<LearnerExamQuestionDTO> questions = examService.getExamQuestions(id);
         return ResponseEntity.ok(questions);
     }
 
     @GetMapping("/my-attempts")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<ExamAttemptResponseDTO>> getMyExamAttempts() {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
@@ -57,6 +61,7 @@ public class ExamController {
     }
 
     @GetMapping("/{id}/attempts")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<ExamAttemptResponseDTO>> getExamAttempts(@PathVariable Long id) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
@@ -67,6 +72,7 @@ public class ExamController {
     }
 
     @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ExamAttemptResponseDTO> submitExam(
             @PathVariable Long id,
             @RequestBody ExamAttemptRequestDTO request) {

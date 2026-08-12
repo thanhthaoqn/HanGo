@@ -5,6 +5,7 @@ import '../../../data/repositories/course_repository.dart';
 import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/cart_manager.dart';
+import '../../../utils/permission_utils.dart';
 import '../../../utils/wishlist_manager.dart';
 import '../pages/course/course_detail_page.dart';
 
@@ -28,6 +29,7 @@ class _CourseCardState extends State<CourseCard> {
   bool _isInCart = false;
   bool _isEnrolled = false;
   bool _isLoadingEnroll = false;
+  bool _canEnroll = true;
   final CourseRepository _repository = CourseRepository();
 
   @override
@@ -47,12 +49,14 @@ class _CourseCardState extends State<CourseCard> {
     final wishlist = prefs.getStringList('wishlisted_course_ids') ?? [];
     final cart = await CartManager.getCartIds();
     final enrolledLocal = prefs.getBool('enrolled_course_id_${widget.course.id}') ?? false;
+    final roles = prefs.getStringList('user_roles') ?? [];
 
     if (mounted) {
       setState(() {
         _isInWishlist = wishlist.contains(widget.course.id.toString());
         _isInCart = cart.contains(widget.course.id.toString());
         _isEnrolled = enrolledLocal || (widget.course.progressPercentage > 0);
+        _canEnroll = PermissionUtils.canEnrollAndLearn(roles);
       });
     }
   }
@@ -543,6 +547,37 @@ class _CourseCardState extends State<CourseCard> {
                 style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    if (!_canEnroll) {
+      return SizedBox(
+        width: double.infinity,
+        height: 36,
+        child: OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            foregroundColor: const Color(0xFF64748B),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: EdgeInsets.zero,
+          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CourseDetailPage(courseId: widget.course.id),
+              ),
+            );
+          },
+          child: Text(
+            isVi ? 'Xem chi tiết' : 'View details',
+            style: const TextStyle(
+              fontSize: 12,
+              fontFamily: 'Outfit',
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       );

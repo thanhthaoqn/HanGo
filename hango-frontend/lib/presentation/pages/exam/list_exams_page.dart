@@ -3,6 +3,7 @@ import 'dart:ui';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../utils/language_manager.dart';
+import '../../../utils/permission_utils.dart';
 import '../../widgets/exam_card.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
@@ -21,6 +22,9 @@ class _ListExamsPageState extends State<ListExamsPage> {
   final ExamRepository _repository = ExamRepository();
   late Future<List<dynamic>> _dataFuture;
 
+  bool _isLoggedIn = false;
+  bool _canAttemptExam = true;
+
   String _searchQuery = '';
   String _examTypeFilter = 'All'; // All, Mock, Quiz
   String _durationFilter = 'All'; // All, 15m, 60m
@@ -30,7 +34,20 @@ class _ListExamsPageState extends State<ListExamsPage> {
   @override
   void initState() {
     super.initState();
+    _loadPermissions();
     _loadData();
+  }
+
+  Future<void> _loadPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final roles = prefs.getStringList('user_roles') ?? [];
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = token != null && token.isNotEmpty;
+        _canAttemptExam = PermissionUtils.shouldShowExamUi(_isLoggedIn, roles);
+      });
+    }
   }
 
   @override
@@ -59,6 +76,32 @@ class _ListExamsPageState extends State<ListExamsPage> {
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
     final isVi = LanguageManager.isVi;
+
+    if (_isLoggedIn && !_canAttemptExam) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: widget.isEmbedded
+            ? null
+            : SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              isVi
+                  ? 'Tính năng làm bài thi không khả dụng cho vai trò của bạn.'
+                  : 'Exam attempts are not available for your role.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

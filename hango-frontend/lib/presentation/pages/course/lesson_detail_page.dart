@@ -19,6 +19,7 @@ import '../../widgets/lesson_ai_chatbox.dart';
 import 'course_detail_page.dart';
 import 'course_completion_page.dart';
 import '../../../utils/language_manager.dart';
+import '../../../utils/permission_utils.dart';
 
 class LessonDetailPage extends StatefulWidget {
   final int courseId;
@@ -67,6 +68,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   bool _isPostingReply = false;
 
   bool _isAIAssistantOpen = true;
+  bool _canUseAIAssistant = true;
+  bool _canRateAndComment = true;
+  bool _canAttemptQuiz = true;
   final TextEditingController _commentController = TextEditingController();
   bool _isPostingComment = false;
 
@@ -291,10 +295,17 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         initials = parts.last[0].toUpperCase();
       }
     }
+    final roles = prefs.getStringList('user_roles') ?? [];
     setState(() {
       _currentUserId = prefs.getInt('user_id') ?? 1;
       _currentUserAvatar = avatar;
       _currentUserInitials = initials;
+      _canUseAIAssistant = roles.contains('AI_LEARNING_ASSISTANT') || roles.contains('ROLE_ADMINISTRATOR');
+      _canRateAndComment = roles.contains('RATE_AND_COMMENT') || roles.contains('ROLE_ADMINISTRATOR');
+      _canAttemptQuiz = PermissionUtils.canAttemptQuizAndExam(roles);
+      if (!_canAttemptQuiz) {
+        _isDoingQuiz = false;
+      }
     });
   }
 
@@ -899,7 +910,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             )
           : null,
-      floatingActionButton: (!_isDoingQuiz && _lessonDetail != null && (!isDesktop || !_isAIAssistantOpen))
+      floatingActionButton: (!_isDoingQuiz && _lessonDetail != null && _canUseAIAssistant && (!isDesktop || !_isAIAssistantOpen))
           ? _buildFloatingAIBubble(isDesktop)
           : null,
       body: _isLoading
@@ -1205,7 +1216,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         ],
                       ),
                     ),
-                    if (isDesktop && !_isDoingQuiz) ...[
+                    if (isDesktop && !_isDoingQuiz && _canUseAIAssistant) ...[
                       const SizedBox(width: 16),
                       MouseRegion(
                         cursor: SystemMouseCursors.click,
@@ -1271,8 +1282,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                       ),
                     ),
 
-                    // Right column: resizable AI chat (desktop only when toggled ON)
-                    if (isDesktop && !_isDoingQuiz && _isAIAssistantOpen) ...[
+                    // Right column: resizable AI chat (desktop only when toggled ON and has permission)
+                    if (isDesktop && !_isDoingQuiz && _isAIAssistantOpen && _canUseAIAssistant) ...[
                       const SizedBox(width: 12),
 
                       // Divider draggable between lesson and chat
@@ -1895,6 +1906,28 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     LessonDetail lesson,
     CourseLesson? currentCourseLesson,
   ) {
+    if (!_canAttemptQuiz) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Text(
+          'Quiz attempts are not available for your role',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Outfit',
+          ),
+        ),
+      );
+    }
+
     final activeQuestions = lesson.questions;
 
     if (_reviewAttemptIndex != null) {
@@ -3649,7 +3682,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           ),
           const SizedBox(height: 24),
 
-          // Add Comment Input Form
+          // Add Comment Input Form (only if user has RATE_AND_COMMENT permission)
+          if (_canRateAndComment) ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -3764,6 +3798,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             ],
           ),
+          ], // end if (_canRateAndComment)
           const SizedBox(height: 32),
           const Divider(color: Color(0xFFF1F5F9), height: 1),
           const SizedBox(height: 24),

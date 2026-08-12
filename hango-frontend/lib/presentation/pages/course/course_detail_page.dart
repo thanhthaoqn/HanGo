@@ -42,6 +42,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   bool _dismissedVersionBanner = false;
 
   int _currentUserId = 1;
+  bool _canEnroll = true;
+  bool _canRateAndComment = true;
 
   @override
   void initState() {
@@ -81,9 +83,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   Future<void> _loadCurrentUserId() async {
     final prefs = await SharedPreferences.getInstance();
+    final roles = prefs.getStringList('user_roles') ?? [];
     if (mounted) {
       setState(() {
         _currentUserId = prefs.getInt('user_id') ?? 1;
+        _canEnroll = roles.contains('ENROLL_AND_LEARN_COURSES') || roles.contains('ROLE_ADMINISTRATOR');
+        _canRateAndComment = roles.contains('RATE_AND_COMMENT') || roles.contains('ROLE_ADMINISTRATOR');
       });
     }
   }
@@ -555,6 +560,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   void _enroll(CourseDetail course) async {
+    if (!_canEnroll) {
+      _showNotification('Enrollment is not available for your role.', isError: true);
+      return;
+    }
     final authService = AuthService();
     final isLoggedIn = await authService.isLoggedIn();
     if (!isLoggedIn) {
@@ -569,6 +578,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   void _showEnrollConfirmDialog(CourseDetail course) {
+    if (!_canEnroll) {
+      _showNotification('Enrollment is not available for your role.', isError: true);
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) {
@@ -674,6 +687,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   void _proceedWithEnrollment(CourseDetail course) async {
+    if (!_canEnroll) {
+      _showNotification('Enrollment is not available for your role.', isError: true);
+      return;
+    }
     setState(() {
       _isEnrolling = true;
       // Optimistic update to immediately reflect the state in UI without visual jumps
@@ -1248,12 +1265,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               );
               return ReviewTab(
                 summary: snapshot.data!,
-                showWriteReviewButton: course.isEnrolled && !hasReviewed,
+                showWriteReviewButton: _canRateAndComment && course.isEnrolled && !hasReviewed,
                 onWriteReview: _showWriteReviewDialog,
                 currentUserId: _currentUserId,
-                onDeleteReview: _deleteReview,
-                onEditReview: (rating, content) =>
-                    _showWriteReviewDialog(rating: rating, content: content),
+                onDeleteReview: _canRateAndComment ? _deleteReview : null,
+                onEditReview: _canRateAndComment
+                    ? (rating, content) =>
+                        _showWriteReviewDialog(rating: rating, content: content)
+                    : null,
                 isEnrolled: course.isEnrolled,
               );
             },
@@ -1988,7 +2007,30 @@ class _CourseDetailPageState extends State<CourseDetailPage>
             ),
           ] else ...[
             // Buy / Enroll Buttons Section
-            if (isFree) ...[
+            if (!_canEnroll) ...[
+              SizedBox(
+                width: double.infinity,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Enrollment not available for your role',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ] else if (isFree) ...[
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

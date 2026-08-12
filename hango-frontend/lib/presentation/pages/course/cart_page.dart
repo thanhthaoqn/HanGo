@@ -27,6 +27,7 @@ class _CartPageState extends State<CartPage> {
   List<Course> _cartCourses = [];
   Set<String> _enrolledCourseIds = {};
   bool _isLoading = true;
+  bool _canEnroll = true;
 
   @override
   void initState() {
@@ -67,6 +68,7 @@ class _CartPageState extends State<CartPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
+      final roles = prefs.getStringList('user_roles') ?? [];
 
       List<Course> coursesInCart = [];
       if (token != null && token.isNotEmpty) {
@@ -102,6 +104,8 @@ class _CartPageState extends State<CartPage> {
         setState(() {
           _cartCourses = coursesInCart;
           _enrolledCourseIds = enrolled;
+          _canEnroll = roles.contains('ENROLL_AND_LEARN_COURSES') ||
+              roles.contains('ROLE_ADMINISTRATOR');
           _isLoading = false;
         });
       }
@@ -147,6 +151,10 @@ class _CartPageState extends State<CartPage> {
   }
 
   void _enrollFreeCourse(Course course) async {
+    if (!_canEnroll) {
+      ToastHelper.showError(context, 'Enrollment is not available for your role.');
+      return;
+    }
     setState(() {
       _isLoading = true;
     });
@@ -181,6 +189,10 @@ class _CartPageState extends State<CartPage> {
   }
 
   void _checkoutCart() async {
+    if (!_canEnroll) {
+      ToastHelper.showError(context, 'Checkout is not available for your role.');
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     if (token == null || token.isEmpty) {
@@ -516,6 +528,9 @@ class _CartPageState extends State<CartPage> {
                       ),
                     );
                   } else if (isFree) {
+                    if (!_canEnroll) {
+                      return const SizedBox.shrink();
+                    }
                     return ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28B79B),
@@ -611,7 +626,7 @@ class _CartPageState extends State<CartPage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 2,
             ),
-            onPressed: _checkoutCart,
+            onPressed: _canEnroll ? _checkoutCart : null,
             icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
             label: Text(
               isVi ? 'Quét mã QR thanh toán' : 'Scan QR Code Checkout',

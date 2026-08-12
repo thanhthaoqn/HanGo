@@ -1071,6 +1071,7 @@ class AuthServiceTest {
 
         assertEquals("new-jwt", response.getToken());
         assertEquals("new-raw-token", response.getRefreshToken());
+        assertTrue(response.getRoles() != null && !response.getRoles().isEmpty());
         assertTrue(stored.getRevoked());
         verify(refreshTokenRepository).save(stored);
         verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));

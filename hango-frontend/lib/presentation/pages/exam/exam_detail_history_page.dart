@@ -21,11 +21,23 @@ class ExamDetailHistoryPage extends StatefulWidget {
 class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
   List<Map<String, dynamic>> _attempts = [];
   bool _isLoadingAttempts = true;
+  bool _canAttemptExam = true;
 
   @override
   void initState() {
     super.initState();
     _loadAttempts();
+    _loadRoles();
+  }
+
+  Future<void> _loadRoles() async {
+    final prefs = await SharedPreferences.getInstance();
+    final roles = prefs.getStringList('user_roles') ?? [];
+    if (mounted) {
+      setState(() {
+        _canAttemptExam = roles.contains('ATTEMPT_QUIZ_AND_EXAM') || roles.contains('ROLE_ADMINISTRATOR');
+      });
+    }
   }
 
   // Load attempt history from Backend API
@@ -332,51 +344,72 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
           const SizedBox(height: 24),
 
           // Start button
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                final token = prefs.getString('auth_token');
-                if (token == null || token.isEmpty) {
-                  if (context.mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginPage(),
-                      ),
-                    );
-                  }
-                } else {
-                  if (context.mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TakeExamPage(exam: widget.exam),
-                      ),
-                    ).then((_) => _onExamCompleted());
-                  }
-                }
-              },
-              icon: const Icon(Icons.play_arrow, color: Colors.white),
-              label: Text(
-                _attempts.isEmpty ? 'Start Exam' : 'Retake Exam',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+          if (!_canAttemptExam)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(
+                child: Text(
+                  'Exam attempts are not available for your role',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28B79B),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  final token = prefs.getString('auth_token');
+                  if (token == null || token.isEmpty) {
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TakeExamPage(exam: widget.exam),
+                        ),
+                      ).then((_) => _onExamCompleted());
+                    }
+                  }
+                },
+                icon: const Icon(Icons.play_arrow, color: Colors.white),
+                label: Text(
+                  _attempts.isEmpty ? 'Start Exam' : 'Retake Exam',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28B79B),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

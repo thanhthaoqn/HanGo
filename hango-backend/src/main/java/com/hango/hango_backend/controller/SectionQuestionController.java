@@ -11,6 +11,7 @@ import com.hango.hango_backend.repository.SectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,7 @@ public class SectionQuestionController {
     private final JdbcTemplate jdbcTemplate;
 
     @GetMapping("/courses/{courseId}/sections")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<SectionQuestionCountDTO>> getCourseSections(@PathVariable Long courseId) {
         List<Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(courseId);
         List<SectionQuestionCountDTO> dtos = new ArrayList<>();
@@ -50,6 +52,7 @@ public class SectionQuestionController {
     }
 
     @GetMapping("/sections/{sectionId}/questions")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> getSectionQuestions(
             @PathVariable Long sectionId,
             @RequestParam(defaultValue = "0") int page,
@@ -155,6 +158,7 @@ public class SectionQuestionController {
     }
 
     @GetMapping("/lessons/{lessonId}/questions")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Map<String, Object>> getLessonQuestions(
             @PathVariable Long lessonId,
             @RequestParam(defaultValue = "0") int page,
@@ -290,6 +294,7 @@ public class SectionQuestionController {
     }
 
     @GetMapping("/sections/{sectionId}/questions/select")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<Long>> selectSectionQuestions(
             @PathVariable Long sectionId,
             @RequestParam int quantity,
@@ -320,6 +325,7 @@ public class SectionQuestionController {
     }
 
     @PostMapping("/lessons/{lessonId}/questions")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     @Transactional
     public ResponseEntity<?> saveQuizQuestions(
             @PathVariable Long lessonId,
@@ -345,6 +351,7 @@ public class SectionQuestionController {
     }
 
     @PostMapping("/questions")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     @Transactional
     public ResponseEntity<?> createQuestion(@RequestBody CreateQuestionRequestDTO request) {
         Long currentUserId = getCurrentUserId();
@@ -430,6 +437,7 @@ public class SectionQuestionController {
     }
 
     @PutMapping("/questions/{id}")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     @Transactional
     public ResponseEntity<?> updateQuestion(
             @PathVariable Long id,
@@ -494,6 +502,7 @@ public class SectionQuestionController {
     }
 
     @PostMapping("/questions/group")
+    @PreAuthorize("hasAuthority('MANAGE_QUESTION_BANK') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     @Transactional
     public ResponseEntity<?> createGroupQuestion(@RequestBody CreateGroupQuestionRequestDTO request) {
         Long currentUserId = getCurrentUserId();

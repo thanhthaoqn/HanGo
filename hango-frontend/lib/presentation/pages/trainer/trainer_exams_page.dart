@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hango/presentation/widgets/internal_app_header.dart';
+import '../../../utils/permission_utils.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../course_manager/course_manager_create_exam_page.dart';
@@ -343,13 +344,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         _trainerAvatarUrl = avatarUrl;
         _currentUserId = prefs.getInt('user_id');
 
-        _isCourseManager = roles.any(
-          (r) =>
-              r.toUpperCase() == 'COURSE_MANAGER' ||
-              r.toUpperCase() == 'ADMINISTRATOR' ||
-              r.toUpperCase() == 'COURSE_MANAGER' ||
-              r.toUpperCase() == 'ADMIN',
-        );
+        _isCourseManager = PermissionUtils.canManageExamsAsCourseManager(roles);
       });
     }
   }

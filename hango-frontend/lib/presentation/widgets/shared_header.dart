@@ -24,6 +24,7 @@ import '../../../data/repositories/notification_repository.dart';
 import '../../utils/toast_helper.dart';
 import '../../utils/language_manager.dart';
 import '../../utils/cart_manager.dart';
+import '../../utils/permission_utils.dart';
 
 class SharedHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isDesktop;
@@ -60,6 +61,8 @@ class _SharedHeaderState extends State<SharedHeader> {
   bool _isVietnamese = true;
   int _cartCount = 0;
   List<String> _userRoles = [];
+  bool _canEnroll = true;
+  bool _canAttemptExam = true;
 
   List<Course> _cartCourses = [];
 
@@ -514,6 +517,8 @@ class _SharedHeaderState extends State<SharedHeader> {
       if (mounted) {
         setState(() {
           _isLoggedIn = false;
+          _canEnroll = true;
+          _canAttemptExam = true;
         });
       }
       return;
@@ -546,6 +551,8 @@ class _SharedHeaderState extends State<SharedHeader> {
         _userInitials = initials;
         _userAvatarUrl = avatarUrl;
         _userRoles = roles;
+        _canEnroll = PermissionUtils.shouldShowEnrollUi(true, roles);
+        _canAttemptExam = PermissionUtils.shouldShowExamUi(true, roles);
       });
     }
   }
@@ -832,12 +839,14 @@ class _SharedHeaderState extends State<SharedHeader> {
           onTap: () => _navigateToLearnerTab(1),
         ),
         const SizedBox(width: 12),
-        _buildHeaderNavLink(
-          _isVietnamese ? 'Đề thi' : 'Exams',
-          active: widget.activeTab == 'Exams',
-          onTap: () => _navigateToLearnerTab(2),
-        ),
-        const SizedBox(width: 12),
+        if (_canAttemptExam) ...[
+          _buildHeaderNavLink(
+            _isVietnamese ? 'Đề thi' : 'Exams',
+            active: widget.activeTab == 'Exams',
+            onTap: () => _navigateToLearnerTab(2),
+          ),
+          const SizedBox(width: 12),
+        ],
         _buildHeaderNavLink(
           _isVietnamese ? 'Lộ trình' : 'Pathway',
           active: widget.activeTab == 'Learning Pathway',
@@ -851,7 +860,7 @@ class _SharedHeaderState extends State<SharedHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.isDesktop) ...[
-                if (!widget.hideCommerceActions) ...[
+                if (!widget.hideCommerceActions && _canEnroll) ...[
                   _buildCartButton(),
                   const SizedBox(width: 8),
                 ],
@@ -1244,33 +1253,34 @@ class _SharedHeaderState extends State<SharedHeader> {
                       ),
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'cart',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.shopping_cart_outlined,
-                            size: 18,
-                            color: Color(0xFF4B5563),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _isVietnamese ? 'Giỏ hàng của tôi' : 'My Cart',
-                              style: const TextStyle(
-                                fontFamily: 'Outfit',
-                                color: Color(0xFF1E293B),
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
+                  if (_canEnroll)
+                    PopupMenuItem(
+                      value: 'cart',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.shopping_cart_outlined,
+                              size: 18,
+                              color: Color(0xFF4B5563),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _isVietnamese ? 'Giỏ hàng của tôi' : 'My Cart',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  color: Color(0xFF1E293B),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
 
 
                   if (_userRoles.any((r) => r.toUpperCase().contains('TRAINER') || r.toUpperCase().contains('MANAGER')))

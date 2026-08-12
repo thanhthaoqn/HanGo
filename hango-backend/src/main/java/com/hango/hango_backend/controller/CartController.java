@@ -6,6 +6,7 @@ import com.hango.hango_backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,7 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getCart(@AuthenticationPrincipal UserDetailsImpl currentUser) {
         if (currentUser == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -35,6 +37,7 @@ public class CartController {
     }
 
     @PostMapping("/items")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> addItem(
             @RequestBody Map<String, Long> payload,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -55,6 +58,7 @@ public class CartController {
     }
 
     @DeleteMapping("/items/{courseId}")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> removeItem(
             @PathVariable Long courseId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -71,6 +75,7 @@ public class CartController {
     }
 
     @DeleteMapping
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> clearCart(@AuthenticationPrincipal UserDetailsImpl currentUser) {
         if (currentUser == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -85,6 +90,7 @@ public class CartController {
     }
 
     @PostMapping("/sync")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> syncCart(
             @RequestBody Map<String, List<Long>> payload,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {

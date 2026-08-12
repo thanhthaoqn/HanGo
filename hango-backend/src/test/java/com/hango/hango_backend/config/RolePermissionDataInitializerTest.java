@@ -48,12 +48,12 @@ class RolePermissionDataInitializerTest {
     // =================================================================
 
     @Test
-    void runShouldCreateAllFifteenPermissionsWhenNoneExistYet() throws Exception {
+    void runShouldCreateAllFourteenPermissionsWhenNoneExistYet() throws Exception {
         stubNoExistingPermissionsAndNoRoles();
 
         initializer.run();
 
-        verify(permissionRepository, times(15)).save(any(Permission.class));
+        verify(permissionRepository, times(14)).save(any(Permission.class));
     }
 
     @Test
@@ -83,8 +83,8 @@ class RolePermissionDataInitializerTest {
 
         initializer.run();
 
-        // 15 permissions total, 1 already up to date -> only the other 14 get created/saved.
-        verify(permissionRepository, times(14)).save(any(Permission.class));
+        // 14 permissions total, 1 already up to date -> only the other 13 get created/saved.
+        verify(permissionRepository, times(13)).save(any(Permission.class));
     }
 
     // =================================================================

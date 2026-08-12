@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,6 +31,7 @@ public class PaymentController {
      * POST /api/v1/payment/create
      */
     @PostMapping("/create")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createPayment(
             @RequestBody PaymentRequestDTO request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
@@ -75,6 +77,7 @@ public class PaymentController {
      * GET /api/v1/payment/my-history?page=0&size=10&status=ALL
      */
     @GetMapping("/my-history")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getMyPaymentHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -97,6 +100,7 @@ public class PaymentController {
      * GET /api/v1/payment/status/{txnRef}
      */
     @GetMapping("/status/{txnRef}")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getPaymentStatus(
             @PathVariable String txnRef,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -118,7 +122,7 @@ public class PaymentController {
      * GET /api/v1/payment/manager/all
      */
     @GetMapping("/manager/all")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR', 'VIEW_PLATFORM_DASHBOARD')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAllPaymentsForManager(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -138,7 +142,7 @@ public class PaymentController {
      * GET /api/v1/payment/manager/export-excel
      */
     @GetMapping("/manager/export-excel")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR', 'VIEW_PLATFORM_DASHBOARD')")
+    @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<byte[]> exportPaymentsToExcel(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String settlementStatus,

@@ -31,7 +31,7 @@ public class AdminCommentController {
     private CommentRepository commentRepository;
 
     @GetMapping("/comments")
-    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MODERATE_COMMENTS') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getAllComments() {
         try {
             List<Comment> comments = commentRepository.findAllByOrderByCreatedAtDesc();
@@ -49,7 +49,7 @@ public class AdminCommentController {
     }
 
     @GetMapping("/comments/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MODERATE_COMMENTS') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getCommentDetail(@PathVariable Long id) {
         Optional<Comment> commentOpt = commentRepository.findById(id);
         if (commentOpt.isEmpty()) {
@@ -67,7 +67,7 @@ public class AdminCommentController {
     }
 
     @PutMapping("/comments/{id}/status")
-    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MODERATE_COMMENTS') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateCommentStatus(@PathVariable Long id, @RequestParam String status) {
         try {
             Optional<Comment> commentOpt = commentRepository.findById(id);
@@ -86,7 +86,7 @@ public class AdminCommentController {
     }
 
     @DeleteMapping("/comments/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('MODERATE_COMMENTS') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> deleteComment(@PathVariable Long id) {
         if (!commentRepository.existsById(id)) {
             return ResponseEntity.status(404).body("Comment not found");
