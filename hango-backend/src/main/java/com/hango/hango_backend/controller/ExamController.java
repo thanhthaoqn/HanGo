@@ -35,7 +35,6 @@ public class ExamController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<ExamResponseDTO>> getAllExams(
             @RequestParam(required = false, defaultValue = "All") String status) {
         List<ExamResponseDTO> exams = examService.getAllExams(status);
