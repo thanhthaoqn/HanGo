@@ -406,7 +406,7 @@ class PaymentServiceImplTest {
 
         PaymentStatusDTO result = paymentService.getPaymentStatus("57", 1L);
 
-        assertEquals("Khóa học", result.getCourseTitle());
+        assertEquals("Course", result.getCourseTitle());
         assertEquals(null, result.getCourseId());
     }
 
@@ -422,7 +422,7 @@ class PaymentServiceImplTest {
 
         List<PaymentHistoryDTO> result = paymentService.getMyPaymentHistory(1L);
 
-        assertEquals("Thanh toán 2 khóa học trong giỏ hàng", result.get(0).getCourseTitle());
+        assertEquals("Payment for 2 courses in cart", result.get(0).getCourseTitle());
     }
 
     @Test
@@ -445,7 +445,7 @@ class PaymentServiceImplTest {
 
         List<PaymentHistoryDTO> result = paymentService.getMyPaymentHistory(1L);
 
-        assertEquals("Khóa học HanGo", result.get(0).getCourseTitle());
+        assertEquals("HanGo Course", result.get(0).getCourseTitle());
     }
 
     @Test

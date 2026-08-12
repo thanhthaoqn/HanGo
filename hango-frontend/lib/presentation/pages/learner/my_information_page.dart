@@ -249,11 +249,11 @@ class _MyInformationPageState extends State<MyInformationPage> {
             isDesktop: isDesktop,
           ),
           const SizedBox(height: 8),
-          // Tab 2: Payment History
+          // Tab 2: Purchase History
           _buildSidebarTabButton(
             index: 2,
             icon: Icons.receipt_long_rounded,
-            label: 'Payment History',
+            label: isVi ? 'Lịch sử mua hàng' : 'Purchase History',
             isDesktop: isDesktop,
           ),
         ],
@@ -1599,7 +1599,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
   int _totalPages = 1;
   int _totalElements = 0;
   final int _pageSize = 10;
-  String _selectedStatus = 'ALL';
+  final String _selectedStatus = 'SUCCESS';
 
   @override
   void initState() {
@@ -1721,34 +1721,6 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _selectedStatus == value;
-    return ChoiceChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : const Color(0xFF475569),
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 13,
-          fontFamily: 'Outfit',
-        ),
-      ),
-      selected: isSelected,
-      selectedColor: const Color(0xFF28B79B),
-      backgroundColor: const Color(0xFFF1F5F9),
-      showCheckmark: false,
-      onSelected: (selected) {
-        if (selected && _selectedStatus != value) {
-          setState(() {
-            _selectedStatus = value;
-            _currentPage = 0;
-          });
-          _loadHistory();
-        }
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isVi = LanguageManager.isVi;
@@ -1774,7 +1746,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isVi ? 'Lịch sử thanh toán' : 'Payment History',
+                isVi ? 'Lịch sử mua hàng' : 'Purchase History',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -1790,20 +1762,6 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                 ),
                 tooltip: isVi ? 'Tải lại' : 'Refresh',
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Status Filter Chips
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildFilterChip(isVi ? 'Tất cả' : 'All', 'ALL'),
-              _buildFilterChip(isVi ? 'Thành công' : 'Success', 'SUCCESS'),
-              _buildFilterChip(isVi ? 'Đang xử lý' : 'Pending', 'PENDING'),
-              _buildFilterChip(isVi ? 'Thất bại' : 'Failed', 'FAILED'),
-              _buildFilterChip(isVi ? 'Hết hạn' : 'Expired', 'EXPIRED'),
             ],
           ),
           const SizedBox(height: 16),
@@ -1867,8 +1825,8 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                         const SizedBox(height: 12),
                         Text(
                           isVi
-                              ? 'Chưa có lịch sử giao dịch nào.'
-                              : 'No transaction history available.',
+                              ? 'Chưa có lịch sử mua hàng nào.'
+                              : 'No purchase history available.',
                           style: const TextStyle(
                             color: Color(0xFF64748B),
                             fontFamily: 'Outfit',
