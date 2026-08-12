@@ -1777,13 +1777,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   title: 'Approvals',
                   isMobileDrawer: isMobileDrawer,
                 ),
-                const SizedBox(height: 8),
-                _buildSidebarMenuItem(
-                  index: 7,
-                  icon: Icons.history_outlined,
-                  title: 'Audit Log',
-                  isMobileDrawer: isMobileDrawer,
-                ),
+
 
                 const Spacer(),
                 const Divider(color: Color(0xFFE5E7EB)),
