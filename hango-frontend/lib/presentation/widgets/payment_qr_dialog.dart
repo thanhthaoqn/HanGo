@@ -164,7 +164,11 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
     if (_paymentUrl == null) return;
     final uri = Uri.parse(_paymentUrl!);
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.platformDefault);
+      await launchUrl(
+        uri,
+        mode: LaunchMode.platformDefault,
+        webOnlyWindowName: '_self',
+      );
     }
   }
 
