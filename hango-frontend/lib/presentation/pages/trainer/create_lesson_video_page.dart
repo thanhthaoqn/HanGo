@@ -61,6 +61,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
       TextEditingController();
 
   String? _currentVideoUrl;
+  final _formKey = GlobalKey<FormState>();
   YoutubePlayerController? _youtubeController;
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
@@ -525,6 +526,9 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
   }
 
   void _saveLesson() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final title = _titleController.text.trim();
     final code = _codeController.text.trim();
     final objectives = _learningObjectivesController.text.trim();
@@ -535,47 +539,6 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
     final videoTranscript = _videoTranscriptController.text.trim();
     final estimatedTimeText = _estimatedTimeController.text.trim();
     final estimatedTimeMinutes = int.tryParse(estimatedTimeText) ?? 0;
-
-    if (title.isEmpty) {
-      ToastHelper.showError(context, 'Please enter a lesson title');
-      return;
-    }
-    if (title.length > 100) {
-      ToastHelper.showError(context, 'Lesson title cannot exceed 100 characters');
-      return;
-    }
-    if (code.length > 20) {
-      ToastHelper.showError(context, 'Lesson code cannot exceed 20 characters');
-      return;
-    }
-    if (desc.length > 500) {
-      ToastHelper.showError(context, 'Description cannot exceed 500 characters');
-      return;
-    }
-    if (objectives.length > 1000) {
-      ToastHelper.showError(context, 'Learning objectives cannot exceed 1000 characters');
-      return;
-    }
-
-    if (videoUrl.isEmpty) {
-      ToastHelper.showError(context, 'Please enter the video URL');
-      return;
-    }
-    
-    final uri = Uri.tryParse(videoUrl);
-    if (uri == null || !uri.isAbsolute || !(uri.scheme == 'http' || uri.scheme == 'https')) {
-      ToastHelper.showError(context, 'Please enter a valid video URL (e.g., https://youtube.com/...)');
-      return;
-    }
-
-    if (mediaDuration <= 0) {
-      ToastHelper.showError(context, 'Please enter a valid video duration (> 0 seconds)');
-      return;
-    }
-    if (estimatedTimeMinutes <= 0) {
-      ToastHelper.showError(context, 'Please enter a valid estimated time (> 0 minutes)');
-      return;
-    }
 
     setState(() {
       final lessons = List.from(
@@ -1127,7 +1090,9 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
         ],
       ),
       padding: const EdgeInsets.all(24),
-      child: Column(
+      child: Form(
+        key: _formKey,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Expanded Section Header Box
@@ -1193,7 +1158,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 24),
           // Lesson Code field
           const Text(
-            'Lesson Code',
+            'Lesson Code (Optional)',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1204,6 +1169,12 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _codeController,
+            validator: (value) {
+              if (value != null && value.trim().length > 20) {
+                return 'Lesson code cannot exceed 20 characters';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               hintText: 'e.g. L01',
               hintStyle: const TextStyle(
@@ -1240,7 +1211,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 24),
           // Lesson Title field
           const Text(
-            'Lesson Title',
+            'Lesson Title *',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1251,6 +1222,15 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _titleController,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter a lesson title';
+              }
+              if (value.trim().length > 100) {
+                return 'Lesson title cannot exceed 100 characters';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               hintText: 'Enter lesson title',
               hintStyle: const TextStyle(
@@ -1287,7 +1267,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 20),
           // Lesson Description field
           const Text(
-            'Lesson Description',
+            'Lesson Description (Optional)',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1298,6 +1278,12 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _descController,
+            validator: (value) {
+              if (value != null && value.trim().length > 500) {
+                return 'Description cannot exceed 500 characters';
+              }
+              return null;
+            },
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Enter lesson description.....',
@@ -1335,7 +1321,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 20),
           // Learning Objectives field
           const Text(
-            'Learning Objectives',
+            'Learning Objectives (Optional)',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1346,6 +1332,12 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _learningObjectivesController,
+            validator: (value) {
+              if (value != null && value.trim().length > 1000) {
+                return 'Learning objectives cannot exceed 1000 characters';
+              }
+              return null;
+            },
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Enter learning objectives (one per line).....',
@@ -1383,7 +1375,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 20),
           // Content Type field (Pre-filled Video)
           const Text(
-            'Content Type',
+            'Content Type *',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1423,6 +1415,16 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _videoUrlController,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter the video URL';
+              }
+              final uri = Uri.tryParse(value.trim());
+              if (uri == null || !uri.isAbsolute || !(uri.scheme == 'http' || uri.scheme == 'https')) {
+                return 'Please enter a valid video URL (e.g., https://youtube.com/...)';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               hintText: 'Enter YouTube or Vimeo URL',
               hintStyle: const TextStyle(
@@ -1494,7 +1496,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Video Transcript / Subtitles',
+                'Video Transcript / Subtitles (Optional)',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -1572,7 +1574,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 24),
           // Estimated Time input
           const Text(
-            'Estimated Time (Minutes)',
+            'Estimated Time (Minutes) *',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1583,6 +1585,13 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _estimatedTimeController,
+            validator: (value) {
+              final val = int.tryParse(value?.trim() ?? '');
+              if (val == null || val <= 0) {
+                return 'Please enter a valid estimated time (> 0 minutes)';
+              }
+              return null;
+            },
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               hintText: 'e.g. 15',
@@ -1630,7 +1639,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Duration (Seconds)',
+                      'Duration (Seconds) *',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1641,6 +1650,13 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _mediaDurationController,
+                      validator: (value) {
+                        final val = int.tryParse(value?.trim() ?? '');
+                        if (val == null || val <= 0) {
+                          return 'Please enter a valid video duration (> 0 seconds)';
+                        }
+                        return null;
+                      },
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         hintText: 'e.g. 120',
@@ -1684,7 +1700,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Size (Bytes)',
+                      'Size (Bytes) (Optional)',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1736,6 +1752,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
           ),
 
         ],
+      ),
       ),
     );
   }

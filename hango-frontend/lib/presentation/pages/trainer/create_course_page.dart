@@ -576,6 +576,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _selectedCategoryKey,
+                validator: (value) => value == null || value.isEmpty ? 'Please select a category' : null,
                 decoration: InputDecoration(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,

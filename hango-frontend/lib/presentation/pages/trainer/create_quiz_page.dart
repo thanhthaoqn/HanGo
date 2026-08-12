@@ -42,6 +42,7 @@ class CreateQuizPage extends StatefulWidget {
 
 class _CreateQuizPageState extends State<CreateQuizPage> {
   late List<dynamic> _localSections;
+  final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
@@ -70,31 +71,13 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
   }
 
   void _onCreateQuizPressed() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final title = _titleController.text.trim();
     final desc = _descController.text.trim();
     final passingScore = int.tryParse(_passingScoreController.text.trim()) ?? 70;
     final timeLimit = int.tryParse(_timeLimitController.text.trim()) ?? 60;
-
-    if (title.isEmpty) {
-      ToastHelper.showError(context, 'Please enter a quiz title');
-      return;
-    }
-    if (title.length > 255) {
-      ToastHelper.showError(context, 'Title cannot exceed 255 characters');
-      return;
-    }
-    if (desc.length > 500) {
-      ToastHelper.showError(context, 'Description cannot exceed 500 characters');
-      return;
-    }
-    if (passingScore < 0 || passingScore > 100) {
-      ToastHelper.showError(context, 'Passing score must be between 0 and 100');
-      return;
-    }
-    if (timeLimit <= 0) {
-      ToastHelper.showError(context, 'Time limit must be greater than 0');
-      return;
-    }
 
     setState(() {
       final lessons = List.from(_localSections[widget.sectionIndex]['lessons'] ?? []);
@@ -658,7 +641,9 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
         ],
       ),
       padding: const EdgeInsets.all(32),
-      child: Column(
+      child: Form(
+        key: _formKey,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Title & Icon Row
@@ -693,7 +678,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
 
           // QUIZ TITLE
           const Text(
-            'QUIZ TITLE',
+            'QUIZ TITLE *',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -702,8 +687,17 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
+          TextFormField(
             controller: _titleController,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter a quiz title';
+              }
+              if (value.trim().length > 255) {
+                return 'Title cannot exceed 255 characters';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               hintText: 'Enter quiz title...',
               hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontFamily: 'Outfit'),
@@ -727,7 +721,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
 
           // QUIZ DESCRIPTION
           const Text(
-            'QUIZ DESCRIPTION',
+            'QUIZ DESCRIPTION (Optional)',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -736,8 +730,14 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
+          TextFormField(
             controller: _descController,
+            validator: (value) {
+              if (value != null && value.trim().length > 500) {
+                return 'Description cannot exceed 500 characters';
+              }
+              return null;
+            },
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Briefly describe what this quiz covers...',
@@ -769,7 +769,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'PASSING SCORE (%)',
+                      'PASSING SCORE (%) *',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -778,8 +778,15 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    TextField(
+                    TextFormField(
                       controller: _passingScoreController,
+                      validator: (value) {
+                        final val = int.tryParse(value?.trim() ?? '');
+                        if (val == null || val < 0 || val > 100) {
+                          return 'Passing score must be between 0 and 100';
+                        }
+                        return null;
+                      },
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         hintText: 'Enter pass score...',
@@ -818,7 +825,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'TIME LIMIT (MINUTES)',
+                      'TIME LIMIT (MINUTES) *',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -827,8 +834,15 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    TextField(
+                    TextFormField(
                       controller: _timeLimitController,
+                      validator: (value) {
+                        final val = int.tryParse(value?.trim() ?? '');
+                        if (val == null || val <= 0) {
+                          return 'Time limit must be greater than 0';
+                        }
+                        return null;
+                      },
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         hintText: 'Enter time...',
@@ -866,7 +880,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
 
           // VERSION
           const Text(
-            'VERSION',
+            'VERSION (Optional)',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -875,7 +889,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
+          TextFormField(
             controller: _versionController,
             decoration: InputDecoration(
               hintText: 'Enter version...',
@@ -958,6 +972,7 @@ class _CreateQuizPageState extends State<CreateQuizPage> {
             ],
           ),
         ],
+      ),
       ),
     );
   }

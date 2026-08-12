@@ -57,6 +57,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   String? _uploadedImageUrl;
 
   String? _uploadedPdfName;
+
+  final _formKey = GlobalKey<FormState>();
   bool _isUploadingPdf = false;
   double _pdfUploadProgress = 0.0;
   String? _pdfFileSizeStr;
@@ -307,6 +309,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
   }
 
   void _saveLesson() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final title = _titleController.text.trim();
     final code = _codeController.text.trim();
     final objectives = _learningObjectivesController.text.trim();
@@ -314,48 +319,6 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         int.tryParse(_estimatedTimeController.text.trim()) ?? 0;
     final desc = _descController.text.trim();
     final question = _questionController.text.trim();
-
-    if (title.isEmpty) {
-      ToastHelper.showError(context, 'Please enter a lesson title');
-      return;
-    }
-    if (title.length > 100) {
-      ToastHelper.showError(
-        context,
-        'Lesson title cannot exceed 100 characters',
-      );
-      return;
-    }
-    if (code.length > 20) {
-      ToastHelper.showError(context, 'Lesson code cannot exceed 20 characters');
-      return;
-    }
-    if (desc.length > 500) {
-      ToastHelper.showError(
-        context,
-        'Description cannot exceed 500 characters',
-      );
-      return;
-    }
-    if (objectives.length > 1000) {
-      ToastHelper.showError(
-        context,
-        'Learning objectives cannot exceed 1000 characters',
-      );
-      return;
-    }
-    if (estimatedTime <= 0) {
-      ToastHelper.showError(
-        context,
-        'Please enter a valid estimated time (> 0 minutes)',
-      );
-      return;
-    }
-
-    if (question.isEmpty) {
-      ToastHelper.showError(context, 'Please enter the lesson content');
-      return;
-    }
 
     setState(() {
       final lessons = List.from(
@@ -916,7 +879,9 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
         ],
       ),
       padding: const EdgeInsets.all(24),
-      child: Column(
+      child: Form(
+        key: _formKey,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Expanded Section Header Box
@@ -982,7 +947,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 24),
           // Lesson Code field
           const Text(
-            'Lesson Code',
+            'Lesson Code (Optional)',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -993,6 +958,12 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _codeController,
+            validator: (value) {
+              if (value != null && value.trim().length > 20) {
+                return 'Lesson code cannot exceed 20 characters';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               hintText: 'e.g. L01',
               hintStyle: const TextStyle(
@@ -1029,7 +1000,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 24),
           // Lesson Title field
           const Text(
-            'Lesson Title',
+            'Lesson Title *',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1040,6 +1011,15 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _titleController,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter a lesson title';
+              }
+              if (value.trim().length > 100) {
+                return 'Lesson title cannot exceed 100 characters';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               hintText: 'Enter lesson title',
               hintStyle: const TextStyle(
@@ -1076,7 +1056,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 20),
           // Lesson Description field
           const Text(
-            'Lesson Description',
+            'Lesson Description (Optional)',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1087,6 +1067,12 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _descController,
+            validator: (value) {
+              if (value != null && value.trim().length > 500) {
+                return 'Description cannot exceed 500 characters';
+              }
+              return null;
+            },
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Enter lesson description.....',
@@ -1124,7 +1110,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 20),
           // Learning Objectives field
           const Text(
-            'Learning Objectives',
+            'Learning Objectives (Optional)',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1135,6 +1121,12 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _learningObjectivesController,
+            validator: (value) {
+              if (value != null && value.trim().length > 1000) {
+                return 'Learning objectives cannot exceed 1000 characters';
+              }
+              return null;
+            },
             maxLines: 4,
             decoration: InputDecoration(
               hintText: 'Enter learning objectives (one per line).....',
@@ -1172,7 +1164,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 20),
           // Content Type field (Pre-filled Text)
           const Text(
-            'Content Type',
+            'Content Type *',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1309,6 +1301,12 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
                   padding: const EdgeInsets.all(16),
                   child: TextFormField(
                     controller: _questionController,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter the lesson content';
+                      }
+                      return null;
+                    },
                     maxLines: 8,
                     onChanged: (val) {
                       setState(() {});
@@ -1525,7 +1523,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 24),
           // Estimated Time input
           const Text(
-            'Estimated Time (Minutes)',
+            'Estimated Time (Minutes) *',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
@@ -1536,6 +1534,13 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _estimatedTimeController,
+            validator: (value) {
+              final val = int.tryParse(value?.trim() ?? '');
+              if (val == null || val <= 0) {
+                return 'Please enter a valid estimated time (> 0 minutes)';
+              }
+              return null;
+            },
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               hintText: 'e.g. 15',
@@ -1575,6 +1580,7 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
