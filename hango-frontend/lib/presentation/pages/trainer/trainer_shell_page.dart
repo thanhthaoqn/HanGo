@@ -26,6 +26,7 @@ class TrainerShellPage extends StatefulWidget {
 
 class TrainerShellPageState extends State<TrainerShellPage> {
   late int _currentIndex;
+  final Set<int> _initializedTabs = {};
 
   String _trainerName = 'Trainer';
   String _trainerInitials = 'T';
@@ -40,6 +41,7 @@ class TrainerShellPageState extends State<TrainerShellPage> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _initializedTabs.add(_currentIndex);
     _loadHeaderInfo();
     _loadNotifications();
   }
@@ -68,8 +70,21 @@ class TrainerShellPageState extends State<TrainerShellPage> {
     if (_currentIndex != index) {
       setState(() {
         _currentIndex = index;
+        _initializedTabs.add(index);
       });
     }
+  }
+
+  Widget _lazyTab(int index, Widget Function() builder) {
+    if (_initializedTabs.contains(index)) {
+      return builder();
+    }
+    return const Center(
+      child: CircularProgressIndicator(
+        color: Color(0xFF20B486),
+        strokeWidth: 2.5,
+      ),
+    );
   }
 
   Future<void> _loadNotifications() async {
@@ -214,14 +229,14 @@ class TrainerShellPageState extends State<TrainerShellPage> {
                 Expanded(
                   child: IndexedStack(
                     index: _currentIndex,
-                    children: const [
-                      TrainerDashboardPage(isEmbedded: true),
-                      TrainerCoursesPage(isEmbedded: true),
-                      TrainerExamsPage(isEmbedded: true),
-                      TrainerQuestionBankPage(isEmbedded: true),
-                      TrainerRevenuePage(isEmbedded: true),
-                      TrainerProfilePage(isEmbedded: true),
-                      TrainerTicketsPage(isEmbedded: true),
+                    children: [
+                      _lazyTab(0, () => const TrainerDashboardPage(isEmbedded: true)),
+                      _lazyTab(1, () => const TrainerCoursesPage(isEmbedded: true)),
+                      _lazyTab(2, () => const TrainerExamsPage(isEmbedded: true)),
+                      _lazyTab(3, () => const TrainerQuestionBankPage(isEmbedded: true)),
+                      _lazyTab(4, () => const TrainerRevenuePage(isEmbedded: true)),
+                      _lazyTab(5, () => const TrainerProfilePage(isEmbedded: true)),
+                      _lazyTab(6, () => const TrainerTicketsPage(isEmbedded: true)),
                     ],
                   ),
                 ),

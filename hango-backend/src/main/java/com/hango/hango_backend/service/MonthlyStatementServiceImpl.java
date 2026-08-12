@@ -51,24 +51,28 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
         TrainerProfile profile = trainerProfileRepository.findById(trainerId).orElse(null);
         String trainerType = profile != null && profile.getTrainerType() != null ? profile.getTrainerType() : "PROFESSIONAL";
 
-        List<Payment> payments = paymentRepository.findByCourseCreatorIdAndStatus(trainerId, "SUCCESS");
+        List<Object[]> revenueRows = paymentRepository.findRevenueDataByTrainerId(trainerId);
 
         LocalDateTime holdThreshold = LocalDateTime.now().minusDays(7);
         BigDecimal pendingHold = BigDecimal.ZERO;
         BigDecimal available = BigDecimal.ZERO;
 
-        for (Payment p : payments) {
-            BigDecimal earnings = p.getTrainerEarnings();
+        for (Object[] row : revenueRows) {
+            BigDecimal earnings = row[0] != null ? new BigDecimal(row[0].toString()) : null;
             if (earnings == null) {
                 // Default calculation if old record
                 double platformRate = "PEER_TUTOR".equalsIgnoreCase(trainerType) ? 0.40 : 0.30;
-                BigDecimal gross = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
+                BigDecimal gross = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
                 BigDecimal pFee = gross.multiply(BigDecimal.valueOf(platformRate)).setScale(2, RoundingMode.HALF_UP);
                 earnings = gross.subtract(pFee);
             }
 
-            if ("PENDING".equalsIgnoreCase(p.getSettlementStatus()) || p.getSettlementStatus() == null) {
-                if (p.getCreatedAt() != null && p.getCreatedAt().isAfter(holdThreshold)) {
+            String settlementStatus = row[2] != null ? row[2].toString() : null;
+            java.sql.Timestamp createdAtTs = row[3] != null ? (java.sql.Timestamp) row[3] : null;
+            LocalDateTime createdAt = createdAtTs != null ? createdAtTs.toLocalDateTime() : null;
+
+            if ("PENDING".equalsIgnoreCase(settlementStatus) || settlementStatus == null) {
+                if (createdAt != null && createdAt.isAfter(holdThreshold)) {
                     pendingHold = pendingHold.add(earnings);
                 } else {
                     available = available.add(earnings);

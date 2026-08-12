@@ -19,12 +19,10 @@ public class Payment {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     @JoinColumn(name = "course_id", nullable = true)
     private Course course;
 

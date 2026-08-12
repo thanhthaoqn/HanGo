@@ -47,6 +47,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Object[]> getRevenueByMonthForCurrentYear(@org.springframework.data.repository.query.Param("trainerId") Long trainerId);
 
     List<Payment> findByCourseCreatorIdAndStatus(Long creatorId, String status);
+
+    @Query(value = "SELECT p.trainer_earnings, p.amount, p.settlement_status, p.created_at " +
+           "FROM payments p JOIN courses c ON p.course_id = c.id " +
+           "WHERE c.created_by = :trainerId AND p.status = 'SUCCESS'",
+           nativeQuery = true)
+    List<Object[]> findRevenueDataByTrainerId(@Param("trainerId") Long trainerId);
     List<Payment> findByCourseCreatorIdAndStatusAndSettlementStatus(Long creatorId, String status, String settlementStatus);
 
     @Query(value = "SELECT p FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +

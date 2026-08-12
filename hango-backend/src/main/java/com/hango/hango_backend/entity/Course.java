@@ -2,8 +2,6 @@ package com.hango.hango_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.NotFound;
-import org.hibernate.annotations.NotFoundAction;
 import org.hibernate.annotations.DynamicUpdate;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -26,13 +24,11 @@ public class Course {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "created_by", nullable = false)
     private User creator;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_param_id", nullable = true)
-    @NotFound(action = NotFoundAction.IGNORE)
     private SystemParameter category;
 
     @ManyToMany(fetch = FetchType.LAZY)
@@ -46,7 +42,6 @@ public class Course {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "difficulty_param_id", nullable = true)
-    @NotFound(action = NotFoundAction.IGNORE)
     private SystemParameter difficulty;
 
     @Column(nullable = false)
