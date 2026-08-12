@@ -18,7 +18,11 @@ import '../ticket/create_ticket_modal.dart';
 class MyInformationPage extends StatefulWidget {
   final int initialTab;
   final bool isEmbedded;
-  const MyInformationPage({super.key, this.initialTab = 0, this.isEmbedded = false});
+  const MyInformationPage({
+    super.key,
+    this.initialTab = 0,
+    this.isEmbedded = false,
+  });
 
   @override
   State<MyInformationPage> createState() => _MyInformationPageState();
@@ -27,7 +31,8 @@ class MyInformationPage extends StatefulWidget {
 class _MyInformationPageState extends State<MyInformationPage> {
   final _authService = AuthService();
   bool _isLoading = true;
-  late int _activeTab; // 0: Information & Contact, 1: Change Password, 2: Payment History
+  late int
+  _activeTab; // 0: Information & Contact, 1: Change Password, 2: Payment History
 
   // Profile data
   String _fullName = '';
@@ -80,7 +85,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
           }
           _address = data['address'] ?? '';
           _avatarUrl = data['avatarUrl'] ?? '';
-          
+
           if (_fullName.trim().isNotEmpty) {
             final parts = _fullName.trim().split(' ');
             if (parts.isNotEmpty) {
@@ -104,7 +109,8 @@ class _MyInformationPageState extends State<MyInformationPage> {
           }
         });
       } else {
-        if (res['message'] != null && res['message'] != 'No auth token found.') {
+        if (res['message'] != null &&
+            res['message'] != 'No auth token found.') {
           _showErrorSnackBar('Failed to load profile: ${res['message']}');
         }
       }
@@ -132,14 +138,15 @@ class _MyInformationPageState extends State<MyInformationPage> {
         final isDesktop = constraints.maxWidth > 992;
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
-          appBar: widget.isEmbedded ? null : SharedHeader(
-            isDesktop: isDesktop,
-            activeTab: '',
-          ),
+          appBar: widget.isEmbedded
+              ? null
+              : SharedHeader(isDesktop: isDesktop, activeTab: ''),
           body: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF28B79B),
+                    ),
                   ),
                 )
               : SingleChildScrollView(
@@ -155,7 +162,8 @@ class _MyInformationPageState extends State<MyInformationPage> {
                             constraints: const BoxConstraints(maxWidth: 1440),
                             child: isDesktop
                                 ? Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // Sidebar Left
                                       _buildSidebar(isDesktop),
@@ -165,21 +173,22 @@ class _MyInformationPageState extends State<MyInformationPage> {
                                         child: _activeTab == 0
                                             ? _buildInformationTab(isDesktop)
                                             : _activeTab == 1
-                                                ? _buildChangePasswordTab(isDesktop)
-                                                : const _PaymentHistoryPanel(),
+                                            ? _buildChangePasswordTab(isDesktop)
+                                            : const _PaymentHistoryPanel(),
                                       ),
                                     ],
                                   )
                                 : Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
                                     children: [
                                       _buildSidebar(isDesktop),
                                       const SizedBox(height: 20),
                                       _activeTab == 0
                                           ? _buildInformationTab(isDesktop)
                                           : _activeTab == 1
-                                              ? _buildChangePasswordTab(isDesktop)
-                                              : const _PaymentHistoryPanel(),
+                                          ? _buildChangePasswordTab(isDesktop)
+                                          : const _PaymentHistoryPanel(),
                                     ],
                                   ),
                           ),
@@ -284,7 +293,9 @@ class _MyInformationPageState extends State<MyInformationPage> {
             Icon(
               icon,
               size: 20,
-              color: isActive ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+              color: isActive
+                  ? const Color(0xFF28B79B)
+                  : const Color(0xFF64748B),
             ),
             const SizedBox(width: 12),
             Text(
@@ -292,7 +303,9 @@ class _MyInformationPageState extends State<MyInformationPage> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? const Color(0xFF28B79B) : const Color(0xFF334155),
+                color: isActive
+                    ? const Color(0xFF28B79B)
+                    : const Color(0xFF334155),
                 fontFamily: 'Outfit',
               ),
             ),
@@ -343,7 +356,10 @@ class _MyInformationPageState extends State<MyInformationPage> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF28B79B),
                   side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -458,7 +474,10 @@ class _MyInformationPageState extends State<MyInformationPage> {
         _buildTwoFieldRow(
           isWide,
           _buildReadOnlyField('Full name*', _fullName),
-          _buildReadOnlyField('date of birth*', _dateOfBirth.isNotEmpty ? _dateOfBirth : '--/--/----'),
+          _buildReadOnlyField(
+            'date of birth*',
+            _dateOfBirth.isNotEmpty ? _dateOfBirth : '--/--/----',
+          ),
         ),
         const SizedBox(height: 20),
         _buildTwoFieldRow(
@@ -469,8 +488,14 @@ class _MyInformationPageState extends State<MyInformationPage> {
         const SizedBox(height: 20),
         _buildTwoFieldRow(
           isWide,
-          _buildReadOnlyField('Phone number*', _phoneNumber.isNotEmpty ? _phoneNumber : 'Not provided'),
-          _buildReadOnlyField('Address', _address.isNotEmpty ? _address : 'Not provided'),
+          _buildReadOnlyField(
+            'Phone number*',
+            _phoneNumber.isNotEmpty ? _phoneNumber : 'Not provided',
+          ),
+          _buildReadOnlyField(
+            'Address',
+            _address.isNotEmpty ? _address : 'Not provided',
+          ),
         ),
       ],
     );
@@ -486,13 +511,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
         ],
       );
     }
-    return Column(
-      children: [
-        left,
-        const SizedBox(height: 20),
-        right,
-      ],
-    );
+    return Column(children: [left, const SizedBox(height: 20), right]);
   }
 
   Widget _buildReadOnlyField(String label, String value) {
@@ -582,7 +601,10 @@ class _MyInformationPageState extends State<MyInformationPage> {
           _isLoading = true;
         });
         try {
-          final res = await _authService.changePassword(currentPassword, newPassword);
+          final res = await _authService.changePassword(
+            currentPassword,
+            newPassword,
+          );
           if (res['success'] == true) {
             _showSuccessSnackBar('Password updated successfully!');
             // The prompt says "After the change, you will need to log back in on all devices."
@@ -684,14 +706,18 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         _isUploading = true;
       });
 
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      );
       final request = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          pickedFile.bytes,
-          filename: pickedFile.name,
-        ));
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            pickedFile.bytes,
+            filename: pickedFile.name,
+          ),
+        );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
@@ -704,7 +730,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         });
         ToastHelper.showSuccess(context, 'Avatar uploaded successfully!');
       } else {
-        ToastHelper.showError(context, 'Avatar upload failed: Cloudinary returned status ${response.statusCode}');
+        ToastHelper.showError(
+          context,
+          'Avatar upload failed: Cloudinary returned status ${response.statusCode}',
+        );
       }
     } catch (e) {
       ToastHelper.showError(context, 'Error uploading avatar: $e');
@@ -730,7 +759,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
                 ),
@@ -748,7 +780,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                   ],
                 ),
@@ -770,7 +805,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                               height: 100,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+                                border: Border.all(
+                                  color: const Color(0xFFCBD5E1),
+                                  width: 2,
+                                ),
                               ),
                               child: ClipOval(
                                 child: _avatarUrl.isNotEmpty
@@ -803,7 +841,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                                   ),
                                   child: const Center(
                                     child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -812,7 +852,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                               bottom: 0,
                               right: 0,
                               child: InkWell(
-                                onTap: _isUploading ? null : _pickAndUploadAvatar,
+                                onTap: _isUploading
+                                    ? null
+                                    : _pickAndUploadAvatar,
                                 customBorder: const CircleBorder(),
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
@@ -838,12 +880,16 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                         _buildInputField(
                           label: 'Full name*',
                           controller: _nameController,
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Please enter your full name'
+                              : null,
                         ),
                         _buildInputField(
                           label: 'Name account*',
                           controller: _usernameController,
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Please enter a username'
+                              : null,
                         ),
                       ]),
                       const SizedBox(height: 20),
@@ -853,20 +899,34 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                         _buildInputField(
                           label: 'Phone number*',
                           controller: _phoneController,
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please enter your phone number';
+                            if (!RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$').hasMatch(v)) {
+                              return 'Please enter a valid 10-digit Vietnamese phone number (e.g. 0912345678)';
+                            }
+                            return null;
+                          },
                         ),
                         _buildInputField(
                           label: 'date of birth*',
                           controller: _dobController,
                           hint: 'DD/MM/YYYY',
                           readOnly: true,
-                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                          suffixIcon: const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 18,
+                            color: Color(0xFF64748B),
+                          ),
                           onTap: () async {
-                            DateTime initialDate = DateTime.now().subtract(const Duration(days: 365 * 18));
+                            DateTime initialDate = DateTime.now().subtract(
+                              const Duration(days: 365 * 18),
+                            );
                             if (_dobController.text.isNotEmpty) {
                               final parts = _dobController.text.split('/');
                               if (parts.length == 3) {
-                                final parsed = DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+                                final parsed = DateTime.tryParse(
+                                  '${parts[2]}-${parts[1]}-${parts[0]}',
+                                );
                                 if (parsed != null) {
                                   initialDate = parsed;
                                 }
@@ -892,15 +952,20 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                             );
                             if (picked != null) {
                               final day = picked.day.toString().padLeft(2, '0');
-                              final month = picked.month.toString().padLeft(2, '0');
+                              final month = picked.month.toString().padLeft(
+                                2,
+                                '0',
+                              );
                               final year = picked.year.toString();
                               _dobController.text = '$day/$month/$year';
                             }
                           },
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Required';
+                            if (v == null || v.trim().isEmpty)
+                              return 'Please select your date of birth';
                             final parts = v.split('/');
-                            if (parts.length != 3) return 'Format: DD/MM/YYYY';
+                            if (parts.length != 3)
+                              return 'Please enter date in DD/MM/YYYY format';
                             return null;
                           },
                         ),
@@ -914,7 +979,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                           controller: _addressController,
                         ),
                         _buildGenderToggle(
-                          value: ['Male', 'Female'].contains(_gender) ? _gender : 'Male',
+                          value: ['Male', 'Female'].contains(_gender)
+                              ? _gender
+                              : 'Male',
                           onChanged: (newVal) {
                             setState(() {
                               _gender = newVal;
@@ -935,10 +1002,11 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                               if (_dobController.text.isNotEmpty) {
                                 final parts = _dobController.text.split('/');
                                 if (parts.length == 3) {
-                                  formattedDob = '${parts[2]}-${parts[1]}-${parts[0]}';
+                                  formattedDob =
+                                      '${parts[2]}-${parts[1]}-${parts[0]}';
                                 }
                               }
-                              
+
                               final data = {
                                 'fullName': _nameController.text.trim(),
                                 'username': _usernameController.text.trim(),
@@ -946,7 +1014,8 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                                 'avatarUrl': _avatarUrl,
                                 'gender': _gender,
                                 'address': _addressController.text.trim(),
-                                if (formattedDob != null) 'dateOfBirth': formattedDob,
+                                if (formattedDob != null)
+                                  'dateOfBirth': formattedDob,
                               };
                               widget.onSave(data);
                               Navigator.pop(context);
@@ -995,11 +1064,7 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
           );
         }
         return Column(
-          children: [
-            children[0],
-            const SizedBox(height: 20),
-            children[1],
-          ],
+          children: [children[0], const SizedBox(height: 20), children[1]],
         );
       },
     );
@@ -1034,10 +1099,14 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
           onTap: onTap,
           style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
           decoration: InputDecoration(
+            errorMaxLines: 3,
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
             suffixIcon: suffixIcon,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -1048,7 +1117,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF28B79B),
+                width: 1.5,
+              ),
             ),
             filled: true,
             fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
@@ -1085,7 +1157,12 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
           child: Row(
             children: [
               _buildGenderOption('Male', Icons.male_rounded, value, onChanged),
-              _buildGenderOption('Female', Icons.female_rounded, value, onChanged),
+              _buildGenderOption(
+                'Female',
+                Icons.female_rounded,
+                value,
+                onChanged,
+              ),
             ],
           ),
         ),
@@ -1115,7 +1192,7 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                       color: const Color(0xFF28B79B).withOpacity(0.15),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -1125,7 +1202,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
               Icon(
                 icon,
                 size: 18,
-                color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
+                color: isSelected
+                    ? const Color(0xFF28B79B)
+                    : const Color(0xFF94A3B8),
               ),
               const SizedBox(width: 6),
               Text(
@@ -1133,7 +1212,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+                  color: isSelected
+                      ? const Color(0xFF28B79B)
+                      : const Color(0xFF64748B),
                   fontFamily: 'Outfit',
                 ),
               ),
@@ -1224,8 +1305,10 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               label: 'Password *',
               controller: _currPasswordController,
               obscure: _obscureCurr,
-              onToggleObscure: () => setState(() => _obscureCurr = !_obscureCurr),
-              validator: (v) => v == null || v.isEmpty ? 'Current password required' : null,
+              onToggleObscure: () =>
+                  setState(() => _obscureCurr = !_obscureCurr),
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Current password required' : null,
             ),
             const SizedBox(height: 20),
 
@@ -1238,7 +1321,8 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               showForgetPass: true,
               validator: (v) {
                 if (v == null || v.isEmpty) return 'New password required';
-                if (v.length < 8) return 'Password must be at least 8 characters';
+                if (v.length < 8)
+                  return 'Password must be at least 8 characters';
                 return null;
               },
             ),
@@ -1249,10 +1333,13 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               label: 'Confirm Password *',
               controller: _confirmPasswordController,
               obscure: _obscureConfirm,
-              onToggleObscure: () => setState(() => _obscureConfirm = !_obscureConfirm),
+              onToggleObscure: () =>
+                  setState(() => _obscureConfirm = !_obscureConfirm),
               validator: (v) {
-                if (v == null || v.isEmpty) return 'Confirmation password required';
-                if (v != _newPasswordController.text) return 'Passwords do not match';
+                if (v == null || v.isEmpty)
+                  return 'Confirmation password required';
+                if (v != _newPasswordController.text)
+                  return 'Passwords do not match';
                 return null;
               },
             ),
@@ -1301,21 +1388,27 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
                 return isWide
                     ? Row(
                         children: [
-                          Expanded(child: _buildInfoCard(
-                            icon: Icons.shield_outlined,
-                            iconColor: const Color(0xFF3B82F6),
-                            bgColor: const Color(0xFFEFF6FF),
-                            title: 'Strong security',
-                            desc: 'Use at least 8 characters, including letters, numbers, and special characters.',
-                          )),
+                          Expanded(
+                            child: _buildInfoCard(
+                              icon: Icons.shield_outlined,
+                              iconColor: const Color(0xFF3B82F6),
+                              bgColor: const Color(0xFFEFF6FF),
+                              title: 'Strong security',
+                              desc:
+                                  'Use at least 8 characters, including letters, numbers, and special characters.',
+                            ),
+                          ),
                           const SizedBox(width: 16),
-                          Expanded(child: _buildInfoCard(
-                            icon: Icons.info_outline_rounded,
-                            iconColor: const Color(0xFFF97316),
-                            bgColor: const Color(0xFFFFF7ED),
-                            title: 'Note',
-                            desc: 'After the change, you will need to log back in on all devices.',
-                          )),
+                          Expanded(
+                            child: _buildInfoCard(
+                              icon: Icons.info_outline_rounded,
+                              iconColor: const Color(0xFFF97316),
+                              bgColor: const Color(0xFFFFF7ED),
+                              title: 'Note',
+                              desc:
+                                  'After the change, you will need to log back in on all devices.',
+                            ),
+                          ),
                         ],
                       )
                     : Column(
@@ -1325,7 +1418,8 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
                             iconColor: const Color(0xFF3B82F6),
                             bgColor: const Color(0xFFEFF6FF),
                             title: 'Strong security',
-                            desc: 'Use at least 8 characters, including letters, numbers, and special characters.',
+                            desc:
+                                'Use at least 8 characters, including letters, numbers, and special characters.',
                           ),
                           const SizedBox(height: 16),
                           _buildInfoCard(
@@ -1333,7 +1427,8 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
                             iconColor: const Color(0xFFF97316),
                             bgColor: const Color(0xFFFFF7ED),
                             title: 'Note',
-                            desc: 'After the change, you will need to log back in on all devices.',
+                            desc:
+                                'After the change, you will need to log back in on all devices.',
                           ),
                         ],
                       );
@@ -1371,7 +1466,10 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
             if (showForgetPass)
               TextButton(
                 onPressed: () {
-                  ToastHelper.showSuccess(context, 'Please use OTP verification to recover password.');
+                  ToastHelper.showSuccess(
+                    context,
+                    'Please use OTP verification to recover password.',
+                  );
                 },
                 style: TextButton.styleFrom(
                   minimumSize: Size.zero,
@@ -1397,10 +1495,15 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
           validator: validator,
           style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             suffixIcon: IconButton(
               icon: Icon(
-                obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 size: 20,
                 color: const Color(0xFF64748B),
               ),
@@ -1416,7 +1519,10 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF28B79B),
+                width: 1.5,
+              ),
             ),
             filled: true,
             fillColor: Colors.white,
@@ -1491,7 +1597,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
   bool _isLoading = true;
   String? _errorMessage;
   List<dynamic> _historyList = [];
-  
+
   int _currentPage = 0;
   int _totalPages = 1;
   int _totalElements = 0;
@@ -1522,7 +1628,8 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
           if (res is Map<String, dynamic>) {
             _historyList = res['content'] as List<dynamic>? ?? [];
             _totalPages = res['totalPages'] as int? ?? 1;
-            _totalElements = res['totalElements'] as int? ?? _historyList.length;
+            _totalElements =
+                res['totalElements'] as int? ?? _historyList.length;
           } else if (res is List<dynamic>) {
             _historyList = res;
             _totalPages = 1;
@@ -1547,11 +1654,15 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
 
   String _formatPrice(dynamic amount) {
     if (amount == null) return '0 ₫';
-    double numVal = (amount is num) ? amount.toDouble() : (double.tryParse(amount.toString()) ?? 0);
-    final formatted = numVal.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+    double numVal = (amount is num)
+        ? amount.toDouble()
+        : (double.tryParse(amount.toString()) ?? 0);
+    final formatted = numVal
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
     return '$formatted ₫';
   }
 
@@ -1676,7 +1787,10 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
               ),
               IconButton(
                 onPressed: _loadHistory,
-                icon: const Icon(Icons.refresh_rounded, color: Color(0xFF28B79B)),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Color(0xFF28B79B),
+                ),
                 tooltip: isVi ? 'Tải lại' : 'Refresh',
               ),
             ],
@@ -1707,192 +1821,237 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                   ),
                 )
               : _errorMessage != null
-                  ? SizedBox(
-                      height: 200,
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.error_outline_rounded, color: Colors.red, size: 40),
-                            const SizedBox(height: 12),
-                            Text(_errorMessage!, style: const TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadHistory,
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
-                              child: Text(isVi ? 'Thử lại' : 'Retry', style: const TextStyle(color: Colors.white)),
-                            ),
-                          ],
+              ? SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          color: Colors.red,
+                          size: 40,
                         ),
-                      ),
-                    )
-                  : _historyList.isEmpty
-                      ? SizedBox(
-                          height: 200,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.receipt_long_outlined, size: 48, color: Color(0xFF94A3B8)),
-                                const SizedBox(height: 12),
-                                Text(
-                                  isVi ? 'Chưa có lịch sử giao dịch nào.' : 'No transaction history available.',
-                                  style: const TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit', fontSize: 15),
-                                ),
-                              ],
-                            ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontFamily: 'Outfit',
                           ),
-                        )
-                      : Column(
-                          children: [
-                            ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _historyList.length,
-                              separatorBuilder: (context, index) => const SizedBox(height: 12),
-                              itemBuilder: (context, index) {
-                                final item = _historyList[index] as Map<String, dynamic>;
-                                final txnRef = item['txnRef'] ?? '${item['id']}';
-                                final courseTitle = item['courseTitle'] ?? (isVi ? 'Khóa học' : 'Course');
-                                final courseThumbnail = item['courseThumbnail'] as String?;
-                                final amount = item['amount'];
-                                final status = item['status'] ?? 'PENDING';
-                                final bankCode = item['bankCode'] as String?;
-                                final date = item['paidAt'] ?? item['createdAt'];
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadHistory,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF28B79B),
+                          ),
+                          child: Text(
+                            isVi ? 'Thử lại' : 'Retry',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : _historyList.isEmpty
+              ? SizedBox(
+                  height: 200,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.receipt_long_outlined,
+                          size: 48,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          isVi
+                              ? 'Chưa có lịch sử giao dịch nào.'
+                              : 'No transaction history available.',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontFamily: 'Outfit',
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _historyList.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final item =
+                            _historyList[index] as Map<String, dynamic>;
+                        final txnRef = item['txnRef'] ?? '${item['id']}';
+                        final courseTitle =
+                            item['courseTitle'] ??
+                            (isVi ? 'Khóa học' : 'Course');
+                        final courseThumbnail =
+                            item['courseThumbnail'] as String?;
+                        final amount = item['amount'];
+                        final status = item['status'] ?? 'PENDING';
+                        final bankCode = item['bankCode'] as String?;
+                        final date = item['paidAt'] ?? item['createdAt'];
 
-                                return Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Container(
-                                          width: 48,
-                                          height: 48,
-                                          color: Colors.white,
-                                          child: (courseThumbnail != null && courseThumbnail.isNotEmpty)
-                                              ? Image.network(
-                                                  courseThumbnail,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) =>
-                                                      const Icon(Icons.receipt_outlined, color: Color(0xFF28B79B), size: 24),
-                                                )
-                                              : Container(
-                                                  padding: const EdgeInsets.all(10),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius: BorderRadius.circular(10),
-                                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  color: Colors.white,
+                                  child:
+                                      (courseThumbnail != null &&
+                                          courseThumbnail.isNotEmpty)
+                                      ? Image.network(
+                                          courseThumbnail,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  const Icon(
+                                                    Icons.receipt_outlined,
+                                                    color: Color(0xFF28B79B),
+                                                    size: 24,
                                                   ),
-                                                  child: const Icon(Icons.receipt_outlined, color: Color(0xFF28B79B), size: 24),
-                                                ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              courseTitle,
-                                              style: const TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF1E293B),
-                                                fontFamily: 'Outfit',
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                        )
+                                      : Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              10,
                                             ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '${isVi ? "Mã GD" : "Txn Ref"}: #$txnRef${bankCode != null && bankCode.isNotEmpty ? (isVi ? ' · Phương thức: ' : ' · Method: ') + bankCode : ''} · ${isVi ? "Ngày" : "Date"}: ${_formatDate(date)}',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFF64748B),
-                                                fontFamily: 'Outfit',
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            _formatPrice(amount),
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF0F172A),
-                                              fontFamily: 'Outfit',
+                                            border: Border.all(
+                                              color: const Color(0xFFCBD5E1),
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          _buildStatusBadge(status.toString()),
-                                        ],
+                                          child: const Icon(
+                                            Icons.receipt_outlined,
+                                            color: Color(0xFF28B79B),
+                                            size: 24,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      courseTitle,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E293B),
+                                        fontFamily: 'Outfit',
                                       ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                            
-                            // Pagination Controls
-                            if (_totalPages > 1) ...[
-                              const SizedBox(height: 24),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${isVi ? "Mã GD" : "Txn Ref"}: #$txnRef${bankCode != null && bankCode.isNotEmpty ? (isVi ? ' · Phương thức: ' : ' · Method: ') + bankCode : ''} · ${isVi ? "Ngày" : "Date"}: ${_formatDate(date)}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    isVi 
-                                      ? 'Trang ${_currentPage + 1} / $_totalPages (Tổng $_totalElements giao dịch)'
-                                      : 'Page ${_currentPage + 1} of $_totalPages (Total $_totalElements transactions)',
+                                    _formatPrice(amount),
                                     style: const TextStyle(
-                                      color: Color(0xFF64748B),
-                                      fontSize: 13,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
                                       fontFamily: 'Outfit',
                                     ),
                                   ),
-                                  Row(
-                                    children: [
-                                      IconButton(
-                                        onPressed: _currentPage > 0
-                                            ? () {
-                                                setState(() {
-                                                  _currentPage--;
-                                                });
-                                                _loadHistory();
-                                              }
-                                            : null,
-                                        icon: const Icon(Icons.chevron_left_rounded),
-                                        tooltip: isVi ? 'Trang trước' : 'Previous page',
-                                      ),
-                                      IconButton(
-                                        onPressed: _currentPage < _totalPages - 1
-                                            ? () {
-                                                setState(() {
-                                                  _currentPage++;
-                                                });
-                                                _loadHistory();
-                                              }
-                                            : null,
-                                        icon: const Icon(Icons.chevron_right_rounded),
-                                        tooltip: isVi ? 'Trang sau' : 'Next page',
-                                      ),
-                                    ],
-                                  ),
+                                  const SizedBox(height: 4),
+                                  _buildStatusBadge(status.toString()),
                                 ],
                               ),
                             ],
-                          ],
-                        ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Pagination Controls
+                    if (_totalPages > 1) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isVi
+                                ? 'Trang ${_currentPage + 1} / $_totalPages (Tổng $_totalElements giao dịch)'
+                                : 'Page ${_currentPage + 1} of $_totalPages (Total $_totalElements transactions)',
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                onPressed: _currentPage > 0
+                                    ? () {
+                                        setState(() {
+                                          _currentPage--;
+                                        });
+                                        _loadHistory();
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.chevron_left_rounded),
+                                tooltip: isVi ? 'Trang trước' : 'Previous page',
+                              ),
+                              IconButton(
+                                onPressed: _currentPage < _totalPages - 1
+                                    ? () {
+                                        setState(() {
+                                          _currentPage++;
+                                        });
+                                        _loadHistory();
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.chevron_right_rounded),
+                                tooltip: isVi ? 'Trang sau' : 'Next page',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
         ],
       ),
     );
@@ -1970,7 +2129,12 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
       ),
       child: Text(
         label,
-        style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Outfit'),
+        style: TextStyle(
+          color: fg,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+          fontFamily: 'Outfit',
+        ),
       ),
     );
   }
@@ -1978,10 +2142,8 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
   void _showDetailModal(TicketModel ticket) {
     showDialog(
       context: context,
-      builder: (context) => _TicketDetailDialog(
-        ticketId: ticket.id,
-        onRefresh: _fetchTickets,
-      ),
+      builder: (context) =>
+          _TicketDetailDialog(ticketId: ticket.id, onRefresh: _fetchTickets),
     );
   }
 
@@ -2023,7 +2185,11 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                   const SizedBox(height: 4),
                   Text(
                     'Track and manage your submitted help requests ($_totalElements total)',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                 ],
               ),
@@ -2031,9 +2197,8 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                 onPressed: () {
                   showDialog(
                     context: context,
-                    builder: (context) => CreateTicketModal(
-                      onSuccess: _fetchTickets,
-                    ),
+                    builder: (context) =>
+                        CreateTicketModal(onSuccess: _fetchTickets),
                   );
                 },
                 icon: const Icon(Icons.add_rounded, size: 18),
@@ -2041,10 +2206,19 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF28B79B),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   elevation: 0,
-                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 13),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Outfit',
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],
@@ -2076,7 +2250,9 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
           if (_isLoading)
             const SizedBox(
               height: 250,
-              child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
+              child: Center(
+                child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+              ),
             )
           else if (_tickets.isEmpty)
             Container(
@@ -2091,11 +2267,20 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.confirmation_number_outlined, size: 40, color: Color(0xFFCBD5E1)),
+                    Icon(
+                      Icons.confirmation_number_outlined,
+                      size: 40,
+                      color: Color(0xFFCBD5E1),
+                    ),
                     SizedBox(height: 10),
                     Text(
                       'No support tickets found',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                   ],
                 ),
@@ -2132,7 +2317,11 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                           color: const Color(0xFFE6FFFA),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF28B79B), size: 20),
+                        child: const Icon(
+                          Icons.confirmation_number_outlined,
+                          color: Color(0xFF28B79B),
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -2143,7 +2332,12 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                               children: [
                                 Text(
                                   '#${t.ticketCode}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: Color(0xFF28B79B),
+                                    fontFamily: 'Outfit',
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 _buildStatusBadge(t.status),
@@ -2152,14 +2346,23 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                             const SizedBox(height: 4),
                             Text(
                               t.title,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Color(0xFF0F172A),
+                                fontFamily: 'Outfit',
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Created: ${t.createdAt}',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                                fontFamily: 'Outfit',
+                              ),
                             ),
                           ],
                         ),
@@ -2170,10 +2373,22 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF334155),
                           side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                        child: const Text('View', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Outfit')),
+                        child: const Text(
+                          'View',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -2196,7 +2411,14 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
                         }
                       : null,
                 ),
-                Text('Page ${_currentPage + 1} of $_totalPages', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                Text(
+                  'Page ${_currentPage + 1} of $_totalPages',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontFamily: 'Outfit',
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.chevron_right),
                   onPressed: _currentPage < _totalPages - 1
@@ -2232,14 +2454,18 @@ class _SupportTicketsPanelState extends State<_SupportTicketsPanel> {
           color: isSelected ? const Color(0xFFE6FFFA) : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? const Color(0xFF28B79B) : const Color(0xFFE2E8F0),
+            color: isSelected
+                ? const Color(0xFF28B79B)
+                : const Color(0xFFE2E8F0),
             width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+            color: isSelected
+                ? const Color(0xFF28B79B)
+                : const Color(0xFF64748B),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             fontSize: 12,
             fontFamily: 'Outfit',
@@ -2306,7 +2532,10 @@ class _TicketDetailDialogState extends State<_TicketDetailDialog> {
         _loadDetail();
         widget.onRefresh();
       } else {
-        ToastHelper.showError(context, res['message'] ?? 'Failed to send reply.');
+        ToastHelper.showError(
+          context,
+          res['message'] ?? 'Failed to send reply.',
+        );
       }
     }
   }
@@ -2320,180 +2549,313 @@ class _TicketDetailDialogState extends State<_TicketDetailDialog> {
         constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
         padding: const EdgeInsets.all(24),
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)))
+            ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+              )
             : _ticket == null
-                ? const Center(child: Text('Ticket not found'))
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            ? const Center(child: Text('Ticket not found'))
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Header Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  '#${_ticket!.ticketCode}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF28B79B),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    _ticket!.status,
+                                    style: const TextStyle(
+                                      color: Color(0xFFD97706),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _ticket!.title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: Color(0xFFE2E8F0)),
+                  const SizedBox(height: 12),
+
+                  // Thread List
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
+                          // Initial Description
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('#${_ticket!.ticketCode}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B), fontSize: 13)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFEF3C7),
-                                        borderRadius: BorderRadius.circular(6),
+                                    const Text(
+                                      'Original Request',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
                                       ),
-                                      child: Text(_ticket!.status, style: const TextStyle(color: Color(0xFFD97706), fontWeight: FontWeight.bold, fontSize: 11)),
+                                    ),
+                                    Text(
+                                      _ticket!.createdAt,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFF94A3B8),
+                                      ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(_ticket!.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _ticket!.description,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF334155),
+                                    height: 1.4,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Color(0xFF64748B)),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const Divider(color: Color(0xFFE2E8F0)),
-                      const SizedBox(height: 12),
+                          const SizedBox(height: 16),
 
-                      // Thread List
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Initial Description
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text('Original Request', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF64748B))),
-                                        Text(_ticket!.createdAt, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(_ticket!.description, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4)),
-                                  ],
+                          // Rejection or Admin Note if exists
+                          if (_ticket!.rejectionReason != null &&
+                              _ticket!.rejectionReason!.isNotEmpty) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0xFFFCA5A5),
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Rejection Reason',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _ticket!.rejectionReason!,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF991B1B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
 
-                              // Rejection or Admin Note if exists
-                              if (_ticket!.rejectionReason != null && _ticket!.rejectionReason!.isNotEmpty) ...[
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(14),
+                          // Discussion Messages
+                          const Text(
+                            'Responses & Conversation',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF0F172A),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (_ticket!.messages.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: Text(
+                                  'No responses yet',
+                                  style: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _ticket!.messages.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, index) {
+                                final msg = _ticket!.messages[index];
+                                final isStaff =
+                                    msg.senderRole == 'ADMINISTRATOR' ||
+                                    msg.senderRole == 'COURSE_MANAGER';
+                                return Container(
+                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                                    color: isStaff
+                                        ? const Color(0xFFF0FDF4)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isStaff
+                                          ? const Color(0xFFBBF7D0)
+                                          : const Color(0xFFE2E8F0),
+                                    ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Rejection Reason', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFDC2626))),
-                                      const SizedBox(height: 6),
-                                      Text(_ticket!.rejectionReason!, style: const TextStyle(fontSize: 13, color: Color(0xFF991B1B))),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-
-                              // Discussion Messages
-                              const Text('Responses & Conversation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
-                              const SizedBox(height: 10),
-                              if (_ticket!.messages.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: Center(child: Text('No responses yet', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12))),
-                                )
-                              else
-                                ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _ticket!.messages.length,
-                                  separatorBuilder: (context, index) => const SizedBox(height: 10),
-                                  itemBuilder: (context, index) {
-                                    final msg = _ticket!.messages[index];
-                                    final isStaff = msg.senderRole == 'ADMINISTRATOR' || msg.senderRole == 'COURSE_MANAGER';
-                                    return Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: isStaff ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: isStaff ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text('${msg.senderName} (${msg.senderRole})', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isStaff ? const Color(0xFF166534) : const Color(0xFF0F172A))),
-                                              Text(msg.createdAt, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                                            ],
+                                          Text(
+                                            '${msg.senderName} (${msg.senderRole})',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                              color: isStaff
+                                                  ? const Color(0xFF166534)
+                                                  : const Color(0xFF0F172A),
+                                            ),
                                           ),
-                                          const SizedBox(height: 6),
-                                          Text(msg.message, style: const TextStyle(fontSize: 13, color: Color(0xFF334155))),
+                                          Text(
+                                            msg.createdAt,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Color(0xFF94A3B8),
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                    );
-                                  },
-                                ),
-                            ],
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        msg.message,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF334155),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  // Reply Box
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _replyController,
+                          decoration: InputDecoration(
+                            hintText: 'Type your message...',
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            fillColor: const Color(0xFFF8FAFC),
+                            filled: true,
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 16),
-                      // Reply Box
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _replyController,
-                              decoration: InputDecoration(
-                                hintText: 'Type your message...',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                fillColor: const Color(0xFFF8FAFC),
-                                filled: true,
-                              ),
-                            ),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: _isSending ? null : _sendReply,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
                           ),
-                          const SizedBox(width: 10),
-                          ElevatedButton(
-                            onPressed: _isSending ? null : _sendReply,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF28B79B),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: _isSending ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Send'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ],
+                        ),
+                        child: _isSending
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Send'),
                       ),
                     ],
                   ),
+                ],
+              ),
       ),
     );
   }
