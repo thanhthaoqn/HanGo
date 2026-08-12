@@ -10,36 +10,36 @@ import jakarta.validation.constraints.Size;
 @AllArgsConstructor
 public class CourseLessonDTO {
     private Long id;
-    
+
     @NotBlank(message = "Lesson title cannot be blank")
     @Size(max = 100, message = "Lesson title cannot exceed 100 characters")
     private String title;
-    
+
     private Integer orderIndex;
     private String itemType;
     private Long examId;
     private Integer questionCount;
     private Boolean isCompleted;
     private java.util.List<QuizQuestionDTO> questions;
-    
+
     @Size(max = 500, message = "Lesson description cannot exceed 500 characters")
     private String description;
-    
+
     private String questionText;
     private String pdfName;
     private String questionImageUrl;
     private Integer estimatedTime;
 
     // Added fields
-    @Size(max = 20, message = "Lesson code cannot exceed 20 characters")
+    @Size(max = 100, message = "Lesson code cannot exceed 100 characters")
     private String lessonCode;
-    
+
     private Integer mediaDurationSeconds;
     private Long mediaSizeBytes;
     private Integer estimatedTimeMinutes;
-    
+
     @Size(max = 1000, message = "Learning objectives cannot exceed 1000 characters")
     private String learningObjectives;
-    
+
     private String videoTranscript;
 }

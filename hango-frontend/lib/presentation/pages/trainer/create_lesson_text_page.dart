@@ -959,8 +959,8 @@ class _CreateLessonTextPageState extends State<CreateLessonTextPage> {
           TextFormField(
             controller: _codeController,
             validator: (value) {
-              if (value != null && value.trim().length > 20) {
-                return 'Lesson code cannot exceed 20 characters';
+              if (value != null && value.trim().length > 100) {
+                return 'Lesson code cannot exceed 100 characters';
               }
               return null;
             },
