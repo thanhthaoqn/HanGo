@@ -17,7 +17,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/management/tickets")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMINISTRATOR', 'TRAINER_LEAD', 'COURSE_MANAGER')")
+@PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
 public class ManagementTicketController {
 
     private final TicketService ticketService;

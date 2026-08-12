@@ -67,19 +67,9 @@ public class TicketServiceImpl implements TicketService {
 
         ticket = ticketRepository.save(ticket);
 
-        // Add initial description as first message
-        TicketMessage firstMsg = TicketMessage.builder()
-                .ticket(ticket)
-                .sender(user)
-                .senderRole(userRole)
-                .message(description)
-                .build();
-
-        ticketMessageRepository.save(firstMsg);
-
-        // Notify Course Managers
+        // Notify System Administrators
         try {
-            notificationService.notifyRole("TRAINER_LEAD", "TicketCreated", "New Support Ticket: " + ticketCode, title, null);
+            notificationService.notifyRole("ADMINISTRATOR", "TicketCreated", "New Support Ticket: " + ticketCode, title, null);
         } catch (Exception e) {
             System.err.println("Failed to send notification for ticket: " + e.getMessage());
         }
@@ -117,9 +107,8 @@ public class TicketServiceImpl implements TicketService {
         User user = userRepository.findById(userId).orElse(null);
         boolean isStaff = user != null && user.getRoles() != null &&
                 user.getRoles().stream().anyMatch(r -> 
-                    "ADMINISTRATOR".equalsIgnoreCase(r.getRoleName()) || 
-                    "TRAINER_LEAD".equalsIgnoreCase(r.getRoleName()) || 
-                    "COURSE_MANAGER".equalsIgnoreCase(r.getRoleName())
+                    "ADMINISTRATOR".equalsIgnoreCase(r.getRoleName()) ||
+                    (r.getRoleName() != null && r.getRoleName().contains("ADMIN"))
                 );
 
         if (!isStaff && !ticket.getUser().getId().equals(userId)) {
@@ -154,6 +143,24 @@ public class TicketServiceImpl implements TicketService {
         User sender = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        boolean isStaff = sender.getRoles() != null &&
+                sender.getRoles().stream().anyMatch(r ->
+                        "ADMINISTRATOR".equalsIgnoreCase(r.getRoleName()) ||
+                        (r.getRoleName() != null && r.getRoleName().contains("ADMIN"))
+                );
+
+        if (message == null || message.trim().isEmpty()) {
+            throw new RuntimeException("Message content cannot be empty");
+        }
+
+        if ("APPROVED".equalsIgnoreCase(ticket.getStatus()) || "REJECTED".equalsIgnoreCase(ticket.getStatus())) {
+            throw new RuntimeException("Cannot reply to a closed ticket");
+        }
+
+        if (!isStaff && !ticket.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Access denied: You do not have permission to reply to this ticket");
+        }
+
         String senderRole = "LEARNER";
         if (sender.getRoles() != null && !sender.getRoles().isEmpty()) {
             senderRole = sender.getRoles().iterator().next().getRoleName();
@@ -175,6 +182,28 @@ public class TicketServiceImpl implements TicketService {
         }
         ticketRepository.save(ticket);
 
+        try {
+            if (isStaff) {
+                notificationService.notifyUser(
+                        ticket.getUser(),
+                        "TicketResponse",
+                        "New Response on Ticket #" + ticket.getTicketCode(),
+                        sender.getFullName() + " (Admin): " + message,
+                        null
+                );
+            } else {
+                notificationService.notifyRole(
+                        "ADMINISTRATOR",
+                        "TicketResponse",
+                        "New Message on Ticket #" + ticket.getTicketCode(),
+                        sender.getFullName() + " (Trainer): " + message,
+                        null
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to send notification for ticket message: " + e.getMessage());
+        }
+
         return mapToMessageDTO(msg);
     }
 
@@ -184,22 +213,6 @@ public class TicketServiceImpl implements TicketService {
         String filterStatus = (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) ? status.toUpperCase() : null;
         String filterCategory = (category != null && !category.isBlank() && !"ALL".equalsIgnoreCase(category)) ? category.toUpperCase() : null;
         String filterKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
-
-        // Role-based Category Routing
-        if (currentUserId != null) {
-            User user = userRepository.findById(currentUserId).orElse(null);
-            if (user != null && user.getRoles() != null) {
-                boolean isAdmin = user.getRoles().stream()
-                        .anyMatch(r -> r.getRoleName() != null && (r.getRoleName().contains("ADMIN") || r.getRoleName().contains("ADMINISTRATOR")));
-                boolean isCourseManager = user.getRoles().stream()
-                        .anyMatch(r -> r.getRoleName() != null && (r.getRoleName().contains("MANAGER") || r.getRoleName().contains("TRAINER_LEAD")));
-
-                // If user is Course Manager (and not Admin), allow all operational and settlement categories
-                if (isCourseManager && !isAdmin && filterCategory == null) {
-                    // Allowed for CM: CONTENT_ISSUE, GENERAL_ENQUIRY, REVENUE_STATEMENT_DISPUTE
-                }
-            }
-        }
 
         Page<Ticket> page = ticketRepository.findAllFiltered(filterStatus, filterCategory, filterKeyword, pageable);
         return page.map(this::mapToDTO);
@@ -214,17 +227,7 @@ public class TicketServiceImpl implements TicketService {
         User manager = userRepository.findById(managerUserId)
                 .orElseThrow(() -> new RuntimeException("Manager not found"));
 
-        // RBAC Enforcement: Course Manager handles Content, General Enquiries, and Revenue Settlement Disputes.
-        // System Admin handles Bank/Tax Updates and Course Refunds.
-        boolean isManagerAdmin = manager.getRoles() != null && manager.getRoles().stream()
-                .anyMatch(r -> r.getRoleName() != null && (r.getRoleName().contains("ADMIN") || r.getRoleName().contains("ADMINISTRATOR")));
 
-        if (!isManagerAdmin) {
-            String cat = ticket.getCategory();
-            if ("PAYOUT_INFO_UPDATE".equalsIgnoreCase(cat) || "REFUND_REQUEST".equalsIgnoreCase(cat)) {
-                throw new RuntimeException("Course Manager is not authorized to process Bank/Tax Info Updates or Refund Requests. Assigned to System Admin.");
-            }
-        }
 
         ticket.setProcessedBy(manager);
         ticket.setProcessedAt(LocalDateTime.now());
@@ -234,7 +237,7 @@ public class TicketServiceImpl implements TicketService {
             if (dto.getAdminResponse() != null && !dto.getAdminResponse().isBlank()) {
                 ticket.setAdminResponse(dto.getAdminResponse());
             } else {
-                ticket.setAdminResponse("Ticket approved by manager.");
+                ticket.setAdminResponse("Ticket approved by administrator.");
             }
         } else if ("REJECT".equalsIgnoreCase(dto.getAction())) {
             ticket.setStatus("REJECTED");
@@ -242,23 +245,15 @@ public class TicketServiceImpl implements TicketService {
             if (dto.getAdminResponse() != null && !dto.getAdminResponse().isBlank()) {
                 ticket.setAdminResponse(dto.getAdminResponse());
             } else {
-                ticket.setAdminResponse("Ticket rejected by manager.");
+                ticket.setAdminResponse(null);
             }
         }
 
         ticket = ticketRepository.save(ticket);
 
         String responseText = "APPROVE".equalsIgnoreCase(dto.getAction())
-                ? "Ticket approved by " + manager.getFullName() + ": " + ticket.getAdminResponse()
-                : "Ticket rejected by " + manager.getFullName() + ". Reason: " + (dto.getRejectionReason() != null ? dto.getRejectionReason() : "N/A");
-
-        TicketMessage msg = TicketMessage.builder()
-                .ticket(ticket)
-                .sender(manager)
-                .senderRole("ADMINISTRATOR")
-                .message(responseText)
-                .build();
-        ticketMessageRepository.save(msg);
+                ? "Ticket approved: " + (ticket.getAdminResponse() != null ? ticket.getAdminResponse() : "Approved")
+                : "Ticket rejected. Reason: " + (dto.getRejectionReason() != null ? dto.getRejectionReason() : "N/A");
 
         try {
             String title = "APPROVE".equalsIgnoreCase(dto.getAction()) ? "Support Ticket Approved" : "Support Ticket Rejected";
@@ -282,7 +277,22 @@ public class TicketServiceImpl implements TicketService {
 
     private TicketResponseDTO mapToDTO(Ticket ticket) {
         List<TicketMessage> messages = ticketMessageRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId());
-        List<TicketMessageDTO> messageDTOs = messages.stream().map(this::mapToMessageDTO).toList();
+        String ticketDesc = ticket.getDescription() != null ? ticket.getDescription().trim() : "";
+        List<TicketMessageDTO> messageDTOs = messages.stream()
+                .filter(msg -> {
+                    if (msg.getMessage() == null) return false;
+                    String text = msg.getMessage().trim();
+                    if (text.equalsIgnoreCase(ticketDesc)) return false;
+                    if (text.startsWith("Ticket approved by ") || text.startsWith("Ticket rejected by ")) return false;
+                    return true;
+                })
+                .map(this::mapToMessageDTO)
+                .toList();
+
+        String cleanAdminResponse = ticket.getAdminResponse();
+        if (cleanAdminResponse != null && (cleanAdminResponse.startsWith("Ticket rejected") || "REJECTED".equalsIgnoreCase(ticket.getStatus()))) {
+            cleanAdminResponse = null;
+        }
 
         return TicketResponseDTO.builder()
                 .id(ticket.getId())
@@ -296,7 +306,7 @@ public class TicketServiceImpl implements TicketService {
                 .status(ticket.getStatus())
                 .title(ticket.getTitle())
                 .description(ticket.getDescription())
-                .adminResponse(ticket.getAdminResponse())
+                .adminResponse(cleanAdminResponse)
                 .rejectionReason(ticket.getRejectionReason())
                 .processedByName(ticket.getProcessedBy() != null ? ticket.getProcessedBy().getFullName() : null)
                 .processedAt(ticket.getProcessedAt())

@@ -30,7 +30,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _adminEmail = 'thao@hango.edu';
   String _adminInitials = 'T';
   String _adminAvatarUrl = '';
-  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Comment, 5: Profile, 6: Approvals, 7: Audit Log
+  int _selectedMenuIndex = 0; // 0: Dashboard, 1: Accounts, 2: AI Analytics, 3: Roles, 4: Comment, 5: Profile, 6: Approvals, 7: Audit Log, 8: Support Tickets
   String _currentCommentTab = 'Lesson';
 
   // Notification bell state
@@ -1770,14 +1770,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   title: 'Comment',
                   isMobileDrawer: isMobileDrawer,
                 ),
-                const SizedBox(height: 8),
                 _buildSidebarMenuItem(
                   index: 6,
                   icon: Icons.rate_review_outlined,
                   title: 'Approvals',
                   isMobileDrawer: isMobileDrawer,
                 ),
-
+                _buildSidebarMenuItem(
+                  index: 7,
+                  icon: Icons.history_outlined,
+                  title: 'Audit Log',
+                  isMobileDrawer: isMobileDrawer,
+                ),
+                const SizedBox(height: 8),
+                _buildSidebarMenuItem(
+                  index: 8,
+                  icon: Icons.confirmation_number_outlined,
+                  title: 'Support Tickets',
+                  isMobileDrawer: isMobileDrawer,
+                ),
 
                 const Spacer(),
                 const Divider(color: Color(0xFFE5E7EB)),
@@ -1873,6 +1884,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         return const AdminTrainerReviewsPage();
       case 7:
         return _buildAuditLogTab();
+      case 8:
+        return const ManagementTicketsPage(isEmbedded: true);
       default:
         return _buildDashboardTab(isDesktop);
     }

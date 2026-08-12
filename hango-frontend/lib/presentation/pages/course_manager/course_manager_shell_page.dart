@@ -7,7 +7,6 @@ import 'course_manager_exams_page.dart';
 import 'course_manager_matrix_management_page.dart';
 import 'course_manager_question_bank_page.dart';
 import 'course_manager_settlement_page.dart';
-import '../ticket/management_tickets_page.dart';
 
 /// Tab order for the shell's [IndexedStack], matching the route keys
 /// [CourseManagerSidebar] already uses for its `currentRoute`/`onSelectRoute`.
@@ -18,7 +17,6 @@ const List<String> _kCourseManagerShellRoutes = [
   'matrix',
   'question_bank',
   'settlement',
-  'support',
 ];
 
 /// Persistent shell for the Course Manager role: keeps a single header and
@@ -44,7 +42,6 @@ class CourseManagerShellPageState extends State<CourseManagerShellPage> {
     CourseManagerMatrixManagementPage(isEmbedded: true),
     CourseManagerQuestionBankPage(isEmbedded: true),
     CourseManagerSettlementPage(isEmbedded: true),
-    ManagementTicketsPage(isEmbedded: true),
   ];
 
   late int _currentIndex;

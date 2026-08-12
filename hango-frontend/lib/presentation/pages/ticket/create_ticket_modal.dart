@@ -50,11 +50,6 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
     final title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
 
-    if (title.isEmpty || description.isEmpty) {
-      ToastHelper.showError(context, 'Please enter title and description.');
-      return;
-    }
-
     setState(() {
       _isLoading = true;
     });
@@ -210,7 +205,11 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                     fillColor: const Color(0xFFF8FAFC),
                     filled: true,
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Title is required.'
+                      : (v.trim().length < 5)
+                          ? 'Title must be at least 5 characters.'
+                          : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -246,7 +245,11 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                     fillColor: const Color(0xFFF8FAFC),
                     filled: true,
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Description is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Description is required.'
+                      : (v.trim().length < 10)
+                          ? 'Description must be at least 10 characters.'
+                          : null,
                 ),
                 const SizedBox(height: 12),
 
