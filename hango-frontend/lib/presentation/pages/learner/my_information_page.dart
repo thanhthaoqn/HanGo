@@ -253,7 +253,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
           _buildSidebarTabButton(
             index: 2,
             icon: Icons.receipt_long_rounded,
-            label: isVi ? 'Lịch sử mua hàng' : 'Purchase History',
+            label: 'Purchase History',
             isDesktop: isDesktop,
           ),
         ],
@@ -1723,8 +1723,6 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final isVi = LanguageManager.isVi;
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1745,9 +1743,9 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                isVi ? 'Lịch sử mua hàng' : 'Purchase History',
-                style: const TextStyle(
+              const Text(
+                'Purchase History',
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E293B),
@@ -1760,7 +1758,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                   Icons.refresh_rounded,
                   color: Color(0xFF28B79B),
                 ),
-                tooltip: isVi ? 'Tải lại' : 'Refresh',
+                tooltip: 'Refresh',
               ),
             ],
           ),
@@ -1801,9 +1799,9 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF28B79B),
                           ),
-                          child: Text(
-                            isVi ? 'Thử lại' : 'Retry',
-                            style: const TextStyle(color: Colors.white),
+                          child: const Text(
+                            'Retry',
+                            style: TextStyle(color: Colors.white),
                           ),
                         ),
                       ],
@@ -1823,11 +1821,9 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                           color: Color(0xFF94A3B8),
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          isVi
-                              ? 'Chưa có lịch sử mua hàng nào.'
-                              : 'No purchase history available.',
-                          style: const TextStyle(
+                        const Text(
+                          'No purchase history available.',
+                          style: TextStyle(
                             color: Color(0xFF64748B),
                             fontFamily: 'Outfit',
                             fontSize: 15,
@@ -1850,8 +1846,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                             _historyList[index] as Map<String, dynamic>;
                         final txnRef = item['txnRef'] ?? '${item['id']}';
                         final courseTitle =
-                            item['courseTitle'] ??
-                            (isVi ? 'Khóa học' : 'Course');
+                            item['courseTitle'] ?? 'Course';
                         final courseThumbnail =
                             item['courseThumbnail'] as String?;
                         final amount = item['amount'];
@@ -1925,7 +1920,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${isVi ? "Mã GD" : "Txn Ref"}: #$txnRef${bankCode != null && bankCode.isNotEmpty ? (isVi ? ' · Phương thức: ' : ' · Method: ') + bankCode : ''} · ${isVi ? "Ngày" : "Date"}: ${_formatDate(date)}',
+                                      'Txn Ref: #$txnRef${bankCode != null && bankCode.isNotEmpty ? " · Method: " + bankCode : ""} · Date: ${_formatDate(date)}',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: Color(0xFF64748B),
@@ -1965,9 +1960,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            isVi
-                                ? 'Trang ${_currentPage + 1} / $_totalPages (Tổng $_totalElements giao dịch)'
-                                : 'Page ${_currentPage + 1} of $_totalPages (Total $_totalElements transactions)',
+                            'Page ${_currentPage + 1} of $_totalPages (Total $_totalElements transactions)',
                             style: const TextStyle(
                               color: Color(0xFF64748B),
                               fontSize: 13,
@@ -1986,7 +1979,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                       }
                                     : null,
                                 icon: const Icon(Icons.chevron_left_rounded),
-                                tooltip: isVi ? 'Trang trước' : 'Previous page',
+                                tooltip: 'Previous page',
                               ),
                               IconButton(
                                 onPressed: _currentPage < _totalPages - 1
@@ -1998,7 +1991,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                       }
                                     : null,
                                 icon: const Icon(Icons.chevron_right_rounded),
-                                tooltip: isVi ? 'Trang sau' : 'Next page',
+                                tooltip: 'Next page',
                               ),
                             ],
                           ),
