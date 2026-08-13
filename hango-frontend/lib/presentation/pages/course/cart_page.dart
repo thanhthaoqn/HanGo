@@ -203,11 +203,11 @@ class _CartPageState extends State<CartPage> {
       return;
     }
 
-    final unpaidCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price > 0).toList();
-    final freeCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price <= 0).toList();
+    final unpaidCourses = _cartCourses.where((c) => c.price > 0).toList();
+    final freeCourses = _cartCourses.where((c) => c.price <= 0).toList();
 
     if (unpaidCourses.isEmpty && freeCourses.isEmpty) {
-      ToastHelper.show(context, 'All courses in cart are already enrolled');
+      ToastHelper.show(context, 'Your cart is empty');
       return;
     }
 
@@ -257,6 +257,7 @@ class _CartPageState extends State<CartPage> {
           for (final c in courses) {
             await prefs.setBool('enrolled_course_id_${c.id}', true);
             cartIds.remove(c.id.toString());
+            await CartManager.removeFromCart(c.id);
           }
           await CartManager.setCartIds(cartIds);
           await CartManager.updateCount();
