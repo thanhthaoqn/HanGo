@@ -3,7 +3,6 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'course_manager_edit_exam_page.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/config.dart';
 import '../../../data/repositories/trainer_ai_recommendation_repository.dart';
@@ -13,7 +12,13 @@ import '../../../domain/model/trainer_ai_question_models.dart';
 class CourseManagerExamAiGeneratePage extends StatefulWidget {
   final VoidCallback onBack;
   final bool isCourseManager;
-  const CourseManagerExamAiGeneratePage({super.key, required this.onBack, this.isCourseManager = true});
+  final ValueChanged<Map<String, dynamic>> onExamCreated;
+  const CourseManagerExamAiGeneratePage({
+    super.key,
+    required this.onBack,
+    required this.onExamCreated,
+    this.isCourseManager = true,
+  });
 
   @override
   State<CourseManagerExamAiGeneratePage> createState() =>
@@ -124,18 +129,13 @@ class _CourseManagerExamAiGeneratePageState extends State<CourseManagerExamAiGen
 
       if (mounted) {
         ToastHelper.show(context, 'Exam created successfully!');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CourseManagerEditExamPage(
-              examId: newExamId,
-              examTitle: response.title,
-              examExpectedCount: response.expectedQuestionCount,
-              isCourseManager: widget.isCourseManager,
-              initialAiData: response,
-            ),
-          ),
-        );
+        widget.onExamCreated({
+          'id': newExamId,
+          'title': response.title,
+          'expectedQuestionCount': response.expectedQuestionCount,
+          'status': 'DRAFT',
+          'aiData': response,
+        });
       }
     } catch (e) {
       if (mounted) {

@@ -42,10 +42,10 @@ class HangoApi {
   Future<dynamic> _send(Future<http.Response> request) async {
     late final http.Response response;
     try {
-      response = await request.timeout(const Duration(seconds: 18));
+      response = await request.timeout(const Duration(seconds: 60));
     } on Exception {
       throw const ApiFailure(
-        'Không kết nối được backend. Kiểm tra server Spring Boot và base URL.',
+        'Failed to connect to backend. Please check Spring Boot server and base URL.',
       );
     }
 
@@ -63,9 +63,9 @@ class HangoApi {
       return body['message'] as String? ??
           body['error'] as String? ??
           body['detail'] as String? ??
-          'Yêu cầu chưa thành công.';
+          'Request failed.';
     }
-    return 'Yêu cầu chưa thành công.';
+    return 'Request failed.';
   }
 
   Future<AuthSession> login({
@@ -197,6 +197,16 @@ class HangoApi {
         .toList();
   }
 
+  Future<void> updateExamInfo(int examId, Map<String, dynamic> data) async {
+    await _send(
+      http.put(
+        _uri('/api/v1/trainer/exams/$examId/info'),
+        headers: _headers,
+        body: jsonEncode(data),
+      ),
+    );
+  }
+
   // 🟢 ĐÃ SỬA: Thêm /v1 vào endpoint lấy trạng thái sức khỏe AI
   Future<AiHealth> aiStatus() async {
     final body = await _send(
@@ -259,7 +269,11 @@ class HangoApi {
         .toList();
   }
 
-  Future<void> toggleQuestionStatus(int questionId, String newStatus, {bool isGroup = false}) async {
+  Future<void> toggleQuestionStatus(
+    int questionId,
+    String newStatus, {
+    bool isGroup = false,
+  }) async {
     final queryParams = {'status': newStatus, 'isGroup': isGroup.toString()};
     final baseUri = _uri('/api/v1/trainer/question-bank/$questionId/status');
     final uri = Uri(
@@ -272,7 +286,10 @@ class HangoApi {
     await _send(http.patch(uri, headers: _headers));
   }
 
-  Future<Map<String, dynamic>> getCourseManagerQuestionDetail(int id, {bool isGroup = false}) async {
+  Future<Map<String, dynamic>> getCourseManagerQuestionDetail(
+    int id, {
+    bool isGroup = false,
+  }) async {
     final queryParams = {'isGroup': isGroup.toString()};
     final baseUri = _uri('/api/v1/trainer/question-bank/detail/$id');
     final uri = Uri(
@@ -286,7 +303,11 @@ class HangoApi {
     return body as Map<String, dynamic>;
   }
 
-  Future<void> updateCourseManagerQuestionGroup(int id, Map<String, dynamic> payload, {bool isGroup = false}) async {
+  Future<void> updateCourseManagerQuestionGroup(
+    int id,
+    Map<String, dynamic> payload, {
+    bool isGroup = false,
+  }) async {
     final queryParams = {'isGroup': isGroup.toString()};
     final baseUri = _uri('/api/v1/trainer/question-bank/$id');
     final uri = Uri(
@@ -296,30 +317,33 @@ class HangoApi {
       path: baseUri.path,
       queryParameters: queryParams,
     );
-    await _send(
-      http.put(
-        uri,
-        headers: _headers,
-        body: jsonEncode(payload),
-      ),
-    );
+    await _send(http.put(uri, headers: _headers, body: jsonEncode(payload)));
   }
 
   Future<List<Map<String, dynamic>>> getSystemParameters(String type) async {
     final body = await _send(
-      http.get(_uri('/api/v1/metadata/parameters?type=$type'), headers: _headers),
+      http.get(
+        _uri('/api/v1/metadata/parameters?type=$type'),
+        headers: _headers,
+      ),
     );
-    return (body as List? ?? const []).whereType<Map<String, dynamic>>().toList();
+    return (body as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   Future<List<Map<String, dynamic>>> getQuestionCategories() async {
     final body = await _send(
       http.get(_uri('/api/v1/metadata/categories'), headers: _headers),
     );
-    return (body as List? ?? const []).whereType<Map<String, dynamic>>().toList();
+    return (body as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
-  Future<void> createCourseManagerQuestionGroup(Map<String, dynamic> payload) async {
+  Future<void> createCourseManagerQuestionGroup(
+    Map<String, dynamic> payload,
+  ) async {
     await _send(
       http.post(
         _uri('/api/v1/trainer/question-bank'),
@@ -329,7 +353,10 @@ class HangoApi {
     );
   }
 
-  Future<void> saveExamQuestions(int examId, Map<String, dynamic> payload) async {
+  Future<void> saveExamQuestions(
+    int examId,
+    Map<String, dynamic> payload,
+  ) async {
     await _send(
       http.post(
         _uri('/api/v1/trainer/exams/$examId/questions'),
@@ -361,25 +388,26 @@ class HangoApi {
 
   /// Upload an Excel file to import exams and questions.
   /// Returns the server response map.
-  Future<Map<String, dynamic>> importExamExcel(Uint8List fileBytes, String fileName) async {
+  Future<Map<String, dynamic>> importExamExcel(
+    Uint8List fileBytes,
+    String fileName,
+  ) async {
     final uri = _uri('/api/v1/trainer/exams/import-excel-multiple');
     final request = http.MultipartRequest('POST', uri);
     if (token != null && token!.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
     }
-    
+
     request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        fileBytes,
-        filename: fileName,
-      ),
+      http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
     );
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
-    
-    final body = response.body.isEmpty ? null : jsonDecode(utf8.decode(response.bodyBytes));
+
+    final body = response.body.isEmpty
+        ? null
+        : jsonDecode(utf8.decode(response.bodyBytes));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiFailure(_errorMessage(body), statusCode: response.statusCode);
     }
@@ -402,7 +430,9 @@ class HangoApi {
       ),
     );
     // Assuming backend returns the created exam with an 'id' field
-    if (body != null && body is Map<String, dynamic> && body.containsKey('id')) {
+    if (body != null &&
+        body is Map<String, dynamic> &&
+        body.containsKey('id')) {
       return body['id'] as int;
     }
     throw const ApiFailure('Cannot retrieve ID of created exam');
@@ -414,7 +444,10 @@ class HangoApi {
       headers: _headers,
     );
     if (response.statusCode >= 400) {
-      throw ApiFailure('Failed to download template', statusCode: response.statusCode);
+      throw ApiFailure(
+        'Failed to download template',
+        statusCode: response.statusCode,
+      );
     }
     return response.bodyBytes;
   }
@@ -425,43 +458,50 @@ class HangoApi {
       headers: _headers,
     );
     if (response.statusCode >= 400) {
-      throw ApiFailure('Failed to download template', statusCode: response.statusCode);
+      throw ApiFailure(
+        'Failed to download template',
+        statusCode: response.statusCode,
+      );
     }
     return response.bodyBytes;
   }
 
   Future<void> deleteExam(int id) async {
     await _send(
-      http.delete(
-        _uri('/api/v1/trainer/exams/$id'),
-        headers: _headers,
-      ),
+      http.delete(_uri('/api/v1/trainer/exams/$id'), headers: _headers),
     );
   }
+
   Future<List<Map<String, dynamic>>> getExamMatrices() async {
     final response = await http.get(
       _uri('/trainer/matrices'),
       headers: _headers,
     );
     if (response.statusCode >= 400) {
-      throw ApiFailure('Failed to get matrices', statusCode: response.statusCode);
+      throw ApiFailure(
+        'Failed to get matrices',
+        statusCode: response.statusCode,
+      );
     }
     final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
     return data.cast<Map<String, dynamic>>();
   }
 
   Future<int> generateExamFromMatrix(
-      int matrixId,
-      String? title,
-      String? description,
-      int? durationMinutes,
-      int? expectedQuestionCount,
-      double? passingScore) async {
+    int matrixId,
+    String? title,
+    String? description,
+    int? durationMinutes,
+    int? expectedQuestionCount,
+    double? passingScore,
+  ) async {
     final payload = {};
     if (title != null && title.isNotEmpty) payload['title'] = title;
-    if (description != null && description.isNotEmpty) payload['description'] = description;
+    if (description != null && description.isNotEmpty)
+      payload['description'] = description;
     if (durationMinutes != null) payload['durationMinutes'] = durationMinutes;
-    if (expectedQuestionCount != null) payload['expectedQuestionCount'] = expectedQuestionCount;
+    if (expectedQuestionCount != null)
+      payload['expectedQuestionCount'] = expectedQuestionCount;
     if (passingScore != null) payload['passingScore'] = passingScore;
 
     final body = await _send(
@@ -471,31 +511,46 @@ class HangoApi {
         body: jsonEncode(payload),
       ),
     );
-    if (body != null && body is Map<String, dynamic> && body.containsKey('examId')) {
+    if (body != null &&
+        body is Map<String, dynamic> &&
+        body.containsKey('examId')) {
       return body['examId'] as int;
     }
     throw const ApiFailure('Cannot retrieve ID of generated exam');
   }
 
-  Future<Map<String, dynamic>> createExamMatrix(Map<String, dynamic> data) async {
-    final response = await _send(http.post(
-      _uri('/trainer/matrices'),
-      headers: _headers,
-      body: jsonEncode(data),
-    ));
+  Future<Map<String, dynamic>> createExamMatrix(
+    Map<String, dynamic> data,
+  ) async {
+    final response = await _send(
+      http.post(
+        _uri('/trainer/matrices'),
+        headers: _headers,
+        body: jsonEncode(data),
+      ),
+    );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return jsonDecode(utf8.decode(response.bodyBytes))
+          as Map<String, dynamic>;
     } else {
       throw ApiFailure('Failed to create matrix: ${response.statusCode}');
     }
   }
 
-  Future<int> countAvailableQuestions(int skillId, int diffId, int catId) async {
-    final response = await _send(http.get(
-      _uri('/trainer/matrices/count-available?skillId=$skillId&diffId=$diffId&catId=$catId'),
-      headers: _headers,
-    ));
+  Future<int> countAvailableQuestions(
+    int skillId,
+    int diffId,
+    int catId,
+  ) async {
+    final response = await _send(
+      http.get(
+        _uri(
+          '/trainer/matrices/count-available?skillId=$skillId&diffId=$diffId&catId=$catId',
+        ),
+        headers: _headers,
+      ),
+    );
 
     if (response.statusCode == 200) {
       final json = jsonDecode(utf8.decode(response.bodyBytes));

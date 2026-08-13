@@ -401,6 +401,22 @@ class CourseManagerApi {
     }
   }
 
+  Future<void> updateExamInfo(int examId, Map<String, dynamic> data) async {
+    final token = await _requireToken();
+    final uri = Uri.parse('${EnvConfig.apiBaseUrl}/api/v1/trainer/exams/$examId/info');
+    final response = await http.put(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(data),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update exam info: ${response.statusCode}');
+    }
+  }
+
   Future<http.Response> _get(
     String path, {
     Map<String, String>? queryParameters,

@@ -13,6 +13,8 @@ public class ExamResponseDTO {
     private String creatorName;
     private Long creatorId;
     private Integer questionCount;
+    private Integer expectedQuestionCount;
+    private Double passingScore;
     private Integer durationMinutes;
     private Double rating;
     private String learnerCountFormatted;

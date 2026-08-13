@@ -42,6 +42,9 @@ public class ExamImportController {
 
         int totalExamsCreated = 0;
         int totalQuestionsImported = 0;
+        Long firstExamId = null;
+        String firstExamTitle = null;
+        Integer firstExamExpectedCount = null;
 
         try (InputStream is = file.getInputStream();
                 Workbook workbook = new XSSFWorkbook(is)) {
@@ -106,6 +109,11 @@ public class ExamImportController {
                 if (examKey != null) {
                     examCodeToId.put(examCode, examKey.longValue());
                     totalExamsCreated++;
+                    if (firstExamId == null) {
+                        firstExamId = examKey.longValue();
+                        firstExamTitle = title;
+                        firstExamExpectedCount = qCount;
+                    }
                     System.out.println("Created exam: " + examCode + " with ID: " + examKey.longValue());
                 }
             }
@@ -152,21 +160,13 @@ public class ExamImportController {
                     Long groupId = null;
                     Row firstRow = rows.get(0);
 
-                    String skillStr = getCellString(firstRow, 10);
-                    String diffStr = getCellString(firstRow, 11);
+                    // Group Type describes the passage as a whole, so it's read once from
+                    // the group's first row. Skill/Difficulty are per-question properties
+                    // (each row is its own record per the import guidelines) and must be
+                    // read from every row below, not copied from the first row of the group.
                     String groupTypeStr = getCellString(firstRow, 12);
-
-                    Long skillParamId = resolveSystemParam(skillStr);
-                    Long difficultyId = resolveSystemParam(diffStr);
                     Long groupTypeId = resolveSystemParam(groupTypeStr);
                     Long categoryId = null; // Excel does not provide category
-
-                    if (skillParamId == null)
-                        throw new IllegalArgumentException(
-                                "Invalid Skill Type '" + skillStr + "' at Exam " + currentExamCode);
-                    if (difficultyId == null)
-                        throw new IllegalArgumentException(
-                                "Invalid Difficulty '" + diffStr + "' at Exam " + currentExamCode);
 
                     if (isGroup) {
                         if (groupTypeId == null)
@@ -204,6 +204,18 @@ public class ExamImportController {
                             throw new IllegalArgumentException(
                                     "Correct Answer must be A, B, C, or D in Exam " + currentExamCode);
                         }
+
+                        String skillStr = getCellString(row, 10);
+                        String diffStr = getCellString(row, 11);
+                        Long skillParamId = resolveSystemParam(skillStr);
+                        Long difficultyId = resolveSystemParam(diffStr);
+
+                        if (skillParamId == null)
+                            throw new IllegalArgumentException(
+                                    "Invalid Skill Type '" + skillStr + "' at Exam " + currentExamCode);
+                        if (difficultyId == null)
+                            throw new IllegalArgumentException(
+                                    "Invalid Difficulty '" + diffStr + "' at Exam " + currentExamCode);
 
                         final Long fGroupId = groupId;
                         final Long fSkill = skillParamId;
@@ -268,10 +280,19 @@ public class ExamImportController {
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to parse Excel: " + e.getMessage()));
         }
 
-        return ResponseEntity.ok(Map.of(
-                "message", "Import successful",
-                "totalExamsCreated", totalExamsCreated,
-                "totalQuestionsImported", totalQuestionsImported));
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("message", "Import successful");
+        responseBody.put("totalExamsCreated", totalExamsCreated);
+        responseBody.put("totalQuestionsImported", totalQuestionsImported);
+        // Only surface a single exam to open for verification when exactly
+        // one was created; with several exams there's no single obvious one
+        // to jump to, so the frontend falls back to the exam list.
+        if (totalExamsCreated == 1) {
+            responseBody.put("examId", firstExamId);
+            responseBody.put("examTitle", firstExamTitle);
+            responseBody.put("examExpectedQuestionCount", firstExamExpectedCount);
+        }
+        return ResponseEntity.ok(responseBody);
     }
 
     @GetMapping("/import-excel/template")

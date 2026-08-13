@@ -8,10 +8,14 @@ import '../../../utils/config.dart';
 
 class CourseManagerExamImportExcelPage extends StatefulWidget {
   final VoidCallback onBack;
+  final VoidCallback? onImportSuccess;
+  final ValueChanged<Map<String, dynamic>>? onExamCreated;
   final bool isCourseManager;
   const CourseManagerExamImportExcelPage({
     super.key,
     required this.onBack,
+    this.onImportSuccess,
+    this.onExamCreated,
     this.isCourseManager = true,
   });
 
@@ -83,13 +87,32 @@ class _CourseManagerExamImportExcelPageState
       final int examsCreated = response['totalExamsCreated'] as int? ?? 0;
       final int questionsImported =
           response['totalQuestionsImported'] as int? ?? 0;
+      final int? examId = response['examId'] as int?;
 
       if (mounted) {
         ToastHelper.show(
           context,
           'Successfully imported $examsCreated exams and $questionsImported questions!',
         );
-        Navigator.pop(context); // Go back to Exam List page
+        // This page is always embedded (no Scaffold/route of its own), so
+        // Navigator.pop here had no matching route to pop and silently did
+        // nothing. When exactly one exam was created, jump straight into
+        // its verify/edit view (same as the AI/matrix creation flows) so
+        // the user can review the imported questions right away; with
+        // several exams there's no single one to jump to, so fall back to
+        // the exam list.
+        if (examId != null && widget.onExamCreated != null) {
+          widget.onExamCreated!({
+            'id': examId,
+            'title': response['examTitle'] as String? ?? 'Imported Exam',
+            'expectedQuestionCount':
+                response['examExpectedQuestionCount'] as int? ??
+                questionsImported,
+            'status': 'DRAFT',
+          });
+        } else {
+          (widget.onImportSuccess ?? widget.onBack)();
+        }
       }
     } catch (e) {
       if (mounted)
@@ -117,7 +140,7 @@ class _CourseManagerExamImportExcelPageState
                 const SizedBox(width: 8),
                 const Flexible(
                   child: Text(
-                    'Import Exam by rExcel',
+                    'Import Exam by Excel',
                     style: TextStyle(
                       fontSize: 24,
                       color: Color(0xFF1E293B),
@@ -345,13 +368,15 @@ class _CourseManagerExamImportExcelPageState
                                                           0xFF64748B,
                                                         ),
                                                       ),
-                                                      Text(
-                                                        type,
-                                                        style: const TextStyle(
-                                                          fontSize: 14,
-                                                          fontFamily: 'Outfit',
-                                                          color: Color(
-                                                            0xFF475569,
+                                                      Expanded(
+                                                        child: Text(
+                                                          type,
+                                                          style: const TextStyle(
+                                                            fontSize: 14,
+                                                            fontFamily: 'Outfit',
+                                                            color: Color(
+                                                              0xFF475569,
+                                                            ),
                                                           ),
                                                         ),
                                                       ),

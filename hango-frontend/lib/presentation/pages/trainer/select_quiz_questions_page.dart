@@ -1444,7 +1444,13 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                             ),
                                           ),
                                           const SizedBox(height: 6),
-                                          Row(
+                                          // Badge group: use Wrap (not Row) so it reflows
+                                          // onto new lines instead of overflowing when there
+                                          // are many badges or the window is narrow.
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 6,
+                                            crossAxisAlignment: WrapCrossAlignment.center,
                                             children: [
                                               // Type badge
                                               Container(
@@ -1463,8 +1469,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                                   ),
                                                 ),
                                               ),
-                                              if (q['skillName'] != null) ...[
-                                                const SizedBox(width: 8),
+                                              if (q['skillName'] != null)
                                                 Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                   decoration: BoxDecoration(
@@ -1481,9 +1486,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                                     ),
                                                   ),
                                                 ),
-                                              ],
-                                              if (q['groupTypeName'] != null) ...[
-                                                const SizedBox(width: 8),
+                                              if (q['groupTypeName'] != null)
                                                 Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                   decoration: BoxDecoration(
@@ -1500,9 +1503,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                                     ),
                                                   ),
                                                 ),
-                                              ],
-                                              if (q['difficultyName'] != null) ...[
-                                                const SizedBox(width: 8),
+                                              if (q['difficultyName'] != null)
                                                 Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                                   decoration: BoxDecoration(
@@ -1519,8 +1520,6 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                                     ),
                                                   ),
                                                 ),
-                                              ],
-                                              const SizedBox(width: 8),
                                               // Options count badge
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

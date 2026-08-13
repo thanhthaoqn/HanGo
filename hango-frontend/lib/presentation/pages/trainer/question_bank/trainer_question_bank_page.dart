@@ -344,17 +344,17 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: !isDesktop
-          ? const Drawer(child: TrainerSidebar(activeIndex: 2))
+          ? const Drawer(child: TrainerSidebar(activeIndex: 3))
           : null,
       body: Row(
         children: [
           if (isDesktop)
-            const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
+            const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 3)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                InternalAppHeader(isMobile: !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
                 Expanded(child: _buildBodyContent(isDesktop)),
               ],
             ),
@@ -430,7 +430,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   builder: (context) => CourseManagerCreateQuestionPage(
                     question: q,
                     isReadOnly: true,
-                    isCourseManager: true,
+                    isCourseManager: false,
                   ),
                 ),
               );
@@ -442,7 +442,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   builder: (context) => CourseManagerCreateQuestionPage(
                     question: q,
                     isEdit: true,
-                    isCourseManager: true,
+                    isCourseManager: false,
                   ),
                 ),
               ).then((_) => _fetchQuestions());
@@ -482,19 +482,19 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   }
 
   Widget _buildWelcomeSection() {
-    return Row(
-      children: [
-        const Text(
-          'Question Bank',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
-            fontFamily: 'Outfit',
-          ),
-        ),
-        const Spacer(),
-        Wrap(
+    final title = const Text(
+      'Question Bank',
+      style: TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF1E293B),
+        fontFamily: 'Outfit',
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    final actionButtons = Wrap(
           spacing: 12,
           runSpacing: 12,
           children: [
@@ -570,7 +570,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const CourseManagerCreateQuestionPage(
-                      isCourseManager: true,
+                      isCourseManager: false,
                     ),
                   ),
                 ).then((_) => _fetchQuestions());
@@ -598,7 +598,26 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
               ),
             ),
           ],
-        ),
+        );
+
+    final isCompact = MediaQuery.of(context).size.width < 820;
+
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          title,
+          const SizedBox(height: 16),
+          actionButtons,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: title),
+        const SizedBox(width: 12),
+        actionButtons,
       ],
     );
   }

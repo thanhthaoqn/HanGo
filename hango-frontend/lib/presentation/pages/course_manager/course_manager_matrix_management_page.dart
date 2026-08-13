@@ -42,8 +42,8 @@ class _CourseManagerMatrixManagementPageState
     }).toList();
 
     filtered.sort((a, b) {
-      final dateA = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(2000);
-      final dateB = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(2000);
+      final dateA = _parseDate(a['createdAt']);
+      final dateB = _parseDate(b['createdAt']);
       return _sortBy == 'NEWEST' ? dateB.compareTo(dateA) : dateA.compareTo(dateB);
     });
 
@@ -78,10 +78,38 @@ class _CourseManagerMatrixManagementPageState
     }
   }
 
+  DateTime _parseDate(dynamic dateData) {
+    if (dateData == null) return DateTime(2000);
+    if (dateData is List && dateData.isNotEmpty) {
+      try {
+        return DateTime(
+          dateData.length > 0 ? (dateData[0] as num).toInt() : 2000,
+          dateData.length > 1 ? (dateData[1] as num).toInt() : 1,
+          dateData.length > 2 ? (dateData[2] as num).toInt() : 1,
+          dateData.length > 3 ? (dateData[3] as num).toInt() : 0,
+          dateData.length > 4 ? (dateData[4] as num).toInt() : 0,
+          dateData.length > 5 ? (dateData[5] as num).toInt() : 0,
+        );
+      } catch (e) {
+        return DateTime(2000);
+      }
+    }
+    return DateTime.tryParse(dateData.toString()) ?? DateTime(2000);
+  }
+
   String _formatDate(dynamic dateStr) {
     if (dateStr == null) return 'N/A';
     try {
-      final dateTime = DateTime.parse(dateStr.toString());
+      DateTime dateTime;
+      if (dateStr is List && dateStr.isNotEmpty) {
+        dateTime = DateTime(
+          dateStr.length > 0 ? (dateStr[0] as num).toInt() : 2000,
+          dateStr.length > 1 ? (dateStr[1] as num).toInt() : 1,
+          dateStr.length > 2 ? (dateStr[2] as num).toInt() : 1,
+        );
+      } else {
+        dateTime = DateTime.parse(dateStr.toString());
+      }
       return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
     } catch (e) {
       String str = dateStr.toString();

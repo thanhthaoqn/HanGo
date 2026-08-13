@@ -154,6 +154,14 @@ public class TrainerQuestionAIService {
             throw new ApiException("Chat history is required", HttpStatus.BAD_REQUEST);
         }
 
+        List<SystemParameter> activeSkills = systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE");
+        List<SystemParameter> activeGroupTypes = systemParameterRepository.findByParamTypeAndIsActiveTrue("GROUP_TYPE");
+        List<SystemParameter> activeDifficulties = systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY");
+
+        String skillOptionsText = activeSkills.stream().map(s -> s.getId() + "=" + s.getParamValue()).collect(Collectors.joining(", "));
+        String groupOptionsText = activeGroupTypes.stream().map(g -> g.getId() + "=" + g.getParamValue()).collect(Collectors.joining(", "));
+        String diffOptionsText = activeDifficulties.stream().map(d -> d.getId() + "=" + d.getParamValue()).collect(Collectors.joining(", "));
+
         String systemPrompt = "You are an expert English test question generator for HanGo trainer.\n" +
                 "Based on the chat history provided, generate a COMPLETE EXAM in JSON format.\n" +
                 "Return PURE JSON only (no markdown). Do NOT use unescaped control characters or literal newlines in JSON strings (use \\\\n instead).\n" +
@@ -188,9 +196,15 @@ public class TrainerQuestionAIService {
                 "    }\n" +
                 "  ]\n" +
                 "}\n" +
-                "categoryId can default to 1 (General). difficultyId can be 14 (Easy), 15 (Medium), 16 (Hard). skillParamId can be null if not specified.\n" +
-                "For group questions, set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array.\n" +
-                "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array.\n" +
+                "Available IDs:\n" +
+                "SKILLS (skillParamId): " + (skillOptionsText.isEmpty() ? "None available" : skillOptionsText) + "\n" +
+                "GROUP TYPES (categoryId): " + (groupOptionsText.isEmpty() ? "None available" : groupOptionsText) + "\n" +
+                "DIFFICULTIES (difficultyId): " + (diffOptionsText.isEmpty() ? "None available" : diffOptionsText) + "\n" +
+                "IMPORTANT: Choose the most appropriate IDs for skillParamId, categoryId, and difficultyId from the Available IDs based on the question content and user request.\n" +
+                "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array. " +
+                "For single questions, the categoryId is NOT used for GROUP TYPES, it defaults to a general category ID (like 1).\n" +
+                "For group questions (e.g. Reading, Listening), set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array. " +
+                "For group questions, categoryId MUST be one of the GROUP TYPES IDs provided above.\n" +
                 "Generate the EXACT number of questions and groups as discussed in the chat.";
 
         List<GeminiGenerateRequest.Content> contents = req.getHistory().stream()

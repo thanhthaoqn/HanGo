@@ -13,6 +13,10 @@ class ExamReviewDashboardDialog extends StatefulWidget {
   final int examId;
   final String examTitle;
   final int examExpectedCount;
+  final int examQuestionCount;
+  final int examDurationMinutes;
+  final String? examCreatedAt;
+  final String? examUpdatedAt;
   final String status;
   final bool isCourseManager;
   final VoidCallback onActionSuccess;
@@ -26,6 +30,10 @@ class ExamReviewDashboardDialog extends StatefulWidget {
     required this.examId,
     required this.examTitle,
     required this.examExpectedCount,
+    required this.examQuestionCount,
+    required this.examDurationMinutes,
+    this.examCreatedAt,
+    this.examUpdatedAt,
     required this.status,
     required this.isCourseManager,
     required this.onActionSuccess,
@@ -434,33 +442,69 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
       color: Colors.white,
       padding: const EdgeInsets.all(24),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Exam Review: ${widget.examTitle}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Outfit',
-                  color: Color(0xFF1E293B),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Exam Review: ${widget.examTitle}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Outfit',
+                    color: Color(0xFF1E293B),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
                   _buildStatusBadge(widget.status),
                   const SizedBox(width: 16),
                   Text(
-                    'Expected Questions: ${widget.examExpectedCount}',
+                    'Questions: ${widget.examQuestionCount}/${widget.examExpectedCount}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: Color(0xFF64748B),
                       fontFamily: 'Outfit',
                     ),
                   ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Duration: ${widget.examDurationMinutes}m',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF64748B),
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  if (widget.examCreatedAt != null) ...[
+                    const SizedBox(width: 16),
+                    Text(
+                      'Created: ${widget.examCreatedAt}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
+                  if (widget.examUpdatedAt != null) ...[
+                    const SizedBox(width: 16),
+                    Text(
+                      'Updated: ${widget.examUpdatedAt}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
                   if (widget.creatorId != null) ...[
                     const SizedBox(width: 16),
                     const Icon(
@@ -481,9 +525,11 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
                       ),
                     ),
                   ],
-                ],
-              ),
-            ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.close, color: Color(0xFF64748B)),
@@ -583,21 +629,25 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
                   ),
                 ),
                 if (categoryName != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      categoryName,
-                      style: const TextStyle(
-                        color: Color(0xFF4F46E5),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        categoryName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF4F46E5),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -682,7 +732,9 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
                     ),
                     if (skillName != null || diffName != null) ...[
                       const SizedBox(height: 8),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           if (skillName != null)
                             _buildTag(
@@ -690,8 +742,6 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
                               const Color(0xFFF0FDF4),
                               const Color(0xFF16A34A),
                             ),
-                          if (skillName != null && diffName != null)
-                            const SizedBox(width: 8),
                           if (diffName != null)
                             _buildTag(
                               diffName,
@@ -813,7 +863,10 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(24),
-      child: Row(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        reverse: true,
+        child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           TextButton(
@@ -827,7 +880,7 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
             ),
           ),
           if (_isOwnExam &&
-              widget.status.toUpperCase() == 'REJECTED' &&
+              ['REJECTED', 'PUBLISHED'].contains(widget.status.toUpperCase()) &&
               widget.onEditExam != null) ...[
             const SizedBox(width: 12),
             ElevatedButton.icon(
@@ -837,7 +890,7 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
               },
               icon: const Icon(Icons.edit, size: 18),
               label: const Text(
-                'Edit Exam',
+                'Update Exam',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
@@ -1018,6 +1071,7 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
             ),
           ],
         ],
+        ),
       ),
     );
   }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'course_manager_edit_exam_page.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
@@ -12,7 +11,15 @@ class CourseManagerExamMatrixPage extends StatefulWidget {
   final bool isCourseManager;
   final List<Map<String, dynamic>>? preloadedMatrices;
   final bool? isMatricesLoading;
-  const CourseManagerExamMatrixPage({super.key, required this.onBack, this.isCourseManager = false, this.preloadedMatrices, this.isMatricesLoading});
+  final ValueChanged<Map<String, dynamic>> onExamCreated;
+  const CourseManagerExamMatrixPage({
+    super.key,
+    required this.onBack,
+    required this.onExamCreated,
+    this.isCourseManager = false,
+    this.preloadedMatrices,
+    this.isMatricesLoading,
+  });
 
   @override
   State<CourseManagerExamMatrixPage> createState() => _CourseManagerExamMatrixPageState();
@@ -422,7 +429,7 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                   return _matrices.map<Widget>((e) {
                                     return Align(
                                       alignment: Alignment.centerLeft,
-                                      child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit'), overflow: TextOverflow.ellipsis),
+                                      child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit'), maxLines: 1, overflow: TextOverflow.ellipsis),
                                     );
                                   }).toList();
                                 },
@@ -432,7 +439,7 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                           child: Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Expanded(child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit'))),
+                                              Expanded(child: Text(e['title'] ?? 'Untitled', style: const TextStyle(fontFamily: 'Outfit'), maxLines: 1, overflow: TextOverflow.ellipsis)),
                                               IconButton(
                                                 icon: const Icon(Icons.remove_red_eye, color: Color(0xFF38C9A6)),
                                                 onPressed: () {
@@ -484,16 +491,21 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                       }
                                       if (mounted) {
                                         ToastHelper.show(context, 'Exam generated successfully!');
-                                        Navigator.pushReplacement(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => CourseManagerEditExamPage(
-                                              examId: examId,
-                                              examTitle: _titleController.text.trim(),
-                                              examExpectedCount: 0,
-                                            ),
-                                          ),
+                                        final selectedMatrix = _matrices.firstWhere(
+                                          (m) => m['id'].toString() == _selectedMatrixId,
+                                          orElse: () => {},
                                         );
+                                        final details = (selectedMatrix['details'] as List?) ?? [];
+                                        final totalQuestions = details.fold<int>(
+                                          0,
+                                          (sum, d) => sum + ((d['quantity'] ?? 0) as int),
+                                        );
+                                        widget.onExamCreated({
+                                          'id': examId,
+                                          'title': _titleController.text.trim(),
+                                          'expectedQuestionCount': totalQuestions,
+                                          'status': 'DRAFT',
+                                        });
                                       }
                                     } catch (e) {
                                       if (mounted) {
