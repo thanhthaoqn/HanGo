@@ -23,6 +23,10 @@ import com.hango.hango_backend.dto.PermissionDTO;
 import com.hango.hango_backend.dto.RolePermissionsUpdateRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -70,36 +74,48 @@ public class AdminController {
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getDashboardStats() {
         try {
-            long totalUsers = userRepository.count();
-            long totalRoles = roleRepository.count();
+            // Run all queries in parallel to avoid network latency accumulation
+            java.util.concurrent.CompletableFuture<Long> usersFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> userRepository.count());
+            java.util.concurrent.CompletableFuture<Long> rolesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> roleRepository.count());
+            java.util.concurrent.CompletableFuture<Long> coursesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> courseRepository.count());
+            java.util.concurrent.CompletableFuture<Long> enrollmentsFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> enrollmentRepository.count());
+            java.util.concurrent.CompletableFuture<List<TopCourseProjection>> topCoursesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> courseRepository.findTopCoursesByEnrollment(5));
+            
+            LocalDate today = LocalDate.now();
+            LocalDateTime startOf7DaysAgo = today.minusDays(6).atStartOfDay();
+            java.util.concurrent.CompletableFuture<List<Object[]>> weeklyStatsFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> userRepository.countUsersRegisteredByDate(startOf7DaysAgo));
+
+            // Wait for all queries to finish
+            java.util.concurrent.CompletableFuture.allOf(usersFuture, rolesFuture, coursesFuture, enrollmentsFuture, topCoursesFuture, weeklyStatsFuture).join();
 
             // Calculate weekly registration counts for the last 7 days
             List<String> labels = new ArrayList<>();
             List<Long> values = new ArrayList<>();
             DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("d/M");
-
-            LocalDate today = LocalDate.now();
-            List<User> allUsers = userRepository.findAll();
+            
+            List<Object[]> rawWeeklyStats = weeklyStatsFuture.get();
+            Map<String, Long> dateToCountMap = new HashMap<>();
+            for (Object[] row : rawWeeklyStats) {
+                if (row != null && row.length == 2 && row[0] != null && row[1] != null) {
+                    dateToCountMap.put(row[0].toString(), ((Number) row[1]).longValue());
+                }
+            }
 
             for (int i = 6; i >= 0; i--) {
                 LocalDate date = today.minusDays(i);
                 labels.add(date.format(labelFormatter));
-
-                long count = allUsers.stream()
-                        .filter(u -> u.getCreatedAt() != null && u.getCreatedAt().toLocalDate().equals(date))
-                        .count();
-                values.add(count);
+                
+                String dateStr = date.toString(); // SQL DATE() returns yyyy-MM-dd
+                values.add(dateToCountMap.getOrDefault(dateStr, 0L));
             }
 
-            long totalCourses = courseRepository.count();
-            long totalEnrollments = enrollmentRepository.count();
-            List<TopCourseProjection> topCourses = courseRepository.findTopCoursesByEnrollment(5);
+            List<TopCourseProjection> topCourses = topCoursesFuture.get();
 
             Map<String, Object> response = new HashMap<>();
-            response.put("totalUsers", totalUsers);
-            response.put("totalRoles", totalRoles);
-            response.put("totalCourses", totalCourses);
-            response.put("totalEnrollments", totalEnrollments);
+            response.put("totalUsers", usersFuture.get());
+            response.put("totalRoles", rolesFuture.get());
+            response.put("totalCourses", coursesFuture.get());
+            response.put("totalEnrollments", enrollmentsFuture.get());
             response.put("weeklyLabels", labels);
             response.put("weeklyValues", values);
             response.put("topCourses", topCourses.stream().map(tc -> {
@@ -124,83 +140,27 @@ public class AdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         try {
-            List<User> allUsers = userRepository.findAll();
-            List<User> filteredUsers = new ArrayList<>();
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+            Page<User> userPage;
+            
+            String safeSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
-            // 1. Filter by roleType
-            for (User user : allUsers) {
-                boolean isLearner = user.getRoles().stream()
-                        .anyMatch(r -> {
-                            String name = r.getRoleName().toUpperCase();
-                            if (name.startsWith("ROLE_")) name = name.substring(5);
-                            return name.equals("LEARNER");
-                        });
-                boolean isTrainer = user.getRoles().stream()
-                        .anyMatch(r -> {
-                            String name = r.getRoleName().toUpperCase();
-                            if (name.startsWith("ROLE_")) name = name.substring(5);
-                            return name.equals("TRAINER");
-                        });
-                boolean isTrainerLead = user.getRoles().stream()
-                        .anyMatch(r -> {
-                            String name = r.getRoleName().toUpperCase();
-                            if (name.startsWith("ROLE_")) name = name.substring(5);
-                            return name.equals("COURSE_MANAGER");
-                        });
-                boolean isAdmin = user.getRoles().stream()
-                        .anyMatch(r -> {
-                            String name = r.getRoleName().toUpperCase();
-                            if (name.startsWith("ROLE_")) name = name.substring(5);
-                            return name.equals("ADMINISTRATOR") || name.equals("ADMIN");
-                        });
-
-                if ("learner".equalsIgnoreCase(roleType)) {
-                    if (isLearner) {
-                        filteredUsers.add(user);
-                    }
-                } else if ("trainer".equalsIgnoreCase(roleType)) {
-                    if (isTrainer) {
-                        filteredUsers.add(user);
-                    }
-                } else if ("course_manager".equalsIgnoreCase(roleType) || "course_manager".equalsIgnoreCase(roleType)) {
-                    if (isTrainerLead) {
-                        filteredUsers.add(user);
-                    }
-                } else if ("admin".equalsIgnoreCase(roleType)) {
-                    if (isAdmin) {
-                        filteredUsers.add(user);
-                    }
-                } else { // "staff"
-                    if (!isLearner) {
-                        filteredUsers.add(user);
-                    }
-                }
+            if ("learner".equalsIgnoreCase(roleType)) {
+                userPage = userRepository.findUsersByRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), safeSearch, pageable);
+            } else if ("trainer".equalsIgnoreCase(roleType)) {
+                userPage = userRepository.findUsersByRoleNamesAndSearch(List.of("TRAINER", "ROLE_TRAINER"), safeSearch, pageable);
+            } else if ("course_manager".equalsIgnoreCase(roleType)) {
+                userPage = userRepository.findUsersByRoleNamesAndSearch(List.of("COURSE_MANAGER", "ROLE_COURSE_MANAGER"), safeSearch, pageable);
+            } else if ("admin".equalsIgnoreCase(roleType)) {
+                userPage = userRepository.findUsersByRoleNamesAndSearch(List.of("ADMINISTRATOR", "ROLE_ADMINISTRATOR", "ADMIN"), safeSearch, pageable);
+            } else { // "staff" - meaning anyone who is NOT just a learner
+                userPage = userRepository.findUsersNotInRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), safeSearch, pageable);
             }
 
-            // 2. Filter by search query (name or email)
-            if (search != null && !search.trim().isEmpty()) {
-                String q = search.trim().toLowerCase();
-                filteredUsers.removeIf(u -> 
-                    (u.getFullName() == null || !u.getFullName().toLowerCase().contains(q)) && 
-                    (u.getEmail() == null || !u.getEmail().toLowerCase().contains(q))
-                );
-            }
-
-            // 3. Sort users (by id desc)
-            filteredUsers.sort((u1, u2) -> u2.getId().compareTo(u1.getId()));
-
-            // 4. Pagination
-            int totalCount = filteredUsers.size();
-            int totalPages = (int) Math.ceil((double) totalCount / size);
+            List<User> pagedUsers = userPage.getContent();
+            long totalCount = userPage.getTotalElements();
+            int totalPages = userPage.getTotalPages();
             if (totalPages == 0) totalPages = 1;
-
-            int fromIndex = page * size;
-            int toIndex = Math.min(fromIndex + size, totalCount);
-
-            List<User> pagedUsers = new ArrayList<>();
-            if (fromIndex < totalCount) {
-                pagedUsers = filteredUsers.subList(fromIndex, toIndex);
-            }
 
             // 5. Map to safe JSON structure
             List<Map<String, Object>> content = pagedUsers.stream().map(u -> {
