@@ -26,6 +26,7 @@ class AdminDashboardPage extends StatefulWidget {
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final _authService = AuthService();
+  final Set<int> _initializedTabs = {};
   String _adminName = 'Thao';
   String _adminEmail = 'thao@hango.edu';
   String _adminInitials = 'T';
@@ -126,13 +127,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     super.initState();
     _selectedMenuIndex = widget.initialIndex;
     _loadAdminInfo();
-    _fetchDashboardStats();
-    _fetchAccounts();
-    _fetchAiUsageStats();
-    _fetchAuditLog();
-    _fetchRoles();
-    _fetchPermissions();
     _loadNotifications();
+    _initializeTab(_selectedMenuIndex);
+  }
+
+  void _initializeTab(int index) {
+    if (_initializedTabs.contains(index)) return;
+    _initializedTabs.add(index);
+    switch (index) {
+      case 0:
+        _fetchDashboardStats();
+        break;
+      case 1:
+        _fetchAccounts();
+        break;
+      case 2:
+        _fetchAiUsageStats();
+        break;
+      case 3:
+        _fetchRoles();
+        _fetchPermissions();
+        break;
+      case 7:
+        _fetchAuditLog();
+        break;
+    }
   }
 
   Future<void> _loadNotifications() async {
@@ -1770,18 +1789,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   title: 'Comment',
                   isMobileDrawer: isMobileDrawer,
                 ),
+                const SizedBox(height: 8),
                 _buildSidebarMenuItem(
                   index: 6,
                   icon: Icons.rate_review_outlined,
                   title: 'Approvals',
                   isMobileDrawer: isMobileDrawer,
                 ),
-                _buildSidebarMenuItem(
-                  index: 7,
-                  icon: Icons.history_outlined,
-                  title: 'Audit Log',
-                  isMobileDrawer: isMobileDrawer,
-                ),
+                // Audit Log hidden — feature kept but sidebar entry disabled
+                // _buildSidebarMenuItem(
+                //   index: 7,
+                //   icon: Icons.history_outlined,
+                //   title: 'Audit Log',
+                //   isMobileDrawer: isMobileDrawer,
+                // ),
                 const SizedBox(height: 8),
                 _buildSidebarMenuItem(
                   index: 8,
@@ -1818,9 +1839,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           setState(() {
             _selectedMenuIndex = index;
           });
-          if (index == 1) {
-            _fetchAccounts();
-          }
+          _initializeTab(index);
           if (isMobileDrawer) {
             Navigator.pop(context);
           }

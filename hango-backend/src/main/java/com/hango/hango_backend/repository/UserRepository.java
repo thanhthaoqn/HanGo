@@ -6,9 +6,12 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDateTime;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -30,4 +33,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.roleName IN :roleNames")
     List<User> findByRoleNames(@Param("roleNames") List<String> roleNames);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt >= :startDate AND u.createdAt < :endDate")
+    long countUsersRegisteredBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query(value = "SELECT DATE(created_at) as date, COUNT(*) as count FROM users WHERE created_at >= :startDate GROUP BY DATE(created_at)", nativeQuery = true)
+    List<Object[]> countUsersRegisteredByDate(@Param("startDate") LocalDateTime startDate);
+
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r.roleName IN :roleNames AND (:search IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<User> findUsersByRoleNamesAndSearch(@Param("roleNames") List<String> roleNames, @Param("search") String search, Pageable pageable);
+
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r.roleName NOT IN :roleNames AND (:search IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<User> findUsersNotInRoleNamesAndSearch(@Param("roleNames") List<String> roleNames, @Param("search") String search, Pageable pageable);
 }
