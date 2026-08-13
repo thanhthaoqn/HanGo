@@ -1,6 +1,8 @@
 package com.hango.hango_backend.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import lombok.*;
 
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,6 +44,7 @@ public class Notification {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Course course;
 
     @Builder.Default

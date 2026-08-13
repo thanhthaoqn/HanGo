@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
@@ -54,4 +55,24 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
     @Query("SELECT e.course.id, COUNT(DISTINCT e.user.id) FROM Enrollment e WHERE e.course.id IN :courseIds GROUP BY e.course.id")
     List<Object[]> countDistinctUsersByCourseIdsGrouped(@Param("courseIds") List<Long> courseIds);
+
+    // ── Dashboard aggregate queries ──
+
+    @Query("SELECT COUNT(DISTINCT e.user.id) FROM Enrollment e")
+    long countDistinctEnrolledUsers();
+
+    @Query("SELECT COUNT(DISTINCT e.user.id) FROM Enrollment e WHERE e.completedAt IS NOT NULL")
+    long countDistinctUsersCompletedAnyCourse();
+
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.completedAt IS NOT NULL")
+    long countCompletedEnrollments();
+
+    @Query(value = "SELECT DATE(e.enrolled_at) as day, COUNT(*) as cnt " +
+           "FROM enrollments e WHERE e.enrolled_at >= :since " +
+           "GROUP BY DATE(e.enrolled_at) ORDER BY day", nativeQuery = true)
+    List<Object[]> getDailyEnrollmentsSince(@Param("since") LocalDateTime since);
+
+    @Query(value = "SELECT COUNT(DISTINCT lp.user_id) FROM lesson_progresses lp " +
+           "WHERE lp.completed_at IS NOT NULL AND lp.completed_at >= :since", nativeQuery = true)
+    long countActiveLearnersSince(@Param("since") java.time.LocalDateTime since);
 }

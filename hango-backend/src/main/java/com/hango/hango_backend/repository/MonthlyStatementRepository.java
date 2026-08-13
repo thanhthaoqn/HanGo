@@ -15,4 +15,9 @@ public interface MonthlyStatementRepository extends JpaRepository<MonthlyStateme
     List<MonthlyStatement> findByPeriodMonthAndStatus(String periodMonth, String status);
     List<MonthlyStatement> findByStatus(String status);
     Optional<MonthlyStatement> findByStatementCode(String statementCode);
+
+    // ── Dashboard aggregate queries ──
+
+    @org.springframework.data.jpa.repository.Query("SELECT s.status, COUNT(s), COALESCE(SUM(s.netPayoutAmount), 0) FROM MonthlyStatement s GROUP BY s.status")
+    java.util.List<Object[]> countAndSumGroupedByStatus();
 }

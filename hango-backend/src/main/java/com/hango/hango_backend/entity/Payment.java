@@ -1,6 +1,8 @@
 package com.hango.hango_backend.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,6 +26,7 @@ public class Payment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = true)
+    @NotFound(action = NotFoundAction.IGNORE)
     private Course course;
 
     @Column(name = "course_ids", length = 255)

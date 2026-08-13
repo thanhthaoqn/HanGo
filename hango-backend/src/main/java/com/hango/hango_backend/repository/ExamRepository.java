@@ -37,4 +37,12 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
            "FROM Exam e LEFT JOIN e.createdBy u WHERE e.deletedAt IS NULL AND u.id = :trainerId " +
            "ORDER BY e.createdAt DESC")
     List<Object[]> findTrainerExamsForTrainer(@Param("trainerId") Long trainerId);
+
+    // ── Dashboard aggregate queries ──
+
+    @Query("SELECT e.status, COUNT(e) FROM Exam e WHERE e.deletedAt IS NULL GROUP BY e.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("SELECT MIN(e.createdAt) FROM Exam e WHERE e.status = 'PENDING_APPROVAL' AND e.deletedAt IS NULL")
+    java.time.LocalDateTime findOldestPendingExamDate();
 }

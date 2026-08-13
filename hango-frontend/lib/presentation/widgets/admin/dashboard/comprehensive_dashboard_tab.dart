@@ -1,0 +1,874 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import '../../../../data/services/auth_service.dart';
+import 'package:intl/intl.dart';
+
+class ComprehensiveDashboardTab extends StatefulWidget {
+  final bool isDesktop;
+  const ComprehensiveDashboardTab({super.key, this.isDesktop = true});
+
+  @override
+  State<ComprehensiveDashboardTab> createState() => _ComprehensiveDashboardTabState();
+}
+
+class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
+  bool _isLoading = true;
+  String? _error;
+  Map<String, dynamic>? _stats;
+  final AuthService _authService = AuthService();
+  int _periodDays = 30; // Default filter
+
+  String get apiBaseUrl {
+    final authUrl = AuthService.baseUrl;
+    return authUrl.replaceAll('/auth', '');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStats();
+  }
+
+  Future<void> _fetchStats() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        setState(() {
+          _error = 'Unauthorized';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final url = Uri.parse('$apiBaseUrl/admin/dashboard/comprehensive-stats?periodDays=$_periodDays');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _stats = jsonDecode(response.body);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'Failed to load stats (${response.statusCode})';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Error fetching stats: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 16)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchStats,
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
+              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_stats == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeaderActions(),
+        const SizedBox(height: 24),
+        _buildKpiGrid(),
+        const SizedBox(height: 24),
+        _buildMainCharts(widget.isDesktop),
+        const SizedBox(height: 24),
+        _buildBottomSection(widget.isDesktop), // Pipeline & Quick Actions
+        const SizedBox(height: 24),
+        _buildLearningAnalytics(widget.isDesktop), // Phase 2
+        const SizedBox(height: 24),
+        _buildTicketAndAiAnalytics(widget.isDesktop), // Phase 2 & 3
+        const SizedBox(height: 48), // Bottom padding
+      ],
+    );
+  }
+
+  Widget _buildHeaderActions() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Platform Overview',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1E293B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _periodDays,
+              icon: const Icon(Icons.calendar_today, size: 16, color: Color(0xFF64748B)),
+              style: const TextStyle(color: Color(0xFF334155), fontSize: 14, fontWeight: FontWeight.w500),
+              items: const [
+                DropdownMenuItem(value: 7, child: Text('Last 7 Days')),
+                DropdownMenuItem(value: 30, child: Text('Last 30 Days')),
+                DropdownMenuItem(value: 90, child: Text('Last 3 Months')),
+                DropdownMenuItem(value: 365, child: Text('Last 12 Months')),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _periodDays = val);
+                  _fetchStats();
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKpiGrid() {
+    final overview = _stats!['overview'] ?? {};
+    final revenue = _stats!['revenue'] ?? {};
+
+    return LayoutBuilder(builder: (context, constraints) {
+      int crossAxisCount = constraints.maxWidth > 1100 ? 6 : (constraints.maxWidth > 800 ? 4 : 2);
+      double width = (constraints.maxWidth - (crossAxisCount - 1) * 16) / crossAxisCount;
+
+      return Wrap(
+        spacing: 16,
+        runSpacing: 16,
+        children: [
+          _buildKpiCard('Total Users', '${overview['totalActiveUsers'] ?? 0}', Icons.people, Colors.blue, width),
+          _buildKpiCard('Enrollments', '${overview['totalEnrollments'] ?? 0}', Icons.school, Colors.orange, width),
+          _buildKpiCard('Courses', '${overview['totalPublishedCourses'] ?? 0}', Icons.book, Colors.purple, width),
+          _buildKpiCard('Exam Attempts', '${overview['totalExamAttempts'] ?? 0}', Icons.assignment, Colors.indigo, width),
+          _buildKpiCard('Total Revenue', _formatCurrency(revenue['totalRevenue']), Icons.attach_money, Colors.green, width),
+          _buildKpiCard('Transactions', '${revenue['transactionCount'] ?? 0}', Icons.receipt_long, Colors.teal, width),
+        ],
+      );
+    });
+  }
+
+  Widget _buildKpiCard(String title, String value, IconData icon, MaterialColor color, double width) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          )
+        ],
+        border: Border.all(color: color.shade50.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color.shade600, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF1E293B),
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Outfit',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainCharts(bool isDesktop) {
+    final revenueChart = _buildRevenueChart();
+    final userGrowthChart = _buildUserGrowthChart();
+
+    if (isDesktop) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(flex: 2, child: revenueChart),
+          const SizedBox(width: 24),
+          Expanded(flex: 1, child: userGrowthChart),
+        ],
+      );
+    } else {
+      return Column(
+        children: [
+          revenueChart,
+          const SizedBox(height: 24),
+          userGrowthChart,
+        ],
+      );
+    }
+  }
+
+  Widget _buildRevenueChart() {
+    final trends = _stats!['trends'] ?? {};
+    final revenueByDay = (trends['revenueByDay'] as List?) ?? [];
+
+    List<FlSpot> spots = [];
+    for (int i = 0; i < revenueByDay.length; i++) {
+      double val = (revenueByDay[i]['amount'] ?? 0).toDouble();
+      spots.add(FlSpot(i.toDouble(), val));
+    }
+
+    return Container(
+      height: 360,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Revenue Trend', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+          const SizedBox(height: 24),
+          Expanded(
+            child: revenueByDay.isEmpty
+                ? const Center(child: Text('No data for selected period'))
+                : LineChart(
+                    LineChartData(
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1),
+                      ),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 60,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                _formatCompactCurrency(value),
+                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                              );
+                            },
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              if (value.toInt() >= 0 && value.toInt() < revenueByDay.length) {
+                                final dateStr = revenueByDay[value.toInt()]['date'];
+                                final date = DateTime.tryParse(dateStr);
+                                if (date != null && (value.toInt() % (revenueByDay.length > 7 ? 3 : 1) == 0)) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Text(DateFormat('MMM d').format(date), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                                  );
+                                }
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: spots,
+                          isCurved: true,
+                          color: const Color(0xFF28B79B),
+                          barWidth: 3,
+                          isStrokeCapRound: true,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: const Color(0xFF28B79B).withOpacity(0.1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserGrowthChart() {
+    final overview = _stats!['overview'] ?? {};
+    final totalUsers = (overview['totalActiveUsers'] ?? 0) as int;
+    if (totalUsers == 0) return const SizedBox.shrink();
+
+    final learners = (overview['totalLearners'] ?? 0) as int;
+    final trainers = (overview['totalTrainers'] ?? 0) as int;
+    final others = totalUsers - learners - trainers;
+
+    return Container(
+      height: 360,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('User Distribution', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+          const SizedBox(height: 24),
+          Expanded(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 60,
+                    sections: [
+                      PieChartSectionData(
+                        color: const Color(0xFF3B82F6),
+                        value: learners.toDouble(),
+                        title: '',
+                        radius: 30,
+                      ),
+                      PieChartSectionData(
+                        color: const Color(0xFF8B5CF6),
+                        value: trainers.toDouble(),
+                        title: '',
+                        radius: 30,
+                      ),
+                      PieChartSectionData(
+                        color: const Color(0xFFF59E0B),
+                        value: others.toDouble(),
+                        title: '',
+                        radius: 30,
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$totalUsers',
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+                    ),
+                    const Text('Total', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildLegendItem(const Color(0xFF3B82F6), 'Learners', learners),
+              _buildLegendItem(const Color(0xFF8B5CF6), 'Trainers', trainers),
+              _buildLegendItem(const Color(0xFFF59E0B), 'Others', others),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label, int value) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('$value', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+      ],
+    );
+  }
+
+  Widget _buildBottomSection(bool isDesktop) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 2, child: _buildContentStatusPipeline()),
+        if (isDesktop) const SizedBox(width: 24),
+        if (isDesktop) Expanded(flex: 1, child: _buildQuickActions()),
+      ],
+    );
+  }
+
+  Widget _buildContentStatusPipeline() {
+    final pending = _stats!['pendingActions'] ?? {};
+    final contentHealth = _stats!['contentHealth'] ?? {};
+    final approvalRate = (contentHealth['approvalRate'] ?? 1.0) * 100;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Pending Approvals Pipeline', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildPipelineItem('Courses', pending['coursesPendingReview'] ?? 0, Colors.purple),
+              _buildPipelineItem('Exams', pending['examsPendingReview'] ?? 0, Colors.indigo),
+              _buildPipelineItem('Trainer Apps', pending['trainerAppsPending'] ?? 0, Colors.blue),
+              _buildPipelineItem('Tickets', pending['ticketsPending'] ?? 0, Colors.orange),
+              _buildPipelineItem('Comments', pending['commentsPendingModeration'] ?? 0, Colors.red),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Divider(color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 20),
+              const SizedBox(width: 8),
+              Text('Approval Rate: ${approvalRate.toStringAsFixed(1)}%', style: const TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.w600)),
+              const Spacer(),
+              if (pending['coursesPendingReview'] > 0 || pending['examsPendingReview'] > 0)
+                const Text('Review needed', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12))
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPipelineItem(String label, int count, MaterialColor color) {
+    return Column(
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: count > 0 ? color.shade50 : const Color(0xFFF8FAFC),
+            shape: BoxShape.circle,
+            border: Border.all(color: count > 0 ? color.shade200 : const Color(0xFFE2E8F0)),
+          ),
+          child: Center(
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: count > 0 ? color.shade700 : const Color(0xFF94A3B8),
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFF28B79B), Color(0xFF1F9E84)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit')),
+          const SizedBox(height: 24),
+          _buildActionItem(Icons.playlist_add_check, 'Review Pending Courses'),
+          _buildActionItem(Icons.money, 'Process Settlements'),
+          _buildActionItem(Icons.headset_mic, 'View Open Tickets'),
+          _buildActionItem(Icons.settings, 'Platform Settings'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionItem(IconData icon, String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                const Spacer(),
+                const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 14),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatCurrency(dynamic amount) {
+    if (amount == null) return '0 đ';
+    double val = (amount is num) ? amount.toDouble() : double.tryParse(amount.toString()) ?? 0;
+    return '${NumberFormat('#,###').format(val)} đ';
+  }
+
+  String _formatCompactCurrency(double amount) {
+    if (amount >= 1000000000) return '${(amount / 1000000000).toStringAsFixed(1)}B đ';
+    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(1)}M đ';
+    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(1)}k đ';
+    return '${amount.toInt()} đ';
+  }
+
+  // --- PHASE 2 & 3 SECTIONS ---
+
+  Widget _buildLearningAnalytics(bool isDesktop) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 3, child: _buildLearningFunnel()),
+        if (isDesktop) const SizedBox(width: 24),
+        if (isDesktop) Expanded(flex: 2, child: _buildExamPerformance()),
+      ],
+    );
+  }
+
+  Widget _buildLearningFunnel() {
+    final learning = _stats!['learningPerformance'] ?? {};
+    final funnel = learning['learningFunnel'] ?? {};
+    final completionRate = ((learning['completionRate'] ?? 0.0) * 100).toStringAsFixed(1);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Learning Funnel', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(20)),
+                child: Text('Completion: $completionRate%', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold, fontSize: 13)),
+              )
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildFunnelStep('Registered Users', funnel['registered'] ?? 0, 1.0, Colors.blue),
+          _buildFunnelStep('Enrolled (≥1 Course)', funnel['enrolledAtLeast1'] ?? 0, 0.8, Colors.indigo),
+          _buildFunnelStep('Actively Learning (30d)', funnel['activelyLearning'] ?? 0, 0.6, Colors.purple),
+          _buildFunnelStep('Completed (≥1 Course)', funnel['completedAtLeast1Course'] ?? 0, 0.45, Colors.orange),
+          _buildFunnelStep('Certified', funnel['certified'] ?? 0, 0.3, Colors.green),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFunnelStep(String label, int count, double widthFraction, MaterialColor color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: LayoutBuilder(builder: (context, constraints) {
+        return Row(
+          children: [
+            SizedBox(
+              width: 140,
+              child: Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 24,
+                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: widthFraction,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [color.shade300, color.shade500]),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 40,
+              child: Text('$count', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildExamPerformance() {
+    final learning = _stats!['learningPerformance'] ?? {};
+    final avgScore = (learning['avgScore'] ?? 0.0).toStringAsFixed(1);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Global Exam Performance', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildCircularStat(avgScore, 'Avg Score', const Color(0xFF3B82F6)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCircularStat(String value, String label, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: color, width: 4),
+          ),
+          child: Center(
+            child: Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color, fontFamily: 'Outfit')),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(label, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _buildTicketAndAiAnalytics(bool isDesktop) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 1, child: _buildTicketAnalytics()),
+        if (isDesktop) const SizedBox(width: 24),
+        if (isDesktop) Expanded(flex: 1, child: _buildAiUsage()),
+      ],
+    );
+  }
+
+  Widget _buildTicketAnalytics() {
+    final tickets = _stats!['ticketHealth'] ?? {};
+    final avgFirstResponse = (tickets['avgFirstResponseHours'] ?? 0.0).toStringAsFixed(1);
+    final avgResolution = (tickets['avgResolutionHours'] ?? 0.0).toStringAsFixed(1);
+    final byStatus = tickets['byStatus'] ?? {};
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Support Health (Tickets)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(child: _buildMetricBox('Avg Response', '$avgFirstResponse hrs', Icons.timer, Colors.orange)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildMetricBox('Avg Resolution', '$avgResolution hrs', Icons.check_circle, Colors.green)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildStatusRow('Open', byStatus['OPEN'] ?? 0, Colors.red),
+          _buildStatusRow('Processing', byStatus['PROCESSING'] ?? 0, Colors.orange),
+          _buildStatusRow('Resolved', byStatus['RESOLVED'] ?? 0, Colors.green),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiUsage() {
+    final ai = _stats!['aiUsage'] ?? {};
+    final totalCalls = ai['totalCalls'] ?? 0;
+    final successRate = ((ai['successRate'] ?? 0.0) * 100).toStringAsFixed(1);
+    final avgDuration = (ai['avgSuccessDurationMs'] ?? 0.0).toStringAsFixed(0);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('AI Integration Health', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit')),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(child: _buildMetricBox('Total API Calls', '$totalCalls', Icons.api, Colors.purple)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildMetricBox('Avg Latency', '${avgDuration}ms', Icons.speed, Colors.blue)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Overall Success Rate', style: TextStyle(fontWeight: FontWeight.w500, color: Color(0xFF64748B))),
+              Text('$successRate%', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            value: (ai['successRate'] ?? 0.0).toDouble(),
+            backgroundColor: const Color(0xFFF1F5F9),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricBox(String label, String value, IconData icon, MaterialColor color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: color.shade50, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color.shade600, size: 20),
+          const SizedBox(height: 12),
+          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color.shade800, fontFamily: 'Outfit')),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 12, color: color.shade600, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(String label, int count, MaterialColor color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(width: 10, height: 10, decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
+              const SizedBox(width: 8),
+              Text(label, style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+            ],
+          ),
+          Text('$count', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+        ],
+      ),
+    );
+  }
+}

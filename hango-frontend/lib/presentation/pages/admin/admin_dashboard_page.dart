@@ -14,6 +14,7 @@ import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
 import '../../widgets/admin/role/role_matrix_tab.dart';
 import '../../widgets/admin/role/role_detail_drawer.dart';
+import '../../widgets/admin/dashboard/comprehensive_dashboard_tab.dart';
 import '../../../utils/file_picker_helper.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -136,7 +137,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _initializedTabs.add(index);
     switch (index) {
       case 0:
-        _fetchDashboardStats();
+        // Dashboard handles its own data fetching now
         break;
       case 1:
         _fetchAccounts();
@@ -1845,7 +1846,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildMainContent(bool isDesktop) {
     switch (_selectedMenuIndex) {
       case 0:
-        return _buildDashboardTab(isDesktop);
+        return ComprehensiveDashboardTab(isDesktop: isDesktop);
       case 1:
         return _buildAccountsTab();
       case 2:
@@ -1869,7 +1870,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       case 8:
         return const ManagementTicketsPage(isEmbedded: true);
       default:
-        return _buildDashboardTab(isDesktop);
+        return ComprehensiveDashboardTab(isDesktop: isDesktop);
     }
   }
 

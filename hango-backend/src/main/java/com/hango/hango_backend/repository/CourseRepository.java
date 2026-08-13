@@ -158,4 +158,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @org.springframework.data.jpa.repository.Modifying
     @Query("UPDATE Course c SET c.averageRating = :average, c.totalRatings = :total WHERE c.id = :courseId")
     void updateCourseStats(@Param("courseId") Long courseId, @Param("average") Double average, @Param("total") Integer total);
+
+    // ── Dashboard aggregate queries ──
+
+    @Query("SELECT c.status, COUNT(c) FROM Course c WHERE c.deletedAt IS NULL GROUP BY c.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("SELECT MIN(c.createdAt) FROM Course c WHERE c.status = 'PENDING_APPROVAL' AND c.deletedAt IS NULL")
+    java.time.LocalDateTime findOldestPendingCourseDate();
 }
