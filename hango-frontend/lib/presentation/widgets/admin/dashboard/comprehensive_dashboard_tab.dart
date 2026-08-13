@@ -190,37 +190,52 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
         double width =
             (constraints.maxWidth - (crossAxisCount - 1) * 16) / crossAxisCount;
 
+        int totalUsers = overview['totalActiveUsers'] ?? 0;
+        int totalEnrollments = overview['totalEnrollments'] ?? 0;
+        double avgEnrollments = totalUsers > 0 ? totalEnrollments / totalUsers : 0.0;
+        
+        final learning = _stats!['learningPerformance'] ?? {};
+        double avgScore = (learning['avgExamScore'] is num) ? (learning['avgExamScore'] as num).toDouble() : 0.0;
+
         return Wrap(
           spacing: 16,
           runSpacing: 16,
           children: [
             _buildKpiCard(
               'Total Users',
-              '${overview['totalActiveUsers'] ?? 0}',
+              '$totalUsers',
+              '${overview['totalLearners'] ?? 0} Learners · ${overview['totalTrainers'] ?? 0} Trainers',
               Icons.people,
               Colors.blue,
               width,
+              countToday: overview['newUsersToday'],
             ),
             _buildKpiCard(
               'Enrollments',
-              '${overview['totalEnrollments'] ?? 0}',
+              '$totalEnrollments',
+              'Avg ${avgEnrollments.toStringAsFixed(1)} per user',
               Icons.school,
               Colors.orange,
               width,
+              countToday: overview['newEnrollmentsToday'],
             ),
             _buildKpiCard(
               'Courses',
               '${overview['totalPublishedCourses'] ?? 0}',
+              '${overview['totalFreeCourses'] ?? 0} Free · ${overview['totalPaidCourses'] ?? 0} Paid',
               Icons.book,
               Colors.purple,
               width,
+              countToday: overview['newCoursesToday'],
             ),
             _buildKpiCard(
               'Exam Attempts',
               '${overview['totalExamAttempts'] ?? 0}',
+              'Avg Score: ${avgScore.toStringAsFixed(1)} / 10',
               Icons.assignment,
               Colors.indigo,
               width,
+              countToday: overview['newExamAttemptsToday'],
             ),
           ],
         );
@@ -231,10 +246,12 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   Widget _buildKpiCard(
     String title,
     String value,
+    String subtitle,
     IconData icon,
     MaterialColor color,
-    double width,
-  ) {
+    double width, {
+    int? countToday,
+  }) {
     return Container(
       width: width,
       padding: const EdgeInsets.all(24),
@@ -278,20 +295,62 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Outfit',
-                letterSpacing: -0.5,
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Outfit',
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
               ),
+              if (countToday != null && countToday > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin: const EdgeInsets.only(bottom: 4, left: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.shade100),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_upward, color: Colors.green.shade600, size: 12),
+                      const SizedBox(width: 2),
+                      Text(
+                        '$countToday today',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

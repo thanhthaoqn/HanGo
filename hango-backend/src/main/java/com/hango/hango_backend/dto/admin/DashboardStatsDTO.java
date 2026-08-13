@@ -38,6 +38,11 @@ public class DashboardStatsDTO {
         private long totalEnrollments;
         private long totalExamAttempts;
         private long totalCertificates;
+        
+        private long newUsersToday;
+        private long newEnrollmentsToday;
+        private long newCoursesToday;
+        private long newExamAttemptsToday;
     }
 
     @Data

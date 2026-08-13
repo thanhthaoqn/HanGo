@@ -166,4 +166,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     @Query("SELECT MIN(c.createdAt) FROM Course c WHERE c.status = 'PENDING_APPROVAL' AND c.deletedAt IS NULL")
     java.time.LocalDateTime findOldestPendingCourseDate();
+
+    @Query("SELECT COUNT(c) FROM Course c WHERE c.status = 'PUBLISHED' AND (c.price IS NULL OR c.price = 0) AND c.deletedAt IS NULL")
+    long countFreePublishedCourses();
+
+    @Query(value = "SELECT COUNT(*) FROM courses WHERE status = 'PUBLISHED' AND deleted_at IS NULL AND DATE(published_at) = CURRENT_DATE", nativeQuery = true)
+    long countCoursesPublishedToday();
 }

@@ -51,4 +51,7 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
            "WHERE ea.submitted_at IS NOT NULL " +
            "GROUP BY ea.exam_id, e.title ORDER BY avg_score ASC LIMIT 5", nativeQuery = true)
     List<Object[]> findHardestExams();
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT COUNT(*) FROM exam_attempts WHERE DATE(started_at) = CURRENT_DATE", nativeQuery = true)
+    long countExamAttemptsToday();
 }

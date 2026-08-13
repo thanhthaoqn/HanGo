@@ -45,4 +45,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r.roleName NOT IN :roleNames AND (:search IS NULL OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<User> findUsersNotInRoleNamesAndSearch(@Param("roleNames") List<String> roleNames, @Param("search") String search, Pageable pageable);
+
+    @Query(value = "SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURRENT_DATE", nativeQuery = true)
+    long countUsersCreatedToday();
 }

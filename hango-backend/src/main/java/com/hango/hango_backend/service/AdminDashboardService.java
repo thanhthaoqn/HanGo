@@ -45,11 +45,16 @@ public class AdminDashboardService {
         var totalAdminsFuture = CompletableFuture.supplyAsync(() -> userRepository.countByRoleName("ADMINISTRATOR"));
 
         var totalPublishedCoursesFuture = CompletableFuture.supplyAsync(() -> courseRepository.countByStatusAndDeletedAtIsNull("PUBLISHED"));
-        var totalFreeCoursesFuture = CompletableFuture.supplyAsync(() -> paymentRepository.countFreeEnrollmentPayments()); // approximation
+        var totalFreeCoursesFuture = CompletableFuture.supplyAsync(() -> courseRepository.countFreePublishedCourses());
         
         var totalEnrollmentsFuture = CompletableFuture.supplyAsync(() -> enrollmentRepository.count());
         var totalExamAttemptsFuture = CompletableFuture.supplyAsync(() -> examAttemptRepository.count());
         var totalCertificatesFuture = CompletableFuture.supplyAsync(() -> certificateRepository.count());
+        
+        var newUsersTodayFuture = CompletableFuture.supplyAsync(() -> userRepository.countUsersCreatedToday());
+        var newEnrollmentsTodayFuture = CompletableFuture.supplyAsync(() -> enrollmentRepository.countEnrollmentsCreatedToday());
+        var newCoursesTodayFuture = CompletableFuture.supplyAsync(() -> courseRepository.countCoursesPublishedToday());
+        var newExamAttemptsTodayFuture = CompletableFuture.supplyAsync(() -> examAttemptRepository.countExamAttemptsToday());
 
         // --- REVENUE ---
         var totalRevenueFuture = CompletableFuture.supplyAsync(() -> paymentRepository.sumTotalRevenue());
@@ -99,6 +104,7 @@ public class AdminDashboardService {
         CompletableFuture.allOf(
                 totalActiveUsersFuture, totalLearnersFuture, totalTrainersFuture, totalCourseManagersFuture, totalAdminsFuture,
                 totalPublishedCoursesFuture, totalFreeCoursesFuture, totalEnrollmentsFuture, totalExamAttemptsFuture, totalCertificatesFuture,
+                newUsersTodayFuture, newEnrollmentsTodayFuture, newCoursesTodayFuture, newExamAttemptsTodayFuture,
                 totalRevenueFuture, totalPlatformFeeFuture, totalTrainerEarningsFuture, totalTxCountFuture, monthlyRevenueFuture,
                 coursesByStatusFuture, examsByStatusFuture, trainerAppsByStatusFuture, oldestPendingCourseDateFuture, oldestPendingExamDateFuture,
                 completedEnrollmentsFuture, avgExamScoreFuture, activeLearners30dFuture, enrolledAtLeast1Future, completedAtLeast1Future,
@@ -121,6 +127,10 @@ public class AdminDashboardService {
                 .totalEnrollments(totalEnrollmentsFuture.join())
                 .totalExamAttempts(totalExamAttemptsFuture.join())
                 .totalCertificates(totalCertificatesFuture.join())
+                .newUsersToday(newUsersTodayFuture.join())
+                .newEnrollmentsToday(newEnrollmentsTodayFuture.join())
+                .newCoursesToday(newCoursesTodayFuture.join())
+                .newExamAttemptsToday(newExamAttemptsTodayFuture.join())
                 .build();
 
         // 2. Revenue Build
