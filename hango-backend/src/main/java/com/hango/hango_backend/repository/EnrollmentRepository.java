@@ -75,4 +75,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     @Query(value = "SELECT COUNT(DISTINCT lp.user_id) FROM lesson_progresses lp " +
            "WHERE lp.completed_at IS NOT NULL AND lp.completed_at >= :since", nativeQuery = true)
     long countActiveLearnersSince(@Param("since") java.time.LocalDateTime since);
+
+    @Query(value = "SELECT COUNT(*) FROM enrollments WHERE DATE(enrolled_at) = CURRENT_DATE", nativeQuery = true)
+    long countEnrollmentsCreatedToday();
 }
