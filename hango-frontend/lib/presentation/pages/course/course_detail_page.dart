@@ -37,7 +37,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   late ScrollController _scrollController;
   late Future<CourseReviewSummary> _reviewsFuture;
   bool _isEnrolling = false;
-  bool _isUnenrolling = false;
   bool _isSwitchingVersion = false;
   bool _isInCart = false;
   bool _dismissedVersionBanner = false;
@@ -1844,37 +1843,32 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 ),
               ),
             ],
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: _isUnenrolling
-                    ? null
-                    : () => _showUnenrollConfirmDialog(course),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: Color(0xFFCBD5E1)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            if (course.price > 0) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showRefundRequestModal(course),
+                  icon: const Icon(Icons.currency_exchange_rounded, size: 18, color: Color(0xFFEF4444)),
+                  label: const Text(
+                    'Request Refund',
+                    style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: Color(0xFFFECACA)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
-                child: _isUnenrolling
-                    ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text(
-                        'Cancel Enrollment',
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
               ),
-            ),
+            ],
           ] else ...[
             // Buy / Enroll Buttons Section
             if (!_canEnroll) ...[
