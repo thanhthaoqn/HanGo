@@ -354,6 +354,9 @@ public class PaymentServiceImpl implements PaymentService {
                 }
 
                 for (Long cId : targetIds) {
+                    // Always clear paid items from DB cart
+                    cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
+
                     boolean alreadyEnrolled = enrollmentRepository.existsByUserIdAndCourseId(payment.getUser().getId(), cId);
                     if (!alreadyEnrolled) {
                         Course c = courseRepository.findById(cId).orElse(null);
@@ -371,9 +374,6 @@ public class PaymentServiceImpl implements PaymentService {
                                     "New enrollment",
                                     payment.getUser().getFullName() + " enrolled in your course \"" + c.getTitle() + "\".",
                                     c);
-
-                            // Clear paid items from DB cart
-                            cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
 
                             // Send email confirmation
                             try {

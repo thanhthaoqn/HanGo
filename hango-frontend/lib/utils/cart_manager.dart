@@ -129,6 +129,20 @@ class CartManager {
     }
   }
 
+  static Future<void> clearCart() async {
+    _lastRemoteSyncAt = null;
+    _pendingDeletedCourseIds.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('guest_cart_course_ids');
+    final userId = prefs.getInt('user_id');
+    if (userId != null) {
+      await prefs.remove('cart_course_ids_user_$userId');
+    }
+    cartCoursesNotifier.value = [];
+    cartCountNotifier.value = 0;
+    await updateCount(forceRefresh: true);
+  }
+
   static Future<void> clearCartOnLogout() async {
     _lastRemoteSyncAt = null;
     _pendingDeletedCourseIds.clear();

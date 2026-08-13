@@ -90,7 +90,7 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         if (courseId != null) {
           await CartManager.removeFromCart(courseId);
         } else {
-          await CartManager.updateCount();
+          await CartManager.clearCart();
         }
         if (mounted) {
           ToastHelper.showSuccess(
