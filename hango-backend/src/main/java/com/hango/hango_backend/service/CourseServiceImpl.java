@@ -442,7 +442,7 @@ public class CourseServiceImpl implements CourseService {
             String priceText = (courseToEnroll.getPrice() != null && courseToEnroll.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0)
                     ? String.format("%,.0fđ", courseToEnroll.getPrice())
                     : "Free";
-            emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), courseToEnroll.getTitle(), priceText);
+            emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), courseToEnroll.getTitle(), priceText, courseToEnroll.getThumbnailUrl());
         } catch (Exception e) {
             System.err.println("[EMAIL WARN] Failed to send enrollment email: " + e.getMessage());
         }
