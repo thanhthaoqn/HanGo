@@ -15,6 +15,7 @@ import 'cart_page.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../utils/toast_helper.dart';
 import '../../widgets/payment_qr_dialog.dart';
 import '../../widgets/refund_request_modal.dart';
 
@@ -1878,7 +1879,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           final msg = isCompleted
                               ? (LanguageManager.isVi ? 'Không thể hoàn tiền: Bạn đã hoàn thành khóa học này.' : 'Refund Not Eligible: You have already completed this course.')
                               : (LanguageManager.isVi ? 'Không thể hoàn tiền: Tiến độ học đã vượt quá 20%.' : 'Refund Not Eligible: Learning progress exceeds 20%.');
-                          ToastHelper.showError(context, msg);
+                          _showNotification(msg, isError: true);
                         },
                         icon: const Icon(Icons.lock_outline_rounded, size: 18, color: Color(0xFF94A3B8)),
                         label: Text(
