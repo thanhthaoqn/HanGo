@@ -120,30 +120,129 @@ public class EmailService {
     }
 
     public void sendEnrollmentSuccessEmail(String toEmail, String learnerName, String courseTitle, String priceText) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(toEmail);
-        message.setSubject("HanGo - Course Enrollment Confirmation");
-        message.setText("Dear " + (learnerName != null && !learnerName.trim().isEmpty() ? learnerName : "Learner") + ",\n\n" +
-                "Congratulations! You have successfully enrolled in a course on the HanGo platform.\n\n" +
-                "ORDER DETAILS:\n" +
-                "- Course Title: " + courseTitle + "\n" +
-                "- Tuition Fee: " + priceText + "\n" +
-                "- Access Status: FULLY UNLOCKED\n\n" +
-                "You can access your course immediately to start learning:\n" +
-                "https://hangog92.online\n\n" +
-                "We wish you a wonderful learning experience with HanGo!\n\n" +
-                "Best regards,\n" +
-                "HanGo EdTech Team");
+        sendEnrollmentSuccessEmail(toEmail, learnerName, courseTitle, priceText, null);
+    }
+
+    public void sendEnrollmentSuccessEmail(String toEmail, String learnerName, String courseTitle, String priceText, String courseImageUrl) {
+        final String safeName = (learnerName != null && !learnerName.trim().isEmpty()) ? learnerName.trim() : "Learner";
+        final String safeTitle = (courseTitle != null && !courseTitle.trim().isEmpty()) ? courseTitle.trim() : "HanGo Online Course";
+        final String safePrice = (priceText != null && !priceText.trim().isEmpty()) ? priceText.trim() : "Free";
+        final String safeImageUrl = (courseImageUrl != null && !courseImageUrl.trim().isEmpty())
+                ? courseImageUrl.trim()
+                : "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80";
+
+        final String htmlContent = "<!DOCTYPE html>"
+                + "<html>"
+                + "<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></head>"
+                + "<body style=\"margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;\">"
+                + "  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color: #f1f5f9; padding: 40px 10px;\">"
+                + "    <tr>"
+                + "      <td align=\"center\">"
+                + "        <table role=\"presentation\" width=\"100%\" style=\"max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;\">"
+                + "          <tr>"
+                + "            <td align=\"center\" style=\"background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0d9488 100%); padding: 32px 24px;\">"
+                + "              <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\">"
+                + "                <tr>"
+                + "                  <td align=\"center\" style=\"padding-bottom: 8px;\">"
+                + "                    <div style=\"background-color: #28b79b; border-radius: 12px; width: 50px; height: 50px; line-height: 50px; text-align: center; color: #ffffff; font-weight: 900; font-size: 24px; display: inline-block; box-shadow: 0 4px 12px rgba(40,183,155,0.4);\">"
+                + "                      4G"
+                + "                    </div>"
+                + "                  </td>"
+                + "                </tr>"
+                + "                <tr>"
+                + "                  <td align=\"center\">"
+                + "                    <span style=\"color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;\">HanGo<span style=\"color: #28b79b;\">.</span></span>"
+                + "                  </td>"
+                + "                </tr>"
+                + "              </table>"
+                + "            </td>"
+                + "          </tr>"
+                + "          <tr>"
+                + "            <td style=\"padding: 36px 32px;\">"
+                + "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
+                + "                <tr>"
+                + "                  <td align=\"center\" style=\"padding-bottom: 20px;\">"
+                + "                    <span style=\"background-color: #d1fae5; color: #047857; font-size: 13px; font-weight: 700; padding: 8px 18px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;\">"
+                + "                      ✓ Enrollment Confirmed"
+                + "                    </span>"
+                + "                  </td>"
+                + "                </tr>"
+                + "                <tr>"
+                + "                  <td align=\"center\" style=\"padding-bottom: 12px;\">"
+                + "                    <h1 style=\"margin: 0; color: #0f172a; font-size: 22px; font-weight: 800; text-align: center;\">Congratulations on your enrollment!</h1>"
+                + "                  </td>"
+                + "                </tr>"
+                + "                <tr>"
+                + "                  <td align=\"center\" style=\"padding-bottom: 28px;\">"
+                + "                    <p style=\"margin: 0; color: #64748b; font-size: 15px; line-height: 1.6; text-align: center;\">"
+                + "                      Hi <strong style=\"color: #0f172a;\">" + safeName + "</strong>, your course registration is confirmed. You now have full unlimited access to all course contents."
+                + "                    </p>"
+                + "                  </td>"
+                + "                </tr>"
+                + "              </table>"
+                + "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 28px;\">"
+                + "                <tr>"
+                + "                  <td style=\"padding: 0;\">"
+                + "                    <img src=\"" + safeImageUrl + "\" alt=\"" + safeTitle + "\" style=\"width: 100%; max-height: 240px; object-fit: cover; display: block; border-bottom: 1px solid #e2e8f0;\">"
+                + "                  </td>"
+                + "                </tr>"
+                + "                <tr>"
+                + "                  <td style=\"padding: 20px 24px;\">"
+                + "                    <h2 style=\"margin: 0 0 8px 0; color: #0f172a; font-size: 18px; font-weight: 700; line-height: 1.4;\">" + safeTitle + "</h2>"
+                + "                    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 12px;\">"
+                + "                      <tr>"
+                + "                        <td style=\"color: #64748b; font-size: 14px;\">Tuition Fee:</td>"
+                + "                        <td align=\"right\" style=\"color: #28b79b; font-size: 16px; font-weight: 800;\">" + safePrice + "</td>"
+                + "                      </tr>"
+                + "                      <tr>"
+                + "                        <td style=\"color: #64748b; font-size: 14px; padding-top: 6px;\">Access Status:</td>"
+                + "                        <td align=\"right\" style=\"color: #059669; font-size: 14px; font-weight: 700; padding-top: 6px;\">Lifetime Access 🔓</td>"
+                + "                      </tr>"
+                + "                    </table>"
+                + "                  </td>"
+                + "                </tr>"
+                + "              </table>"
+                + "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 28px;\">"
+                + "                <tr>"
+                + "                  <td align=\"center\">"
+                + "                    <a href=\"https://hangog92.online\" target=\"_blank\" style=\"background-color: #28b79b; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 14px 36px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(40, 183, 155, 0.35);\">"
+                + "                      Start Learning Now &rarr;"
+                + "                    </a>"
+                + "                  </td>"
+                + "                </tr>"
+                + "              </table>"
+                + "              <p style=\"margin: 0; color: #94a3b8; font-size: 13px; text-align: center; line-height: 1.5;\">"
+                + "                If you have any questions, contact our support team at <a href=\"mailto:support@hangog92.online\" style=\"color: #28b79b; text-decoration: none;\">support@hangog92.online</a>."
+                + "              </p>"
+                + "            </td>"
+                + "          </tr>"
+                + "          <tr>"
+                + "            <td align=\"center\" style=\"background-color: #f8fafc; padding: 24px; border-top: 1px solid #e2e8f0;\">"
+                + "              <p style=\"margin: 0 0 6px 0; color: #64748b; font-size: 13px; font-weight: 600;\">HanGo EdTech Learning Platform</p>"
+                + "              <p style=\"margin: 0; color: #94a3b8; font-size: 12px;\">© 2026 HanGo. All rights reserved.</p>"
+                + "            </td>"
+                + "          </tr>"
+                + "        </table>"
+                + "      </td>"
+                + "    </tr>"
+                + "  </table>"
+                + "</body>"
+                + "</html>";
 
         try {
             if (mailSender != null) {
-                mailSender.send(message);
-                System.out.println("[EMAIL SUCCESS] Sent enrollment confirmation email to learner: " + toEmail);
+                jakarta.mail.internet.MimeMessage mimeMessage = mailSender.createMimeMessage();
+                org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(mimeMessage, true, "UTF-8");
+                helper.setTo(toEmail);
+                helper.setSubject("HanGo - Course Enrollment Confirmation");
+                helper.setText(htmlContent, true);
+                mailSender.send(mimeMessage);
+                System.out.println("[EMAIL SUCCESS] Sent HTML enrollment email with logo & course image to: " + toEmail);
             } else {
-                System.out.println("[EMAIL SUCCESS LOG] Enrollment Confirmation Email: " + toEmail + " -> Course: " + courseTitle + " (" + priceText + ")");
+                System.out.println("[EMAIL SUCCESS LOG] HTML Enrollment Email: " + toEmail + " -> Course: " + safeTitle + " (" + safePrice + ")");
             }
         } catch (Exception e) {
-            System.err.println("[EMAIL WARNING] Could not send enrollment email: " + e.getMessage());
+            System.err.println("[EMAIL WARNING] Could not send enrollment HTML email: " + e.getMessage());
         }
     }
 

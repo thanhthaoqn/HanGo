@@ -140,7 +140,7 @@ public class PaymentServiceImpl implements PaymentService {
                     }
 
                     try {
-                        emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), c.getTitle(), "Free");
+                        emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), c.getTitle(), "Free", c.getThumbnailUrl());
                     } catch (Exception e) {
                         log.warn("Failed to send free course enrollment email to {}: {}", user.getEmail(), e.getMessage());
                     }
@@ -419,7 +419,8 @@ public class PaymentServiceImpl implements PaymentService {
                                 payment.getUser().getEmail(),
                                 payment.getUser().getFullName(),
                                 c.getTitle(),
-                                priceText);
+                                priceText,
+                                c.getThumbnailUrl());
                     } catch (Exception e) {
                         log.warn("Failed to send enrollment email to {}: {}", payment.getUser().getEmail(), e.getMessage());
                     }
