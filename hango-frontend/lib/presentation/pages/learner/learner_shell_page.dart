@@ -33,13 +33,32 @@ class LearnerShellPage extends StatefulWidget {
 class LearnerShellPageState extends State<LearnerShellPage> {
   late int _currentIndex;
   late int _informationSubTab;
+  bool _isRedirecting = false;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _informationSubTab = widget.initialSubTab;
+    _checkRedirectState();
     _handlePayOSRedirect();
+  }
+
+  void _checkRedirectState() {
+    final currentUri = Uri.base.toString();
+    final fragment = Uri.base.fragment;
+    final fullUrl = '$currentUri#$fragment';
+
+    final isSuccess = fullUrl.contains('payment-success') ||
+        fullUrl.contains('paymentStatus=success') ||
+        (fullUrl.contains('status=PAID') && (fullUrl.contains('code=00') || fullUrl.contains('cancel=false')));
+    final isFailed = fullUrl.contains('payment-failed') ||
+        fullUrl.contains('paymentStatus=failed') ||
+        fullUrl.contains('cancel=true');
+
+    if (isSuccess || isFailed) {
+      _isRedirecting = true;
+    }
   }
 
   void _handlePayOSRedirect() {
@@ -87,12 +106,16 @@ class LearnerShellPageState extends State<LearnerShellPage> {
       }
 
       if (courseId != null && mounted) {
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => CourseDetailPage(courseId: courseId!),
           ),
         );
+      } else if (mounted) {
+        setState(() {
+          _isRedirecting = false;
+        });
       }
     });
   }
@@ -127,6 +150,15 @@ class LearnerShellPageState extends State<LearnerShellPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isRedirecting) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+        ),
+      );
+    }
+
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 992;
 

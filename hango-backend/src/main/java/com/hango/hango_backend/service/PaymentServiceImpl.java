@@ -329,9 +329,10 @@ public class PaymentServiceImpl implements PaymentService {
 
                 paymentRepository.save(payment);
 
+                String formattedAmount = String.format("%,d", amount.longValue());
                 notificationService.notifyUser(payment.getUser(), NotificationService.TYPE_PURCHASE_SUCCESS,
                         "Payment successful",
-                        "Your payment of " + amount + " VND was successful. Enjoy your course(s)!",
+                        "Your payment of " + formattedAmount + " VND was successful. Enjoy your course(s)!",
                         payment.getCourse());
 
                 // Auto enroll into all courses in payment
