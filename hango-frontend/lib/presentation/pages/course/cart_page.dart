@@ -77,9 +77,7 @@ class _CartPageState extends State<CartPage> {
         } catch (e) {
           debugPrint('Error loading DB cart: $e');
         }
-      }
-
-      if (coursesInCart.isEmpty) {
+      } else {
         final cartIds = await CartManager.getCartIds();
         if (cartIds.isNotEmpty) {
           final allCourses = await _repository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
@@ -203,11 +201,11 @@ class _CartPageState extends State<CartPage> {
       return;
     }
 
-    final unpaidCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price > 0).toList();
-    final freeCourses = _cartCourses.where((c) => !_enrolledCourseIds.contains(c.id.toString()) && c.price <= 0).toList();
+    final unpaidCourses = _cartCourses.where((c) => c.price > 0).toList();
+    final freeCourses = _cartCourses.where((c) => c.price <= 0).toList();
 
     if (unpaidCourses.isEmpty && freeCourses.isEmpty) {
-      ToastHelper.show(context, 'All courses in cart are already enrolled');
+      ToastHelper.show(context, 'Your cart is empty');
       return;
     }
 
@@ -257,6 +255,7 @@ class _CartPageState extends State<CartPage> {
           for (final c in courses) {
             await prefs.setBool('enrolled_course_id_${c.id}', true);
             cartIds.remove(c.id.toString());
+            await CartManager.removeFromCart(c.id);
           }
           await CartManager.setCartIds(cartIds);
           await CartManager.updateCount();
@@ -508,25 +507,7 @@ class _CartPageState extends State<CartPage> {
                   final isFree = course.price <= 0;
                   
                   if (isEnrolled) {
-                    return ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CourseDetailPage(courseId: course.id),
-                          ),
-                        );
-                      },
-                      child: Text(
-                        isVi ? 'Học ngay' : 'Study Now',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                      ),
-                    );
+                    return const SizedBox.shrink();
                   } else if (isFree) {
                     if (!_canEnroll) {
                       return const SizedBox.shrink();

@@ -29,5 +29,26 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
 
     // Lấy N attempts gần nhất của learner (theo submittedAt desc) để tổng hợp skill gaps.
     List<ExamAttempt> findTop10ByStudent_IdOrderBySubmittedAtDesc(Long studentId);
-}
 
+    // ── Dashboard aggregate queries ──
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(AVG(e.score), 0) FROM ExamAttempt e WHERE e.submittedAt IS NOT NULL")
+    Double avgScore();
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT DATE(ea.submitted_at) as day, COUNT(*) as cnt " +
+           "FROM exam_attempts ea WHERE ea.submitted_at IS NOT NULL AND ea.submitted_at >= :since " +
+           "GROUP BY DATE(ea.submitted_at) ORDER BY day", nativeQuery = true)
+    List<Object[]> getDailyAttemptsSince(@org.springframework.data.repository.query.Param("since") java.time.LocalDateTime since);
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT ea.exam_id, e.title, COUNT(*) as attempt_count, AVG(ea.score) as avg_score " +
+           "FROM exam_attempts ea JOIN exams e ON ea.exam_id = e.id " +
+           "WHERE ea.submitted_at IS NOT NULL " +
+           "GROUP BY ea.exam_id, e.title ORDER BY attempt_count DESC LIMIT 5", nativeQuery = true)
+    List<Object[]> findTopExamsByAttemptCount();
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT ea.exam_id, e.title, AVG(ea.score) as avg_score, COUNT(*) as attempt_count " +
+           "FROM exam_attempts ea JOIN exams e ON ea.exam_id = e.id " +
+           "WHERE ea.submitted_at IS NOT NULL " +
+           "GROUP BY ea.exam_id, e.title ORDER BY avg_score ASC LIMIT 5", nativeQuery = true)
+    List<Object[]> findHardestExams();
+}

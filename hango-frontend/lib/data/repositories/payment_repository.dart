@@ -11,7 +11,7 @@ class PaymentRepository {
     final token = prefs.getString('auth_token');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Vui lòng đăng nhập để thanh toán.');
+      throw Exception('Please log in to check out.');
     }
 
     final Map<String, dynamic> bodyData = {};
@@ -32,7 +32,17 @@ class PaymentRepository {
 
     if (response.statusCode != 200) {
       final body = utf8.decode(response.bodyBytes);
-      throw Exception('Tạo thanh toán thất bại: $body');
+      try {
+        final errorMap = jsonDecode(body) as Map<String, dynamic>;
+        if (errorMap.containsKey('error')) {
+          throw Exception(errorMap['error']);
+        }
+      } catch (e) {
+        if (e is Exception && !e.toString().contains('FormatException')) {
+          rethrow;
+        }
+      }
+      throw Exception('Failed to create payment: $body');
     }
 
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;

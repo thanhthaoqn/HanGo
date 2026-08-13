@@ -140,7 +140,7 @@ public class PaymentServiceImpl implements PaymentService {
                     }
 
                     try {
-                        emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), c.getTitle(), "Free");
+                        emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), c.getTitle(), "Free", c.getThumbnailUrl());
                     } catch (Exception e) {
                         log.warn("Failed to send free course enrollment email to {}: {}", user.getEmail(), e.getMessage());
                     }
@@ -182,8 +182,13 @@ public class PaymentServiceImpl implements PaymentService {
         if (frontendBaseUrl.endsWith("/")) {
             frontendBaseUrl = frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1);
         }
-        String cancelUrl = frontendBaseUrl + "/?paymentStatus=failed&courseId=" + primaryCourse.getId();
-        String returnUrl = frontendBaseUrl + "/?paymentStatus=success&courseId=" + primaryCourse.getId();
+        boolean isCartPayment = targetCourseIds.size() > 1;
+        String cancelUrl = isCartPayment 
+                ? frontendBaseUrl + "/?paymentStatus=failed&isCart=true"
+                : frontendBaseUrl + "/?paymentStatus=failed&courseId=" + primaryCourse.getId();
+        String returnUrl = isCartPayment 
+                ? frontendBaseUrl + "/?paymentStatus=success&isCart=true"
+                : frontendBaseUrl + "/?paymentStatus=success&courseId=" + primaryCourse.getId();
 
         // Tạo chữ ký cho PayOS: amount, cancelUrl, description, orderCode, returnUrl sorted alphabetically
         String signatureData = "amount=" + totalAmount.longValue() +
@@ -303,98 +308,127 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             if ("00".equals(code)) {
-                payment.setStatus("SUCCESS");
                 payment.setVnpayTxnNo((String) data.get("reference"));
                 payment.setBankCode("VietQR");
-                payment.setPaidAt(LocalDateTime.now());
-
-                // Calculate Revenue Split (70/30 for PROFESSIONAL, 60/40 for PEER_TUTOR)
-                BigDecimal amount = payment.getAmount();
-                if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
-                    double platformRate = 0.30;
-                    if (payment.getCourse() != null && payment.getCourse().getCreator() != null) {
-                        Long creatorId = payment.getCourse().getCreator().getId();
-                        TrainerProfile profile = trainerProfileRepository.findById(creatorId).orElse(null);
-                        if (profile != null && "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType())) {
-                            platformRate = 0.40;
-                        }
-                    }
-                    BigDecimal platformFee = amount.multiply(BigDecimal.valueOf(platformRate)).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal trainerEarnings = amount.subtract(platformFee);
-
-                    payment.setPlatformFee(platformFee);
-                    payment.setTrainerEarnings(trainerEarnings);
-                    payment.setSettlementStatus("PENDING");
-                }
-
-                paymentRepository.save(payment);
-
-                String formattedAmount = String.format("%,d", amount.longValue());
-                notificationService.notifyUser(payment.getUser(), NotificationService.TYPE_PURCHASE_SUCCESS,
-                        "Payment successful",
-                        "Your payment of " + formattedAmount + " VND was successful. Enjoy your course(s)!",
-                        payment.getCourse());
-
-                // Auto enroll into all courses in payment
-                List<Long> targetIds = new ArrayList<>();
-                if (payment.getCourseIds() != null && !payment.getCourseIds().trim().isEmpty()) {
-                    for (String idStr : payment.getCourseIds().split(",")) {
-                        try {
-                            targetIds.add(Long.parseLong(idStr.trim()));
-                        } catch (Exception ignored) {}
-                    }
-                }
-                if (targetIds.isEmpty() && payment.getCourse() != null) {
-                    targetIds.add(payment.getCourse().getId());
-                }
-
-                for (Long cId : targetIds) {
-                    boolean alreadyEnrolled = enrollmentRepository.existsByUserIdAndCourseId(payment.getUser().getId(), cId);
-                    if (!alreadyEnrolled) {
-                        Course c = courseRepository.findById(cId).orElse(null);
-                        if (c != null) {
-                            Enrollment enrollment = Enrollment.builder()
-                                    .user(payment.getUser())
-                                    .course(c)
-                                    .status("ENROLLED")
-                                    .build();
-                            enrollmentRepository.save(enrollment);
-                            log.info("Auto-enrolled userId={} into courseId={} after PayOS payment",
-                                    payment.getUser().getId(), cId);
-
-                            notificationService.notifyUser(c.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
-                                    "New enrollment",
-                                    payment.getUser().getFullName() + " enrolled in your course \"" + c.getTitle() + "\".",
-                                    c);
-
-                            // Clear paid items from DB cart
-                            cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
-
-                            // Send email confirmation
-                            try {
-                                String priceText = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
-                                        ? String.format("%,.0fđ", c.getPrice())
-                                        : "Free";
-                                emailService.sendEnrollmentSuccessEmail(
-                                        payment.getUser().getEmail(),
-                                        payment.getUser().getFullName(),
-                                        c.getTitle(),
-                                        priceText);
-                            } catch (Exception e) {
-                                log.warn("Failed to send enrollment email to {}: {}", payment.getUser().getEmail(), e.getMessage());
-                            }
-                        }
-                    } else {
-                        // Still ensure cart item is removed if user was somehow already enrolled
-                        cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
-                    }
-                }
+                fulfillPaymentSuccess(payment);
             } else {
                 payment.setStatus("FAILED");
                 paymentRepository.save(payment);
                 log.info("PayOS payment failed for txnRef={}", txnRef);
             }
         });
+    }
+
+    private Map<String, Object> getPayOSPaymentInformation(long orderCode) {
+        try {
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            String url = "https://api-merchant.payos.vn/v2/payment-requests/" + orderCode;
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("x-client-id", clientId);
+            headers.set("x-api-key", apiKey);
+            org.springframework.http.HttpEntity<Void> entity = new org.springframework.http.HttpEntity<>(headers);
+
+            org.springframework.http.ResponseEntity<Map> response = restTemplate.exchange(
+                    url,
+                    org.springframework.http.HttpMethod.GET,
+                    entity,
+                    Map.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+                if ("00".equals(body.get("code")) && body.get("data") != null) {
+                    return (Map<String, Object>) body.get("data");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Error querying PayOS info for orderCode={}: {}", orderCode, e.getMessage());
+        }
+        return null;
+    }
+
+    private void fulfillPaymentSuccess(Payment payment) {
+        if ("SUCCESS".equalsIgnoreCase(payment.getStatus())) {
+            return;
+        }
+        payment.setStatus("SUCCESS");
+        payment.setPaidAt(LocalDateTime.now());
+
+        BigDecimal amount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        double platformRate = 0.30;
+        if (payment.getCourse() != null && payment.getCourse().getCreator() != null) {
+            Long creatorId = payment.getCourse().getCreator().getId();
+            TrainerProfile profile = trainerProfileRepository.findById(creatorId).orElse(null);
+            if (profile != null && "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType())) {
+                platformRate = 0.40;
+            }
+        }
+        BigDecimal platformFee = amount.multiply(BigDecimal.valueOf(platformRate)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal trainerEarnings = amount.subtract(platformFee);
+
+        payment.setPlatformFee(platformFee);
+        payment.setTrainerEarnings(trainerEarnings);
+        payment.setSettlementStatus("PENDING");
+
+        paymentRepository.save(payment);
+
+        String formattedAmount = String.format("%,d", amount.longValue());
+        notificationService.notifyUser(payment.getUser(), NotificationService.TYPE_PURCHASE_SUCCESS,
+                "Payment successful",
+                "Your payment of " + formattedAmount + " VND was successful. Enjoy your course(s)!",
+                payment.getCourse());
+
+        List<Long> targetIds = new ArrayList<>();
+        if (payment.getCourseIds() != null && !payment.getCourseIds().trim().isEmpty()) {
+            for (String idStr : payment.getCourseIds().split(",")) {
+                try {
+                    targetIds.add(Long.parseLong(idStr.trim()));
+                } catch (Exception ignored) {}
+            }
+        }
+        if (targetIds.isEmpty() && payment.getCourse() != null) {
+            targetIds.add(payment.getCourse().getId());
+        }
+
+        for (Long cId : targetIds) {
+            cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
+
+            boolean alreadyEnrolled = enrollmentRepository.existsByUserIdAndCourseId(payment.getUser().getId(), cId);
+            if (!alreadyEnrolled) {
+                Course c = courseRepository.findById(cId).orElse(null);
+                if (c != null) {
+                    Enrollment enrollment = Enrollment.builder()
+                            .user(payment.getUser())
+                            .course(c)
+                            .status("ENROLLED")
+                            .build();
+                    enrollmentRepository.save(enrollment);
+                    log.info("Auto-enrolled userId={} into courseId={} after PayOS payment",
+                            payment.getUser().getId(), cId);
+
+                    notificationService.notifyUser(c.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
+                            "New enrollment",
+                            payment.getUser().getFullName() + " enrolled in your course \"" + c.getTitle() + "\".",
+                            c);
+
+                    try {
+                        String priceText = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                                ? String.format("%,.0fđ", c.getPrice())
+                                : "Free";
+                        emailService.sendEnrollmentSuccessEmail(
+                                payment.getUser().getEmail(),
+                                payment.getUser().getFullName(),
+                                c.getTitle(),
+                                priceText,
+                                c.getThumbnailUrl());
+                    } catch (Exception e) {
+                        log.warn("Failed to send enrollment email to {}: {}", payment.getUser().getEmail(), e.getMessage());
+                    }
+                }
+            } else {
+                cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
+            }
+        }
     }
 
     @Override
@@ -408,11 +442,22 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         String currentStatus = payment.getStatus();
-        if ("PENDING".equalsIgnoreCase(currentStatus) && payment.getCreatedAt() != null
-                && payment.getCreatedAt().isBefore(java.time.LocalDateTime.now().minusMinutes(15))) {
-            payment.setStatus("EXPIRED");
-            paymentRepository.save(payment);
-            currentStatus = "EXPIRED";
+        if ("PENDING".equalsIgnoreCase(currentStatus)) {
+            try {
+                long orderCode = Long.parseLong(txnRef);
+                Map<String, Object> payosData = getPayOSPaymentInformation(orderCode);
+                if (payosData != null && "PAID".equalsIgnoreCase((String) payosData.get("status"))) {
+                    fulfillPaymentSuccess(payment);
+                    currentStatus = "SUCCESS";
+                } else if (payment.getCreatedAt() != null
+                        && payment.getCreatedAt().isBefore(java.time.LocalDateTime.now().minusMinutes(15))) {
+                    payment.setStatus("EXPIRED");
+                    paymentRepository.save(payment);
+                    currentStatus = "EXPIRED";
+                }
+            } catch (Exception e) {
+                log.warn("Failed to query PayOS API for orderCode={}: {}", txnRef, e.getMessage());
+            }
         }
 
         return PaymentStatusDTO.builder()

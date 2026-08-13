@@ -24,8 +24,9 @@ class CartManager {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final userId = prefs.getInt('user_id');
-    if (token != null && token.isNotEmpty && userId != null) {
-      return 'cart_course_ids_user_$userId';
+    if (token != null && token.isNotEmpty) {
+      final idStr = userId != null ? '$userId' : 'logged_in';
+      return 'cart_course_ids_user_$idStr';
     } else {
       return 'guest_cart_course_ids';
     }
@@ -128,7 +129,35 @@ class CartManager {
     }
   }
 
+  static Future<void> clearCart() async {
+    _lastRemoteSyncAt = null;
+    _pendingDeletedCourseIds.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('guest_cart_course_ids');
+    final userId = prefs.getInt('user_id');
+    if (userId != null) {
+      await prefs.remove('cart_course_ids_user_$userId');
+    }
+    cartCoursesNotifier.value = [];
+    cartCountNotifier.value = 0;
+    await updateCount(forceRefresh: true);
+  }
+
+  static Future<void> clearCartOnLogout() async {
+    _lastRemoteSyncAt = null;
+    _pendingDeletedCourseIds.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('guest_cart_course_ids');
+    final userId = prefs.getInt('user_id');
+    if (userId != null) {
+      await prefs.remove('cart_course_ids_user_$userId');
+    }
+    cartCoursesNotifier.value = [];
+    cartCountNotifier.value = 0;
+  }
+
   static Future<void> syncGuestCartOnLogin() async {
+    _lastRemoteSyncAt = null;
     final prefs = await SharedPreferences.getInstance();
     final guestCart = prefs.getStringList('guest_cart_course_ids') ?? [];
     if (guestCart.isNotEmpty) {
@@ -143,7 +172,7 @@ class CartManager {
         debugPrint('Error syncing guest cart to DB: $e');
       }
     }
-    await updateCount();
+    await updateCount(forceRefresh: true);
   }
 
   static Future<void> updateCount({bool forceRefresh = false}) {

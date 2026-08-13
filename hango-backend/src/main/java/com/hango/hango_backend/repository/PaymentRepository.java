@@ -104,6 +104,44 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @org.springframework.data.jpa.repository.Modifying
     @Query("UPDATE Payment p SET p.settlementStatus = 'SETTLED' WHERE p.statementId IS NOT NULL AND (p.settlementStatus IS NULL OR UPPER(p.settlementStatus) != 'SETTLED') AND p.statementId IN (SELECT s.id FROM MonthlyStatement s WHERE UPPER(s.status) = 'PAID')")
     int syncSettledPaymentsForPaidStatements();
+
+    // ── Dashboard aggregate queries ──
+
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.status = 'SUCCESS'")
+    java.math.BigDecimal sumTotalRevenue();
+
+    @Query("SELECT COALESCE(SUM(p.platformFee), 0) FROM Payment p WHERE p.status = 'SUCCESS'")
+    java.math.BigDecimal sumTotalPlatformFee();
+
+    @Query("SELECT COALESCE(SUM(p.trainerEarnings), 0) FROM Payment p WHERE p.status = 'SUCCESS'")
+    java.math.BigDecimal sumTotalTrainerEarnings();
+
+    @Query("SELECT COUNT(p) FROM Payment p WHERE p.status = 'SUCCESS'")
+    long countSuccessful();
+
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.status = 'SUCCESS' AND p.createdAt >= :since")
+    java.math.BigDecimal sumRevenueSince(@Param("since") LocalDateTime since);
+
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.status = 'SUCCESS' AND p.createdAt >= :start AND p.createdAt < :end")
+    java.math.BigDecimal sumRevenueBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT DATE_FORMAT(p.created_at, '%Y-%m') as month, " +
+           "SUM(p.amount) as total_revenue, " +
+           "SUM(p.platform_fee) as platform_fee, " +
+           "SUM(p.trainer_earnings) as trainer_earnings, " +
+           "COUNT(*) as tx_count " +
+           "FROM payments p WHERE p.status = 'SUCCESS' " +
+           "GROUP BY DATE_FORMAT(p.created_at, '%Y-%m') " +
+           "ORDER BY month DESC LIMIT :limit", nativeQuery = true)
+    List<Object[]> getMonthlyRevenueBreakdown(@Param("limit") int limit);
+
+    @Query(value = "SELECT DATE(p.created_at) as day, SUM(p.amount) as revenue, COUNT(*) as tx_count " +
+           "FROM payments p WHERE p.status = 'SUCCESS' AND p.created_at >= :since " +
+           "GROUP BY DATE(p.created_at) ORDER BY day", nativeQuery = true)
+    List<Object[]> getDailyRevenueSince(@Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(p) FROM Payment p WHERE p.status = 'SUCCESS' AND p.course.price = 0")
+    long countFreeEnrollmentPayments();
 }
 
 

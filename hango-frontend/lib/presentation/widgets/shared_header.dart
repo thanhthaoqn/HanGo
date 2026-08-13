@@ -232,6 +232,7 @@ class _SharedHeaderState extends State<SharedHeader> {
 
   void _onUserChanged() {
     if (mounted) {
+      _hideCartOverlay();
       _loadUserInfo();
       if (AuthService.cachedIsLoggedIn == true) {
         _loadNotifications();

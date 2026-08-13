@@ -9,4 +9,9 @@ public interface TrainerProfileRepository extends JpaRepository<TrainerProfile, 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     @org.springframework.data.jpa.repository.Query("SELECT t FROM TrainerProfile t")
     java.util.List<TrainerProfile> findAllWithUser();
+
+    // ── Dashboard aggregate queries ──
+
+    @org.springframework.data.jpa.repository.Query("SELECT t.status, COUNT(t) FROM TrainerProfile t GROUP BY t.status")
+    java.util.List<Object[]> countGroupedByStatus();
 }
