@@ -135,6 +135,10 @@ class _CourseManagerExamAiGeneratePageState extends State<CourseManagerExamAiGen
           'expectedQuestionCount': response.expectedQuestionCount,
           'status': 'DRAFT',
           'aiData': response,
+          'description': response.description,
+          'durationMinutes': response.durationMinutes,
+          'passingScore': response.passingScore,
+          'thumbnailUrl': '',
         });
       }
     } catch (e) {

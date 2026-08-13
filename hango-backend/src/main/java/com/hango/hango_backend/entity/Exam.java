@@ -8,6 +8,14 @@ import java.time.LocalDateTime;
 @Table(name = "exams")
 @Data
 public class Exam {
+
+    public static final String DEFAULT_THUMBNAIL_URL =
+            "https://i.postimg.cc/3r0N7XX3/1786612247888-2782837767096679587-2782837767096679587-9949ba3331c93dfd1b5b113d20c37b92.jpg";
+
+    public static String resolveThumbnailUrl(String thumbnailUrl) {
+        return (thumbnailUrl == null || thumbnailUrl.isBlank()) ? DEFAULT_THUMBNAIL_URL : thumbnailUrl;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

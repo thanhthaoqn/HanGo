@@ -25,7 +25,8 @@ public class EmailService {
         message.setText("Hello,\n\n" +
                 "You requested to reset your password. Please use the following 6-digit OTP code to proceed:\n\n" +
                 otpCode + "\n\n" +
-                "This OTP code is valid for 5 minutes. If you did not request this, you can safely ignore this email.\n\n" +
+                "This OTP code is valid for 5 minutes. If you did not request this, you can safely ignore this email.\n\n"
+                +
                 "Best regards,\n" +
                 "HanGo Team");
 
@@ -44,12 +45,14 @@ public class EmailService {
     }
 
     public void sendVerificationEmail(String toEmail, String verificationToken) {
-        String verifyUrl = appBaseUrl + "/api/auth/verify?token=" + URLEncoder.encode(verificationToken, StandardCharsets.UTF_8);
+        String verifyUrl = appBaseUrl + "/api/auth/verify?token="
+                + URLEncoder.encode(verificationToken, StandardCharsets.UTF_8);
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
         message.setSubject("HanGo - Verify Your Account");
         message.setText("Hello,\n\n" +
-                "Thank you for registering on HanGo. Please click the link below to verify and activate your account:\n\n" +
+                "Thank you for registering on HanGo. Please click the link below to verify and activate your account:\n\n"
+                +
                 verifyUrl + "\n\n" +
                 "Best regards,\n" +
                 "HanGo Team");
@@ -79,7 +82,8 @@ public class EmailService {
             subject = "HanGo - Trainer Profile Approved!";
             contentText = "Congratulations!\n\n" +
                     "Your Trainer application on HanGo has been APPROVED. " +
-                    "You can now complete your payout setup to access your Trainer Dashboard, create courses, and publish exams.\n\n" +
+                    "You can now complete your payout setup to access your Trainer Dashboard, create courses, and publish exams.\n\n"
+                    +
                     (adminNotes != null && !adminNotes.trim().isEmpty() ? "Notes: " + adminNotes + "\n\n" : "") +
                     "Access your account now: https://hangog92.online/login\n\n" +
                     "Thank you for joining HanGo!\n\n" +
@@ -97,8 +101,12 @@ public class EmailService {
             subject = "HanGo - Trainer Application Rejected";
             contentText = "Hello,\n\n" +
                     "Your Trainer application on HanGo has been REJECTED by the Administrator.\n\n" +
-                    (adminNotes != null && !adminNotes.trim().isEmpty() ? "Rejection Reason & Required Edits: " + adminNotes + "\n\n" : "Please log into HanGo to view rejection details.\n\n") +
-                    "Please log into your account, update your profile details and certificates as requested, and resubmit:\n" +
+                    (adminNotes != null && !adminNotes.trim().isEmpty()
+                            ? "Rejection Reason & Required Edits: " + adminNotes + "\n\n"
+                            : "Please log into HanGo to view rejection details.\n\n")
+                    +
+                    "Please log into your account, update your profile details and certificates as requested, and resubmit:\n"
+                    +
                     "https://hangog92.online/login\n\n" +
                     "Best regards,\n" +
                     "HanGo EdTech Team";
@@ -112,7 +120,8 @@ public class EmailService {
                 mailSender.send(message);
                 System.out.println("[EMAIL SUCCESS] Sent status update email to trainer: " + toEmail);
             } else {
-                System.out.println("[EMAIL WARN] JavaMailSender not initialized. Trainer Status Email: " + toEmail + " -> " + status);
+                System.out.println("[EMAIL WARN] JavaMailSender not initialized. Trainer Status Email: " + toEmail
+                        + " -> " + status);
             }
         } catch (Exception e) {
             System.err.println("[EMAIL WARNING] Could not send trainer status email: " + e.getMessage());
@@ -123,9 +132,11 @@ public class EmailService {
         sendEnrollmentSuccessEmail(toEmail, learnerName, courseTitle, priceText, null);
     }
 
-    public void sendEnrollmentSuccessEmail(String toEmail, String learnerName, String courseTitle, String priceText, String courseImageUrl) {
+    public void sendEnrollmentSuccessEmail(String toEmail, String learnerName, String courseTitle, String priceText,
+            String courseImageUrl) {
         final String safeName = (learnerName != null && !learnerName.trim().isEmpty()) ? learnerName.trim() : "Learner";
-        final String safeTitle = (courseTitle != null && !courseTitle.trim().isEmpty()) ? courseTitle.trim() : "HanGo Online Course";
+        final String safeTitle = (courseTitle != null && !courseTitle.trim().isEmpty()) ? courseTitle.trim()
+                : "HanGo Online Course";
         final String safePrice = (priceText != null && !priceText.trim().isEmpty()) ? priceText.trim() : "Free";
         final String safeImageUrl = (courseImageUrl != null && !courseImageUrl.trim().isEmpty())
                 ? courseImageUrl.trim()
@@ -162,7 +173,8 @@ public class EmailService {
                 + "                <tr>"
                 + "                  <td align=\"center\" style=\"padding-bottom: 28px;\">"
                 + "                    <p style=\"margin: 0; color: #64748b; font-size: 15px; line-height: 1.6; text-align: center;\">"
-                + "                      Hi <strong style=\"color: #0f172a;\">" + safeName + "</strong>, your course registration is confirmed. You now have full unlimited access to all course contents."
+                + "                      Hi <strong style=\"color: #0f172a;\">" + safeName
+                + "</strong>, your course registration is confirmed. You now have full unlimited access to all course contents."
                 + "                    </p>"
                 + "                  </td>"
                 + "                </tr>"
@@ -170,16 +182,19 @@ public class EmailService {
                 + "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 28px;\">"
                 + "                <tr>"
                 + "                  <td style=\"padding: 0;\">"
-                + "                    <img src=\"" + safeImageUrl + "\" alt=\"" + safeTitle + "\" style=\"width: 100%; max-height: 240px; object-fit: cover; display: block; border-bottom: 1px solid #e2e8f0;\">"
+                + "                    <img src=\"" + safeImageUrl + "\" alt=\"" + safeTitle
+                + "\" style=\"width: 100%; max-height: 240px; object-fit: cover; display: block; border-bottom: 1px solid #e2e8f0;\">"
                 + "                  </td>"
                 + "                </tr>"
                 + "                <tr>"
                 + "                  <td style=\"padding: 20px 24px;\">"
-                + "                    <h2 style=\"margin: 0 0 8px 0; color: #0f172a; font-size: 18px; font-weight: 700; line-height: 1.4;\">" + safeTitle + "</h2>"
+                + "                    <h2 style=\"margin: 0 0 8px 0; color: #0f172a; font-size: 18px; font-weight: 700; line-height: 1.4;\">"
+                + safeTitle + "</h2>"
                 + "                    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 12px;\">"
                 + "                      <tr>"
                 + "                        <td style=\"color: #64748b; font-size: 14px;\">Tuition Fee:</td>"
-                + "                        <td align=\"right\" style=\"color: #28b79b; font-size: 16px; font-weight: 800;\">" + safePrice + "</td>"
+                + "                        <td align=\"right\" style=\"color: #28b79b; font-size: 16px; font-weight: 800;\">"
+                + safePrice + "</td>"
                 + "                      </tr>"
                 + "                      <tr>"
                 + "                        <td style=\"color: #64748b; font-size: 14px; padding-top: 6px;\">Access Status:</td>"
@@ -199,7 +214,7 @@ public class EmailService {
                 + "                </tr>"
                 + "              </table>"
                 + "              <p style=\"margin: 0; color: #94a3b8; font-size: 13px; text-align: center; line-height: 1.5;\">"
-                + "                If you have any questions, contact our support team at <a href=\"mailto:support@hangog92.online\" style=\"color: #28b79b; text-decoration: none;\">support@hangog92.online</a>."
+                + "                If you have any questions, contact our support team at <a href=\"mailto:hangog92su26@gmail.com\" style=\"color: #28b79b; text-decoration: none;\">support@hangog92.online</a>."
                 + "              </p>"
                 + "            </td>"
                 + "          </tr>"
@@ -219,31 +234,40 @@ public class EmailService {
         try {
             if (mailSender != null) {
                 jakarta.mail.internet.MimeMessage mimeMessage = mailSender.createMimeMessage();
-                org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(mimeMessage, true, "UTF-8");
+                org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
+                        mimeMessage, true, "UTF-8");
                 helper.setTo(toEmail);
                 helper.setSubject("HanGo - Course Enrollment Confirmation");
                 helper.setText(htmlContent, true);
                 mailSender.send(mimeMessage);
-                System.out.println("[EMAIL SUCCESS] Sent HTML enrollment email with logo & course image to: " + toEmail);
+                System.out
+                        .println("[EMAIL SUCCESS] Sent HTML enrollment email with logo & course image to: " + toEmail);
             } else {
-                System.out.println("[EMAIL SUCCESS LOG] HTML Enrollment Email: " + toEmail + " -> Course: " + safeTitle + " (" + safePrice + ")");
+                System.out.println("[EMAIL SUCCESS LOG] HTML Enrollment Email: " + toEmail + " -> Course: " + safeTitle
+                        + " (" + safePrice + ")");
             }
         } catch (Exception e) {
             System.err.println("[EMAIL WARNING] Could not send enrollment HTML email: " + e.getMessage());
         }
     }
 
-    public void sendSettlementPaidEmail(String toEmail, String trainerName, String periodMonth, String netPayoutText, String bankTxnRef, String receiptUrl) {
+    public void sendSettlementPaidEmail(String toEmail, String trainerName, String periodMonth, String netPayoutText,
+            String bankTxnRef, String receiptUrl) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(toEmail);
         message.setSubject("HanGo - Monthly Revenue Settlement Confirmation");
-        message.setText("Dear " + (trainerName != null && !trainerName.trim().isEmpty() ? trainerName : "Trainer") + ",\n\n" +
-                "Your monthly revenue payout for period " + periodMonth + " has been successfully processed and transferred to your registered bank account.\n\n" +
+        message.setText("Dear " + (trainerName != null && !trainerName.trim().isEmpty() ? trainerName : "Trainer")
+                + ",\n\n" +
+                "Your monthly revenue payout for period " + periodMonth
+                + " has been successfully processed and transferred to your registered bank account.\n\n" +
                 "PAYOUT DETAILS:\n" +
                 "- Statement Period: " + periodMonth + "\n" +
                 "- Net Payout Amount: " + netPayoutText + "\n" +
-                (bankTxnRef != null && !bankTxnRef.trim().isEmpty() ? "- Bank Transaction Ref: " + bankTxnRef + "\n" : "") +
-                (receiptUrl != null && !receiptUrl.trim().isEmpty() ? "- Payout Receipt URL: " + receiptUrl + "\n" : "") +
+                (bankTxnRef != null && !bankTxnRef.trim().isEmpty() ? "- Bank Transaction Ref: " + bankTxnRef + "\n"
+                        : "")
+                +
+                (receiptUrl != null && !receiptUrl.trim().isEmpty() ? "- Payout Receipt URL: " + receiptUrl + "\n" : "")
+                +
                 "- Status: PAID & COMPLETED\n\n" +
                 "You can log into your Trainer Dashboard to review full transaction items and statements:\n" +
                 "https://hangog92.online/trainer/revenue\n\n" +
@@ -256,7 +280,8 @@ public class EmailService {
                 mailSender.send(message);
                 System.out.println("[EMAIL SUCCESS] Sent revenue settlement confirmation email to: " + toEmail);
             } else {
-                System.out.println("[EMAIL SUCCESS LOG] Revenue Settlement Email: " + toEmail + " -> Period: " + periodMonth + " (" + netPayoutText + ")");
+                System.out.println("[EMAIL SUCCESS LOG] Revenue Settlement Email: " + toEmail + " -> Period: "
+                        + periodMonth + " (" + netPayoutText + ")");
             }
         } catch (Exception e) {
             System.err.println("[EMAIL WARNING] Could not send settlement email: " + e.getMessage());

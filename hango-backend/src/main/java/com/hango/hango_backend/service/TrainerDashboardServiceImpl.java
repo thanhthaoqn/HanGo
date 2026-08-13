@@ -940,7 +940,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         exam.setExpectedQuestionCount(request.getExpectedQuestionCount());
         exam.setPassingScore(request.getPassingScore());
         exam.setDurationMinutes(request.getDurationMinutes());
-        exam.setThumbnailUrl(request.getThumbnailUrl());
+        exam.setThumbnailUrl(com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(request.getThumbnailUrl()));
 
         exam.setStatus("DRAFT");
         exam.setVisibility("PRIVATE");
@@ -973,7 +973,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         exam.setExpectedQuestionCount(request.getExpectedQuestionCount());
         exam.setPassingScore(request.getPassingScore());
         exam.setDurationMinutes(request.getDurationMinutes());
-        exam.setThumbnailUrl(request.getThumbnailUrl());
+        exam.setThumbnailUrl(com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(request.getThumbnailUrl()));
 
         if ("PUBLISHED".equals(exam.getStatus()) && !isCourseManagerOrAdmin) {
             exam.setStatus("SUBMITTED");

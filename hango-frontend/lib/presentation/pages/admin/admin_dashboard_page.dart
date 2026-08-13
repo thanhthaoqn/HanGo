@@ -1846,7 +1846,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildMainContent(bool isDesktop) {
     switch (_selectedMenuIndex) {
       case 0:
-        return ComprehensiveDashboardTab(isDesktop: isDesktop);
+        return ComprehensiveDashboardTab(
+          isDesktop: isDesktop,
+          onNavigate: (index) {
+            setState(() {
+              _selectedMenuIndex = index;
+            });
+            _initializeTab(index);
+          },
+        );
       case 1:
         return _buildAccountsTab();
       case 2:
@@ -1870,7 +1878,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       case 8:
         return const ManagementTicketsPage(isEmbedded: true);
       default:
-        return ComprehensiveDashboardTab(isDesktop: isDesktop);
+        return ComprehensiveDashboardTab(
+          isDesktop: isDesktop,
+          onNavigate: (index) {
+            setState(() {
+              _selectedMenuIndex = index;
+            });
+            _initializeTab(index);
+          },
+        );
     }
   }
 

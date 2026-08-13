@@ -655,25 +655,6 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
         children: [
           Row(
             children: [
-              // Drag handle
-              if (widget.mode != MatrixMode.view)
-                Tooltip(
-                  message: 'Hold to reorder',
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.grab,
-                    child: ReorderableDragStartListener(
-                      index: index,
-                      child: const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: Icon(
-                          Icons.drag_indicator,
-                          color: Color(0xFFCBD5E1),
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               Expanded(
                 child: Row(
                   children: [

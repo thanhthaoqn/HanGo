@@ -1203,7 +1203,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  child: Wrap(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
                   alignment: WrapAlignment.end,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 12,
@@ -1443,6 +1445,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     ],
                   ],
                 ),
+                  ),
               ),
               ),
             ],
@@ -1648,27 +1651,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildLabel('GROUP TYPE'),
-                      _buildDropdown(
-                        value: block.selectedGroupTypeId,
-                        items: _groupTypes,
-                        onChanged: (val) =>
-                            setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'paramValue',
-                        errorText: block.groupTypeError,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
                       _buildLabel('DIFFICULTY'),
                       _buildDropdown(
                         value: block.questions.isNotEmpty
@@ -1689,34 +1671,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('STATUS'),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Text(
-                          'Draft',
-                          style: TextStyle(
-                            color: Color(0xFF475569),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ] else ...[
@@ -1733,34 +1687,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                         onChanged: (val) =>
                             setState(() => block.selectedGroupTypeId = val),
                         displayKey: 'paramValue',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('STATUS'),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Text(
-                          'Draft',
-                          style: TextStyle(
-                            color: Color(0xFF475569),
-                            fontSize: 14,
-                          ),
-                        ),
                       ),
                     ],
                   ),

@@ -45,6 +45,10 @@ public class ExamImportController {
         Long firstExamId = null;
         String firstExamTitle = null;
         Integer firstExamExpectedCount = null;
+        String firstExamDescription = null;
+        Double firstExamPassingScore = null;
+        Integer firstExamDurationMinutes = null;
+        String firstExamThumbnailUrl = null;
 
         try (InputStream is = file.getInputStream();
                 Workbook workbook = new XSSFWorkbook(is)) {
@@ -67,7 +71,7 @@ public class ExamImportController {
                 String qCountStr = getCellString(row, 3);
                 String passingScoreStr = getCellString(row, 4);
                 String timeStr = getCellString(row, 5);
-                String thumbnailUrl = getCellString(row, 6);
+                String thumbnailUrl = com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(getCellString(row, 6));
 
                 if (title == null || title.isBlank())
                     throw new IllegalArgumentException("Title is required at row " + (i + 1));
@@ -98,10 +102,7 @@ public class ExamImportController {
                     ps.setInt(4, qCount);
                     ps.setDouble(5, passingScore);
                     ps.setInt(6, durationMinutes);
-                    if (thumbnailUrl != null)
-                        ps.setString(7, thumbnailUrl);
-                    else
-                        ps.setNull(7, java.sql.Types.VARCHAR);
+                    ps.setString(7, thumbnailUrl);
                     return ps;
                 }, examKh);
 
@@ -113,6 +114,10 @@ public class ExamImportController {
                         firstExamId = examKey.longValue();
                         firstExamTitle = title;
                         firstExamExpectedCount = qCount;
+                        firstExamDescription = description;
+                        firstExamPassingScore = passingScore;
+                        firstExamDurationMinutes = durationMinutes;
+                        firstExamThumbnailUrl = thumbnailUrl;
                     }
                     System.out.println("Created exam: " + examCode + " with ID: " + examKey.longValue());
                 }
@@ -291,6 +296,10 @@ public class ExamImportController {
             responseBody.put("examId", firstExamId);
             responseBody.put("examTitle", firstExamTitle);
             responseBody.put("examExpectedQuestionCount", firstExamExpectedCount);
+            responseBody.put("examDescription", firstExamDescription);
+            responseBody.put("examPassingScore", firstExamPassingScore);
+            responseBody.put("examDurationMinutes", firstExamDurationMinutes);
+            responseBody.put("examThumbnailUrl", firstExamThumbnailUrl);
         }
         return ResponseEntity.ok(responseBody);
     }

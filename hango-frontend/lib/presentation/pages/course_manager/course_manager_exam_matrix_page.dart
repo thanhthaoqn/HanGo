@@ -505,11 +505,21 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                           'title': _titleController.text.trim(),
                                           'expectedQuestionCount': totalQuestions,
                                           'status': 'DRAFT',
+                                          'description': _descriptionController.text.trim(),
+                                          'durationMinutes': int.tryParse(_durationController.text.trim()),
+                                          'passingScore': double.tryParse(_passingScoreController.text.trim()),
                                         });
                                       }
                                     } catch (e) {
                                       if (mounted) {
-                                        ToastHelper.show(context, 'System error, please try again later.', isError: true);
+                                        final match = RegExp(r'"error"\s*:\s*"([^"]*)"')
+                                            .firstMatch(e.toString());
+                                        ToastHelper.show(
+                                          context,
+                                          match?.group(1) ??
+                                              'System error, please try again later.',
+                                          isError: true,
+                                        );
                                       }
                                     }
                                   },

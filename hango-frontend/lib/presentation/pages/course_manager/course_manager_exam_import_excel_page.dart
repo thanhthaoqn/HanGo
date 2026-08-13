@@ -109,6 +109,10 @@ class _CourseManagerExamImportExcelPageState
                 response['examExpectedQuestionCount'] as int? ??
                 questionsImported,
             'status': 'DRAFT',
+            'description': response['examDescription'] as String?,
+            'passingScore': response['examPassingScore'],
+            'durationMinutes': response['examDurationMinutes'] as int?,
+            'thumbnailUrl': response['examThumbnailUrl'] as String?,
           });
         } else {
           (widget.onImportSuccess ?? widget.onBack)();
@@ -440,7 +444,8 @@ class _CourseManagerExamImportExcelPageState
                           ),
                         )
                       else
-                        Wrap(
+                        Center(
+                          child: Wrap(
                           alignment: WrapAlignment.center,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           spacing: 24,
@@ -496,6 +501,7 @@ class _CourseManagerExamImportExcelPageState
                               ),
                             ),
                           ],
+                          ),
                         ),
                     ],
                   ),
