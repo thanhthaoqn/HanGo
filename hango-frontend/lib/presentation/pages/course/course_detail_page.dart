@@ -16,6 +16,7 @@ import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/payment_qr_dialog.dart';
+import '../../widgets/refund_request_modal.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final int courseId;
@@ -730,147 +731,16 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     }
   }
 
-  void _showUnenrollConfirmDialog(CourseDetail course) {
+  void _showRefundRequestModal(CourseDetail course) {
     showDialog(
       context: context,
-      builder: (ctx) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: 10,
-          backgroundColor: Colors.white,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 400),
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFEE2E2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.warning_amber_rounded,
-                    color: Color(0xFFEF4444),
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Cancel Enrollment',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Are you sure you want to cancel your enrollment for ${course.title}?',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF64748B),
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'No, Keep It',
-                          style: TextStyle(
-                            color: Color(0xFF475569),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _unenroll(course);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF4444),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Yes, Cancel',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (ctx) => RefundRequestModal(
+        courseId: course.id,
+        courseTitle: course.title,
+        priceText: _getCoursePrice(course),
+        courseImageUrl: course.thumbnailUrl,
+      ),
     );
-  }
-
-  void _unenroll(CourseDetail course) async {
-    setState(() {
-      _isUnenrolling = true;
-      // Optimistic update to immediately reflect the state in UI without visual jumps
-      _courseDetail = course.copyWith(
-        isEnrolled: false,
-        learnersCount: (course.learnersCount - 1).clamp(0, 999999),
-      );
-    });
-    try {
-      await _repository.unenrollCourse(course.id);
-      if (!mounted) return;
-
-      _showNotification('You have successfully canceled your enrollment.');
-
-      // Silently fetch fresh details in background to sync any other backend updates
-      final updated = await _repository.fetchCourseDetail(widget.courseId);
-      if (mounted) {
-        setState(() {
-          _courseDetail = updated;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      // Rollback optimistic update
-      setState(() {
-        _courseDetail = course;
-      });
-      _showNotification('Failed to cancel enrollment: $e', isError: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUnenrolling = false;
-        });
-      }
-    }
   }
 
   @override

@@ -11,6 +11,7 @@ import '../../../utils/language_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'learner_home_page.dart';
+import '../trainer/trainer_tickets_page.dart';
 
 class MyInformationPage extends StatefulWidget {
   final int initialTab;
@@ -171,7 +172,9 @@ class _MyInformationPageState extends State<MyInformationPage> {
                                             ? _buildInformationTab(isDesktop)
                                             : _activeTab == 1
                                             ? _buildChangePasswordTab(isDesktop)
-                                            : const _PaymentHistoryPanel(),
+                                            : _activeTab == 2
+                                            ? const _PaymentHistoryPanel()
+                                            : const TrainerTicketsPage(isEmbedded: true),
                                       ),
                                     ],
                                   )
@@ -185,7 +188,9 @@ class _MyInformationPageState extends State<MyInformationPage> {
                                           ? _buildInformationTab(isDesktop)
                                           : _activeTab == 1
                                           ? _buildChangePasswordTab(isDesktop)
-                                          : const _PaymentHistoryPanel(),
+                                          : _activeTab == 2
+                                          ? const _PaymentHistoryPanel()
+                                          : const TrainerTicketsPage(isEmbedded: true),
                                     ],
                                   ),
                           ),
@@ -254,6 +259,14 @@ class _MyInformationPageState extends State<MyInformationPage> {
             index: 2,
             icon: Icons.receipt_long_rounded,
             label: 'Purchase History',
+            isDesktop: isDesktop,
+          ),
+          const SizedBox(height: 8),
+          // Tab 3: Support & Tickets
+          _buildSidebarTabButton(
+            index: 3,
+            icon: Icons.confirmation_number_outlined,
+            label: 'Support & Tickets',
             isDesktop: isDesktop,
           ),
         ],
