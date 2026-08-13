@@ -95,7 +95,7 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         if (mounted) {
           ToastHelper.showSuccess(
             context,
-            'Payment successful! Course unlocked.',
+            'Payment successful! ${courseId != null ? "Course unlocked." : "Courses unlocked."}',
           );
         }
       } else {
@@ -114,6 +114,7 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         );
       } else if (mounted) {
         setState(() {
+          _currentIndex = 6; // Return directly to Shopping Cart tab
           _isRedirecting = false;
         });
       }

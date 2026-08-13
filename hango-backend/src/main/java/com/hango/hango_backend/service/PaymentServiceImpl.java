@@ -182,8 +182,13 @@ public class PaymentServiceImpl implements PaymentService {
         if (frontendBaseUrl.endsWith("/")) {
             frontendBaseUrl = frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1);
         }
-        String cancelUrl = frontendBaseUrl + "/?paymentStatus=failed&courseId=" + primaryCourse.getId();
-        String returnUrl = frontendBaseUrl + "/?paymentStatus=success&courseId=" + primaryCourse.getId();
+        boolean isCartPayment = targetCourseIds.size() > 1;
+        String cancelUrl = isCartPayment 
+                ? frontendBaseUrl + "/?paymentStatus=failed&isCart=true"
+                : frontendBaseUrl + "/?paymentStatus=failed&courseId=" + primaryCourse.getId();
+        String returnUrl = isCartPayment 
+                ? frontendBaseUrl + "/?paymentStatus=success&isCart=true"
+                : frontendBaseUrl + "/?paymentStatus=success&courseId=" + primaryCourse.getId();
 
         // Tạo chữ ký cho PayOS: amount, cancelUrl, description, orderCode, returnUrl sorted alphabetically
         String signatureData = "amount=" + totalAmount.longValue() +
