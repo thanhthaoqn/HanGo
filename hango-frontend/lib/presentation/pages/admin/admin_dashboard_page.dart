@@ -1770,18 +1770,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   title: 'Comment',
                   isMobileDrawer: isMobileDrawer,
                 ),
+                const SizedBox(height: 8),
                 _buildSidebarMenuItem(
                   index: 6,
                   icon: Icons.rate_review_outlined,
                   title: 'Approvals',
                   isMobileDrawer: isMobileDrawer,
                 ),
-                _buildSidebarMenuItem(
-                  index: 7,
-                  icon: Icons.history_outlined,
-                  title: 'Audit Log',
-                  isMobileDrawer: isMobileDrawer,
-                ),
+                // Audit Log hidden — feature kept but sidebar entry disabled
+                // _buildSidebarMenuItem(
+                //   index: 7,
+                //   icon: Icons.history_outlined,
+                //   title: 'Audit Log',
+                //   isMobileDrawer: isMobileDrawer,
+                // ),
                 const SizedBox(height: 8),
                 _buildSidebarMenuItem(
                   index: 8,
