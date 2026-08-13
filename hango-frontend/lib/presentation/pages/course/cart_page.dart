@@ -508,25 +508,7 @@ class _CartPageState extends State<CartPage> {
                   final isFree = course.price <= 0;
                   
                   if (isEnrolled) {
-                    return ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CourseDetailPage(courseId: course.id),
-                          ),
-                        );
-                      },
-                      child: Text(
-                        isVi ? 'Học ngay' : 'Study Now',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
-                      ),
-                    );
+                    return const SizedBox.shrink();
                   } else if (isFree) {
                     if (!_canEnroll) {
                       return const SizedBox.shrink();
