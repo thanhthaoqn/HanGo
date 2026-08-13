@@ -128,7 +128,16 @@ class CartManager {
     }
   }
 
+  static Future<void> clearCartOnLogout() async {
+    _lastRemoteSyncAt = null;
+    _pendingDeletedCourseIds.clear();
+    cartCoursesNotifier.value = [];
+    cartCountNotifier.value = 0;
+    await updateCount(forceRefresh: true);
+  }
+
   static Future<void> syncGuestCartOnLogin() async {
+    _lastRemoteSyncAt = null;
     final prefs = await SharedPreferences.getInstance();
     final guestCart = prefs.getStringList('guest_cart_course_ids') ?? [];
     if (guestCart.isNotEmpty) {
@@ -143,7 +152,7 @@ class CartManager {
         debugPrint('Error syncing guest cart to DB: $e');
       }
     }
-    await updateCount();
+    await updateCount(forceRefresh: true);
   }
 
   static Future<void> updateCount({bool forceRefresh = false}) {

@@ -274,7 +274,7 @@ class AuthService {
       debugPrint('Error disconnecting Google Sign In: $e');
     }
 
-    await CartManager.updateCount();
+    await CartManager.clearCartOnLogout();
   }
 
   // Perform registration request
