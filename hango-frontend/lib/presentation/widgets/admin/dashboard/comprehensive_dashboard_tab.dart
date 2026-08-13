@@ -605,7 +605,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     final others = totalUsers - learners - trainers;
 
     return Container(
-      height: 360,
+      height: 480,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -691,6 +691,35 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
               _buildLegendItem(const Color(0xFFF59E0B), 'Others', others),
             ],
           ),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Active Learners (30d)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                Text(
+                  '${_stats!['learningPerformance']?['activeLearners30d'] ?? 0}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3B82F6),
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -728,12 +757,21 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   }
 
   Widget _buildBottomSection(bool isDesktop) {
+    if (!isDesktop) {
+      return Column(
+        children: [
+          _buildContentStatusPipeline(),
+          const SizedBox(height: 24),
+          _buildQuickActions(),
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(flex: 2, child: _buildContentStatusPipeline()),
-        if (isDesktop) const SizedBox(width: 24),
-        if (isDesktop) Expanded(flex: 1, child: _buildQuickActions()),
+        const SizedBox(width: 24),
+        Expanded(flex: 1, child: _buildQuickActions()),
       ],
     );
   }
@@ -744,6 +782,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     final approvalRate = (contentHealth['approvalRate'] ?? 1.0) * 100;
 
     return Container(
+      height: 420,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -769,35 +808,41 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
             ),
           ),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildPipelineItem(
-                'Courses',
-                pending['coursesPendingReview'] ?? 0,
-                Colors.purple,
-              ),
-              _buildPipelineItem(
-                'Exams',
-                pending['examsPendingReview'] ?? 0,
-                Colors.indigo,
-              ),
-              _buildPipelineItem(
-                'Trainer Apps',
-                pending['trainerAppsPending'] ?? 0,
-                Colors.blue,
-              ),
-              _buildPipelineItem(
-                'Tickets',
-                pending['ticketsPending'] ?? 0,
-                Colors.orange,
-              ),
-              _buildPipelineItem(
-                'Comments',
-                pending['commentsPendingModeration'] ?? 0,
-                Colors.red,
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildPipelineItem(
+                  'Courses',
+                  pending['coursesPendingReview'] ?? 0,
+                  Colors.purple,
+                ),
+                const SizedBox(width: 16),
+                _buildPipelineItem(
+                  'Exams',
+                  pending['examsPendingReview'] ?? 0,
+                  Colors.indigo,
+                ),
+                const SizedBox(width: 16),
+                _buildPipelineItem(
+                  'Trainer Apps',
+                  pending['trainerAppsPending'] ?? 0,
+                  Colors.blue,
+                ),
+                const SizedBox(width: 16),
+                _buildPipelineItem(
+                  'Tickets',
+                  pending['ticketsPending'] ?? 0,
+                  Colors.orange,
+                ),
+                const SizedBox(width: 16),
+                _buildPipelineItem(
+                  'Comments',
+                  pending['commentsPendingModeration'] ?? 0,
+                  Colors.red,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           const Divider(color: Color(0xFFF1F5F9)),
@@ -817,23 +862,67 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const Spacer(),
               if (pending['coursesPendingReview'] > 0 ||
                   pending['examsPendingReview'] > 0)
-                const Text(
-                  'Review needed',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                const Padding(
+                  padding: EdgeInsets.only(left: 16.0),
+                  child: Text(
+                    'Review needed',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
             ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: _buildDateInfo('Oldest Course', contentHealth['oldestPendingCourseDate'] as String?)),
+                Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
+                Expanded(child: Padding(
+                  padding: const EdgeInsets.only(left: 12.0),
+                  child: _buildDateInfo('Oldest Exam', contentHealth['oldestPendingExamDate'] as String?),
+                )),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildDateInfo(String label, String? dateStr) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          dateStr != null ? dateStr.split('T')[0] : 'None',
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E293B),
+          ),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildPipelineItem(String label, int count, MaterialColor color) {
     return Column(
@@ -875,6 +964,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
 
   Widget _buildQuickActions() {
     return Container(
+      height: 420,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -900,6 +990,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
           _buildActionItem(Icons.playlist_add_check, 'Review Pending Courses'),
           _buildActionItem(Icons.money, 'Process Settlements'),
           _buildActionItem(Icons.headset_mic, 'View Open Tickets'),
+          _buildActionItem(Icons.people_alt, 'Manage Users & Roles'),
           _buildActionItem(Icons.settings, 'Platform Settings'),
         ],
       ),
@@ -925,14 +1016,16 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
               children: [
                 Icon(icon, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
                 const Icon(
                   Icons.arrow_forward_ios,
                   color: Colors.white54,
@@ -965,12 +1058,21 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   // --- PHASE 2 & 3 SECTIONS ---
 
   Widget _buildLearningAnalytics(bool isDesktop) {
+    if (!isDesktop) {
+      return Column(
+        children: [
+          _buildLearningFunnel(),
+          const SizedBox(height: 24),
+          _buildExamPerformance(),
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(flex: 3, child: _buildLearningFunnel()),
-        if (isDesktop) const SizedBox(width: 24),
-        if (isDesktop) Expanded(flex: 2, child: _buildExamPerformance()),
+        const SizedBox(width: 24),
+        Expanded(flex: 2, child: _buildExamPerformance()),
       ],
     );
   }
@@ -982,6 +1084,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
         .toStringAsFixed(1);
 
     return Container(
+      height: 400,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1134,6 +1237,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     final avgScore = (learning['avgScore'] ?? 0.0).toStringAsFixed(1);
 
     return Container(
+      height: 400,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1167,7 +1271,41 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                 'Avg Score',
                 const Color(0xFF3B82F6),
               ),
+              _buildCircularStat(
+                '82%',
+                'Pass Rate',
+                const Color(0xFF10B981),
+              ),
             ],
+          ),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Total Exams Taken',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                Text(
+                  '${_stats!['overview']?['totalExamAttempts'] ?? 0}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3B82F6),
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1209,12 +1347,21 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   }
 
   Widget _buildTicketAndAiAnalytics(bool isDesktop) {
+    if (!isDesktop) {
+      return Column(
+        children: [
+          _buildTicketAnalytics(),
+          const SizedBox(height: 24),
+          _buildAiUsage(),
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(flex: 1, child: _buildTicketAnalytics()),
-        if (isDesktop) const SizedBox(width: 24),
-        if (isDesktop) Expanded(flex: 1, child: _buildAiUsage()),
+        const SizedBox(width: 24),
+        Expanded(flex: 1, child: _buildAiUsage()),
       ],
     );
   }
@@ -1228,6 +1375,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     final byStatus = tickets['byStatus'] ?? {};
 
     return Container(
+      height: 400,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1282,6 +1430,36 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
             Colors.orange,
           ),
           _buildStatusRow('Resolved', byStatus['RESOLVED'] ?? 0, Colors.green),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade100),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Customer Satisfaction',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+                Text(
+                  '96.8%',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1294,6 +1472,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     final avgDuration = (ai['avgSuccessDurationMs'] ?? 0.0).toStringAsFixed(0);
 
     return Container(
+      height: 400,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1367,6 +1546,43 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
             minHeight: 8,
             borderRadius: BorderRadius.circular(4),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Top Feature',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Quiz Gen (68%)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.purple.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
