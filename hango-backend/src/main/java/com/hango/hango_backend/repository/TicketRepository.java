@@ -38,4 +38,23 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     long countByStatus(String status);
     long countByUserId(Long userId);
     long countByUserIdAndStatus(Long userId, String status);
+
+    // ── Dashboard aggregate queries ──
+
+    @Query("SELECT t.category, COUNT(t) FROM Ticket t GROUP BY t.category")
+    java.util.List<Object[]> countByCategory();
+
+    @Query("SELECT t.status, COUNT(t) FROM Ticket t GROUP BY t.status")
+    java.util.List<Object[]> countGroupedByStatus();
+
+    @Query(value = "SELECT AVG(TIMESTAMPDIFF(HOUR, t.created_at, tm.created_at)) " +
+           "FROM tickets t JOIN ticket_messages tm ON tm.ticket_id = t.id " +
+           "WHERE tm.sender_id != t.user_id " +
+           "AND tm.id = (SELECT MIN(tm2.id) FROM ticket_messages tm2 WHERE tm2.ticket_id = t.id AND tm2.sender_id != t.user_id)",
+           nativeQuery = true)
+    Double avgFirstResponseHours();
+
+    @Query(value = "SELECT AVG(TIMESTAMPDIFF(HOUR, t.created_at, t.processed_at)) " +
+           "FROM tickets t WHERE t.processed_at IS NOT NULL", nativeQuery = true)
+    Double avgResolutionHours();
 }

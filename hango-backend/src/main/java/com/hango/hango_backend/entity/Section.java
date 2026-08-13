@@ -1,6 +1,8 @@
 package com.hango.hango_backend.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import lombok.*;
 
 import java.util.List;
@@ -20,6 +22,7 @@ public class Section {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private Course course;
 
     @Column(length = 100)

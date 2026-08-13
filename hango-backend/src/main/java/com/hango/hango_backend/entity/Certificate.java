@@ -1,6 +1,8 @@
 package com.hango.hango_backend.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import lombok.*;
 import org.hibernate.annotations.DynamicUpdate;
 
@@ -32,6 +34,7 @@ public class Certificate {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private Course course;
 
     @Column(name = "credential_id", nullable = false, length = 50)

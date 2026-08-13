@@ -237,7 +237,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
       final attempts = await _examRepository.fetchMyExamAttempts();
       final hasCompleted = attempts.any(
-        (a) => a['examId'] == 999 || a['examId'] == '999',
+        (a) => a['examId'] == 1028 || a['examId'] == '1028',
       );
 
       if (!hasCompleted) {
@@ -366,19 +366,17 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       Navigator.pop(context); // Close loading
 
       final entryExam = exams.firstWhere(
-        (e) => e.id == '999',
-        orElse: () => exams.isNotEmpty
-            ? exams.first
-            : Exam(
-                id: '999',
-                title: 'Entry Exam',
-                description: 'Entry exam to assess your proficiency level.',
-                creatorName: 'System',
-                questionCount: 40,
-                durationMinutes: 50,
-                rating: 5.0,
-                learnerCountFormatted: '1k Learner',
-              ),
+        (e) => e.id == '1028',
+        orElse: () => Exam(
+          id: '1028',
+          title: 'Global Entry Placement Test',
+          description: 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.',
+          creatorName: 'System',
+          questionCount: 40,
+          durationMinutes: 50,
+          rating: 5.0,
+          learnerCountFormatted: '1k Learner',
+        ),
       );
 
       Navigator.push(

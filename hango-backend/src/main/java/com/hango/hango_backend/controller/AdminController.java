@@ -4,13 +4,11 @@ import com.hango.hango_backend.repository.RoleRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.AuditLogRepository;
 import com.hango.hango_backend.repository.AiUsageLogRepository;
-import com.hango.hango_backend.repository.CourseRepository;
-import com.hango.hango_backend.repository.EnrollmentRepository;
-import com.hango.hango_backend.repository.TopCourseProjection;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.AuditLog;
 import com.hango.hango_backend.entity.AiUsageLog;
+import com.hango.hango_backend.service.AdminDashboardService;
 import com.hango.hango_backend.service.AuthService;
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
@@ -65,70 +63,16 @@ public class AdminController {
     private AiUsageLogRepository aiUsageLogRepository;
 
     @Autowired
-    private CourseRepository courseRepository;
+    private AdminDashboardService adminDashboardService;
 
-    @Autowired
-    private EnrollmentRepository enrollmentRepository;
-
-    @GetMapping("/dashboard/stats")
+    @GetMapping("/dashboard/comprehensive-stats")
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<?> getDashboardStats() {
+    public ResponseEntity<?> getComprehensiveDashboardStats(@RequestParam(defaultValue = "30") int periodDays) {
         try {
-            // Run all queries in parallel to avoid network latency accumulation
-            java.util.concurrent.CompletableFuture<Long> usersFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> userRepository.count());
-            java.util.concurrent.CompletableFuture<Long> rolesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> roleRepository.count());
-            java.util.concurrent.CompletableFuture<Long> coursesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> courseRepository.count());
-            java.util.concurrent.CompletableFuture<Long> enrollmentsFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> enrollmentRepository.count());
-            java.util.concurrent.CompletableFuture<List<TopCourseProjection>> topCoursesFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> courseRepository.findTopCoursesByEnrollment(5));
-            
-            LocalDate today = LocalDate.now();
-            LocalDateTime startOf7DaysAgo = today.minusDays(6).atStartOfDay();
-            java.util.concurrent.CompletableFuture<List<Object[]>> weeklyStatsFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> userRepository.countUsersRegisteredByDate(startOf7DaysAgo));
-
-            // Wait for all queries to finish
-            java.util.concurrent.CompletableFuture.allOf(usersFuture, rolesFuture, coursesFuture, enrollmentsFuture, topCoursesFuture, weeklyStatsFuture).join();
-
-            // Calculate weekly registration counts for the last 7 days
-            List<String> labels = new ArrayList<>();
-            List<Long> values = new ArrayList<>();
-            DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("d/M");
-            
-            List<Object[]> rawWeeklyStats = weeklyStatsFuture.get();
-            Map<String, Long> dateToCountMap = new HashMap<>();
-            for (Object[] row : rawWeeklyStats) {
-                if (row != null && row.length == 2 && row[0] != null && row[1] != null) {
-                    dateToCountMap.put(row[0].toString(), ((Number) row[1]).longValue());
-                }
-            }
-
-            for (int i = 6; i >= 0; i--) {
-                LocalDate date = today.minusDays(i);
-                labels.add(date.format(labelFormatter));
-                
-                String dateStr = date.toString(); // SQL DATE() returns yyyy-MM-dd
-                values.add(dateToCountMap.getOrDefault(dateStr, 0L));
-            }
-
-            List<TopCourseProjection> topCourses = topCoursesFuture.get();
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("totalUsers", usersFuture.get());
-            response.put("totalRoles", rolesFuture.get());
-            response.put("totalCourses", coursesFuture.get());
-            response.put("totalEnrollments", enrollmentsFuture.get());
-            response.put("weeklyLabels", labels);
-            response.put("weeklyValues", values);
-            response.put("topCourses", topCourses.stream().map(tc -> {
-                Map<String, Object> m = new HashMap<>();
-                m.put("id", tc.getId());
-                m.put("title", tc.getTitle());
-                m.put("enrollmentCount", tc.getEnrollmentCount());
-                return m;
-            }).toList());
-
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(adminDashboardService.getComprehensiveStats(periodDays));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
         }
     }
 
@@ -327,9 +271,10 @@ public class AdminController {
     // ------------------------------------------------------------------
 
     private void logAudit(UserDetails currentAdmin, String actionType, Long targetUserId, String details) {
-        User actor = currentAdmin != null
-                ? userRepository.findByEmail(currentAdmin.getUsername()).orElse(null)
-                : null;
+        if (currentAdmin == null) return;
+        User actor = userRepository.findByEmail(currentAdmin.getUsername()).orElse(null);
+        if (actor == null) return;
+        
         AuditLog log = AuditLog.builder()
                 .actor(actor)
                 .actionType(actionType)
