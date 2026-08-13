@@ -44,3 +44,7 @@ void clearPaymentUrlFromAddressBar() {
     }
   } catch (_) {}
 }
+
+void navigateToUrl(String url) {
+  html.window.location.href = url;
+}

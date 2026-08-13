@@ -34,3 +34,9 @@ void setRememberMe(bool value) {
     impl.setRememberMe(value);
   } catch (_) {}
 }
+
+void navigateToUrl(String url) {
+  try {
+    impl.navigateToUrl(url);
+  } catch (_) {}
+}

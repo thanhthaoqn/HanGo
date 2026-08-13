@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/repositories/payment_repository.dart';
+import '../../utils/web_session_helper.dart';
 
 class PaymentQrDialog extends StatefulWidget {
   final int? courseId;
@@ -162,12 +164,15 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
 
   Future<void> _openPaymentUrl() async {
     if (_paymentUrl == null) return;
+    if (kIsWeb) {
+      navigateToUrl(_paymentUrl!);
+      return;
+    }
     final uri = Uri.parse(_paymentUrl!);
     if (await canLaunchUrl(uri)) {
       await launchUrl(
         uri,
         mode: LaunchMode.platformDefault,
-        webOnlyWindowName: '_self',
       );
     }
   }
