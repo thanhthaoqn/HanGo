@@ -1755,61 +1755,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                _buildSidebarMenuItem(
-                  index: 0,
-                  icon: Icons.grid_view_outlined,
-                  title: 'Dashboard',
-                  isMobileDrawer: isMobileDrawer,
-                ),
-                const SizedBox(height: 8),
-                _buildSidebarMenuItem(
-                  index: 1,
-                  icon: Icons.people_alt_outlined,
-                  title: 'Accounts',
-                  isMobileDrawer: isMobileDrawer,
-                ),
-                const SizedBox(height: 8),
-                _buildSidebarMenuItem(
-                  index: 2,
-                  icon: Icons.analytics_outlined,
-                  title: 'AI Analytics',
-                  isMobileDrawer: isMobileDrawer,
-                ),
-                const SizedBox(height: 8),
-                _buildSidebarMenuItem(
-                  index: 3,
-                  icon: Icons.security_outlined,
-                  title: 'Roles',
-                  isMobileDrawer: isMobileDrawer,
-                ),
-                const SizedBox(height: 8),
-                _buildSidebarMenuItem(
-                  index: 4,
-                  icon: Icons.comment_outlined,
-                  title: 'Comment',
-                  isMobileDrawer: isMobileDrawer,
-                ),
-                const SizedBox(height: 8),
-                _buildSidebarMenuItem(
-                  index: 6,
-                  icon: Icons.rate_review_outlined,
-                  title: 'Approvals',
-                  isMobileDrawer: isMobileDrawer,
-                ),
-                // Audit Log hidden — feature kept but sidebar entry disabled
-                // _buildSidebarMenuItem(
-                //   index: 7,
-                //   icon: Icons.history_outlined,
-                //   title: 'Audit Log',
-                //   isMobileDrawer: isMobileDrawer,
-                // ),
-                const SizedBox(height: 8),
-                _buildSidebarMenuItem(
-                  index: 8,
-                  icon: Icons.confirmation_number_outlined,
-                  title: 'Support Tickets',
-                  isMobileDrawer: isMobileDrawer,
-                ),
+                ...[
+                  {'index': 0, 'icon': Icons.grid_view_outlined, 'title': 'Dashboard'},
+                  {'index': 1, 'icon': Icons.people_alt_outlined, 'title': 'Accounts'},
+                  {'index': 2, 'icon': Icons.analytics_outlined, 'title': 'AI Analytics'},
+                  {'index': 3, 'icon': Icons.security_outlined, 'title': 'Roles'},
+                  {'index': 4, 'icon': Icons.comment_outlined, 'title': 'Comment'},
+                  {'index': 6, 'icon': Icons.rate_review_outlined, 'title': 'Approvals'},
+                  // index 7 is Audit Log (hidden as requested)
+                  {'index': 8, 'icon': Icons.confirmation_number_outlined, 'title': 'Support Tickets'},
+                ].expand((item) => [
+                  _buildSidebarMenuItem(
+                    index: item['index'] as int,
+                    icon: item['icon'] as IconData,
+                    title: item['title'] as String,
+                    isMobileDrawer: isMobileDrawer,
+                  ),
+                  const SizedBox(height: 8),
+                ]).toList()..removeLast(), // Remove the very last SizedBox to keep it clean
 
                 const Spacer(),
                 const Divider(color: Color(0xFFE5E7EB)),

@@ -11,6 +11,8 @@ import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.AuditLog;
 import com.hango.hango_backend.entity.AiUsageLog;
+import com.hango.hango_backend.entity.Comment;
+import com.hango.hango_backend.repository.CommentRepository;
 import com.hango.hango_backend.service.AuthService;
 import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.UserResponse;
@@ -69,6 +71,9 @@ public class AdminController {
 
     @Autowired
     private EnrollmentRepository enrollmentRepository;
+
+    @Autowired
+    private CommentRepository commentRepository;
 
     @GetMapping("/dashboard/stats")
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
@@ -327,9 +332,10 @@ public class AdminController {
     // ------------------------------------------------------------------
 
     private void logAudit(UserDetails currentAdmin, String actionType, Long targetUserId, String details) {
-        User actor = currentAdmin != null
-                ? userRepository.findByEmail(currentAdmin.getUsername()).orElse(null)
-                : null;
+        if (currentAdmin == null) return;
+        User actor = userRepository.findByEmail(currentAdmin.getUsername()).orElse(null);
+        if (actor == null) return;
+        
         AuditLog log = AuditLog.builder()
                 .actor(actor)
                 .actionType(actionType)
