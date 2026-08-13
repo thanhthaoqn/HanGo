@@ -23,7 +23,7 @@ public class SystemParameter {
     @Column(name = "param_key", nullable = false, length = 50)
     private String paramKey;
 
-    @Column(name = "param_value", nullable = false, length = 100)
+    @Column(name = "param_value", nullable = false, columnDefinition = "TEXT")
     private String paramValue;
 
     @Builder.Default

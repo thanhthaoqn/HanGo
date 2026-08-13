@@ -12,6 +12,7 @@ import '../ticket/management_tickets_page.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
+import '../../../data/services/admin_config_service.dart';
 import '../../widgets/admin/role/role_matrix_tab.dart';
 import '../../widgets/admin/role/role_detail_drawer.dart';
 import '../../widgets/admin/dashboard/comprehensive_dashboard_tab.dart';
@@ -69,6 +70,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _aiEmbeddingCalls = 0;
   List<String> _aiChartLabels = ['18/5', '19/5', '20/5', '21/5', '22/5', '23/5', '24/5'];
   List<double> _aiChartValues = [0, 0, 0, 0, 0, 0, 0];
+
+  // AI Settings variables
+  final AdminConfigService _adminConfigService = AdminConfigService();
+  int _aiSubTabIndex = 0; // 0: Analytics, 1: Settings, 2: Prompts
+  bool _isLoadingAiConfig = false;
+  Map<String, String> _aiConfig = {};
+  
+  // Controllers for AI Settings
+  final TextEditingController _apiKeyController = TextEditingController();
+  final TextEditingController _chatModelController = TextEditingController();
+  final TextEditingController _embeddingModelController = TextEditingController();
+  final TextEditingController _timeoutController = TextEditingController();
+  
+  // Controllers for AI Prompts
+  final TextEditingController _assistantPromptController = TextEditingController();
+  final TextEditingController _examChatPromptController = TextEditingController();
+  final TextEditingController _examGenPromptController = TextEditingController();
 
   // Audit log entries (FR-RBAC-08) fetched dynamically from DB
   bool _isLoadingAuditLog = true;
@@ -144,6 +162,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         break;
       case 2:
         _fetchAiUsageStats();
+        _fetchAiConfig();
         break;
       case 3:
         _fetchRoles();
@@ -413,6 +432,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       setState(() {
         _isLoadingAiUsage = false;
       });
+    }
+  }
+
+  Future<void> _fetchAiConfig() async {
+    setState(() => _isLoadingAiConfig = true);
+    try {
+      final configs = await _adminConfigService.getAiConfig();
+      setState(() {
+        _aiConfig = configs;
+        _apiKeyController.text = configs['GEMINI_API_KEY'] ?? '';
+        _chatModelController.text = configs['GEMINI_CHAT_MODEL'] ?? 'gemini-1.5-pro';
+        _embeddingModelController.text = configs['GEMINI_EMBEDDING_MODEL'] ?? 'text-embedding-004';
+        _timeoutController.text = configs['GEMINI_TIMEOUT_SECONDS'] ?? '60';
+        _assistantPromptController.text = configs['AI_ASSISTANT_SYSTEM_PROMPT'] ?? '';
+        _examChatPromptController.text = configs['AI_TRAINER_EXAM_CHAT_PROMPT'] ?? '';
+        _examGenPromptController.text = configs['AI_TRAINER_EXAM_GENERATE_PROMPT'] ?? '';
+        _isLoadingAiConfig = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching AI config: $e');
+      setState(() => _isLoadingAiConfig = false);
+    }
+  }
+
+  Future<void> _saveAiConfig() async {
+    try {
+      final configs = {
+        'GEMINI_API_KEY': _apiKeyController.text,
+        'GEMINI_CHAT_MODEL': _chatModelController.text,
+        'GEMINI_EMBEDDING_MODEL': _embeddingModelController.text,
+        'GEMINI_TIMEOUT_SECONDS': _timeoutController.text,
+        'AI_ASSISTANT_SYSTEM_PROMPT': _assistantPromptController.text,
+        'AI_TRAINER_EXAM_CHAT_PROMPT': _examChatPromptController.text,
+        'AI_TRAINER_EXAM_GENERATE_PROMPT': _examGenPromptController.text,
+      };
+      await _adminConfigService.updateAiConfig(configs);
+      if (mounted) ToastHelper.showSuccess(context, 'AI Configurations saved successfully');
+    } catch (e) {
+      if (mounted) ToastHelper.showError(context, 'Failed to save configurations');
     }
   }
 
@@ -2899,16 +2957,43 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'AI Analytics Insights',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-            fontFamily: 'Outfit',
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'AI Analytics & Configuration',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1F2937),
+                fontFamily: 'Outfit',
+              ),
+            ),
+            SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(value: 0, label: Text('Analytics'), icon: Icon(Icons.analytics_outlined)),
+                ButtonSegment(value: 1, label: Text('Settings'), icon: Icon(Icons.settings_outlined)),
+                ButtonSegment(value: 2, label: Text('Prompts'), icon: Icon(Icons.edit_note_outlined)),
+              ],
+              selected: {_aiSubTabIndex},
+              onSelectionChanged: (Set<int> newSelection) {
+                setState(() => _aiSubTabIndex = newSelection.first);
+              },
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 24),
+        if (_aiSubTabIndex == 0) _buildAnalyticsView(isDesktop),
+        if (_aiSubTabIndex == 1) _buildAiSettingsView(),
+        if (_aiSubTabIndex == 2) _buildAiPromptsView(),
+      ],
+    );
+  }
+
+  Widget _buildAnalyticsView(bool isDesktop) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         const Text(
           'Real call counts logged from every Gemini API call (chat + embedding), across AI Assistant, '
           'Question Generation, and Recommendation. No cost/token estimate — no pricing model is configured yet.',
@@ -3009,6 +3094,117 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       }),
                     ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAiSettingsView() {
+    if (_isLoadingAiConfig) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Manage AI Tokens & Models', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 24),
+          _buildTextField('Gemini API Key', _apiKeyController, isPassword: true),
+          const SizedBox(height: 16),
+          _buildTextField('Chat Model', _chatModelController),
+          const SizedBox(height: 16),
+          _buildTextField('Embedding Model', _embeddingModelController),
+          const SizedBox(height: 16),
+          _buildTextField('Timeout (seconds)', _timeoutController, isNumber: true),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _saveAiConfig,
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: const Text('Save Settings'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28B79B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiPromptsView() {
+    if (_isLoadingAiConfig) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Prompt Input Configurations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('Use {lesson_title}, {lesson_content}, {transcript_block}, {practice_block} in the AI Assistant prompt.', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 24),
+          _buildTextField('AI Assistant System Prompt', _assistantPromptController, maxLines: 10),
+          const SizedBox(height: 24),
+          _buildTextField('Trainer Exam Chat Prompt', _examChatPromptController, maxLines: 6),
+          const SizedBox(height: 24),
+          _buildTextField('Trainer Exam Generation Prompt', _examGenPromptController, maxLines: 6),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ElevatedButton.icon(
+                onPressed: _saveAiConfig,
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: const Text('Save Prompts'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28B79B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, {bool isPassword = false, bool isNumber = false, int maxLines = 1}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: isPassword,
+          maxLines: maxLines,
+          keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ],
