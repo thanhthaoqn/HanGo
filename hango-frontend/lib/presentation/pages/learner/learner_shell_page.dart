@@ -11,6 +11,7 @@ import '../course/course_detail_page.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/web_session_helper.dart';
+import '../../../data/repositories/payment_repository.dart';
 
 class LearnerShellPage extends StatefulWidget {
   final int initialIndex;
@@ -81,12 +82,24 @@ class LearnerShellPageState extends State<LearnerShellPage> {
       courseId = int.tryParse(match.group(1)!);
     }
 
+    String? txnRef;
+    final txnMatch = RegExp(r'[?&](?:orderCode|txnRef|id)=(\d+)').firstMatch(fullUrl);
+    if (txnMatch != null) {
+      txnRef = txnMatch.group(1);
+    }
+
     clearPaymentUrlFromAddressBar();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
       if (isSuccess) {
+        if (txnRef != null && txnRef.isNotEmpty) {
+          try {
+            await PaymentRepository().checkPaymentStatus(txnRef);
+          } catch (_) {}
+        }
+
         if (courseId != null) {
           await CartManager.removeFromCart(courseId);
         } else {
