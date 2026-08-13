@@ -77,9 +77,7 @@ class _CartPageState extends State<CartPage> {
         } catch (e) {
           debugPrint('Error loading DB cart: $e');
         }
-      }
-
-      if (coursesInCart.isEmpty) {
+      } else {
         final cartIds = await CartManager.getCartIds();
         if (cartIds.isNotEmpty) {
           final allCourses = await _repository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
