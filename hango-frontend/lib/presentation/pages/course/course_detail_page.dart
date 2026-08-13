@@ -1645,13 +1645,18 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   Widget _buildEnrollCard(CourseDetail course) {
     bool isCompleted = false;
+    double progressRatio = 0.0;
     if (course.isEnrolled && course.sessions.isNotEmpty) {
       final totalLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.length);
       final completedLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
-      if (totalLessons > 0 && completedLessons == totalLessons) {
-        isCompleted = true;
+      if (totalLessons > 0) {
+        progressRatio = completedLessons / totalLessons;
+        if (completedLessons == totalLessons) {
+          isCompleted = true;
+        }
       }
     }
+    final isRefundEligible = course.price > 0 && !isCompleted && progressRatio < 0.2;
 
     final priceStr = _getCoursePrice(course);
     final isFree = priceStr == 'Miễn phí';
@@ -1847,27 +1852,69 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showRefundRequestModal(course),
-                  icon: const Icon(Icons.currency_exchange_rounded, size: 18, color: Color(0xFFEF4444)),
-                  label: const Text(
-                    'Request Refund',
-                    style: TextStyle(
-                      color: Color(0xFFEF4444),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: Color(0xFFFECACA)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+                child: isRefundEligible
+                    ? OutlinedButton.icon(
+                        onPressed: () => _showRefundRequestModal(course),
+                        icon: const Icon(Icons.currency_exchange_rounded, size: 18, color: Color(0xFFEF4444)),
+                        label: const Text(
+                          'Request Refund',
+                          style: TextStyle(
+                            color: Color(0xFFEF4444),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: Color(0xFFFECACA)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: () {
+                          final msg = isCompleted
+                              ? (LanguageManager.isVi ? 'Không thể hoàn tiền: Bạn đã hoàn thành khóa học này.' : 'Refund Not Eligible: You have already completed this course.')
+                              : (LanguageManager.isVi ? 'Không thể hoàn tiền: Tiến độ học đã vượt quá 20%.' : 'Refund Not Eligible: Learning progress exceeds 20%.');
+                          ToastHelper.showError(context, msg);
+                        },
+                        icon: const Icon(Icons.lock_outline_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        label: Text(
+                          LanguageManager.isVi ? 'Không đủ ĐK Hoàn tiền 🔒' : 'Refund Not Eligible 🔒',
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF8FAFC),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
               ),
+              if (!isRefundEligible) ...[
+                const SizedBox(height: 6),
+                Text(
+                  isCompleted
+                      ? (LanguageManager.isVi ? '* Khóa học đã hoàn thành' : '* Course completed')
+                      : (LanguageManager.isVi ? '* Tiến độ học > 20%' : '* Learning progress > 20%'),
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    fontFamily: 'Outfit',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ],
           ] else ...[
             // Buy / Enroll Buttons Section
