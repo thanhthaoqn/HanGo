@@ -22,6 +22,9 @@ public class LearningPathwayResponseDTO {
     @JsonProperty("mentor_summary")
     private String mentorSummary;
 
+    @JsonProperty("exam_attempt_id")
+    private Long examAttemptId;
+
     // Feature B: Smart Time-boxing metadata
     @JsonProperty("goal_name")
     private String goalName;

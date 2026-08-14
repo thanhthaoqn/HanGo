@@ -14,5 +14,7 @@ public class PathwayGenerateRequestDTO {
     private java.time.LocalDate targetDate;
     private Integer hoursPerWeek;
     private java.util.List<Integer> preferredStudyDays;
+
+    private Boolean onlyFree;
 }
 

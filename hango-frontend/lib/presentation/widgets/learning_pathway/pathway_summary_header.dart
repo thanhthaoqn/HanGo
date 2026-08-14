@@ -9,6 +9,7 @@ class PathwaySummaryHeader extends StatelessWidget {
   final VoidCallback? onReroutePressed;
   final VoidCallback? onThemeToggle;
   final VoidCallback? onEditGoalPressed;
+  final VoidCallback? onRegenerateFreePressed;
 
   const PathwaySummaryHeader({
     super.key,
@@ -18,6 +19,7 @@ class PathwaySummaryHeader extends StatelessWidget {
     this.onReroutePressed,
     this.onThemeToggle,
     this.onEditGoalPressed,
+    this.onRegenerateFreePressed,
   });
 
   @override
@@ -132,6 +134,15 @@ class PathwaySummaryHeader extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 8),
+                if (onRegenerateFreePressed != null) ...[
+                  _HeaderIconButton(
+                    tooltip: isVi ? 'Tạo lại lộ trình (Chỉ khóa Free)' : 'Regenerate (Free Only)',
+                    icon: Icons.money_off_rounded,
+                    color: Colors.white,
+                    onPressed: onRegenerateFreePressed,
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 if (onEditGoalPressed != null) ...[
                   _HeaderIconButton(
                     tooltip: isVi ? 'Chỉnh sửa mục tiêu' : 'Edit goal',

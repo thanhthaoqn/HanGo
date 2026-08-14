@@ -39,6 +39,7 @@ class PathwayRepository {
     String? goalName,
     String? targetDate,
     int? hoursPerWeek,
+    bool? onlyFree,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -53,6 +54,7 @@ class PathwayRepository {
       if (goalName != null) 'goalName': goalName,
       if (targetDate != null) 'targetDate': targetDate,
       if (hoursPerWeek != null) 'hoursPerWeek': hoursPerWeek,
+      if (onlyFree != null) 'onlyFree': onlyFree,
     };
 
     final response = await http.post(

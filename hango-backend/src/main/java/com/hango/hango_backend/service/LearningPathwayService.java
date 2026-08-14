@@ -74,6 +74,12 @@ public class LearningPathwayService {
         boolean usingExistingCoursesFallback = publishedCourses.isEmpty();
         List<Course> availableCourses = usingExistingCoursesFallback ? allCourses : publishedCourses;
 
+        if (Boolean.TRUE.equals(requestDTO.getOnlyFree())) {
+            availableCourses = availableCourses.stream()
+                    .filter(course -> course.getPrice() == null || course.getPrice().compareTo(java.math.BigDecimal.ZERO) == 0)
+                    .toList();
+        }
+
         if (availableCourses.isEmpty()) {
             return createEmptyPathway(student, examAttempt,
                     "No courses are available yet, so I cannot build a learning pathway. Please try again after a trainer creates a course.");
@@ -596,6 +602,7 @@ public class LearningPathwayService {
         return LearningPathwayResponseDTO.builder()
                 .pathwayId(pathway.getId())
                 .roadmapId("RM_USER_" + studentId + "_" + pathway.getId())
+                .examAttemptId(pathway.getExamAttempt() != null ? pathway.getExamAttempt().getId() : null)
                 .mentorSummary(pathway.getMentorSummary())
                 .nodes(nodeDTOs)
                 .totalSteps(totalSteps)
@@ -687,7 +694,8 @@ public class LearningPathwayService {
         Optional<LearningPathway> existingPathway = learningPathwayRepository.findByStudentIdAndStatus(studentId, "ACTIVE");
         existingPathway.ifPresent(pathway -> {
             pathway.setStatus("ARCHIVED");
-            learningPathwayRepository.save(pathway);
+            pathway.setExamAttempt(null); // Clear reference so the new pathway can reuse the same examAttemptId (@OneToOne constraint)
+            learningPathwayRepository.saveAndFlush(pathway);
         });
     }
 

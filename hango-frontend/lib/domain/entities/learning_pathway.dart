@@ -357,6 +357,7 @@ class LearningPathway {
   final String? targetDate;
   final int? hoursPerWeek;
   final ScheduleStatus? scheduleStatus;
+  final int? examAttemptId;
 
   LearningPathway({
     this.pendingRerouteSuggestion,
@@ -372,6 +373,7 @@ class LearningPathway {
     this.targetDate,
     this.hoursPerWeek,
     this.scheduleStatus,
+    this.examAttemptId,
   });
 
   LearningPathway copyWith({
@@ -388,6 +390,7 @@ class LearningPathway {
     String? targetDate,
     int? hoursPerWeek,
     ScheduleStatus? scheduleStatus,
+    int? examAttemptId,
   }) {
     return LearningPathway(
       pendingRerouteSuggestion:
@@ -404,6 +407,7 @@ class LearningPathway {
       targetDate: targetDate ?? this.targetDate,
       hoursPerWeek: hoursPerWeek ?? this.hoursPerWeek,
       scheduleStatus: scheduleStatus ?? this.scheduleStatus,
+      examAttemptId: examAttemptId ?? this.examAttemptId,
     );
   }
 
@@ -459,6 +463,7 @@ class LearningPathway {
       targetDate: json['target_date'] ?? json['targetDate'],
       hoursPerWeek: json['hours_per_week'] ?? json['hoursPerWeek'],
       scheduleStatus: parseScheduleStatus(rawSchedule),
+      examAttemptId: json['exam_attempt_id'] ?? json['examAttemptId'],
     );
   }
 }

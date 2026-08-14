@@ -242,6 +242,78 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     }
   }
 
+  Future<void> _showRegenerateFreeWarningDialog() async {
+    final pathway = _pathway;
+    if (pathway == null || pathway.examAttemptId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot regenerate: Missing Exam Attempt ID.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Limitation Warning ⚠️'),
+        content: const Text(
+          'A learning pathway containing only free courses might not cover all the advanced knowledge needed to reach your goal.\n\n'
+          'You can still start with this free pathway and purchase premium courses later to fill any gaps. Do you want to continue generating a free-only pathway?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+            ),
+            child: const Text('Continue (Free Only)'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final newPathway = await _repository.generatePathway(
+        examAttemptId: pathway.examAttemptId!,
+        goalName: pathway.goalName,
+        targetDate: pathway.targetDate,
+        hoursPerWeek: pathway.hoursPerWeek,
+        onlyFree: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pathway = _preparePathwayForDisplay(newPathway);
+        _selectedNode = _initialSelectedNode(newPathway.nodes);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã tạo lộ trình mới chỉ với các khóa học miễn phí!'),
+          backgroundColor: Color(0xFF28B79B),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -303,6 +375,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
           onEditGoalPressed: _showEditGoalDialog,
+          onRegenerateFreePressed: _showRegenerateFreeWarningDialog,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
@@ -362,6 +435,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           isDarkMode: _isDarkMode,
           onAnalysisPressed: _showSkillAnalysis,
           onEditGoalPressed: _showEditGoalDialog,
+          onRegenerateFreePressed: _showRegenerateFreeWarningDialog,
           onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
