@@ -294,7 +294,7 @@ class _CartPageState extends State<CartPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isVi ? 'Giỏ hàng của tôi' : 'Shopping Cart',
+                      isVi ? 'Giỏ hàng của tôi' : 'My Cart',
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
