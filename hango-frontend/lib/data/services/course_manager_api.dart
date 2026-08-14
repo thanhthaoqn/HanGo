@@ -125,24 +125,43 @@ class CourseManagerApi {
     }
   }
 
-  Future<List<CourseReviewCourse>> getReviewCourses({
+  Future<Map<String, dynamic>> getReviewCourses({
     String status = 'PENDING',
+    int page = 0,
+    int size = 10,
   }) async {
     final response = await _get(
       '/courses/review',
-      queryParameters: {'status': status},
+      queryParameters: {
+        'status': status,
+        'page': page.toString(),
+        'size': size.toString(),
+      },
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
-      final list = data is List ? data : (data['courses'] as List?) ?? const [];
-      return list
-          .map(
-            (item) => CourseReviewCourse.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ),
-          )
+      
+      List<dynamic> listData = [];
+      int totalPages = 1;
+
+      if (data is Map && data.containsKey('content')) {
+        listData = data['content'] as List? ?? [];
+        totalPages = data['totalPages'] as int? ?? 1;
+      } else if (data is List) {
+        listData = data;
+      } else if (data is Map && data.containsKey('courses')) {
+        listData = data['courses'] as List? ?? [];
+      }
+
+      final courses = listData
+          .map((item) => CourseReviewCourse.fromJson(Map<String, dynamic>.from(item as Map)))
           .toList();
+
+      return {
+        'courses': courses,
+        'totalPages': totalPages,
+      };
     }
 
     throw Exception(

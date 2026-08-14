@@ -31,6 +31,9 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
 
   List<CourseReviewCourse> _courses = [];
   String _statusFilter = 'PENDING';
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _pageSize = 10;
   String _selectedSortBy = 'NEWEST';
   String _selectedTimePeriod = 'ALL';
   bool _isLoading = true;
@@ -99,10 +102,15 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     });
 
     try {
-      final courses = await _api.getReviewCourses(status: _statusFilter);
+      final result = await _api.getReviewCourses(
+        status: _statusFilter,
+        page: _currentPage - 1,
+        size: _pageSize,
+      );
       if (!mounted) return;
       setState(() {
-        _courses = courses;
+        _courses = result['courses'] as List<CourseReviewCourse>;
+        _totalPages = result['totalPages'] as int;
         _isLoading = false;
         _isMockPreview = false;
       });
@@ -110,6 +118,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
       if (!mounted) return;
       setState(() {
         _courses = _mockCourses;
+        _totalPages = 1;
         _isLoading = false;
         _isMockPreview = true;
       });
@@ -338,6 +347,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
         if (mounted) {
           setState(() {
             _statusFilter = 'ALL';
+            _currentPage = 1;
           });
           await _loadCourses();
 
@@ -631,6 +641,11 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
                 _buildEmptyState()
               else
                 _buildReviewTable(courses),
+              if (_totalPages > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: _buildPagination(),
+                ),
             ],
           ),
         );
@@ -811,7 +826,10 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     final isActive = _statusFilter == status;
     return InkWell(
       onTap: () {
-        setState(() => _statusFilter = status);
+        setState(() {
+          _statusFilter = status;
+          _currentPage = 1;
+        });
         _loadCourses();
       },
       borderRadius: BorderRadius.circular(20),
@@ -1226,6 +1244,75 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
       ),
     );
   }
+
+  Widget _buildPagination() {
+    final safeCurrentPage = _currentPage > _totalPages ? (_totalPages > 0 ? _totalPages : 1) : _currentPage;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (_totalPages > 1)
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: safeCurrentPage > 1
+                    ? () {
+                        setState(() {
+                          _currentPage--;
+                        });
+                        _loadCourses();
+                      }
+                    : null,
+                color: const Color(0xFF20B486),
+              ),
+              ...List.generate(_totalPages, (index) {
+                final pageNum = index + 1;
+                final isCurrent = pageNum == safeCurrentPage;
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _currentPage = pageNum;
+                    });
+                    _loadCourses();
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isCurrent ? const Color(0xFF20B486) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isCurrent ? const Color(0xFF20B486) : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Text(
+                      '$pageNum',
+                      style: TextStyle(
+                        color: isCurrent ? Colors.white : Colors.grey.shade700,
+                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: safeCurrentPage < _totalPages
+                    ? () {
+                        setState(() {
+                          _currentPage++;
+                        });
+                        _loadCourses();
+                      }
+                    : null,
+                color: const Color(0xFF20B486),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
 }
 
 class _CourseTitleCell extends StatelessWidget {
@@ -1336,6 +1423,7 @@ String _formatPrice(num price) {
   if (price <= 0) return 'Free';
   return '${price.toStringAsFixed(0)} VND';
 }
+
 
 final List<CourseReviewCourse> _mockCourses = [
   CourseReviewCourse(

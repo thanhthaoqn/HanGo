@@ -58,26 +58,18 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
 
     @Override
     @Transactional(readOnly = true)
-    public List<CourseReviewDetailDTO> getCoursesForReview(String status) {
+    public org.springframework.data.domain.Page<CourseReviewDetailDTO> getCoursesForReview(String status, int page, int size) {
         String normalizedStatus = normalizeStatus(status);
-        List<Course> courses;
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        org.springframework.data.domain.Page<Course> coursePage;
+        
         if ("ALL".equals(normalizedStatus)) {
-            courses = courseRepository.findAll().stream()
-                    .filter(course -> course.getDeletedAt() == null)
-                    .sorted((left, right) -> {
-                        if (left.getCreatedAt() == null && right.getCreatedAt() == null) return 0;
-                        if (left.getCreatedAt() == null) return 1;
-                        if (right.getCreatedAt() == null) return -1;
-                        return right.getCreatedAt().compareTo(left.getCreatedAt());
-                    })
-                    .collect(Collectors.toList());
+            coursePage = courseRepository.findByDeletedAtIsNullOrderByCreatedAtDesc(pageable);
         } else {
-            courses = courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(normalizedStatus);
+            coursePage = courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(normalizedStatus, pageable);
         }
 
-        return courses.stream()
-                .map(course -> mapCourse(course, false))
-                .collect(Collectors.toList());
+        return coursePage.map(course -> mapCourse(course, false));
     }
 
     @Override

@@ -307,23 +307,31 @@ class CourseManagerDashboardServiceTest {
 
     @Test
     void getCoursesForReviewShouldDefaultToPendingApprovalStatusWhenStatusBlank() {
-        when(courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc("PENDING_APPROVAL"))
-                .thenReturn(List.of());
+        when(courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                org.mockito.ArgumentMatchers.eq("PENDING_APPROVAL"), 
+                org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        List<CourseReviewDetailDTO> result = service.getCoursesForReview(null);
+        org.springframework.data.domain.Page<CourseReviewDetailDTO> result = service.getCoursesForReview(null, 0, 10);
 
         assertTrue(result.isEmpty());
-        verify(courseRepository).findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc("PENDING_APPROVAL");
+        verify(courseRepository).findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                org.mockito.ArgumentMatchers.eq("PENDING_APPROVAL"), 
+                org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class));
     }
 
     @Test
     void getCoursesForReviewShouldNormalizeSubmittedAliasToPendingApproval() {
-        when(courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc("PENDING_APPROVAL"))
-                .thenReturn(List.of());
+        when(courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                org.mockito.ArgumentMatchers.eq("PENDING_APPROVAL"), 
+                org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        service.getCoursesForReview("submitted");
+        service.getCoursesForReview("submitted", 0, 10);
 
-        verify(courseRepository).findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc("PENDING_APPROVAL");
+        verify(courseRepository).findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                org.mockito.ArgumentMatchers.eq("PENDING_APPROVAL"), 
+                org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class));
     }
 
     @Test
@@ -332,24 +340,28 @@ class CourseManagerDashboardServiceTest {
         older.setCreatedAt(LocalDateTime.of(2026, 1, 1, 0, 0));
         Course newer = course(2L, "PUBLISHED", user(2L));
         newer.setCreatedAt(LocalDateTime.of(2026, 2, 1, 0, 0));
-        when(courseRepository.findAll()).thenReturn(List.of(older, newer));
+        when(courseRepository.findByDeletedAtIsNullOrderByCreatedAtDesc(
+                org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(newer, older))); // Manual sorting simulation for page
 
-        List<CourseReviewDetailDTO> result = service.getCoursesForReview("all");
+        org.springframework.data.domain.Page<CourseReviewDetailDTO> result = service.getCoursesForReview("all", 0, 10);
 
-        assertEquals(2L, result.get(0).getId());
-        assertEquals(1L, result.get(1).getId());
+        assertEquals(2L, result.getContent().get(0).getId());
+        assertEquals(1L, result.getContent().get(1).getId());
     }
 
     @Test
     void getCoursesForReviewShouldMapCourseSummaryFieldsWithoutSessionDetail() {
         Course c = course(5L, "PENDING_APPROVAL", user(2L));
-        when(courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc("PENDING_APPROVAL"))
-                .thenReturn(List.of(c));
+        when(courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                org.mockito.ArgumentMatchers.eq("PENDING_APPROVAL"), 
+                org.mockito.ArgumentMatchers.any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(c)));
 
-        List<CourseReviewDetailDTO> result = service.getCoursesForReview(null);
+        org.springframework.data.domain.Page<CourseReviewDetailDTO> result = service.getCoursesForReview(null, 0, 10);
 
-        assertEquals("Course 5", result.get(0).getTitle());
-        assertEquals(0, result.get(0).getSessions().size());
+        assertEquals("Course 5", result.getContent().get(0).getTitle());
+        assertEquals(0, result.getContent().get(0).getSessions().size());
     }
 
     // =================================================================
