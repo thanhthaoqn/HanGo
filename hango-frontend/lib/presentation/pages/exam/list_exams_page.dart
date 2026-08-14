@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'dart:ui';
+import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../utils/language_manager.dart';
@@ -31,11 +34,32 @@ class _ListExamsPageState extends State<ListExamsPage> {
   String _statusFilter = 'All'; // All, Completed, Not Started
   final TextEditingController _searchController = TextEditingController();
 
+  int _totalLearnersCount = 0;
+  int _totalExamsCount = 0;
+
+  Future<void> _fetchPublicStats() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
+      );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        if (mounted) {
+          setState(() {
+            _totalLearnersCount = (data['learnersCount'] ?? 0) as int;
+            _totalExamsCount = (data['freeExamsCount'] ?? 0) as int;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     _loadPermissions();
     _loadData();
+    _fetchPublicStats();
   }
 
   Future<void> _loadPermissions() async {
@@ -277,8 +301,16 @@ class _ListExamsPageState extends State<ListExamsPage> {
                     spacing: 24,
                     runSpacing: 16,
                     children: [
-                      _buildGlassStat(40000, isVi ? 'Lượt làm bài thi' : 'Exams completed', Icons.military_tech_rounded),
-                      _buildGlassStat(50, isVi ? 'Đề thi phong phú' : 'Awesome mock tests', Icons.assignment_rounded),
+                      _buildGlassStat(
+                        _totalLearnersCount > 0 ? _totalLearnersCount : 42,
+                        isVi ? 'Học viên tham gia' : 'Active learners',
+                        Icons.people_rounded,
+                      ),
+                      _buildGlassStat(
+                        _totalExamsCount > 0 ? _totalExamsCount : 10,
+                        isVi ? 'Đề thi sẵn có' : 'Mock exams available',
+                        Icons.assignment_rounded,
+                      ),
                     ],
                   ),
                 ],
@@ -378,6 +410,12 @@ class _ListExamsPageState extends State<ListExamsPage> {
                         _searchQuery = value;
                       });
                     },
+                    onSubmitted: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                        _loadData();
+                      });
+                    },
                     style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500),
                     decoration: InputDecoration(
                       hintText: isVi ? 'Tìm kiếm đề thi thử, bài trắc nghiệm chuyên đề...' : 'Search mock exams, topic tests...',
@@ -397,9 +435,28 @@ class _ListExamsPageState extends State<ListExamsPage> {
                       setState(() {
                         _searchController.clear();
                         _searchQuery = '';
+                        _loadData();
                       });
                     },
                   ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF28B79B),
+                    minimumSize: const Size(100, 38),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _loadData();
+                    });
+                  },
+                  child: Text(
+                    isVi ? 'Tìm kiếm' : 'Search',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
+                  ),
+                ),
               ],
             ),
           ),

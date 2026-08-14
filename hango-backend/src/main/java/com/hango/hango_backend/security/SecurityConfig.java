@@ -64,6 +64,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/v1/exams", "/api/v1/exams/**").permitAll()
                         .requestMatchers("/api/v1/courses", "/api/v1/courses/**").permitAll()
+                        .requestMatchers("/api/v1/metadata/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/lessons/**", "/api/v1/comments/**").permitAll()
 
                         // 🔥 ĐÃ SỬA: Chuyển sang permitAll() giúp cô lập lỗi, tránh bị JwtAuthFilter

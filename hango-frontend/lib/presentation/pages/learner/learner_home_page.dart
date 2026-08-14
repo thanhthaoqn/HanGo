@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
@@ -56,12 +59,15 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   bool _canEnroll = true;
   bool _canAttemptExam = true;
 
+  int _totalCoursesCount = 0;
+  int _totalLearnersCount = 0;
+  int _totalExamsCount = 0;
+
   Timer? _bannerTimer;
   int _currentBannerIndex = 0;
 
   void _startBannerTimer() {
     _bannerTimer?.cancel();
-    if (_isLoggedIn) return;
     _bannerTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
       if (mounted) {
         setState(() {
@@ -71,18 +77,86 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     });
   }
 
+  Future<void> _fetchPublicStats() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
+      );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        if (mounted) {
+          setState(() {
+            _totalCoursesCount = (data['coursesCount'] ?? 0) as int;
+            _totalLearnersCount = (data['learnersCount'] ?? 0) as int;
+            _totalExamsCount = (data['freeExamsCount'] ?? 0) as int;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  final ScrollController _coursesScrollController = ScrollController();
+  final ScrollController _examsScrollController = ScrollController();
+
+  void _scrollCourses(bool forward, bool isDesktop) {
+    if (!_coursesScrollController.hasClients) return;
+    final cardWidth = isDesktop ? 300.0 : 280.0;
+    final itemSpacing = 16.0;
+    final scrollAmount = (cardWidth + itemSpacing) * 4;
+    final targetOffset = forward
+        ? (_coursesScrollController.offset + scrollAmount).clamp(
+            0.0,
+            _coursesScrollController.position.maxScrollExtent,
+          )
+        : (_coursesScrollController.offset - scrollAmount).clamp(
+            0.0,
+            _coursesScrollController.position.maxScrollExtent,
+          );
+
+    _coursesScrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _scrollExams(bool forward, bool isDesktop) {
+    if (!_examsScrollController.hasClients) return;
+    final cardWidth = isDesktop ? 300.0 : 260.0;
+    final itemSpacing = 16.0;
+    final scrollAmount = (cardWidth + itemSpacing) * 4;
+    final targetOffset = forward
+        ? (_examsScrollController.offset + scrollAmount).clamp(
+            0.0,
+            _examsScrollController.position.maxScrollExtent,
+          )
+        : (_examsScrollController.offset - scrollAmount).clamp(
+            0.0,
+            _examsScrollController.position.maxScrollExtent,
+          );
+
+    _examsScrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     _fetchCourses();
     _fetchExams();
+    _fetchPublicStats();
     _startBannerTimer();
   }
 
   @override
   void dispose() {
     _bannerTimer?.cancel();
+    _coursesScrollController.dispose();
+    _examsScrollController.dispose();
     super.dispose();
   }
 
@@ -516,9 +590,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                           const SizedBox(height: 60),
                         ],
 
-                        // 5. Testimonial Section
-                        _buildTestimonialSection(isDesktop),
-                        const SizedBox(height: 60),
+
 
                         // 6. CTA Banner
                         _buildCtaBannerSection(isDesktop),
@@ -634,18 +706,115 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   Widget _buildHeroBanner(bool isDesktop) {
     final isVi = LanguageManager.isVi;
 
-    if (_isLoggedIn) {
-      return _buildStudentHeroBanner(isDesktop, isVi);
-    }
+    return Stack(
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 800),
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: _currentBannerIndex == 0
+              ? _buildStudentHeroBanner(isDesktop, isVi)
+              : _buildTeacherHeroBanner(isDesktop, isVi),
+        ),
 
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 800),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        return FadeTransition(opacity: animation, child: child);
-      },
-      child: _currentBannerIndex == 0
-          ? _buildStudentHeroBanner(isDesktop, isVi)
-          : _buildTeacherHeroBanner(isDesktop, isVi),
+        // Left Navigation Arrow Button
+        Positioned(
+          left: isDesktop ? 20 : 8,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: Material(
+              color: Colors.black.withValues(alpha: 0.4),
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                tooltip: isVi ? 'Banner trước' : 'Previous banner',
+                onPressed: () {
+                  setState(() {
+                    _currentBannerIndex = (_currentBannerIndex - 1 + 2) % 2;
+                  });
+                  _startBannerTimer();
+                },
+              ),
+            ),
+          ),
+        ),
+
+        // Right Navigation Arrow Button
+        Positioned(
+          right: isDesktop ? 20 : 8,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: Material(
+              color: Colors.black.withValues(alpha: 0.4),
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                tooltip: isVi ? 'Banner tiếp' : 'Next banner',
+                onPressed: () {
+                  setState(() {
+                    _currentBannerIndex = (_currentBannerIndex + 1) % 2;
+                  });
+                  _startBannerTimer();
+                },
+              ),
+            ),
+          ),
+        ),
+
+        // Bottom Banner Page Indicator Dots
+        Positioned(
+          bottom: 14,
+          left: 0,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(2, (index) {
+              final isSelected = _currentBannerIndex == index;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _currentBannerIndex = index;
+                  });
+                  _startBannerTimer();
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: isSelected ? 28 : 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF28B79B)
+                        : Colors.white.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(5),
+                    boxShadow: [
+                      if (isSelected)
+                        BoxShadow(
+                          color: const Color(0xFF28B79B).withValues(alpha: 0.5),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
     );
   }
 
@@ -869,10 +1038,22 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     spacing: 48,
                     runSpacing: 16,
                     children: [
-                      _buildHeroStat('50+', isVi ? 'Khóa học' : 'Courses'),
-                      _buildHeroStat('2.000+', isVi ? 'Học viên' : 'Learners'),
                       _buildHeroStat(
-                        '30+',
+                        _totalCoursesCount > 0
+                            ? '$_totalCoursesCount+'
+                            : (_courses.isNotEmpty ? '${_courses.length}+' : '0+'),
+                        isVi ? 'Khóa học' : 'Courses',
+                      ),
+                      _buildHeroStat(
+                        _totalLearnersCount > 0
+                            ? '$_totalLearnersCount+'
+                            : '1+',
+                        isVi ? 'Học viên' : 'Learners',
+                      ),
+                      _buildHeroStat(
+                        _totalExamsCount > 0
+                            ? '$_totalExamsCount+'
+                            : (_exams.isNotEmpty ? '${_exams.length}+' : '0+'),
                         isVi ? 'Đề thi miễn phí' : 'Free exams',
                       ),
                     ],
@@ -1435,7 +1616,45 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 ),
               ),
             ),
-            if (!isDesktop)
+            Row(
+              children: [
+                Material(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _scrollCourses(false, isDesktop),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Icon(
+                        Icons.chevron_left_rounded,
+                        size: 20,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Material(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _scrollCourses(true, isDesktop),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (!isDesktop) ...[
+              const SizedBox(width: 12),
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -1465,6 +1684,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ],
                 ),
               ),
+            ],
           ],
         ),
         const SizedBox(height: 20),
@@ -1495,24 +1715,75 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ),
                 ),
               )
-            : SizedBox(
-                height: isDesktop ? 390 : 360,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  itemCount: _courses.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      width: isDesktop ? 300 : 280,
-                      margin: const EdgeInsets.only(
-                        right: 16,
-                        bottom: 12,
-                        top: 4,
+            : Stack(
+                children: [
+                  SizedBox(
+                    height: isDesktop ? 390 : 360,
+                    child: ListView.builder(
+                      controller: _coursesScrollController,
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: _courses.length,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: isDesktop ? 300 : 280,
+                          margin: const EdgeInsets.only(
+                            right: 16,
+                            bottom: 12,
+                            top: 4,
+                          ),
+                          child: _buildCourseCard(_courses[index]),
+                        );
+                      },
+                    ),
+                  ),
+                  if (_courses.length > 4) ...[
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 12,
+                      child: Center(
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          elevation: 4,
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.chevron_left_rounded,
+                              color: Color(0xFF0F172A),
+                              size: 26,
+                            ),
+                            tooltip: isVi ? '4 khóa học trước' : 'Previous 4 courses',
+                            onPressed: () => _scrollCourses(false, isDesktop),
+                          ),
+                        ),
                       ),
-                      child: _buildCourseCard(_courses[index]),
-                    );
-                  },
-                ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 12,
+                      child: Center(
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          elevation: 4,
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.chevron_right_rounded,
+                              color: Color(0xFF0F172A),
+                              size: 26,
+                            ),
+                            tooltip: isVi ? '4 khóa học tiếp' : 'Next 4 courses',
+                            onPressed: () => _scrollCourses(true, isDesktop),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
       ],
     );
@@ -1998,36 +2269,75 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                   ],
                 ],
               ),
-              if (!isDesktop)
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ListExamsPage(),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      Text(
-                        isVi ? 'Tất cả đề' : 'All exams',
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          fontFamily: 'Outfit',
+              Row(
+                children: [
+                  Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _scrollExams(false, isDesktop),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.chevron_left_rounded,
+                          size: 20,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.arrow_forward,
-                        size: 14,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _scrollExams(true, isDesktop),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 20,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (!isDesktop) ...[
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ListExamsPage(),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        children: [
+                          Text(
+                            isVi ? 'Tất cả đề' : 'All exams',
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.arrow_forward,
+                            size: 14,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -2058,24 +2368,75 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     ),
                   ),
                 )
-              : SizedBox(
-                  height: isDesktop ? 210 : 180,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: _exams.length,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        width: isDesktop ? 300 : 260,
-                        margin: const EdgeInsets.only(
-                          right: 16,
-                          bottom: 10,
-                          top: 4,
+              : Stack(
+                  children: [
+                    SizedBox(
+                      height: isDesktop ? 210 : 180,
+                      child: ListView.builder(
+                        controller: _examsScrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: _exams.length,
+                        itemBuilder: (context, index) {
+                          return Container(
+                            width: isDesktop ? 300 : 260,
+                            margin: const EdgeInsets.only(
+                              right: 16,
+                              bottom: 10,
+                              top: 4,
+                            ),
+                            child: _buildExamCard(_exams[index]),
+                          );
+                        },
+                      ),
+                    ),
+                    if (_exams.length > 4) ...[
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 10,
+                        child: Center(
+                          child: Material(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            elevation: 4,
+                            shape: const CircleBorder(),
+                            clipBehavior: Clip.antiAlias,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.chevron_left_rounded,
+                                color: Color(0xFF0F172A),
+                                size: 26,
+                              ),
+                              tooltip: isVi ? '4 đề thi trước' : 'Previous 4 exams',
+                              onPressed: () => _scrollExams(false, isDesktop),
+                            ),
+                          ),
                         ),
-                        child: _buildExamCard(_exams[index]),
-                      );
-                    },
-                  ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        bottom: 10,
+                        child: Center(
+                          child: Material(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            elevation: 4,
+                            shape: const CircleBorder(),
+                            clipBehavior: Clip.antiAlias,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.chevron_right_rounded,
+                                color: Color(0xFF0F172A),
+                                size: 26,
+                              ),
+                              tooltip: isVi ? '4 đề thi tiếp' : 'Next 4 exams',
+                              onPressed: () => _scrollExams(true, isDesktop),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
         ],
       ),
@@ -2486,228 +2847,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     );
   }
 
-  Widget _buildTestimonialSection(bool isDesktop) {
-    final isVi = LanguageManager.isVi;
-    final testimonials = isVi
-        ? [
-            {
-              'stars': 5,
-              'quote':
-                  'Nhờ kho đề thi THPTQG miễn phí và bài giảng chi tiết, em tăng từ 6 lên 9 điểm Tiếng Anh chỉ trong một học kỳ!',
-              'initials': 'V',
-              'avatarColor': const Color(0xFFE6F4EA),
-              'textColor': const Color(0xFF137333),
-              'name': 'Vũ Đức Thắng',
-              'sub': 'Học sinh lớp 12 · Hà Nội',
-            },
-            {
-              'stars': 5,
-              'quote':
-                  'Em thích nhất là phần luyện đề thi thử có giải thích đáp án chi tiết bằng AI, giúp em tự học ở nhà cực kỳ hiệu quả.',
-              'initials': 'Đ',
-              'avatarColor': const Color(0xFFFFF7ED),
-              'textColor': const Color(0xFFC2410C),
-              'name': 'Đặng Khánh Linh',
-              'sub': 'Học sinh lớp 12 · TP.HCM',
-            },
-            {
-              'stars': 5,
-              'quote':
-                  'Khóa học được sắp xếp khoa học, giáo viên tâm huyết giúp mình học từ vựng chuyên ngành cực nhanh. Giao diện mượt và đẹp.',
-              'initials': 'H',
-              'avatarColor': const Color(0xFFF3E8FF),
-              'textColor': const Color(0xFF6D28D9),
-              'name': 'Hoàng Nam',
-              'sub': 'Người đi làm · Đà Nẵng',
-            },
-          ]
-        : [
-            {
-              'stars': 5,
-              'quote':
-                  'Thanks to the free mock exams and detailed explanations, my score improved from 6 to 9 in just one semester!',
-              'initials': 'V',
-              'avatarColor': const Color(0xFFE6F4EA),
-              'textColor': const Color(0xFF137333),
-              'name': 'Vu Duc Thang',
-              'sub': 'Grade 12 Student · Hanoi',
-            },
-            {
-              'stars': 5,
-              'quote':
-                  'I love the mock exam practice with detailed AI-driven answer explanations. It makes self-study at home incredibly effective!',
-              'initials': 'D',
-              'avatarColor': const Color(0xFFFFF7ED),
-              'textColor': const Color(0xFFC2410C),
-              'name': 'Dang Khanh Linh',
-              'sub': 'Grade 12 Student · HCMC',
-            },
-            {
-              'stars': 5,
-              'quote':
-                  'Well-organized structure, dedicated instructors who helped me learn professional vocabulary rapidly. Interface is smooth and gorgeous.',
-              'initials': 'H',
-              'avatarColor': const Color(0xFFF3E8FF),
-              'textColor': const Color(0xFF6D28D9),
-              'name': 'Hoang Nam',
-              'sub': 'Working Professional · Danang',
-            },
-          ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          isVi ? 'CẢM NHẬN HỌC VIÊN' : 'LEARNER TESTIMONIALS',
-          style: const TextStyle(
-            color: Color(0xFF28B79B),
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-            fontFamily: 'Outfit',
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          isVi ? 'Được học viên tin tưởng' : 'Trusted by our students',
-          style: const TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
-            fontFamily: 'Outfit',
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          isVi
-              ? 'Dành cho học sinh ôn thi THPT Quốc Gia.'
-              : 'For high school students preparing for THPTQG exams.',
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF64748B),
-            fontFamily: 'Outfit',
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 36),
-
-        isDesktop
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: testimonials
-                    .map(
-                      (t) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: _buildTestimonialCard(t),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              )
-            : Column(
-                children: testimonials
-                    .map(
-                      (t) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildTestimonialCard(t),
-                      ),
-                    )
-                    .toList(),
-              ),
-      ],
-    );
-  }
-
-  Widget _buildTestimonialCard(Map<String, dynamic> t) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: List.generate(
-              t['stars'] as int,
-              (index) => const Icon(
-                Icons.star_rounded,
-                size: 18,
-                color: Color(0xFFFBBF24),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Text(
-            '"${t['quote']}"',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF334155),
-              height: 1.5,
-              fontFamily: 'Outfit',
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: t['avatarColor'] as Color,
-                child: Text(
-                  t['initials'] as String,
-                  style: TextStyle(
-                    color: t['textColor'] as Color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      t['name'] as String,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      t['sub'] as String,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF64748B),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildCtaBannerSection(bool isDesktop) {
     final isVi = LanguageManager.isVi;

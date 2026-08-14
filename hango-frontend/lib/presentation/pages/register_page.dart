@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'learner/learner_home_page.dart';
+import 'terms_and_privacy_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -257,27 +258,6 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                     const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text(
-                          'Your trusted education\npartner',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                            height: 1.4,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Icon(Icons.verified_user_outlined, color: Colors.white70, size: 20),
-                            SizedBox(width: 12),
-                            Icon(Icons.school_outlined, color: Colors.white70, size: 20),
-                          ],
-                        )
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -598,64 +578,80 @@ class _RegisterPageState extends State<RegisterPage> {
                           const SizedBox(height: 20),
 
                           // Terms of Service agreement
-                          MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _agreeToTerms = !_agreeToTerms;
-                                });
-                              },
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: Checkbox(
-                                      value: _agreeToTerms,
-                                      activeColor: const Color(0xFF28B79B),
-                                      onChanged: (val) {
-                                        setState(() {
-                                          _agreeToTerms = val ?? false;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: RichText(
-                                      text: const TextSpan(
-                                        text: 'By creating an account, you agree to HanGo\'s ',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFF6B7280),
-                                          height: 1.3,
-                                        ),
-                                        children: [
-                                          TextSpan(
-                                            text: 'Terms of Service',
-                                            style: TextStyle(
-                                              color: Color(0xFF28B79B),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          TextSpan(text: ' and '),
-                                          TextSpan(
-                                            text: 'Privacy Policy',
-                                            style: TextStyle(
-                                              color: Color(0xFF28B79B),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          TextSpan(text: '.'),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _agreeToTerms,
+                                  activeColor: const Color(0xFF28B79B),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _agreeToTerms = val ?? false;
+                                    });
+                                  },
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    text: 'By creating an account, you agree to HanGo\'s ',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF6B7280),
+                                      height: 1.3,
+                                    ),
+                                    children: [
+                                      WidgetSpan(
+                                        child: InkWell(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => const TermsAndPrivacyPage(initialTab: 0),
+                                              ),
+                                            );
+                                          },
+                                          child: const Text(
+                                            'Terms of Service',
+                                            style: TextStyle(
+                                              color: Color(0xFF28B79B),
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const TextSpan(text: ' and '),
+                                      WidgetSpan(
+                                        child: InkWell(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => const TermsAndPrivacyPage(initialTab: 1),
+                                              ),
+                                            );
+                                          },
+                                          child: const Text(
+                                            'Privacy Policy',
+                                            style: TextStyle(
+                                              color: Color(0xFF28B79B),
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const TextSpan(text: '.'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 28),
 
