@@ -51,7 +51,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     _loadCurrentUserId();
     _loadCourseDetail();
     _checkCartStatus();
-    _isInCart = CartManager.cartCoursesNotifier.value.any((c) => c.id == widget.courseId);
+    _isInCart = CartManager.cartCoursesNotifier.value.any(
+      (c) => c.id == widget.courseId,
+    );
     CartManager.cartCoursesNotifier.addListener(_onCartChanged);
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
@@ -65,7 +67,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   void _onCartChanged() {
     if (!mounted) return;
-    final isNowInCart = CartManager.cartCoursesNotifier.value.any((c) => c.id == widget.courseId);
+    final isNowInCart = CartManager.cartCoursesNotifier.value.any(
+      (c) => c.id == widget.courseId,
+    );
     if (isNowInCart != _isInCart) {
       setState(() {
         _isInCart = isNowInCart;
@@ -87,8 +91,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     if (mounted) {
       setState(() {
         _currentUserId = prefs.getInt('user_id') ?? 1;
-        _canEnroll = roles.contains('ENROLL_AND_LEARN_COURSES') || roles.contains('ROLE_ADMINISTRATOR');
-        _canRateAndComment = roles.contains('RATE_AND_COMMENT') || roles.contains('ROLE_ADMINISTRATOR');
+        _canEnroll =
+            roles.contains('ENROLL_AND_LEARN_COURSES') ||
+            roles.contains('ROLE_ADMINISTRATOR');
+        _canRateAndComment =
+            roles.contains('RATE_AND_COMMENT') ||
+            roles.contains('ROLE_ADMINISTRATOR');
       });
     }
   }
@@ -223,19 +231,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         entry.remove();
       } catch (_) {}
     });
-  }
-
-  Future<void> _deleteReview() async {
-    try {
-      await _repository.deleteCourseReview(widget.courseId);
-      _showNotification('Review deleted successfully!');
-      setState(() {
-        _reviewsFuture = _repository.fetchCourseReviews(widget.courseId);
-        _loadCourseDetail();
-      });
-    } catch (e) {
-      _showNotification('Failed to delete review: $e', isError: true);
-    }
   }
 
   void _showWriteReviewDialog({double? rating, String? content}) {
@@ -514,7 +509,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                                       isSubmitting = false;
                                     });
                                     _showNotification(
-                                      'Error: $e',
+                                      e.toString().replaceFirst('Exception: ', ''),
                                       isError: true,
                                     );
                                   }
@@ -561,7 +556,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   void _enroll(CourseDetail course) async {
     if (!_canEnroll) {
-      _showNotification('Enrollment is not available for your role.', isError: true);
+      _showNotification(
+        'Enrollment is not available for your role.',
+        isError: true,
+      );
       return;
     }
     final authService = AuthService();
@@ -579,7 +577,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   void _showEnrollConfirmDialog(CourseDetail course) {
     if (!_canEnroll) {
-      _showNotification('Enrollment is not available for your role.', isError: true);
+      _showNotification(
+        'Enrollment is not available for your role.',
+        isError: true,
+      );
       return;
     }
     showDialog(
@@ -688,7 +689,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   void _proceedWithEnrollment(CourseDetail course) async {
     if (!_canEnroll) {
-      _showNotification('Enrollment is not available for your role.', isError: true);
+      _showNotification(
+        'Enrollment is not available for your role.',
+        isError: true,
+      );
       return;
     }
     setState(() {
@@ -730,8 +734,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
@@ -739,7 +741,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: SharedHeader(
-        isDesktop: isDesktop, 
+        isDesktop: isDesktop,
         activeTab: 'Courses',
         showBackButton: Navigator.canPop(context),
       ),
@@ -961,8 +963,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   Widget _buildMainContent(CourseDetail course) {
     bool isCompleted = false;
     if (course.isEnrolled && course.sessions.isNotEmpty) {
-      final totalLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.length);
-      final completedLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+      final totalLessons = course.sessions.fold(
+        0,
+        (sum, s) => sum + s.lessons.length,
+      );
+      final completedLessons = course.sessions.fold(
+        0,
+        (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length,
+      );
       if (totalLessons > 0 && completedLessons == totalLessons) {
         isCompleted = true;
       }
@@ -1018,7 +1026,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            LanguageManager.isVi ? '🎉 Khóa học đã hoàn thành!' : '🎉 You\'ve Completed This Course!',
+                            LanguageManager.isVi
+                                ? '🎉 Khóa học đã hoàn thành!'
+                                : '🎉 You\'ve Completed This Course!',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1056,14 +1066,22 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                   icon: const Icon(Icons.workspace_premium_rounded, size: 18),
                   label: Text(
                     LanguageManager.isVi ? 'Xem Chứng Chỉ' : 'View Certificate',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ],
@@ -1124,14 +1142,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               );
               return ReviewTab(
                 summary: snapshot.data!,
-                showWriteReviewButton: _canRateAndComment && course.isEnrolled && !hasReviewed,
+                showWriteReviewButton:
+                    _canRateAndComment && isCompleted && !hasReviewed,
                 onWriteReview: _showWriteReviewDialog,
                 currentUserId: _currentUserId,
-                onDeleteReview: _canRateAndComment ? _deleteReview : null,
-                onEditReview: _canRateAndComment
-                    ? (rating, content) =>
-                        _showWriteReviewDialog(rating: rating, content: content)
-                    : null,
                 isEnrolled: course.isEnrolled,
               );
             },
@@ -1392,7 +1406,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   Future<void> _checkCartStatus() async {
-    final inMemory = CartManager.cartCoursesNotifier.value.any((c) => c.id == widget.courseId);
+    final inMemory = CartManager.cartCoursesNotifier.value.any(
+      (c) => c.id == widget.courseId,
+    );
     if (inMemory) {
       if (mounted) {
         setState(() {
@@ -1417,7 +1433,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     setState(() {
       _isInCart = true;
     });
-    _showNotification(isVi ? 'Đã thêm vào giỏ hàng thành công!' : 'Added to cart successfully!');
+    _showNotification(
+      isVi ? 'Đã thêm vào giỏ hàng thành công!' : 'Added to cart successfully!',
+    );
 
     // 2. Convert detail to Course object and sync optimistically
     final detail = _courseDetail!;
@@ -1636,8 +1654,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   Widget _buildEnrollCard(CourseDetail course) {
     bool isCompleted = false;
     if (course.isEnrolled && course.sessions.isNotEmpty) {
-      final totalLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.length);
-      final completedLessons = course.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
+      final totalLessons = course.sessions.fold(
+        0,
+        (sum, s) => sum + s.lessons.length,
+      );
+      final completedLessons = course.sessions.fold(
+        0,
+        (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length,
+      );
       if (totalLessons > 0 && completedLessons == totalLessons) {
         isCompleted = true;
       }
@@ -1813,7 +1837,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       ),
                     );
                   },
-                  icon: const Icon(Icons.workspace_premium_rounded, size: 18, color: Color(0xFFD97706)),
+                  icon: const Icon(
+                    Icons.workspace_premium_rounded,
+                    size: 18,
+                    color: Color(0xFFD97706),
+                  ),
                   label: Text(
                     LanguageManager.isVi ? 'Xem Chứng Chỉ' : 'View Certificate',
                     style: const TextStyle(
@@ -1824,7 +1852,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+                    side: const BorderSide(
+                      color: Color(0xFFF59E0B),
+                      width: 1.5,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -1833,7 +1864,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 ),
               ),
             ],
-
           ] else ...[
             // Buy / Enroll Buttons Section
             if (!_canEnroll) ...[

@@ -22,11 +22,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.hango.hango_backend.dto.CourseReviewSummaryDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.CourseRating;
-import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.repository.CertificateRepository;
 import com.hango.hango_backend.repository.CourseRatingRepository;
 import com.hango.hango_backend.repository.CourseRepository;
-import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,7 +38,7 @@ class CourseRatingServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private EnrollmentRepository enrollmentRepository;
+    private CertificateRepository certificateRepository;
     @Mock
     private NotificationService notificationService;
 
@@ -56,17 +55,14 @@ class CourseRatingServiceTest {
 
     private Course course(Long id, double averageRating, int totalRatings) {
         return Course.builder().id(id).title("English Grammar Mastery")
+                .creator(User.builder().id(999L).email("trainer@example.com").build())
                 .averageRating(averageRating).totalRatings(totalRatings).build();
-    }
-
-    private Enrollment completedEnrollment() {
-        return Enrollment.builder().status("COMPLETED").build();
     }
 
     private void stubEligibleLearner(Long courseId, Long userId, Course course) {
         when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
         when(userRepository.findById(userId)).thenReturn(Optional.of(student(userId, "learner@example.com")));
-        when(enrollmentRepository.findByUserIdAndCourseId(userId, courseId)).thenReturn(Optional.of(completedEnrollment()));
+        when(certificateRepository.existsByUserIdAndCourseId(userId, courseId)).thenReturn(true);
         when(courseRatingRepository.findByCourseIdAndStudentId(courseId, userId)).thenReturn(Optional.empty());
     }
 
@@ -167,21 +163,10 @@ class CourseRatingServiceTest {
     }
 
     @Test
-    void addCourseReviewShouldThrowWhenLearnerIsNotEnrolled() {
+    void addCourseReviewShouldThrowWhenLearnerHasNoCertificate() {
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course(1L, 0.0, 0)));
         when(userRepository.findById(1L)).thenReturn(Optional.of(student(1L, "a@example.com")));
-        when(enrollmentRepository.findByUserIdAndCourseId(1L, 1L)).thenReturn(Optional.empty());
-
-        assertThrows(RuntimeException.class, () -> courseRatingService.addCourseReview(1L, 1L, (short) 5, "Nice"));
-        verify(courseRatingRepository, never()).save(any());
-    }
-
-    @Test
-    void addCourseReviewShouldThrowWhenEnrolledButNotYetCompleted() {
-        when(courseRepository.findById(1L)).thenReturn(Optional.of(course(1L, 0.0, 0)));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(student(1L, "a@example.com")));
-        when(enrollmentRepository.findByUserIdAndCourseId(1L, 1L))
-                .thenReturn(Optional.of(Enrollment.builder().status("ENROLLED").build()));
+        when(certificateRepository.existsByUserIdAndCourseId(1L, 1L)).thenReturn(false);
 
         assertThrows(RuntimeException.class, () -> courseRatingService.addCourseReview(1L, 1L, (short) 5, "Nice"));
         verify(courseRatingRepository, never()).save(any());
@@ -205,23 +190,18 @@ class CourseRatingServiceTest {
     }
 
     @Test
-    void addCourseReviewShouldUpdateExistingRatingInsteadOfCreatingDuplicate() {
+    void addCourseReviewShouldThrowWhenLearnerAlreadyRatedThisCourse() {
         Course c = course(1L, 2.0, 1);
         User learner = student(1L, "a@example.com");
         CourseRating existing = rating(9L, learner, (short) 2, "Meh");
         when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
         when(userRepository.findById(1L)).thenReturn(Optional.of(learner));
-        when(enrollmentRepository.findByUserIdAndCourseId(1L, 1L)).thenReturn(Optional.of(completedEnrollment()));
+        when(certificateRepository.existsByUserIdAndCourseId(1L, 1L)).thenReturn(true);
         when(courseRatingRepository.findByCourseIdAndStudentId(1L, 1L)).thenReturn(Optional.of(existing));
-        when(courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(existing));
 
-        courseRatingService.addCourseReview(1L, 1L, (short) 5, "Changed my mind, great!");
-
-        ArgumentCaptor<CourseRating> captor = ArgumentCaptor.forClass(CourseRating.class);
-        verify(courseRatingRepository).save(captor.capture());
-        assertEquals(9L, captor.getValue().getId());
-        assertEquals((short) 5, captor.getValue().getRating());
-        assertEquals("Changed my mind, great!", captor.getValue().getReviewContent());
+        assertThrows(RuntimeException.class,
+                () -> courseRatingService.addCourseReview(1L, 1L, (short) 5, "Changed my mind, great!"));
+        verify(courseRatingRepository, never()).save(any());
     }
 
     @Test
@@ -267,6 +247,12 @@ class CourseRatingServiceTest {
         courseRatingService.addCourseReview(1L, 1L, (short) 2, "Hard to understand");
 
         verify(notificationService).notifyCourseManagers(
+                org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_RATING), anyString(), anyString(), any());
+        verify(notificationService).notifyRole(
+                org.mockito.ArgumentMatchers.eq(NotificationService.RECIPIENT_ADMIN),
+                org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_RATING), anyString(), anyString(), any());
+        verify(notificationService).notifyUser(
+                org.mockito.ArgumentMatchers.eq(c.getCreator()),
                 org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_RATING), anyString(), anyString(), any());
     }
 
@@ -319,6 +305,12 @@ class CourseRatingServiceTest {
         courseRatingService.addCourseReview(1L, 1L, (short) 2, "meh");
 
         verify(notificationService).notifyCourseManagers(
+                org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_AVERAGE_RATING), anyString(), anyString(), any());
+        verify(notificationService).notifyRole(
+                org.mockito.ArgumentMatchers.eq(NotificationService.RECIPIENT_ADMIN),
+                org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_AVERAGE_RATING), anyString(), anyString(), any());
+        verify(notificationService).notifyUser(
+                org.mockito.ArgumentMatchers.eq(c.getCreator()),
                 org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_AVERAGE_RATING), anyString(), anyString(), any());
     }
 
@@ -374,25 +366,8 @@ class CourseRatingServiceTest {
     // =================================================================
 
     @Test
-    void deleteCourseReviewShouldThrowWhenReviewNotFound() {
-        when(courseRatingRepository.findByCourseIdAndStudentId(1L, 1L)).thenReturn(Optional.empty());
-
+    void deleteCourseReviewShouldAlwaysBeRejectedAsFeedbackIsOneTimeOnly() {
         assertThrows(RuntimeException.class, () -> courseRatingService.deleteCourseReview(1L, 1L));
         verify(courseRatingRepository, never()).delete(any());
-    }
-
-    @Test
-    void deleteCourseReviewShouldDeleteAndRecalculateCourseStats() {
-        Course c = course(1L, 4.0, 2);
-        CourseRating existing = rating(9L, student(1L, "a@example.com"), (short) 4, "Good");
-        existing.setCourse(c);
-        when(courseRatingRepository.findByCourseIdAndStudentId(1L, 1L)).thenReturn(Optional.of(existing));
-        when(courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(
-                rating(2L, student(2L, "b@example.com"), (short) 4, "Good")));
-
-        courseRatingService.deleteCourseReview(1L, 1L);
-
-        verify(courseRatingRepository).delete(existing);
-        verify(courseRepository).updateCourseStats(1L, 4.0, 1);
     }
 }

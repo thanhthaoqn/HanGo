@@ -4,10 +4,9 @@ import com.hango.hango_backend.dto.CourseReviewDTO;
 import com.hango.hango_backend.dto.CourseReviewSummaryDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.CourseRating;
-import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.repository.CertificateRepository;
 import com.hango.hango_backend.repository.CourseRepository;
-import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.CourseRatingRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +30,7 @@ public class CourseRatingServiceImpl implements CourseRatingService {
     private final CourseRatingRepository courseRatingRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
-    private final EnrollmentRepository enrollmentRepository;
+    private final CertificateRepository certificateRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -116,26 +115,20 @@ public class CourseRatingServiceImpl implements CourseRatingService {
         User student = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseId(userId, courseId)
-                .orElseThrow(() -> new RuntimeException("You must enroll in this course before rating it"));
-        if (!"COMPLETED".equalsIgnoreCase(enrollment.getStatus())) {
-            throw new RuntimeException("You must complete the course before rating it");
+        if (!certificateRepository.existsByUserIdAndCourseId(userId, courseId)) {
+            throw new RuntimeException("You must complete the course and receive a certificate before rating it");
         }
 
-        CourseRating courseRating = courseRatingRepository.findByCourseIdAndStudentId(courseId, userId)
-                .orElse(null);
-
-        if (courseRating != null) {
-            courseRating.setRating(rating);
-            courseRating.setReviewContent(content);
-        } else {
-            courseRating = CourseRating.builder()
-                    .course(course)
-                    .student(student)
-                    .rating(rating)
-                    .reviewContent(content)
-                    .build();
+        if (courseRatingRepository.findByCourseIdAndStudentId(courseId, userId).isPresent()) {
+            throw new RuntimeException("You can only rate this course once.");
         }
+
+        CourseRating courseRating = CourseRating.builder()
+                .course(course)
+                .student(student)
+                .rating(rating)
+                .reviewContent(content)
+                .build();
 
         courseRatingRepository.save(courseRating);
 
@@ -150,6 +143,7 @@ public class CourseRatingServiceImpl implements CourseRatingService {
                     + (content == null || content.isBlank() ? "(no comment provided)" : content) + "\"";
             notificationService.notifyCourseManagers(NotificationService.TYPE_LOW_RATING, title, message, course);
             notificationService.notifyRole(NotificationService.RECIPIENT_ADMIN, NotificationService.TYPE_LOW_RATING, title, message, course);
+            notificationService.notifyUser(course.getCreator(), NotificationService.TYPE_LOW_RATING, title, message, course);
         }
 
         boolean wasAboveThreshold = previousTotal > 0 && previousAverage > LOW_AVERAGE_THRESHOLD;
@@ -160,6 +154,7 @@ public class CourseRatingServiceImpl implements CourseRatingService {
                     + "\nTotal Ratings: " + course.getTotalRatings();
             notificationService.notifyCourseManagers(NotificationService.TYPE_LOW_AVERAGE_RATING, title, message, course);
             notificationService.notifyRole(NotificationService.RECIPIENT_ADMIN, NotificationService.TYPE_LOW_AVERAGE_RATING, title, message, course);
+            notificationService.notifyUser(course.getCreator(), NotificationService.TYPE_LOW_AVERAGE_RATING, title, message, course);
         }
     }
 
@@ -181,13 +176,10 @@ public class CourseRatingServiceImpl implements CourseRatingService {
         course.setTotalRatings(total);
     }
 
+    /** Feedback/rating is a one-time action once a certificate is earned: no self-service delete. */
     @Override
     @Transactional
     public void deleteCourseReview(Long courseId, Long userId) {
-        CourseRating courseRating = courseRatingRepository.findByCourseIdAndStudentId(courseId, userId)
-                .orElseThrow(() -> new RuntimeException("Review not found"));
-        Course course = courseRating.getCourse();
-        courseRatingRepository.delete(courseRating);
-        recalculateCourseStats(course);
+        throw new RuntimeException("Reviews cannot be edited or deleted once submitted");
     }
 }

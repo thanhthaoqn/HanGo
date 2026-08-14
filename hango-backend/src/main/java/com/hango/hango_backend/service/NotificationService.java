@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -60,7 +59,14 @@ public class NotificationService {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Throwable.class)
+    /**
+     * Deliberately joins the caller's transaction (not REQUIRES_NEW): a separate transaction here
+     * would insert a Notification row referencing Course via FK on its own connection while the
+     * caller's still-open transaction may hold an exclusive lock on that same Course row (e.g. after
+     * updateCourseStats) - InnoDB then blocks the FK-integrity check until the caller commits, but the
+     * caller is waiting on this call to return, producing a guaranteed self-deadlock/lock-wait timeout.
+     */
+    @Transactional
     public void notifyRole(String role, String type, String title, String message, Course course) {
         try {
             List<User> users = userRepository.findByRoleName(role);
@@ -91,7 +97,8 @@ public class NotificationService {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Throwable.class)
+    /** See {@link #notifyRole} for why this joins the caller's transaction instead of REQUIRES_NEW. */
+    @Transactional
     public void notifyUser(User user, String type, String title, String message, Course course) {
         if (user == null) {
             return;

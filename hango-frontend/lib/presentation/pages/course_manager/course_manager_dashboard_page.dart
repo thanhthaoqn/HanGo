@@ -175,7 +175,8 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
       if (mounted) {
         setState(() {
           _summary = results[0] as CourseManagerDashboardSummary;
-          _pendingCourses = results[1] as List<CourseReviewCourse>;
+          _pendingCourses = (results[1] as Map<String, dynamic>)['courses']
+              as List<CourseReviewCourse>;
           
           // Sort by submittedAt descending (newest first)
           _pendingCourses?.sort((a, b) {

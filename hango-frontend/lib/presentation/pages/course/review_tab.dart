@@ -280,7 +280,8 @@ class _ReviewTabState extends State<ReviewTab> {
                           color: Color(0xFF64748B),
                         ),
                       ),
-                      if (review.userId == widget.currentUserId) ...[
+                      if (review.userId == widget.currentUserId &&
+                          (widget.onEditReview != null || widget.onDeleteReview != null)) ...[
                         const SizedBox(width: 8),
                         PopupMenuButton<String>(
                           shape: RoundedRectangleBorder(

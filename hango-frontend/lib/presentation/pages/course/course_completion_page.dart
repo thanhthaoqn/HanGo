@@ -188,7 +188,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         setState(() {
           _isSubmittingReview = false;
         });
-        ToastHelper.showError(context, 'Error submitting review: $e');
+        ToastHelper.showError(context, e.toString().replaceFirst('Exception: ', ''));
       }
     }
   }
