@@ -19,8 +19,8 @@ public interface CourseRatingRepository extends JpaRepository<CourseRating, Long
     @org.springframework.data.jpa.repository.Query("SELECT AVG(cr.rating) FROM CourseRating cr WHERE cr.course.creator.id = :trainerId")
     Double getAverageRatingByTrainerId(@org.springframework.data.repository.query.Param("trainerId") Long trainerId);
 
-    @org.springframework.data.jpa.repository.Query("SELECT cr FROM CourseRating cr JOIN FETCH cr.course c JOIN FETCH c.creator crt LEFT JOIN FETCH c.category LEFT JOIN FETCH c.difficulty WHERE crt.id = :creatorId ORDER BY cr.createdAt DESC LIMIT 5")
-    List<CourseRating> findTop5ByCourseCreatorIdOrderByCreatedAtDesc(@org.springframework.data.repository.query.Param("creatorId") Long creatorId);
+    @org.springframework.data.jpa.repository.Query("SELECT cr FROM CourseRating cr JOIN FETCH cr.course c JOIN FETCH c.creator crt LEFT JOIN FETCH c.category LEFT JOIN FETCH c.difficulty WHERE crt.id = :creatorId ORDER BY cr.createdAt DESC LIMIT 20")
+    List<CourseRating> findTop20ByCourseCreatorIdOrderByCreatedAtDesc(@org.springframework.data.repository.query.Param("creatorId") Long creatorId);
 
     @org.springframework.data.jpa.repository.Query("SELECT AVG(cr.rating) FROM CourseRating cr WHERE cr.course.id IN :courseIds")
     Double getAverageRatingByCourseIds(@org.springframework.data.repository.query.Param("courseIds") List<Long> courseIds);

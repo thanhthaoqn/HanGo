@@ -452,14 +452,18 @@ public class LearningPathwayService {
     private void applyTimeboxing(LearningPathway pathway, LocalDate targetDate, Integer hoursPerWeek, List<Integer> preferredStudyDays) {
         if (pathway.getNodes() == null || pathway.getNodes().isEmpty()) return;
 
-        List<Integer> estimatedHoursPerNode = pathway.getNodes().stream()
-                .map(node -> {
-                    long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
-                    return totalLessons == 0 ? 3 : (int) (totalLessons * 2); // default 2 hours per lesson if missing data
-                }).toList();
+        List<Integer> estimatedHoursPerNode = new java.util.ArrayList<>();
+        for (PathwayNode node : pathway.getNodes()) {
+            if ("COMPLETED".equalsIgnoreCase(node.getStatus())) {
+                estimatedHoursPerNode.add(0); // Completed nodes consume no forward capacity
+            } else {
+                long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+                estimatedHoursPerNode.add(totalLessons == 0 ? 3 : (int) (totalLessons * 2));
+            }
+        }
 
-        List<PathwayTimeboxingScheduler.NodeSchedule> schedule = PathwayTimeboxingScheduler.schedule(
-                targetDate,
+        List<PathwayTimeboxingScheduler.NodeSchedule> schedule = PathwayTimeboxingScheduler.scheduleForward(
+                LocalDate.now(),
                 hoursPerWeek,
                 preferredStudyDays,
                 estimatedHoursPerNode,
@@ -468,12 +472,28 @@ public class LearningPathwayService {
 
         for (int i = 0; i < pathway.getNodes().size(); i++) {
             PathwayNode node = pathway.getNodes().get(i);
+            if ("COMPLETED".equalsIgnoreCase(node.getStatus())) {
+                continue; // Do not alter the historical schedule of completed nodes
+            }
+            
             PathwayTimeboxingScheduler.NodeSchedule nodeSchedule = schedule.get(i);
             
             node.setStartDate(nodeSchedule.getStartDate() != null ? nodeSchedule.getStartDate().atStartOfDay() : null);
             node.setDeadline(nodeSchedule.getDeadline() != null ? nodeSchedule.getDeadline().atTime(23, 59) : null);
             node.setEstimatedHours(nodeSchedule.getEstimatedHours());
-            node.setScheduleStatus(nodeSchedule.getDeadline() != null && nodeSchedule.getDeadline().isBefore(LocalDate.now()) && !"COMPLETED".equalsIgnoreCase(node.getStatus()) ? "BEHIND" : "ON_TRACK");
+            
+            boolean isBehind = false;
+            if (nodeSchedule.getDeadline() != null) {
+                // If the scheduled deadline is after the user's target date, we are behind
+                if (targetDate != null && nodeSchedule.getDeadline().isAfter(targetDate)) {
+                    isBehind = true;
+                }
+                // Or if the deadline has already passed
+                if (nodeSchedule.getDeadline().isBefore(LocalDate.now())) {
+                    isBehind = true;
+                }
+            }
+            node.setScheduleStatus(isBehind ? "BEHIND" : "ON_TRACK");
         }
     }
 

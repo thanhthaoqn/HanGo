@@ -84,9 +84,12 @@ public class CourseManagerDashboardController {
 
     @GetMapping("/courses/review")
     @PreAuthorize("hasAuthority('VIEW_PLATFORM_DASHBOARD') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<?> getCoursesForReview(@RequestParam(defaultValue = "PENDING") String status) {
+    public ResponseEntity<?> getCoursesForReview(
+            @RequestParam(defaultValue = "PENDING") String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         try {
-            List<CourseReviewDetailDTO> courses = courseManagerDashboardService.getCoursesForReview(status);
+            org.springframework.data.domain.Page<CourseReviewDetailDTO> courses = courseManagerDashboardService.getCoursesForReview(status, page, size);
             return ResponseEntity.ok(courses);
         } catch (Exception e) {
             e.printStackTrace();

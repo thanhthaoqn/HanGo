@@ -32,8 +32,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     @Query("SELECT e FROM Enrollment e WHERE e.user.id = :userId AND e.course.id = :courseId")
     Optional<Enrollment> findByUserIdAndCourseIdWithLock(@Param("userId") Long userId, @Param("courseId") Long courseId);
 
-    @org.springframework.data.jpa.repository.Query("SELECT e FROM Enrollment e JOIN FETCH e.course c JOIN FETCH c.creator crt LEFT JOIN FETCH c.category LEFT JOIN FETCH c.difficulty WHERE crt.id = :creatorId ORDER BY e.enrolledAt DESC LIMIT 5")
-    List<Enrollment> findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(@org.springframework.data.repository.query.Param("creatorId") Long creatorId);
+    @org.springframework.data.jpa.repository.Query("SELECT e FROM Enrollment e JOIN FETCH e.course c JOIN FETCH c.creator crt LEFT JOIN FETCH c.category LEFT JOIN FETCH c.difficulty WHERE crt.id = :creatorId ORDER BY e.enrolledAt DESC LIMIT 20")
+    List<Enrollment> findTop20ByCourseCreatorIdOrderByEnrolledAtDesc(@org.springframework.data.repository.query.Param("creatorId") Long creatorId);
 
     List<Enrollment> findByCourseIdIn(List<Long> courseIds);
 

@@ -133,7 +133,13 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<Course> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String status);
 
     @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
+    org.springframework.data.domain.Page<Course> findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(String status, org.springframework.data.domain.Pageable pageable);
+
+    @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
     List<Course> findByDeletedAtIsNullOrderByCreatedAtDesc();
+
+    @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
+    org.springframework.data.domain.Page<Course> findByDeletedAtIsNullOrderByCreatedAtDesc(org.springframework.data.domain.Pageable pageable);
 
     long countByStatusAndDeletedAtIsNull(String status);
 

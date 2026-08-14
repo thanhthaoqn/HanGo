@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface CourseManagerDashboardService {
     CourseManagerDashboardSummaryDTO getDashboardSummary();
-    List<CourseReviewDetailDTO> getCoursesForReview(String status);
+    org.springframework.data.domain.Page<CourseReviewDetailDTO> getCoursesForReview(String status, int page, int size);
     CourseReviewDetailDTO getCourseReviewDetail(Long courseId);
     void publishCourse(Long courseId);
     void rejectCourse(Long courseId, String reason);

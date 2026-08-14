@@ -425,6 +425,45 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   }
 
   Widget _buildChartSection() {
+    int currentMonth = DateTime.now().month;
+    double minX = 0;
+    double maxX = 11;
+
+    if (_selectedChartPeriod == '1M') {
+      minX = (currentMonth - 2).toDouble();
+      maxX = (currentMonth - 1).toDouble();
+    } else if (_selectedChartPeriod == '3M') {
+      minX = (currentMonth - 3).toDouble();
+      maxX = (currentMonth - 1).toDouble();
+    } else if (_selectedChartPeriod == '6M') {
+      minX = (currentMonth - 6).toDouble();
+      maxX = (currentMonth - 1).toDouble();
+    } else {
+      minX = 0;
+      maxX = 11;
+    }
+    
+    if (minX < 0) minX = 0;
+    if (maxX <= minX) maxX = minX + 1;
+
+    List<FlSpot> spots = [];
+    if (_monthlyRevenues.isNotEmpty) {
+      for (var e in _monthlyRevenues) {
+        int m = e['month'] as int;
+        double val = ((e['revenue'] as num) / 1000000).toDouble();
+        if ((m - 1) >= minX && (m - 1) <= maxX) {
+          spots.add(FlSpot((m - 1).toDouble(), val));
+        }
+      }
+    }
+    if (spots.isEmpty) {
+      spots = [FlSpot(minX, 0), FlSpot(maxX, 0)];
+    }
+
+    double maxVal = spots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+    double maxY = maxVal == 0 ? 10 : ((maxVal / 10).ceil() * 10).toDouble();
+    if (maxY == maxVal) maxY += 10;
+
     return _HoverCard(
       padding: const EdgeInsets.all(24),
       child: SizedBox(
@@ -464,7 +503,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             Expanded(
               child: LineChart(
                 LineChartData(
-                  gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1, getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1)),
+                  gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: maxY / 5, getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1)),
                   titlesData: FlTitlesData(
                     show: true,
                     rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -476,20 +515,35 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                         interval: 1,
                         getTitlesWidget: (value, meta) {
                           const style = TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit');
-                          String text = switch (value.toInt()) { 0 => 'Jan', 2 => 'Mar', 4 => 'May', 6 => 'Jul', 8 => 'Sep', 10 => 'Nov', _ => '' };
-                          return SideTitleWidget(meta: meta, child: Text(text, style: style));
+                          int val = value.toInt();
+                          if (val != value) return const SizedBox.shrink();
+                          List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                          if (val < 0 || val > 11) return const SizedBox.shrink();
+                          
+                          return SideTitleWidget(meta: meta, child: Text(months[val], style: style));
                         },
                       ),
                     ),
-                    leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, interval: 1, reservedSize: 42, getTitlesWidget: (value, meta) => Text('${value.toInt()}M', style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit')))),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, 
+                        reservedSize: 42,
+                        interval: maxY / 5,
+                        getTitlesWidget: (value, meta) {
+                          if (value == meta.max && value != meta.min && value % (maxY / 5) != 0) return const SizedBox.shrink();
+                          return Text('${value.toInt()}M', style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit'));
+                        }
+                      )
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
-                  minX: 0, maxX: 11, minY: 0,
-                  maxY: _monthlyRevenues.isEmpty ? 6 : (_monthlyRevenues.map((e) => ((e['revenue'] as num) / 1000000).toDouble()).reduce((a, b) => a > b ? a : b) + 2),
+                  minX: minX, maxX: maxX, minY: 0,
+                  maxY: maxY,
                   lineBarsData: [
                     LineChartBarData(
-                      spots: _monthlyRevenues.isEmpty ? const [FlSpot(0, 1), FlSpot(1, 1.5), FlSpot(2, 1.4), FlSpot(3, 3.4), FlSpot(4, 2), FlSpot(5, 2.2), FlSpot(6, 1.8), FlSpot(7, 4), FlSpot(8, 3.8), FlSpot(9, 4.5), FlSpot(10, 4.2), FlSpot(11, 5.5)] : _monthlyRevenues.map((e) => FlSpot((e['month'] as num).toDouble() - 1, ((e['revenue'] as num) / 1000000).toDouble())).toList(),
+                      spots: spots,
                       isCurved: true,
+                      preventCurveOverShooting: true,
                       curveSmoothness: 0.35,
                       gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF10B981)]),
                       barWidth: 3.5,
