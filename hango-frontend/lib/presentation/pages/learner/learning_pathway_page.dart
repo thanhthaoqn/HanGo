@@ -188,7 +188,59 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
-
+  Future<void> _handleFastTrack(PathwayNode node) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Fast-track Course'),
+        content: const Text('You are about to skip this course in your learning pathway. Are you sure you want to proceed?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+            ),
+            child: const Text('Yes, Fast-track'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm != true) return;
+    
+    if (_pathway == null) return;
+    try {
+      final updatedPathway = await _repository.sendMentorAction(
+        pathwayId: _pathway!.pathwayId,
+        actionType: 'FAST_TRACK',
+      );
+      setState(() {
+        _pathway = _preparePathwayForDisplay(updatedPathway);
+        _selectedNode = _initialSelectedNode(updatedPathway.nodes);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Course fast-tracked successfully!'),
+            backgroundColor: Color(0xFF28B79B),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to fast-track: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +312,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                 child: InteractiveNodeTree(
                   nodes: _pathway!.nodes,
                   onNodeTap: _handleNodeTap,
+                  onFastTrackTap: _handleFastTrack,
                   selectedNode: _selectedNode,
                   isDarkMode: _isDarkMode,
                   contentPadding: const EdgeInsets.only(right: 480), // Padding to not hide nodes under mentor
@@ -315,6 +368,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           child: InteractiveNodeTree(
             nodes: _pathway!.nodes,
             onNodeTap: _handleNodeTap,
+            onFastTrackTap: _handleFastTrack,
             selectedNode: _selectedNode,
             isDarkMode: _isDarkMode,
             contentPadding: const EdgeInsets.only(bottom: 100),

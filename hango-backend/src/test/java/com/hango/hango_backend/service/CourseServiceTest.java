@@ -67,6 +67,8 @@ class CourseServiceTest {
     private EmailService emailService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private com.hango.hango_backend.repository.PathwayNodeRepository pathwayNodeRepository;
 
     @InjectMocks
     private CourseServiceImpl courseService;

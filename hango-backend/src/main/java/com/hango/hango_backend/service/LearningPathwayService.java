@@ -574,9 +574,8 @@ public class LearningPathwayService {
 
         if (currentNode != null) {
             int progress = calculateCourseProgressPercent(studentId, currentNode.getCourse().getId());
-            if (progress >= 80) {
-                suggestedActions.add("FAST_TRACK");
-            }
+            suggestedActions.add("FAST_TRACK"); // Unconditionally allow fast-track for current node
+            
             if (progress > 0 && progress < 50) {
                 suggestedActions.add("TAKE_QUIZ");
             }

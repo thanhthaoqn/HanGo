@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface PathwayNodeRepository extends JpaRepository<PathwayNode, Long> {
     List<PathwayNode> findByLearningPathwayIdOrderByStepOrderAsc(Long pathwayId);
+    List<PathwayNode> findByCourseIdAndLearningPathway_Student_Id(Long courseId, Long studentId);
 }

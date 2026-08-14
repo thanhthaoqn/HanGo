@@ -5,6 +5,7 @@ import '../../pages/course/course_detail_page.dart';
 class InteractiveNodeTree extends StatelessWidget {
   final List<PathwayNode> nodes;
   final Function(PathwayNode) onNodeTap;
+  final Function(PathwayNode)? onFastTrackTap;
   final PathwayNode? selectedNode;
   final bool isDarkMode;
   final EdgeInsetsGeometry? contentPadding;
@@ -14,6 +15,7 @@ class InteractiveNodeTree extends StatelessWidget {
     super.key,
     required this.nodes,
     required this.onNodeTap,
+    this.onFastTrackTap,
     this.selectedNode,
     this.isDarkMode = false,
     this.contentPadding,
@@ -57,6 +59,7 @@ class InteractiveNodeTree extends StatelessWidget {
             isSelected: selectedNode?.step == node.step,
             isDarkMode: isDarkMode,
             onTap: () => onNodeTap(node),
+            onFastTrackTap: onFastTrackTap != null ? () => onFastTrackTap!(node) : null,
           ),
         );
       },
@@ -71,6 +74,7 @@ class _NodeRow extends StatelessWidget {
   final bool isSelected;
   final bool isDarkMode;
   final VoidCallback onTap;
+  final VoidCallback? onFastTrackTap;
 
   const _NodeRow({
     required this.node,
@@ -79,6 +83,7 @@ class _NodeRow extends StatelessWidget {
     required this.isSelected,
     required this.isDarkMode,
     required this.onTap,
+    this.onFastTrackTap,
   });
 
   @override
@@ -138,6 +143,7 @@ class _NodeRow extends StatelessWidget {
                         node: node,
                         isSelected: isSelected,
                         isDarkMode: isDarkMode,
+                        onFastTrackTap: onFastTrackTap,
                       ),
                     ),
                   ),
@@ -156,11 +162,13 @@ class _NodeCard extends StatelessWidget {
   final PathwayNode node;
   final bool isSelected;
   final bool isDarkMode;
+  final VoidCallback? onFastTrackTap;
 
   const _NodeCard({
     required this.node,
     required this.isSelected,
     required this.isDarkMode,
+    this.onFastTrackTap,
   });
 
   @override
@@ -324,6 +332,31 @@ class _NodeCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   elevation: 0,
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (node.status == NodeStatus.inProgress && node.courseId > 0 && onFastTrackTap != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onFastTrackTap,
+                icon: const Icon(Icons.fast_forward_rounded, size: 18),
+                label: const Text('Fast-track (Skip)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isDarkMode ? Colors.white70 : Colors.black54,
+                  side: BorderSide(
+                    color: isDarkMode ? Colors.white24 : Colors.black12,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   textStyle: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,

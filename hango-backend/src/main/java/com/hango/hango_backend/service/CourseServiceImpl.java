@@ -15,9 +15,11 @@ import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.LessonRepository;
+import com.hango.hango_backend.repository.PathwayNodeRepository;
 import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.TrainerProfileRepository;
+import com.hango.hango_backend.entity.PathwayNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +49,7 @@ public class CourseServiceImpl implements CourseService {
     private final TrainerProfileRepository trainerProfileRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final PathwayNodeRepository pathwayNodeRepository;
 
     @Override
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
@@ -485,7 +488,12 @@ public class CourseServiceImpl implements CourseService {
         }
 
         if (latestPublishedCourse.getId().equals(currentCourse.getId())) {
-            throw new RuntimeException("You are already on the latest course version");
+            throw new com.hango.hango_backend.exception.ApiException("You are already on the latest course version", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+
+        if (enrollmentRepository.existsByUserIdAndCourseId(userId, latestPublishedCourse.getId())) {
+            // User is already enrolled in the latest version (e.g. from a double-click or manual enrollment)
+            throw new com.hango.hango_backend.exception.ApiException("You are already enrolled in the latest version. Please refresh the page.", org.springframework.http.HttpStatus.BAD_REQUEST);
         }
 
         // Map completed lesson progress from the old course to the latest published course version
@@ -555,6 +563,15 @@ public class CourseServiceImpl implements CourseService {
         }
 
         enrollmentRepository.save(currentEnrollment);
+        
+        // Also update the course reference in the user's Learning Pathway nodes
+        List<PathwayNode> affectedNodes = pathwayNodeRepository.findByCourseIdAndLearningPathway_Student_Id(currentCourse.getId(), userId);
+        for (PathwayNode node : affectedNodes) {
+            node.setCourse(latestPublishedCourse);
+        }
+        if (!affectedNodes.isEmpty()) {
+            pathwayNodeRepository.saveAll(affectedNodes);
+        }
     }
 
     @Override
