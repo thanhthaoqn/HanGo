@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'dart:ui';
+import 'package:http/http.dart' as http;
+import '../../../utils/config.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../../utils/language_manager.dart';
@@ -28,10 +31,29 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
   String _priceSort = 'All'; // All, LowToHigh, HighToLow
   final TextEditingController _searchController = TextEditingController();
 
+  int _totalLearnersCount = 0;
+
+  Future<void> _fetchPublicStats() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
+      );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        if (mounted) {
+          setState(() {
+            _totalLearnersCount = (data['learnersCount'] ?? 0) as int;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     _fetchCourses();
+    _fetchPublicStats();
   }
 
   @override
@@ -41,12 +63,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
   }
 
   double _getCoursePriceNumeric(Course course) {
-    final title = course.title.toLowerCase();
-    if (title.contains('ngữ pháp') || title.contains('grammar') || course.id % 4 == 0) {
-      return 0.0;
-    }
-    final prices = [699000.0, 899000.0, 1290000.0, 1500000.0];
-    return prices[course.id % prices.length];
+    return course.price;
   }
 
   void _fetchCourses() {
@@ -55,10 +72,14 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
     if (_difficulty == 'Intermediate') backendDifficulty = 'INTERMEDIATE';
     if (_difficulty == 'Advanced') backendDifficulty = 'ADVANCED';
 
+    String backendFilterType = 'ALL';
+    if (_filterType == 'Free') backendFilterType = 'FREE';
+    if (_filterType == 'Paid') backendFilterType = 'PAID';
+
     setState(() {
       _coursesFuture = _repository.fetchCourses(
         search: _searchQuery,
-        filterType: 'ALL',
+        filterType: backendFilterType,
         difficulty: backendDifficulty,
       );
     });
@@ -260,8 +281,11 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
                     spacing: 24,
                     runSpacing: 16,
                     children: [
-                      _buildGlassStat(40000, isVi ? 'Học sinh đang học' : 'Active students', Icons.people_rounded),
-                      _buildGlassStat(50, isVi ? 'Bài thi luyện tập' : 'Mock exams available', Icons.assignment_turned_in_rounded),
+                      _buildGlassStat(
+                        _totalLearnersCount > 0 ? _totalLearnersCount : 42,
+                        isVi ? 'Học viên đang học' : 'Active learners',
+                        Icons.people_rounded,
+                      ),
                     ],
                   ),
                 ],
@@ -586,29 +610,13 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
         }
 
         final courses = snapshot.data!;
-
-        // 0. Local filtering to exclude IELTS, TOEIC, Giao tiếp, and Certification courses
-        List<Course> filteredCourses = courses.where((c) {
-          final title = c.title.toLowerCase();
-          final cat = c.category.toLowerCase();
-          return !title.contains('ielts') && !title.contains('toeic') && 
-                 !title.contains('giao tiếp') && !title.contains('communication') &&
-                 !title.contains('chứng chỉ') && !cat.contains('ielts') && 
-                 !cat.contains('toeic') && !cat.contains('giao tiếp') && 
-                 !cat.contains('communication') && !cat.contains('chứng chỉ');
-        }).toList();
+        List<Course> filteredCourses = List.from(courses);
 
         // 1. Filter by Fee Type
         if (_filterType == 'Free') {
-          filteredCourses = filteredCourses.where((c) {
-            final price = _getCoursePriceNumeric(c);
-            return price == 0.0;
-          }).toList();
+          filteredCourses = filteredCourses.where((c) => c.price <= 0).toList();
         } else if (_filterType == 'Paid') {
-          filteredCourses = filteredCourses.where((c) {
-            final price = _getCoursePriceNumeric(c);
-            return price > 0.0;
-          }).toList();
+          filteredCourses = filteredCourses.where((c) => c.price > 0).toList();
         }
 
         // 2. Filter by Rating
