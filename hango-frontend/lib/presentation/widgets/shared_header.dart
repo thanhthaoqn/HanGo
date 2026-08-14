@@ -1067,24 +1067,6 @@ class _SharedHeaderState extends State<SharedHeader> {
                     _navigateToLearnerTab(6);
                   } else if (val == 'purchase_history') {
                     _navigateToLearnerTab(5, subTab: 2);
-                  } else if (val == 'support_tickets') {
-                    if (_userRoles.contains('ROLE_COURSE_MANAGER')) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CourseManagerShellPage(initialIndex: 6),
-                        ),
-                      );
-                    } else if (_userRoles.contains('ROLE_TRAINER')) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TrainerShellPage(initialIndex: 6),
-                        ),
-                      );
-                    } else {
-                      _navigateToLearnerTab(5, subTab: 3);
-                    }
                   } else if (val == 'notifications') {
                     ToastHelper.show(
                       context,
@@ -1284,32 +1266,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
 
 
-                  if (_userRoles.any((r) => r.toUpperCase().contains('TRAINER') || r.toUpperCase().contains('MANAGER')))
-                    PopupMenuItem(
-                      value: 'support_tickets',
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.confirmation_number_outlined,
-                              size: 18,
-                              color: Color(0xFF28B79B),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _isVietnamese ? 'Phiếu hỗ trợ' : 'Support Tickets',
-                              style: const TextStyle(
-                                fontFamily: 'Outfit',
-                                color: Color(0xFF1E293B),
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+
                   PopupMenuItem(
                     value: 'purchase_history',
                     child: Container(
