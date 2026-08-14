@@ -143,6 +143,7 @@ public class ExamCourseRecommendationAIService {
                                 .category(course != null && course.getCategory() != null ? course.getCategory().getParamValue() : "")
                                 .difficulty(course != null && course.getDifficulty() != null ? course.getDifficulty().getParamValue() : "")
                                 .reasonWhy(reasonWhy)
+                                .thumbnailUrl(course != null ? course.getThumbnailUrl() : null)
                                 .build();
                     }).toList())
                     .build();

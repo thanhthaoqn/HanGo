@@ -712,10 +712,20 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 width: 70,
                                 height: 70,
                                 color: Colors.grey.shade200,
-                                child: const Icon(
-                                  Icons.book_outlined,
-                                  color: Colors.grey,
-                                ),
+                                child: (r['thumbnailUrl'] != null && r['thumbnailUrl'].toString().isNotEmpty)
+                                    ? Image.network(
+                                        r['thumbnailUrl'].toString(),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            const Icon(
+                                              Icons.book_outlined,
+                                              color: Colors.grey,
+                                            ),
+                                      )
+                                    : const Icon(
+                                        Icons.book_outlined,
+                                        color: Colors.grey,
+                                      ),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -872,10 +882,20 @@ class _ExamResultPageState extends State<ExamResultPage> {
                               width: 70,
                               height: 70,
                               color: Colors.grey.shade200,
-                              child: const Icon(
-                                Icons.book_outlined,
-                                color: Colors.grey,
-                              ),
+                              child: (r['thumbnailUrl'] != null && r['thumbnailUrl'].toString().isNotEmpty)
+                                  ? Image.network(
+                                      r['thumbnailUrl'].toString(),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          const Icon(
+                                            Icons.book_outlined,
+                                            color: Colors.grey,
+                                          ),
+                                    )
+                                  : const Icon(
+                                      Icons.book_outlined,
+                                      color: Colors.grey,
+                                    ),
                             ),
                           ),
                           const SizedBox(width: 16),

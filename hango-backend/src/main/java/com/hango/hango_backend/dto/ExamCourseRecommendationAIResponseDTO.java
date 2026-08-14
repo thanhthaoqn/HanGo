@@ -31,6 +31,7 @@ public class ExamCourseRecommendationAIResponseDTO {
         private String category;
         private String difficulty;
         private String reasonWhy;
+        private String thumbnailUrl;
     }
 }
 
