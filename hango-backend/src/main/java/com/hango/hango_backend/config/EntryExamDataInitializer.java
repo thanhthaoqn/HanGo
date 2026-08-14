@@ -55,18 +55,18 @@ public class EntryExamDataInitializer implements CommandLineRunner {
   public void run(String... args) throws Exception {
     log.info("Checking Entry Exam (Placement Test)...");
 
-    Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exams WHERE id = 1028", Integer.class);
+    Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exams WHERE id = 1035", Integer.class);
     boolean examExists = (count != null && count > 0);
 
     if (examExists) {
-      Integer qCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam_questions WHERE exam_id = 1028",
+      Integer qCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM exam_questions WHERE exam_id = 1035",
           Integer.class);
       if (qCount != null && qCount >= 40) {
-        log.info("Entry Exam (id=1028) already exists with full questions. Skipping initialization.");
+        log.info("Entry Exam (id=1035) already exists with full questions. Skipping initialization.");
         return;
       } else {
-        log.info("Entry Exam (id=1028) is incomplete or needs replacement. Clearing old linkages...");
-        jdbcTemplate.update("DELETE FROM exam_questions WHERE exam_id = 1028");
+        log.info("Entry Exam (id=1035) is incomplete or needs replacement. Clearing old linkages...");
+        jdbcTemplate.update("DELETE FROM exam_questions WHERE exam_id = 1035");
       }
     }
 
@@ -95,15 +95,15 @@ public class EntryExamDataInitializer implements CommandLineRunner {
     Long diffId = difficulties.isEmpty() ? null : difficulties.get(0);
 
     if (examExists) {
-      log.info("Updating existing Entry Exam (id=1028)...");
+      log.info("Updating existing Entry Exam (id=1035)...");
       jdbcTemplate.update(
-          "UPDATE exams SET title = 'Global Entry Placement Test', description = 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.', duration_minutes = 50, status = 'PUBLISHED', expected_question_count = 40, visibility = 'PUBLIC', passing_score = 5.0, thumbnail_url = 'https://res.cloudinary.com/diqekap4o/image/upload/v1714578160/hango-assets/exam-banner.png' WHERE id = 1028");
+          "UPDATE exams SET title = 'Global Entry Placement Test', description = 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.', duration_minutes = 50, status = 'PUBLISHED', expected_question_count = 40, visibility = 'PUBLIC', passing_score = 5.0, thumbnail_url = 'https://res.cloudinary.com/diqekap4o/image/upload/v1714578160/hango-assets/exam-banner.png' WHERE id = 1035");
     } else {
-      log.info("Inserting Entry Exam (id=1028)...");
+      log.info("Inserting Entry Exam (id=1035)...");
       jdbcTemplate.update(
           "INSERT INTO exams (id, title, description, duration_minutes, status, expected_question_count, visibility, created_by, created_at, version, passing_score, thumbnail_url) "
               +
-              "VALUES (1028, 'Global Entry Placement Test', 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.', 50, 'PUBLISHED', 40, 'PUBLIC', ?, NOW(), 'v1.0', 5.0, 'https://res.cloudinary.com/diqekap4o/image/upload/v1714578160/hango-assets/exam-banner.png')",
+              "VALUES (1035, 'Global Entry Placement Test', 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.', 50, 'PUBLISHED', 40, 'PUBLIC', ?, NOW(), 'v1.0', 5.0, 'https://res.cloudinary.com/diqekap4o/image/upload/v1714578160/hango-assets/exam-banner.png')",
           userId);
     }
 
@@ -174,7 +174,7 @@ public class EntryExamDataInitializer implements CommandLineRunner {
         // Generate ExamQuestion linkage
         jdbcTemplate.update(
             "INSERT INTO exam_questions (exam_id, question_id, question_order) VALUES (?, ?, ?)",
-            1028, questionId, orderIndex++);
+            1035, questionId, orderIndex++);
 
         // Insert Options
         for (ExamDataOption opt : q.getOptions()) {
@@ -185,7 +185,7 @@ public class EntryExamDataInitializer implements CommandLineRunner {
       }
     }
 
-    log.info("Entry Exam (id=1028) successfully generated with 40 questions.");
+    log.info("Entry Exam (id=1035) successfully generated with 40 questions.");
   }
 
   private String getExamJson() {

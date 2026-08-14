@@ -311,7 +311,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
       final attempts = await _examRepository.fetchMyExamAttempts();
       final hasCompleted = attempts.any(
-        (a) => a['examId'] == 1028 || a['examId'] == '1028',
+        (a) => a['examId'] == 1035 || a['examId'] == '1035',
       );
 
       if (!hasCompleted) {
@@ -440,9 +440,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       Navigator.pop(context); // Close loading
 
       final entryExam = exams.firstWhere(
-        (e) => e.id == '1028',
+        (e) => e.id == '1035',
         orElse: () => Exam(
-          id: '1028',
+          id: '1035',
           title: 'Global Entry Placement Test',
           description: 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.',
           creatorName: 'System',
