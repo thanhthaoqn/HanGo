@@ -159,27 +159,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       ),
                     ),
                     const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text(
-                          'Your trusted education\npartner',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w400,
-                            height: 1.4,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Icon(Icons.verified_user_outlined, color: Colors.white70, size: 20),
-                            SizedBox(width: 12),
-                            Icon(Icons.school_outlined, color: Colors.white70, size: 20),
-                          ],
-                        )
-                      ],
-                    ),
                   ],
                 ),
               ),
