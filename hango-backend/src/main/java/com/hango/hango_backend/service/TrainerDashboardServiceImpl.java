@@ -164,7 +164,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         List<com.hango.hango_backend.dto.RecentActivityDTO> recentActivities = new ArrayList<>();
 
         List<com.hango.hango_backend.entity.Payment> recentPayments = paymentRepository
-                .findTop5ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(trainerId, "SUCCESS");
+                .findTop20ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(trainerId, "SUCCESS");
         for (com.hango.hango_backend.entity.Payment p : recentPayments) {
             recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
                     .type("PAYMENT")
@@ -175,7 +175,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         List<com.hango.hango_backend.entity.Enrollment> recentEnrollments = enrollmentRepository
-                .findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(trainerId);
+                .findTop20ByCourseCreatorIdOrderByEnrolledAtDesc(trainerId);
         for (com.hango.hango_backend.entity.Enrollment e : recentEnrollments) {
             recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
                     .type("ENROLLMENT")
@@ -186,7 +186,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         List<com.hango.hango_backend.entity.CourseRating> recentRatings = courseRatingRepository
-                .findTop5ByCourseCreatorIdOrderByCreatedAtDesc(trainerId);
+                .findTop20ByCourseCreatorIdOrderByCreatedAtDesc(trainerId);
         for (com.hango.hango_backend.entity.CourseRating r : recentRatings) {
             recentActivities.add(com.hango.hango_backend.dto.RecentActivityDTO.builder()
                     .type("RATING")
@@ -204,8 +204,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             return a2.getTimestamp().compareTo(a1.getTimestamp());
         });
 
-        if (recentActivities.size() > 5) {
-            recentActivities = recentActivities.subList(0, 5);
+        if (recentActivities.size() > 20) {
+            recentActivities = recentActivities.subList(0, 20);
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();

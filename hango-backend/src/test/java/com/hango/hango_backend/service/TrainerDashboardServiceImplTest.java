@@ -145,9 +145,12 @@ class TrainerDashboardServiceImplTest {
         when(courseRepository.findTrainerCoursesDetailBase(1L, "ALL", null))
                 .thenReturn(List.of(projectionA, projectionB, projectionC));
         when(paymentRepository.getRevenueByMonthForCurrentYear(1L)).thenReturn(List.of());
-        when(paymentRepository.findTop5ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(1L, "SUCCESS")).thenReturn(List.of());
-        when(enrollmentRepository.findTop5ByCourseCreatorIdOrderByEnrolledAtDesc(1L)).thenReturn(List.of());
-        when(courseRatingRepository.findTop5ByCourseCreatorIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
+        when(paymentRepository.findTop20ByCourseCreatorIdAndStatusOrderByCreatedAtDesc(1L, "SUCCESS"))
+                .thenReturn(List.of());
+        when(enrollmentRepository.findTop20ByCourseCreatorIdOrderByEnrolledAtDesc(1L))
+                .thenReturn(List.of());
+        when(courseRatingRepository.findTop20ByCourseCreatorIdOrderByCreatedAtDesc(1L))
+                .thenReturn(List.of());
 
         TrainerDashboardSummaryDTO result = service.getTrainerDashboardSummary("trainer@example.com");
 
