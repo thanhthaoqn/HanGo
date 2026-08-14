@@ -235,6 +235,115 @@ public class PathwayTimeboxingScheduler {
     return calendar;
   }
 
+  public static List<NodeSchedule> scheduleForward(
+      LocalDate startDate,
+      int hoursPerWeek,
+      List<Integer> preferredStudyDays,
+      List<Integer> estimatedHoursPerNode,
+      int nodeCount
+  ) {
+    Objects.requireNonNull(startDate, "startDate");
+    if (nodeCount <= 0) return Collections.emptyList();
+    if (hoursPerWeek <= 0) {
+      List<NodeSchedule> out = new ArrayList<>();
+      for (int i = 0; i < nodeCount; i++) {
+        out.add(new NodeSchedule(startDate, startDate, 0));
+      }
+      return out;
+    }
+
+    List<DayOfWeek> workDays = parseWorkDays(preferredStudyDays);
+    int workingDaysPerWeek = Math.max(1, workDays.size());
+
+    int baseHoursPerDay = Math.max(1, hoursPerWeek / workingDaysPerWeek);
+    int remainderHours = hoursPerWeek - baseHoursPerDay * workingDaysPerWeek;
+
+    List<Integer> nodeHours = resolveNodeHours(estimatedHoursPerNode, nodeCount);
+    int totalHours = nodeHours.stream().mapToInt(Integer::intValue).sum();
+    if (totalHours <= 0) {
+      List<NodeSchedule> out = new ArrayList<>();
+      for (int i = 0; i < nodeCount; i++) {
+        out.add(new NodeSchedule(startDate, startDate, 0));
+      }
+      return out;
+    }
+
+    List<WorkingDay> calendar = buildForwardsCalendar(startDate, workDays, baseHoursPerDay, remainderHours, totalHours);
+
+    List<NodeSchedule> out = new ArrayList<>();
+    int remainingIndex = 0; // Start at OLDEST date (startDate)
+
+    for (int nodeIdx = 0; nodeIdx < nodeCount; nodeIdx++) {
+      int hoursNeeded = nodeHours.get(nodeIdx);
+      if (hoursNeeded <= 0) {
+        LocalDate d = (remainingIndex < calendar.size()) ? calendar.get(remainingIndex).date : (calendar.isEmpty() ? startDate : calendar.get(calendar.size() - 1).date);
+        out.add(new NodeSchedule(d, d, 0));
+        continue;
+      }
+
+      int startCalIndex = remainingIndex;
+      int hoursTaken = 0;
+
+      while (remainingIndex < calendar.size() && hoursTaken < hoursNeeded) {
+        WorkingDay day = calendar.get(remainingIndex);
+        hoursTaken += day.hoursCapacity;
+        remainingIndex++;
+      }
+
+      if (startCalIndex >= calendar.size()) {
+        startCalIndex = calendar.size() - 1;
+      }
+      LocalDate nodeStartDate = calendar.get(startCalIndex).date;
+
+      int lastUsedIndex = remainingIndex - 1;
+      if (lastUsedIndex < 0) lastUsedIndex = 0;
+      if (lastUsedIndex >= calendar.size()) lastUsedIndex = calendar.size() - 1;
+
+      LocalDate nodeDeadline = calendar.get(lastUsedIndex).date;
+
+      out.add(new NodeSchedule(nodeStartDate, nodeDeadline, hoursNeeded));
+    }
+
+    return out;
+  }
+
+  private static List<WorkingDay> buildForwardsCalendar(
+      LocalDate startDate,
+      List<DayOfWeek> workDays,
+      int baseHoursPerDay,
+      int remainderHoursPerWeek,
+      int totalHoursNeeded
+  ) {
+    List<WorkingDay> calendar = new ArrayList<>();
+
+    int workingDaysPerWeek = workDays.size();
+    int[] capacityByWorkDayPos = new int[workingDaysPerWeek];
+    for (int i = 0; i < workingDaysPerWeek; i++) {
+      capacityByWorkDayPos[i] = baseHoursPerDay;
+    }
+    for (int i = 0; i < remainderHoursPerWeek; i++) {
+      if (i < workingDaysPerWeek) capacityByWorkDayPos[i] += 1;
+    }
+
+    int hoursAccumulated = 0;
+    LocalDate cursor = startDate;
+
+    int safety = 0;
+    while (hoursAccumulated < totalHoursNeeded && safety < 5000) {
+      safety++;
+      DayOfWeek dow = cursor.getDayOfWeek();
+      int pos = indexOf(workDays, dow);
+      if (pos >= 0) {
+        int cap = capacityByWorkDayPos[pos];
+        calendar.add(new WorkingDay(cursor, cap));
+        hoursAccumulated += cap;
+      }
+      cursor = cursor.plusDays(1);
+    }
+
+    return calendar;
+  }
+
   private static int indexOf(List<DayOfWeek> days, DayOfWeek d) {
     for (int i = 0; i < days.size(); i++) {
       if (days.get(i) == d) return i;
