@@ -29,6 +29,14 @@ public class GeminiGenerateResponse {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Part {
         private String text;
+        private FunctionCall functionCall;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class FunctionCall {
+        private String name;
+        private java.util.Map<String, Object> args;
     }
 
     /** Tiện ích lấy nhanh text trả lời đầu tiên, tránh null-check dài dòng ở nơi gọi. */
@@ -37,5 +45,12 @@ public class GeminiGenerateResponse {
         Content content = candidates.get(0).getContent();
         if (content == null || content.getParts() == null || content.getParts().isEmpty()) return null;
         return content.getParts().get(0).getText();
+    }
+
+    public FunctionCall extractFunctionCall() {
+        if (candidates == null || candidates.isEmpty()) return null;
+        Content content = candidates.get(0).getContent();
+        if (content == null || content.getParts() == null || content.getParts().isEmpty()) return null;
+        return content.getParts().get(0).getFunctionCall();
     }
 }

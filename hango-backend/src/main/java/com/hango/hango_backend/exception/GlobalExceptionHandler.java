@@ -115,6 +115,21 @@ public class GlobalExceptionHandler {
         // Log the exception securely on the server side
         ex.printStackTrace();
         
+        // Also write to file for debugging
+        try {
+            String trace = java.time.LocalDateTime.now() + " | " + request.getRequestURI() + "\n" 
+                + ex.getClass().getName() + ": " + ex.getMessage() + "\n"
+                + java.util.Arrays.stream(ex.getStackTrace())
+                    .limit(30)
+                    .map(StackTraceElement::toString)
+                    .collect(java.util.stream.Collectors.joining("\n\tat ")) + "\n\n";
+            java.nio.file.Files.writeString(
+                java.nio.file.Paths.get("error_trace.log"), 
+                trace, 
+                java.nio.file.StandardOpenOption.CREATE, 
+                java.nio.file.StandardOpenOption.APPEND);
+        } catch (Exception ignored) {}
+        
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())

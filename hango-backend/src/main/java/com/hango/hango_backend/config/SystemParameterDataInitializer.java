@@ -72,7 +72,7 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
                 ));
         List<SystemParameter> toCreate = new ArrayList<>();
 
-        // --- STEP 1.1: Ensure 25 Skill Types exist ---
+        // --- STEP 1.1: Ensure 26 Skill Types exist ---
         Map<String, String> skills = new LinkedHashMap<>();
         skills.put("PHONETICS", "Phonetics");
         skills.put("WORD_ORDER", "Word order");
@@ -99,8 +99,9 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         skills.put("MAIN_IDEA_CENTRAL_THEME_QUESTION", "Main idea / Central theme question");
         skills.put("TRUE_NOT_TRUE_QUESTION", "TRUE / NOT TRUE question");
         skills.put("INFERENCE_QUESTION", "Inference question");
+        skills.put("SENTENCE_INSERTION", "Sentence insertion");
 
-        // --- STEP 1.2: Ensure 25 Skill Types exist for SKILL_TYPE and SKILL ---
+        // --- STEP 1.2: Ensure 26 Skill Types exist for SKILL_TYPE and SKILL ---
         String[] skillParamTypes = { "SKILL_TYPE", "SKILL" };
         for (String paramType : skillParamTypes) {
             for (Map.Entry<String, String> entry : skills.entrySet()) {

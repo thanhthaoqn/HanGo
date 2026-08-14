@@ -169,34 +169,75 @@ public class GeminiClientService {
          * Calls the Gemini chat model to generate a response, including the ENTIRE chat
          * history.
          */
-        public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
-                GeminiGenerateRequest request = GeminiGenerateRequest.builder()
-                                .systemInstruction(GeminiGenerateRequest.SystemInstruction.builder()
-                                                .parts(List.of(GeminiGenerateRequest.Part.builder().text(systemPrompt)
-                                                                .build()))
-                                                .build())
-                                .contents(chatHistory)
-                                .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
-                                                .temperature(0.4)
-                                                .maxOutputTokens(8192)
-                                                .build())
-                                .build();
+        public GeminiGenerateResponse generateChatResponseWithTools(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, List<GeminiGenerateRequest.Tool> tools) {
+        GeminiGenerateRequest request = GeminiGenerateRequest.builder()
+                .systemInstruction(GeminiGenerateRequest.SystemInstruction.builder()
+                        .parts(List.of(GeminiGenerateRequest.Part.builder().text(systemPrompt)
+                                .build()))
+                        .build())
+                .contents(chatHistory)
+                .tools(tools)
+                .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
+                        .temperature(0.4)
+                        .maxOutputTokens(8192)
+                        .build())
+                .build();
 
-                String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
-                long startedAt = System.currentTimeMillis();
+        String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
+        long startedAt = System.currentTimeMillis();
 
-                try {
-                        GeminiGenerateResponse response = webClient.post()
-                                        .uri(path)
-                                        .bodyValue(request)
-                                        .retrieve()
-                                        .bodyToMono(GeminiGenerateResponse.class)
-                                        .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
-                                                        .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
-                                        .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
-                                        .block();
+        try {
+            GeminiGenerateResponse response = webClient.post()
+                    .uri(path)
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(GeminiGenerateResponse.class)
+                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
+                            .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
+                    .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
+                    .block();
 
-                        String text = response != null ? response.extractText() : null;
+            String text = response != null ? response.extractText() : null;
+            recordUsage("chat_generate_with_tools", true, System.currentTimeMillis() - startedAt, null);
+            return response;
+        } catch (Exception e) {
+            recordUsage("chat_generate_with_tools", false, System.currentTimeMillis() - startedAt, e.getMessage());
+            log.error("Failed to generate chat response with tools", e);
+            try {
+                java.nio.file.Files.writeString(java.nio.file.Paths.get("ai_error.log"), e.getMessage() + "\n" + java.util.Arrays.toString(e.getStackTrace()));
+            } catch(Exception ignored) {}
+            throw new ApiException("AI Assistant failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
+        GeminiGenerateRequest request = GeminiGenerateRequest.builder()
+                .systemInstruction(GeminiGenerateRequest.SystemInstruction.builder()
+                        .parts(List.of(GeminiGenerateRequest.Part.builder().text(systemPrompt)
+                                .build()))
+                        .build())
+                .contents(chatHistory)
+                .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
+                        .temperature(0.4)
+                        .maxOutputTokens(8192)
+                        .build())
+                .build();
+
+        String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
+        long startedAt = System.currentTimeMillis();
+
+        try {
+            GeminiGenerateResponse response = webClient.post()
+                    .uri(path)
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(GeminiGenerateResponse.class)
+                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
+                            .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
+                    .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
+                    .block();
+
+            String text = response != null ? response.extractText() : null;
 
                         if (text == null || text.isBlank()) {
                                 recordUsage("CHAT", false, System.currentTimeMillis() - startedAt, "Empty response");

@@ -34,7 +34,6 @@ import com.hango.hango_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -49,8 +48,6 @@ public class LearningPathwayService {
     private final ExamResultAnalyzerService examResultAnalyzerService;
     private final LessonProgressRepository lessonProgressRepository;
     private final LessonRepository lessonRepository;
-
-
 
     @Transactional
     public LearningPathwayResponseDTO generatePathway(Long studentId, PathwayGenerateRequestDTO requestDTO) {
@@ -81,24 +78,31 @@ public class LearningPathwayService {
 
         StringBuilder courseListBuilder = new StringBuilder();
         for (Course course : availableCourses) {
-            courseListBuilder.append(String.format("- ID: %d, Name: %s, Category: %s, Difficulty: %s, Summary: %s%n",
+            String extraCategories = course.getCategories().stream()
+                    .map(com.hango.hango_backend.entity.SystemParameter::getParamValue)
+                    .collect(java.util.stream.Collectors.joining(", "));
+
+            courseListBuilder.append(String.format(
+                    "- ID: %d, Name: %s, Primary Category: %s, Tags/Categories: [%s], Difficulty: %s, Summary: %s%n",
                     course.getId(),
                     course.getTitle(),
                     course.getCategory() != null ? course.getCategory().getParamValue() : "N/A",
+                    extraCategories,
                     course.getDifficulty() != null ? course.getDifficulty().getParamValue() : "N/A",
                     course.getDescription()));
         }
 
         // AI cần đầu vào chuẩn dựa trên lịch sử làm bài của learner.
-        // Giữ examAttemptId làm mốc (để đúng yêu cầu API), nhưng vẫn tổng hợp thêm N attempts gần nhất.
+        // Giữ examAttemptId làm mốc (để đúng yêu cầu API), nhưng vẫn tổng hợp thêm N
+        // attempts gần nhất.
         List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
-        ExamResultAnalysisDTO examAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
+        ExamResultAnalysisDTO examAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId,
+                recentAttempts);
         if (examAnalysis == null) {
-            // Fallback để tránh phá flow (đặc biệt trong unit tests khi mock chưa set returns).
+            // Fallback để tránh phá flow (đặc biệt trong unit tests khi mock chưa set
+            // returns).
             examAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(examAttempt);
         }
-
-
 
         String goalText = (requestDTO.getGoalName() != null && !requestDTO.getGoalName().isBlank())
                 ? "MỤC TIÊU CỦA NGƯỜI HỌC: " + requestDTO.getGoalName() + "\n"
@@ -114,9 +118,10 @@ public class LearningPathwayService {
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
                 2. Prioritize foundations first, then harder reading or advanced skills.
-                3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó.
-                4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT TỔNG QUAN LỘ TRÌNH (ví dụ: "Chào bạn, lộ trình của bạn gồm X khóa học tập trung vào..."). TUYỆT ĐỐI KHÔNG sinh ra bài tập, mini-quiz, hay câu hỏi trắc nghiệm trong mentor_summary.
-                5. Return valid JSON only, without markdown fences.
+                3. ĐẶC BIỆT QUAN TRỌNG: Đầu vào phân tích sẽ chứa danh sách "weak_skills" (điểm yếu). Các "weak_skills" này là các kỹ năng chi tiết (ví dụ: Phonetics, Word order, Reduced relative clause...). Trong khi đó, [AVAILABLE_COURSES] chỉ có trường "Category"(Vocabulary, Grammar, Pronuciation,...). BẠN PHẢI TỰ LIÊN KẾT (map) các "weak_skills" này với "Category" phù hợp của khóa học để chọn ra khóa học khắc phục đúng điểm yếu đó.
+                4. Đưa ra "reason_why" giải thích rõ tại sao Category của khóa học này lại giúp cải thiện weak_skills cụ thể hoặc giúp đạt mục tiêu.
+                5. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT TỔNG QUAN LỘ TRÌNH. TUYỆT ĐỐI KHÔNG sinh ra bài tập, mini-quiz, hay câu hỏi trắc nghiệm trong mentor_summary.
+                6. Return valid JSON only, without markdown fences.
 
                 [AVAILABLE_COURSES]
                 %s
@@ -135,14 +140,13 @@ public class LearningPathwayService {
                     { "step": 2, "course_id": 2, "reason_why": "Why this course helps...", "status": "LOCKED", "tags": ["#Reading"] }
                   ]
                 }
-                """.formatted(
-                goalText,
-                courseListBuilder,
-                examAnalysis.getExamAttemptId(),
-                examAnalysis.getScore(),
-                examAnalysis.getKnowledgeGapsJson() == null ? "" : examAnalysis.getKnowledgeGapsJson()
-        );
-
+                """
+                .formatted(
+                        goalText,
+                        courseListBuilder,
+                        examAnalysis.getExamAttemptId(),
+                        examAnalysis.getScore(),
+                        examAnalysis.getKnowledgeGapsJson() == null ? "" : examAnalysis.getKnowledgeGapsJson());
 
         String userContent = "Latest exam attempt: \n" + examAttempt.getAnswersJson();
         List<GeminiGenerateRequest.Content> chatHistory = List.of(
@@ -204,8 +208,10 @@ public class LearningPathwayService {
             addFallbackNodes(newPathway, examAttempt, availableCourses);
         }
 
-        if (requestDTO.getTargetDate() != null && requestDTO.getHoursPerWeek() != null && requestDTO.getHoursPerWeek() > 0) {
-            applyTimeboxing(newPathway, requestDTO.getTargetDate(), requestDTO.getHoursPerWeek(), requestDTO.getPreferredStudyDays());
+        if (requestDTO.getTargetDate() != null && requestDTO.getHoursPerWeek() != null
+                && requestDTO.getHoursPerWeek() > 0) {
+            applyTimeboxing(newPathway, requestDTO.getTargetDate(), requestDTO.getHoursPerWeek(),
+                    requestDTO.getPreferredStudyDays());
         }
 
         LearningPathway savedPathway = learningPathwayRepository.save(newPathway);
@@ -274,7 +280,8 @@ public class LearningPathwayService {
     }
 
     @Transactional
-    public LearningPathwayResponseDTO processMentorAction(Long pathwayId, Long studentId, MentorActionRequestDTO request) {
+    public LearningPathwayResponseDTO processMentorAction(Long pathwayId, Long studentId,
+            MentorActionRequestDTO request) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
                 .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
 
@@ -305,7 +312,8 @@ public class LearningPathwayService {
                                     }
                                 });
                     }
-                    pathway.setMentorSummary("✅ Đã bỏ qua khóa học '" + currentNode.getCourse().getTitle() + "' và mở khóa bước tiếp theo cho bạn.");
+                    pathway.setMentorSummary("✅ Đã bỏ qua khóa học '" + currentNode.getCourse().getTitle()
+                            + "' và mở khóa bước tiếp theo cho bạn.");
                 } else {
                     pathway.setMentorSummary("Không tìm thấy khóa học nào đang học để bỏ qua.");
                 }
@@ -319,7 +327,8 @@ public class LearningPathwayService {
                 if (newHours != null && newHours > 0) {
                     pathway.setHoursPerWeek(newHours);
                 }
-                if (pathway.getTargetDate() != null && pathway.getHoursPerWeek() != null && pathway.getHoursPerWeek() > 0) {
+                if (pathway.getTargetDate() != null && pathway.getHoursPerWeek() != null
+                        && pathway.getHoursPerWeek() > 0) {
                     applyTimeboxing(pathway, pathway.getTargetDate(), pathway.getHoursPerWeek(), null);
                     pathway.setScheduleStatus("ON_TRACK");
                     pathway.setMentorSummary("📅 Lịch trình đã được tính toán lại" +
@@ -327,7 +336,8 @@ public class LearningPathwayService {
                             " Hãy cố gắng theo đúng tiến độ nhé!");
                 } else {
                     pathway.setScheduleStatus("AT_RISK");
-                    pathway.setMentorSummary("⚠️ Lịch trình chưa thể tính lại vì chưa có ngày mục tiêu hoặc số giờ/tuần. Hãy cập nhật mục tiêu của bạn.");
+                    pathway.setMentorSummary(
+                            "⚠️ Lịch trình chưa thể tính lại vì chưa có ngày mục tiêu hoặc số giờ/tuần. Hãy cập nhật mục tiêu của bạn.");
                 }
             }
             case "TAKE_QUIZ" -> {
@@ -343,9 +353,11 @@ public class LearningPathwayService {
                     overview.append("🎯 Mục tiêu: ").append(pathway.getGoalName()).append("\n");
                 }
                 int total = pathway.getNodes() != null ? pathway.getNodes().size() : 0;
-                long completed = pathway.getNodes() != null ?
-                        pathway.getNodes().stream().filter(n -> "COMPLETED".equalsIgnoreCase(n.getStatus())).count() : 0;
-                overview.append("📊 Tiến độ: ").append(completed).append("/").append(total).append(" bước hoàn thành\n\n");
+                long completed = pathway.getNodes() != null
+                        ? pathway.getNodes().stream().filter(n -> "COMPLETED".equalsIgnoreCase(n.getStatus())).count()
+                        : 0;
+                overview.append("📊 Tiến độ: ").append(completed).append("/").append(total)
+                        .append(" bước hoàn thành\n\n");
                 overview.append("Các kỹ năng sẽ được cải thiện:\n");
                 if (pathway.getNodes() != null) {
                     for (PathwayNode node : pathway.getNodes()) {
@@ -354,8 +366,9 @@ public class LearningPathwayService {
                             case "IN_PROGRESS" -> "🔄";
                             default -> "🔒";
                         };
-                        String skill = node.getCourse().getCategory() != null ?
-                                node.getCourse().getCategory().getParamValue() : "General";
+                        String skill = node.getCourse().getCategory() != null
+                                ? node.getCourse().getCategory().getParamValue()
+                                : "General";
                         overview.append(status).append(" Bước ").append(node.getStepOrder())
                                 .append(": ").append(node.getCourse().getTitle())
                                 .append(" (").append(skill).append(")\n");
@@ -364,7 +377,8 @@ public class LearningPathwayService {
                 pathway.setMentorSummary(overview.toString());
             }
             default -> {
-                pathway.setMentorSummary("Tôi đã nhận được yêu cầu của bạn (" + actionType + "), nhưng chưa biết cách xử lý nó lúc này.");
+                pathway.setMentorSummary("Tôi đã nhận được yêu cầu của bạn (" + actionType
+                        + "), nhưng chưa biết cách xử lý nó lúc này.");
             }
         }
 
@@ -373,7 +387,8 @@ public class LearningPathwayService {
     }
 
     private PathwayNode findCurrentInProgressNode(LearningPathway pathway) {
-        if (pathway.getNodes() == null) return null;
+        if (pathway.getNodes() == null)
+            return null;
         return pathway.getNodes().stream()
                 .filter(n -> "IN_PROGRESS".equalsIgnoreCase(n.getStatus()))
                 .findFirst()
@@ -386,8 +401,9 @@ public class LearningPathwayService {
         }
         try {
             String courseName = currentNode.getCourse().getTitle();
-            String category = currentNode.getCourse().getCategory() != null ?
-                    currentNode.getCourse().getCategory().getParamValue() : "General English";
+            String category = currentNode.getCourse().getCategory() != null
+                    ? currentNode.getCourse().getCategory().getParamValue()
+                    : "General English";
 
             String prompt = """
                     Tạo 3 câu hỏi trắc nghiệm (mỗi câu 4 lựa chọn A/B/C/D) về chủ đề "%s" (%s) cho học sinh luyện thi THPT Quốc gia Tiếng Anh.
@@ -400,12 +416,14 @@ public class LearningPathwayService {
                     ✅ Đáp án: [đáp án đúng]
 
                     Chỉ trả về đúng 3 câu hỏi, không thêm gì khác.
-                    """.formatted(courseName, category);
+                    """
+                    .formatted(courseName, category);
 
             java.util.List<com.hango.hango_backend.dto.GeminiGenerateRequest.Content> history = java.util.List.of(
                     com.hango.hango_backend.dto.GeminiGenerateRequest.Content.builder()
                             .role("user")
-                            .parts(java.util.List.of(com.hango.hango_backend.dto.GeminiGenerateRequest.Part.builder().text(prompt).build()))
+                            .parts(java.util.List.of(com.hango.hango_backend.dto.GeminiGenerateRequest.Part.builder()
+                                    .text(prompt).build()))
                             .build());
 
             String quizText = geminiClientService.generateChatResponse(
@@ -418,7 +436,8 @@ public class LearningPathwayService {
     }
 
     @Transactional
-    public LearningPathwayResponseDTO applySchedule(Long pathwayId, Long studentId, PathwayScheduleRequestDTO requestDTO) {
+    public LearningPathwayResponseDTO applySchedule(Long pathwayId, Long studentId,
+            PathwayScheduleRequestDTO requestDTO) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
                 .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
 
@@ -431,7 +450,8 @@ public class LearningPathwayService {
         pathway.setHoursPerWeek(requestDTO.getHoursPerWeek());
         pathway.setScheduleStatus("ON_TRACK");
 
-        applyTimeboxing(pathway, requestDTO.getTargetDate(), requestDTO.getHoursPerWeek(), requestDTO.getPreferredStudyDays());
+        applyTimeboxing(pathway, requestDTO.getTargetDate(), requestDTO.getHoursPerWeek(),
+                requestDTO.getPreferredStudyDays());
 
         LearningPathway savedPathway = learningPathwayRepository.save(pathway);
         return toResponseDto(savedPathway, studentId);
@@ -449,8 +469,10 @@ public class LearningPathwayService {
         return pathway.getScheduleStatus() != null ? pathway.getScheduleStatus() : "NONE";
     }
 
-    private void applyTimeboxing(LearningPathway pathway, LocalDate targetDate, Integer hoursPerWeek, List<Integer> preferredStudyDays) {
-        if (pathway.getNodes() == null || pathway.getNodes().isEmpty()) return;
+    private void applyTimeboxing(LearningPathway pathway, LocalDate targetDate, Integer hoursPerWeek,
+            List<Integer> preferredStudyDays) {
+        if (pathway.getNodes() == null || pathway.getNodes().isEmpty())
+            return;
 
         List<Integer> estimatedHoursPerNode = new java.util.ArrayList<>();
         for (PathwayNode node : pathway.getNodes()) {
@@ -467,21 +489,20 @@ public class LearningPathwayService {
                 hoursPerWeek,
                 preferredStudyDays,
                 estimatedHoursPerNode,
-                pathway.getNodes().size()
-        );
+                pathway.getNodes().size());
 
         for (int i = 0; i < pathway.getNodes().size(); i++) {
             PathwayNode node = pathway.getNodes().get(i);
             if ("COMPLETED".equalsIgnoreCase(node.getStatus())) {
                 continue; // Do not alter the historical schedule of completed nodes
             }
-            
+
             PathwayTimeboxingScheduler.NodeSchedule nodeSchedule = schedule.get(i);
-            
+
             node.setStartDate(nodeSchedule.getStartDate() != null ? nodeSchedule.getStartDate().atStartOfDay() : null);
             node.setDeadline(nodeSchedule.getDeadline() != null ? nodeSchedule.getDeadline().atTime(23, 59) : null);
             node.setEstimatedHours(nodeSchedule.getEstimatedHours());
-            
+
             boolean isBehind = false;
             if (nodeSchedule.getDeadline() != null) {
                 // If the scheduled deadline is after the user's target date, we are behind
@@ -551,7 +572,8 @@ public class LearningPathwayService {
         if (analysisDTO != null && analysisDTO.getKnowledgeGapsJson() != null) {
             try {
                 @SuppressWarnings("unchecked")
-                java.util.Map<String, Object> gaps = objectMapper.readValue(analysisDTO.getKnowledgeGapsJson(), java.util.Map.class);
+                java.util.Map<String, Object> gaps = objectMapper.readValue(analysisDTO.getKnowledgeGapsJson(),
+                        java.util.Map.class);
                 Object ws = gaps.get("weak_skills");
                 if (ws instanceof List<?> wsList) {
                     weakSkills = wsList.stream().map(Object::toString).toList();
@@ -575,13 +597,14 @@ public class LearningPathwayService {
         if (currentNode != null) {
             int progress = calculateCourseProgressPercent(studentId, currentNode.getCourse().getId());
             suggestedActions.add("FAST_TRACK"); // Unconditionally allow fast-track for current node
-            
+
             if (progress > 0 && progress < 50) {
                 suggestedActions.add("TAKE_QUIZ");
             }
         }
 
-        if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus()) || "AT_RISK".equalsIgnoreCase(pathway.getScheduleStatus())) {
+        if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus())
+                || "AT_RISK".equalsIgnoreCase(pathway.getScheduleStatus())) {
             suggestedActions.add("ADJUST_SCHEDULE");
         }
 
@@ -610,7 +633,8 @@ public class LearningPathwayService {
     }
 
     @Transactional
-    public LearningPathwayResponseDTO submitNodeMastery(Long pathwayId, Long nodeId, Long studentId, com.hango.hango_backend.dto.MasterySubmitRequestDTO request) {
+    public LearningPathwayResponseDTO submitNodeMastery(Long pathwayId, Long nodeId, Long studentId,
+            com.hango.hango_backend.dto.MasterySubmitRequestDTO request) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
                 .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
 
@@ -624,39 +648,47 @@ public class LearningPathwayService {
                 .orElseThrow(() -> new ApiException("Node not found in pathway", HttpStatus.NOT_FOUND));
 
         node.setMasteryScore(request.getScore());
-        
+
         if (request.getScore() != null && request.getScore() >= 80) { // Assuming 80 is the mastery threshold
             node.setIsMastered(true);
-            
+
             // Spaced Repetition logic
             if (node.getReviewIntervalDays() == null) {
                 node.setReviewIntervalDays(1);
             } else {
                 // simple progression: 1 -> 3 -> 7 -> 14 -> 30
                 int current = node.getReviewIntervalDays();
-                if (current == 1) node.setReviewIntervalDays(3);
-                else if (current == 3) node.setReviewIntervalDays(7);
-                else if (current == 7) node.setReviewIntervalDays(14);
-                else if (current == 14) node.setReviewIntervalDays(30);
+                if (current == 1)
+                    node.setReviewIntervalDays(3);
+                else if (current == 3)
+                    node.setReviewIntervalDays(7);
+                else if (current == 7)
+                    node.setReviewIntervalDays(14);
+                else if (current == 14)
+                    node.setReviewIntervalDays(30);
             }
             node.setNextReviewDate(java.time.LocalDateTime.now().plusDays(node.getReviewIntervalDays()));
-            pathway.setMentorSummary("Congratulations on achieving Mastery! This course is scheduled for review in " + node.getReviewIntervalDays() + " days.");
+            pathway.setMentorSummary("Congratulations on achieving Mastery! This course is scheduled for review in "
+                    + node.getReviewIntervalDays() + " days.");
         } else {
             node.setIsMastered(false);
-            pathway.setMentorSummary("Your score is " + request.getScore() + ". You need 80 points to Master the course. Keep reviewing!");
+            pathway.setMentorSummary("Your score is " + request.getScore()
+                    + ". You need 80 points to Master the course. Keep reviewing!");
         }
 
         return toResponseDto(pathway, studentId);
     }
 
     /**
-     * Calculates the real course completion percentage for a given learner and course,
+     * Calculates the real course completion percentage for a given learner and
+     * course,
      * based on actual LessonProgress records stored in the DB.
      */
     private int calculateCourseProgressPercent(Long studentId, Long courseId) {
         try {
             long totalLessons = lessonRepository.countByCourseId(courseId);
-            if (totalLessons == 0) return 0;
+            if (totalLessons == 0)
+                return 0;
             long completedLessons = countCompletedLessons(studentId, courseId);
             return (int) Math.min(100, Math.round((double) completedLessons / totalLessons * 100));
         } catch (Exception e) {
@@ -684,7 +716,8 @@ public class LearningPathwayService {
     }
 
     private void archiveActivePathway(Long studentId) {
-        Optional<LearningPathway> existingPathway = learningPathwayRepository.findByStudentIdAndStatus(studentId, "ACTIVE");
+        Optional<LearningPathway> existingPathway = learningPathwayRepository.findByStudentIdAndStatus(studentId,
+                "ACTIVE");
         existingPathway.ifPresent(pathway -> {
             pathway.setStatus("ARCHIVED");
             learningPathwayRepository.save(pathway);
@@ -751,7 +784,7 @@ public class LearningPathwayService {
                 ? " Điểm số của bạn gần đây nhất là " + examAttempt.getScore() + "."
                 : "";
         String category = course.getCategory() != null ? course.getCategory().getParamValue() : "this topic";
-        return "Khóa học này giúp bạn củng cố thêm về " + category + " dựa trên kết quả gần đây nhất của bạn." + scoreText;
+        return "Khóa học này giúp bạn củng cố thêm về " + category + " dựa trên kết quả gần đây nhất của bạn."
+                + scoreText;
     }
 }
-

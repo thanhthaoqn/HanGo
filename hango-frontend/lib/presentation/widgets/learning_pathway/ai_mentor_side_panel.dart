@@ -232,12 +232,15 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           _dynamicSuggestedQuestions.clear();
         }
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('=== AI MENTOR CHAT ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack: $stackTrace');
       if (!mounted) return;
       setState(() {
         _messages.add({
           'role': 'mentor',
-          'content': 'Lỗi kết nối. Vui lòng thử lại sau.',
+          'content': 'Connection error: $e',
         });
       });
     } finally {
@@ -432,6 +435,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     final hasPendingReroute = widget.pathway.pendingRerouteSuggestion != null;
     final totalItems =
         _messages.length +
+        (_isSending ? 1 : 0) +
         (hasPendingReroute ? 1 : 0) +
         (showActionHub ? 1 : 0);
 
@@ -516,7 +520,54 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               ],
             ),
           );
-        } else if (hasPendingReroute && index == _messages.length) {
+        } else if (_isSending && index == _messages.length) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: dark ? const Color(0xFF21262D) : const Color(0xFFF8FAFC),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(14),
+                      topRight: Radius.circular(14),
+                      bottomLeft: Radius.circular(4),
+                      bottomRight: Radius.circular(14),
+                    ),
+                    border: Border.all(
+                        color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF6366F1),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        LanguageManager.isVi ? 'Đang phân tích...' : 'Analyzing...',
+                        style: TextStyle(
+                          color: dark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else if (hasPendingReroute && index == _messages.length + (_isSending ? 1 : 0)) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _buildRerouteActionArea(dark),

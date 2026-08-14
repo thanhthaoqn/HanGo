@@ -35,6 +35,9 @@ public class PathwayMentorChatService {
     private final LessonRepository lessonRepository;
     private final LessonProgressRepository lessonProgressRepository;
     private final CourseRepository courseRepository;
+    private final PathwayProgressSnapshotService progressSnapshotService;
+    private final PathwayReroutePolicyService reroutePolicyService;
+    private final PathwayMutationService mutationService;
 
     private static final int MAX_HISTORY_MESSAGES = 10;
 
@@ -58,7 +61,13 @@ public class PathwayMentorChatService {
         PathwayConversation conversation = getOrCreateConversation(request.getConversationId(), learnerId, pathway, learner);
 
         // Build pathway-aware system prompt
-        String systemPrompt = buildPathwaySystemPrompt(pathway, learnerId, request.getSelectedNodeCourseId());
+        String systemPrompt;
+        try {
+            systemPrompt = buildPathwaySystemPrompt(pathway, learnerId, request.getSelectedNodeCourseId());
+        } catch (Exception e) {
+            log.warn("Failed to build full system prompt, using minimal: {}", e.getMessage());
+            systemPrompt = "Bạn là AI Mentor của HanGo — hỗ trợ người học về lộ trình học tiếng Anh. Trả lời ngắn gọn, thân thiện.";
+        }
 
         // Build chat history from existing messages (limited to last N)
         List<GeminiGenerateRequest.Content> geminiHistory = buildGeminiHistory(conversation, request.getMessage());
@@ -71,23 +80,86 @@ public class PathwayMentorChatService {
                 .wasOutOfScope(false)
                 .build();
 
+        // Define tools
+        List<GeminiGenerateRequest.Tool> tools = List.of(
+            GeminiGenerateRequest.Tool.builder()
+                .functionDeclarations(List.of(
+                    GeminiGenerateRequest.FunctionDeclaration.builder()
+                        .name("triggerReroute")
+                        .description("Evaluates and triggers a reroute (adjustment) of the learner's pathway. Call this if the learner requests to change the pathway (e.g. they say it's too hard, too easy, or ask for a reassessment).")
+                        .parameters(GeminiGenerateRequest.Schema.builder()
+                            .type("OBJECT")
+                            .properties(java.util.Collections.emptyMap())
+                            .build())
+                        .build()
+                ))
+                .build()
+        );
+
         // Call Gemini
-        String replyText;
+        String replyText = "";
         boolean outOfScope = isClearlyOutOfScope(request.getMessage());
         if (outOfScope) {
             replyText = buildOutOfScopeFallback(pathway);
         } else {
-        try {
-            replyText = geminiClientService.generateChatResponse(systemPrompt, geminiHistory);
-        } catch (Exception e) {
-            log.warn("Pathway mentor chat failed, returning fallback: {}", e.getMessage());
-            replyText = "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau giây lát.";
-        }
+            try {
+                GeminiGenerateResponse response = geminiClientService.generateChatResponseWithTools(systemPrompt, geminiHistory, tools);
+                GeminiGenerateResponse.FunctionCall responseFunctionCall = response.extractFunctionCall();
+                
+                if (responseFunctionCall != null && "triggerReroute".equals(responseFunctionCall.getName())) {
+                    // Map FunctionCall type
+                    GeminiGenerateRequest.FunctionCall reqFunctionCall = GeminiGenerateRequest.FunctionCall.builder()
+                            .name(responseFunctionCall.getName())
+                            .args(responseFunctionCall.getArgs())
+                            .build();
 
+                    // AI decided to trigger a reroute
+                    ProgressSnapshotDTO snapshot = progressSnapshotService.getProgressSnapshot(pathwayId, learnerId);
+                    PathwayReroutePolicyService.PolicyDecision decision = reroutePolicyService.evaluate(snapshot); 
+                    
+                    String functionResultText;
+                    if (decision.action == PathwayReroutePolicyService.PolicyAction.FAST_TRACK_ELIGIBLE) {
+                        mutationService.applyFastTrackSkip(pathway, decision.targetNode.getNodeId(), decision.reason);
+                        functionResultText = "Reroute applied: Fast Track (Skipped a course). Reason: " + decision.reason;
+                    } else if (decision.action == PathwayReroutePolicyService.PolicyAction.DETOUR_REQUIRED) {
+                        mutationService.applyDetourInsertion(pathway, decision.targetNode.getNodeId(), pathway.getNodes().get(0).getCourse(), decision.reason);
+                        functionResultText = "Reroute applied: Detour (Added a remedial course). Reason: " + decision.reason;
+                    } else {
+                        functionResultText = "No reroute applied: The current progress does not meet the strict rules for a detour or skip. Tell the user to keep studying their current lesson.";
+                    }
+
+                    // Append function call and response to history
+                    geminiHistory.add(GeminiGenerateRequest.Content.builder()
+                            .role("model")
+                            .parts(List.of(GeminiGenerateRequest.Part.builder().functionCall(reqFunctionCall).build()))
+                            .build());
+                    
+                    geminiHistory.add(GeminiGenerateRequest.Content.builder()
+                            .role("function") // FIXED: Gemini API requires role="function" for functionResponse
+                            .parts(List.of(GeminiGenerateRequest.Part.builder()
+                                    .functionResponse(GeminiGenerateRequest.FunctionResponse.builder()
+                                            .name("triggerReroute")
+                                            .response(java.util.Map.of("result", functionResultText))
+                                            .build())
+                                    .build()))
+                            .build());
+                    
+                    // Call again
+                    GeminiGenerateResponse finalResponse = geminiClientService.generateChatResponseWithTools(systemPrompt, geminiHistory, tools);
+                    replyText = finalResponse.extractText();
+                    if (replyText == null) replyText = "Tôi đã điều chỉnh lại lộ trình cho bạn.";
+                } else {
+                    replyText = response.extractText();
+                    if (replyText == null) replyText = "Xin lỗi, tôi không hiểu ý bạn.";
+                }
+            } catch (Exception e) {
+                log.warn("Pathway mentor chat failed, returning fallback: {}", e.getMessage());
+                replyText = "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau giây lát.";
+            }
         }
 
         // Simple out-of-scope detection from AI response
-        if (replyText.toLowerCase().contains("ngoài phạm vi") || replyText.toLowerCase().contains("out of scope")) {
+        if (replyText != null && (replyText.toLowerCase().contains("ngoài phạm vi") || replyText.toLowerCase().contains("out of scope"))) {
             outOfScope = true;
         }
         userMessage.setWasOutOfScope(outOfScope);
@@ -262,13 +334,19 @@ public class PathwayMentorChatService {
         sb.append("\nCác bước trong lộ trình:\n");
         if (pathway.getNodes() != null) {
             for (PathwayNode node : pathway.getNodes()) {
-                int progress = calculateProgress(learnerId, node.getCourse().getId());
-                sb.append(String.format("  Bước %d: [%s] %s — Tiến độ: %d%% — Lý do: %s\n",
-                        node.getStepOrder(),
-                        node.getStatus(),
-                        node.getCourse().getTitle(),
-                        progress,
-                        node.getReasonWhy() != null ? node.getReasonWhy() : "N/A"));
+                try {
+                    int progress = calculateProgress(learnerId, node.getCourse().getId());
+                    sb.append(String.format("  Bước %d: [%s] %s — Tiến độ: %d%% — Lý do: %s\n",
+                            node.getStepOrder(),
+                            node.getStatus(),
+                            node.getCourse().getTitle(),
+                            progress,
+                            node.getReasonWhy() != null ? node.getReasonWhy() : "N/A"));
+                } catch (Exception e) {
+                    sb.append(String.format("  Bước %d: [%s] (course data unavailable)\n",
+                            node.getStepOrder(), node.getStatus()));
+                    log.debug("Could not load course data for node {}: {}", node.getId(), e.getMessage());
+                }
             }
         }
 
@@ -290,8 +368,12 @@ public class PathwayMentorChatService {
                 sb.append("\n=== KHÓA HỌC ĐANG ĐƯỢC CHỌN ===\n");
                 sb.append("Tên: ").append(course.getTitle()).append("\n");
                 sb.append("Mô tả: ").append(course.getDescription() != null ? course.getDescription() : "N/A").append("\n");
-                if (course.getCategory() != null) {
-                    sb.append("Kỹ năng: ").append(course.getCategory().getParamValue()).append("\n");
+                try {
+                    if (course.getCategory() != null) {
+                        sb.append("Kỹ năng: ").append(course.getCategory().getParamValue()).append("\n");
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not load category for course {}: {}", course.getId(), e.getMessage());
                 }
             });
         }
