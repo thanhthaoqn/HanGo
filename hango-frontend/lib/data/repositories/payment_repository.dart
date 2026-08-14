@@ -53,7 +53,7 @@ class PaymentRepository {
     final token = prefs.getString('auth_token');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Chưa đăng nhập.');
+      throw Exception('Not logged in.');
     }
 
     final response = await http.get(
@@ -69,7 +69,7 @@ class PaymentRepository {
     }
 
     if (response.statusCode != 200) {
-      throw Exception('Lỗi kiểm tra trạng thái: ${response.statusCode}');
+      throw Exception('Failed to check payment status: ${response.statusCode}');
     }
 
     return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
@@ -80,7 +80,7 @@ class PaymentRepository {
     final token = prefs.getString('auth_token');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Vui lòng đăng nhập.');
+      throw Exception('Please log in.');
     }
 
     final response = await http.get(
@@ -93,7 +93,7 @@ class PaymentRepository {
 
     if (response.statusCode != 200) {
       final body = utf8.decode(response.bodyBytes);
-      throw Exception('Lỗi tải lịch sử thanh toán: $body');
+      throw Exception('Failed to load payment history: $body');
     }
 
     return jsonDecode(utf8.decode(response.bodyBytes));
