@@ -510,6 +510,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .id(payment.getId())
                 .txnRef(payment.getTxnRef())
                 .courseId(payment.getCourse() != null ? payment.getCourse().getId() : null)
+                .courseIds(payment.getCourseIds())
                 .courseTitle(title)
                 .courseThumbnail(payment.getCourse() != null ? payment.getCourse().getThumbnailUrl() : null)
                 .amount(payment.getAmount())

@@ -5,12 +5,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
 import '../../../data/repositories/payment_repository.dart';
+import '../../../data/repositories/course_repository.dart';
+import '../../../domain/model/course_detail.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'learner_home_page.dart';
+import '../course/course_detail_page.dart';
 
 class MyInformationPage extends StatefulWidget {
   final int initialTab;
@@ -1721,6 +1724,368 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
     );
   }
 
+  void _showTransactionDetailsDialog(BuildContext context, Map<String, dynamic> item) {
+    final isVi = LanguageManager.isVi;
+    final txnRef = item['txnRef'] ?? '${item['id']}';
+    final amount = item['amount'];
+    final status = (item['status'] ?? 'PENDING').toString();
+    final bankCode = item['bankCode'] as String?;
+    final date = item['paidAt'] ?? item['createdAt'];
+
+    List<int> targetCourseIds = [];
+    final rawCourseIds = item['courseIds'] as String?;
+    if (rawCourseIds != null && rawCourseIds.trim().isNotEmpty) {
+      final clean = rawCourseIds.replaceAll('[', '').replaceAll(']', '');
+      for (final s in clean.split(',')) {
+        final parsed = int.tryParse(s.trim());
+        if (parsed != null && !targetCourseIds.contains(parsed)) {
+          targetCourseIds.add(parsed);
+        }
+      }
+    }
+    if (targetCourseIds.isEmpty && item['courseId'] != null) {
+      final parsed = int.tryParse(item['courseId'].toString());
+      if (parsed != null) {
+        targetCourseIds.add(parsed);
+      }
+    }
+
+    final CourseRepository courseRepository = CourseRepository();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.white,
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            width: 580,
+            constraints: const BoxConstraints(maxHeight: 650),
+            child: StatefulBuilder(
+              builder: (context, setModalState) {
+                return FutureBuilder<List<CourseDetail>>(
+                  future: Future.wait(
+                    targetCourseIds.map((id) => courseRepository.fetchCourseDetail(id)),
+                  ),
+                  builder: (context, snapshot) {
+                    final isLoadingDetails = snapshot.connectionState == ConnectionState.waiting;
+                    final courseList = snapshot.data ?? [];
+                    final hasError = snapshot.hasError;
+
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF8FAFC),
+                            border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE6F4EA),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.receipt_long_rounded,
+                                  color: Color(0xFF28B79B),
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isVi ? 'Chi tiết đơn hàng #$txnRef' : 'Order Details #$txnRef',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Outfit',
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Date: ${_formatDate(date)}${bankCode != null && bankCode.isNotEmpty ? " · Method: " + bankCode : ""}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF64748B),
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _buildStatusBadge(status),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                onPressed: () => Navigator.pop(context),
+                                icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                                tooltip: isVi ? 'Đóng' : 'Close',
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Body - List of Courses
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isVi
+                                      ? 'Danh sách khóa học đã đăng ký (${targetCourseIds.length}):'
+                                      : 'Enrolled Courses (${targetCourseIds.length}):',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF334155),
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+
+                                if (isLoadingDetails)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 40.0),
+                                    child: Center(
+                                      child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+                                    ),
+                                  )
+                                else if (hasError && courseList.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 30.0),
+                                    child: Center(
+                                      child: Text(
+                                        isVi ? 'Không thể tải thông tin khóa học.' : 'Failed to load course details.',
+                                        style: const TextStyle(color: Colors.red, fontFamily: 'Outfit'),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  ListView.separated(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: courseList.isNotEmpty ? courseList.length : targetCourseIds.length,
+                                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                    itemBuilder: (context, index) {
+                                      final course = courseList.length > index ? courseList[index] : null;
+                                      final courseId = course?.id ?? (targetCourseIds.length > index ? targetCourseIds[index] : 0);
+                                      final title = course?.title ?? (item['courseTitle'] ?? 'Course #$courseId');
+                                      final thumbnail = course?.thumbnailUrl ?? item['courseThumbnail'] as String?;
+                                      final creator = course?.creatorName ?? 'Instructor';
+                                      final difficulty = course?.difficultyName;
+
+                                      return Container(
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(10),
+                                              child: Container(
+                                                width: 54,
+                                                height: 54,
+                                                color: Colors.white,
+                                                child: (thumbnail != null && thumbnail.isNotEmpty)
+                                                    ? Image.network(
+                                                        thumbnail,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error, stackTrace) => const Icon(
+                                                          Icons.school_rounded,
+                                                          color: Color(0xFF28B79B),
+                                                          size: 28,
+                                                        ),
+                                                      )
+                                                    : const Icon(
+                                                        Icons.school_rounded,
+                                                        color: Color(0xFF28B79B),
+                                                        size: 28,
+                                                      ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 14),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    title,
+                                                    style: const TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF0F172A),
+                                                      fontFamily: 'Outfit',
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  Wrap(
+                                                    spacing: 6,
+                                                    runSpacing: 4,
+                                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                                    children: [
+                                                      Text(
+                                                        'Giảng viên: $creator',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color: Color(0xFF64748B),
+                                                          fontFamily: 'Outfit',
+                                                        ),
+                                                      ),
+                                                      if (difficulty != null)
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFE0F2FE),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: Text(
+                                                            difficulty,
+                                                            style: const TextStyle(
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: Color(0xFF0369A1),
+                                                              fontFamily: 'Outfit',
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  Text(
+                                                    course != null
+                                                        ? _formatPrice(course.price)
+                                                        : (item['amount'] != null && targetCourseIds.length == 1
+                                                            ? _formatPrice(item['amount'])
+                                                            : '-- ₫'),
+                                                    style: const TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Color(0xFF28B79B),
+                                                      fontFamily: 'Outfit',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            ElevatedButton.icon(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) => CourseDetailPage(courseId: courseId),
+                                                  ),
+                                                );
+                                              },
+                                              icon: const Icon(Icons.play_circle_fill_rounded, size: 16, color: Colors.white),
+                                              label: Text(
+                                                isVi ? 'Vào học' : 'Learn Now',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: Colors.white,
+                                                  fontFamily: 'Outfit',
+                                                ),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF28B79B),
+                                                elevation: 0,
+                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Footer
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF8FAFC),
+                            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isVi ? 'Tổng tiền thanh toán:' : 'Total Amount Paid:',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _formatPrice(amount),
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0F172A),
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                ),
+                                child: Text(
+                                  isVi ? 'Đóng' : 'Close',
+                                  style: const TextStyle(
+                                    color: Color(0xFF334155),
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1854,100 +2219,114 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                         final bankCode = item['bankCode'] as String?;
                         final date = item['paidAt'] ?? item['createdAt'];
 
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _showTransactionDetailsDialog(context, item),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  color: Colors.white,
-                                  child:
-                                      (courseThumbnail != null &&
-                                          courseThumbnail.isNotEmpty)
-                                      ? Image.network(
-                                          courseThumbnail,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) =>
-                                                  const Icon(
-                                                    Icons.receipt_outlined,
-                                                    color: Color(0xFF28B79B),
-                                                    size: 24,
-                                                  ),
-                                        )
-                                      : Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                            border: Border.all(
-                                              color: const Color(0xFFCBD5E1),
-                                            ),
-                                          ),
-                                          child: const Icon(
-                                            Icons.receipt_outlined,
-                                            color: Color(0xFF28B79B),
-                                            size: 24,
-                                          ),
-                                        ),
-                                ),
+                            hoverColor: const Color(0xFFF1F5F9),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      courseTitle,
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1E293B),
-                                        fontFamily: 'Outfit',
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Txn Ref: #$txnRef${bankCode != null && bankCode.isNotEmpty ? " · Method: " + bankCode : ""} · Date: ${_formatDate(date)}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF64748B),
-                                        fontFamily: 'Outfit',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                              child: Row(
                                 children: [
-                                  Text(
-                                    _formatPrice(amount),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0F172A),
-                                      fontFamily: 'Outfit',
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      width: 48,
+                                      height: 48,
+                                      color: Colors.white,
+                                      child:
+                                          (courseThumbnail != null &&
+                                              courseThumbnail.isNotEmpty)
+                                          ? Image.network(
+                                              courseThumbnail,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) =>
+                                                      const Icon(
+                                                        Icons.receipt_outlined,
+                                                        color: Color(0xFF28B79B),
+                                                        size: 24,
+                                                      ),
+                                            )
+                                          : Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(
+                                                  10,
+                                                ),
+                                                border: Border.all(
+                                                  color: const Color(0xFFCBD5E1),
+                                                ),
+                                              ),
+                                              child: const Icon(
+                                                Icons.receipt_outlined,
+                                                color: Color(0xFF28B79B),
+                                                size: 24,
+                                              ),
+                                            ),
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  _buildStatusBadge(status.toString()),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          courseTitle,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1E293B),
+                                            fontFamily: 'Outfit',
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Txn Ref: #$txnRef${bankCode != null && bankCode.isNotEmpty ? " · Method: " + bankCode : ""} · Date: ${_formatDate(date)}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF64748B),
+                                            fontFamily: 'Outfit',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        _formatPrice(amount),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF0F172A),
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      _buildStatusBadge(status.toString()),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Color(0xFF94A3B8),
+                                    size: 22,
+                                  ),
                                 ],
                               ),
-                            ],
+                            ),
                           ),
                         );
                       },

@@ -1,6 +1,6 @@
 {
-    "name": "hango",
-    "short_name": "hango",
+    "name": "HanGo",
+    "short_name": "HanGo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

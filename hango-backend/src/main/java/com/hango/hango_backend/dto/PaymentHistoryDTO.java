@@ -16,6 +16,7 @@ public class PaymentHistoryDTO {
     private Long id;
     private String txnRef;
     private Long courseId;
+    private String courseIds;
     private String courseTitle;
     private String courseThumbnail;
     private BigDecimal amount;
