@@ -12,7 +12,7 @@ class GeminiClientServiceTest {
     @Test
     void normalizeDocumentAnalysisPayloadShouldOverrideWrongTeachingCertificateWhenEvidenceShowsBachelorDegree() {
         GeminiProperties properties = new GeminiProperties();
-        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class));
+        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class), mock(SystemConfigService.class));
 
         String rawJson = """
                 {
@@ -38,7 +38,7 @@ class GeminiClientServiceTest {
     @Test
     void normalizeDocumentAnalysisPayloadShouldInferIeltsFromIssuerAndEvidence() {
         GeminiProperties properties = new GeminiProperties();
-        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class));
+        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class), mock(SystemConfigService.class));
 
         String rawJson = """
                 {
@@ -63,7 +63,7 @@ class GeminiClientServiceTest {
     @Test
     void normalizeDocumentAnalysisPayloadShouldPreferTeflEvidenceOverWrongDegreeGuess() {
         GeminiProperties properties = new GeminiProperties();
-        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class));
+        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class), mock(SystemConfigService.class));
 
         String rawJson = """
                 {

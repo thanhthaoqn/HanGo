@@ -27,6 +27,56 @@ public class TrainerQuestionAIService {
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
     private final SystemParameterRepository systemParameterRepository;
+    private final SystemConfigService systemConfigService;
+
+    public static final String DEFAULT_CHAT_PROMPT = "You are a helpful AI assistant that helps trainers create exams for the HanGo English learning platform.\n" +
+            "Your goal is to gather all necessary information to generate an exam.\n" +
+            "You need to ask the user for:\n" +
+            "- Exam title\n" +
+            "- Description\n" +
+            "- Duration in minutes\n" +
+            "- Passing score percentage\n" +
+            "- Expected total question count\n" +
+            "- The breakdown of questions (single vs group, skills, difficulty, number of questions for each).\n" +
+            "Do NOT ask for everything at once, keep the conversation natural.\n" +
+            "When you have enough information, gently confirm with the user. Do NOT generate the actual exam questions here.";
+
+    public static final String DEFAULT_GENERATE_PROMPT = "You are an AI generating an exam JSON structure for the HanGo platform.\n" +
+            "You must output ONLY valid JSON matching this structure, with no markdown formatting or extra text.\n" +
+            "Structure:\n" +
+            "{\n" +
+            "  \"title\": \"...\",\n" +
+            "  \"description\": \"...\",\n" +
+            "  \"durationMinutes\": 60,\n" +
+            "  \"passingScore\": 50,\n" +
+            "  \"blocks\": [\n" +
+            "    {\n" +
+            "      \"isQuestionGroup\": false,\n" +
+            "      \"passageText\": \"\",\n" +
+            "      \"categoryId\": 1,\n" +
+            "      \"skillParamId\": 1,\n" +
+            "      \"difficultyId\": 14,\n" +
+            "      \"questions\": [\n" +
+            "        {\n" +
+            "          \"questionText\": \"...\",\n" +
+            "          \"explanation\": \"...\",\n" +
+            "          \"categoryId\": 1,\n" +
+            "          \"difficultyId\": 14,\n" +
+            "          \"options\": [\n" +
+            "            {\"optionText\": \"...\", \"isCorrect\": true},\n" +
+            "            {\"optionText\": \"...\", \"isCorrect\": false},\n" +
+            "            {\"optionText\": \"...\", \"isCorrect\": false},\n" +
+            "            {\"optionText\": \"...\", \"isCorrect\": false}\n" +
+            "          ]\n" +
+            "        }\n" +
+            "      ]\n" +
+            "    }\n" +
+            "  ]\n" +
+            "}\n" +
+            "categoryId can default to 1 (General). difficultyId can be 14 (Easy), 15 (Medium), 16 (Hard). skillParamId can be null if not specified.\n" +
+            "For group questions, set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array.\n" +
+            "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array.\n" +
+            "Generate the EXACT number of questions and groups as discussed in the chat.";
 
     public CreateTrainerQuestionAIResponseDTO generatePayload(CreateTrainerQuestionAIRequestDTO req) {
         if (req == null) {
@@ -127,17 +177,7 @@ public class TrainerQuestionAIService {
             throw new ApiException("Chat history is required", HttpStatus.BAD_REQUEST);
         }
 
-        String systemPrompt = "You are a helpful AI assistant that helps trainers create exams for the HanGo English learning platform.\n" +
-                "Your goal is to gather all necessary information to generate an exam.\n" +
-                "You need to ask the user for:\n" +
-                "- Exam title\n" +
-                "- Description\n" +
-                "- Duration in minutes\n" +
-                "- Passing score percentage\n" +
-                "- Expected total question count\n" +
-                "- The breakdown of questions (single vs group, skills, difficulty, number of questions for each).\n" +
-                "Do NOT ask for everything at once, keep the conversation natural.\n" +
-                "When you have enough information, explicitly summarize the gathered details and ask the user if they want to 'Generate Exam'.";
+        String systemPrompt = systemConfigService.getConfigValue("AI", "AI_TRAINER_EXAM_CHAT_PROMPT", DEFAULT_CHAT_PROMPT);
 
         List<GeminiGenerateRequest.Content> contents = req.getHistory().stream()
                 .map(msg -> GeminiGenerateRequest.Content.builder()
@@ -153,44 +193,26 @@ public class TrainerQuestionAIService {
         if (req == null || req.getHistory() == null || req.getHistory().isEmpty()) {
             throw new ApiException("Chat history is required", HttpStatus.BAD_REQUEST);
         }
+        List<SystemParameter> activeSkills = systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE");
+        List<SystemParameter> activeGroupTypes = systemParameterRepository.findByParamTypeAndIsActiveTrue("GROUP_TYPE");
+        List<SystemParameter> activeDifficulties = systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY");
 
-        String systemPrompt = "You are an expert English test question generator for HanGo trainer.\n" +
-                "Based on the chat history provided, generate a COMPLETE EXAM in JSON format.\n" +
-                "Return PURE JSON only (no markdown). Do NOT use unescaped control characters or literal newlines in JSON strings (use \\\\n instead).\n" +
-                "Schema:\n" +
-                "{\n" +
-                "  \"title\": \"Exam Title\",\n" +
-                "  \"description\": \"Exam Description\",\n" +
-                "  \"durationMinutes\": 60,\n" +
-                "  \"passingScore\": 50.0,\n" +
-                "  \"expectedQuestionCount\": 20,\n" +
-                "  \"blocks\": [\n" +
-                "    {\n" +
-                "      \"isQuestionGroup\": false,\n" +
-                "      \"passageText\": \"\",\n" +
-                "      \"categoryId\": 1,\n" +
-                "      \"skillParamId\": 1,\n" +
-                "      \"difficultyId\": 14,\n" +
-                "      \"questions\": [\n" +
-                "        {\n" +
-                "          \"questionText\": \"...\",\n" +
-                "          \"explanation\": \"...\",\n" +
-                "          \"categoryId\": 1,\n" +
-                "          \"difficultyId\": 14,\n" +
-                "          \"options\": [\n" +
-                "            {\"optionText\": \"...\", \"isCorrect\": true},\n" +
-                "            {\"optionText\": \"...\", \"isCorrect\": false},\n" +
-                "            {\"optionText\": \"...\", \"isCorrect\": false},\n" +
-                "            {\"optionText\": \"...\", \"isCorrect\": false}\n" +
-                "          ]\n" +
-                "        }\n" +
-                "      ]\n" +
-                "    }\n" +
-                "  ]\n" +
-                "}\n" +
-                "categoryId can default to 1 (General). difficultyId can be 14 (Easy), 15 (Medium), 16 (Hard). skillParamId can be null if not specified.\n" +
-                "For group questions, set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array.\n" +
-                "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array.\n" +
+        String skillOptionsText = activeSkills.stream().map(s -> s.getId() + "=" + s.getParamValue()).collect(Collectors.joining(", "));
+        String groupOptionsText = activeGroupTypes.stream().map(g -> g.getId() + "=" + g.getParamValue()).collect(Collectors.joining(", "));
+        String diffOptionsText = activeDifficulties.stream().map(d -> d.getId() + "=" + d.getParamValue()).collect(Collectors.joining(", "));
+
+        String baseSystemPrompt = systemConfigService.getConfigValue("AI", "AI_TRAINER_EXAM_GENERATE_PROMPT", DEFAULT_GENERATE_PROMPT);
+        
+        String systemPrompt = baseSystemPrompt + "\n" +
+                "Available IDs:\n" +
+                "SKILLS (skillParamId): " + (skillOptionsText.isEmpty() ? "None available" : skillOptionsText) + "\n" +
+                "GROUP TYPES (categoryId): " + (groupOptionsText.isEmpty() ? "None available" : groupOptionsText) + "\n" +
+                "DIFFICULTIES (difficultyId): " + (diffOptionsText.isEmpty() ? "None available" : diffOptionsText) + "\n" +
+                "IMPORTANT: Choose the most appropriate IDs for skillParamId, categoryId, and difficultyId from the Available IDs based on the question content and user request.\n" +
+                "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array. " +
+                "For single questions, the categoryId is NOT used for GROUP TYPES, it defaults to a general category ID (like 1).\n" +
+                "For group questions (e.g. Reading, Listening), set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array. " +
+                "For group questions, categoryId MUST be one of the GROUP TYPES IDs provided above.\n" +
                 "Generate the EXACT number of questions and groups as discussed in the chat.";
 
         List<GeminiGenerateRequest.Content> contents = req.getHistory().stream()

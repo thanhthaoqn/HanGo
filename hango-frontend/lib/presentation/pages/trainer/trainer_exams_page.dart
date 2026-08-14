@@ -12,6 +12,7 @@ import '../course_manager/exam_review_dashboard_dialog.dart';
 import '../course_manager/exam_history_dialog.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../domain/model/trainer_ai_exam_models.dart';
 
 class TrainerExamsPage extends StatefulWidget {
   final bool isEmbedded;
@@ -143,6 +144,25 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     }
   }
 
+  DateTime _parseDate(dynamic dateData) {
+    if (dateData == null) return DateTime(2000);
+    if (dateData is List && dateData.isNotEmpty) {
+      try {
+        return DateTime(
+          dateData.length > 0 ? (dateData[0] as num).toInt() : 2000,
+          dateData.length > 1 ? (dateData[1] as num).toInt() : 1,
+          dateData.length > 2 ? (dateData[2] as num).toInt() : 1,
+          dateData.length > 3 ? (dateData[3] as num).toInt() : 0,
+          dateData.length > 4 ? (dateData[4] as num).toInt() : 0,
+          dateData.length > 5 ? (dateData[5] as num).toInt() : 0,
+        );
+      } catch (e) {
+        return DateTime(2000);
+      }
+    }
+    return DateTime.tryParse(dateData.toString()) ?? DateTime(2000);
+  }
+
   void _applyFilters() {
     setState(() {
       var filtered = List<dynamic>.from(_allLoadedExams);
@@ -172,49 +192,39 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         final now = DateTime.now();
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         filtered = filtered.where((e) {
-          DateTime d =
-              DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
+          DateTime d = _parseDate(e['createdAt']);
           return d.isAfter(startOfWeek);
         }).toList();
       } else if (_selectedTimePeriod == 'THIS_MONTH') {
         final now = DateTime.now();
         filtered = filtered.where((e) {
-          DateTime d =
-              DateTime.tryParse(e['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
+          DateTime d = _parseDate(e['createdAt']);
           return d.year == now.year && d.month == now.month;
         }).toList();
       }
 
       filtered.sort((a, b) {
         if (_selectedSortBy == 'STATUS') {
-          final priorityA = _getStatusPriority(_statusOf(a));
-          final priorityB = _getStatusPriority(_statusOf(b));
-          if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+          if (_selectedStatus == 'ALL') {
+            DateTime d1 = _parseDate(a['updatedAt'] ?? a['createdAt']);
+            DateTime d2 = _parseDate(b['updatedAt'] ?? b['createdAt']);
+            return d2.compareTo(d1);
+          } else {
+            final priorityA = _getStatusPriority(_statusOf(a));
+            final priorityB = _getStatusPriority(_statusOf(b));
+            if (priorityA != priorityB) return priorityA.compareTo(priorityB);
 
-          DateTime d1 =
-              DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
-          DateTime d2 =
-              DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
-          return d2.compareTo(d1);
+            DateTime d1 = _parseDate(a['updatedAt'] ?? a['createdAt']);
+            DateTime d2 = _parseDate(b['updatedAt'] ?? b['createdAt']);
+            return d2.compareTo(d1);
+          }
         } else if (_selectedSortBy == 'NEWEST') {
-          DateTime d1 =
-              DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
-          DateTime d2 =
-              DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
+          DateTime d1 = _parseDate(a['createdAt']);
+          DateTime d2 = _parseDate(b['createdAt']);
           return d2.compareTo(d1);
         } else if (_selectedSortBy == 'OLDEST') {
-          DateTime d1 =
-              DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
-          DateTime d2 =
-              DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-              DateTime(2000);
+          DateTime d1 = _parseDate(a['createdAt']);
+          DateTime d2 = _parseDate(b['createdAt']);
           return d1.compareTo(d2);
         } else if (_selectedSortBy == 'ALPHABETICAL') {
           String t1 = a['title']?.toString() ?? '';
@@ -314,7 +324,16 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
   String _formatDate(dynamic dateStr) {
     if (dateStr == null) return 'N/A';
     try {
-      final dateTime = DateTime.parse(dateStr.toString());
+      DateTime dateTime;
+      if (dateStr is List && dateStr.isNotEmpty) {
+        dateTime = DateTime(
+          dateStr.length > 0 ? (dateStr[0] as num).toInt() : 2000,
+          dateStr.length > 1 ? (dateStr[1] as num).toInt() : 1,
+          dateStr.length > 2 ? (dateStr[2] as num).toInt() : 1,
+        );
+      } else {
+        dateTime = DateTime.parse(dateStr.toString());
+      }
       return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
     } catch (e) {
       String str = dateStr.toString();
@@ -365,6 +384,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   _fetchExamsData();
                 });
               },
+              onExamCreated: (examData) {
+                setState(() {
+                  _isCreatingExam = false;
+                  _editingExamData = examData;
+                });
+              },
             )
           : _editingExamData != null
           ? CourseManagerEditExamPage(
@@ -375,9 +400,13 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               isReadOnly: ![
                 'DRAFT',
                 'REJECTED',
+                'PUBLISHED',
               ].contains(_editingExamData!['status']?.toString().toUpperCase()),
+              initialExamData: _editingExamData,
               isCourseManager: false,
               isEmbedded: true,
+              initialAiData:
+                  _editingExamData!['aiData'] as TrainerAiExamGenerateResponse?,
               onBack: () {
                 setState(() {
                   _editingExamData = null;
@@ -396,12 +425,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
       body: Row(
         children: [
           if (isDesktop)
-            const SizedBox(width: 260, child: TrainerSidebar(activeIndex: 2)),
+            const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 2)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                InternalAppHeader(isMobile: !isDesktop),
+                InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
                 Expanded(
                   child: _isCreatingExam
                       ? CourseManagerCreateExamPage(
@@ -411,6 +440,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                             setState(() {
                               _isCreatingExam = false;
                               _fetchExamsData();
+                            });
+                          },
+                          onExamCreated: (examData) {
+                            setState(() {
+                              _isCreatingExam = false;
+                              _editingExamData = examData;
                             });
                           },
                         )
@@ -423,13 +458,15 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                               _editingExamData!['expectedQuestionCount']
                                   as int? ??
                               10,
-                          isReadOnly: !['DRAFT', 'REJECTED'].contains(
+                          isReadOnly: !['DRAFT', 'REJECTED', 'PUBLISHED'].contains(
                             _editingExamData!['status']
                                 ?.toString()
                                 .toUpperCase(),
                           ),
                           isCourseManager: false,
                           isEmbedded: true,
+                          initialAiData: _editingExamData!['aiData']
+                              as TrainerAiExamGenerateResponse?,
                           onBack: () {
                             setState(() {
                               _editingExamData = null;
@@ -475,15 +512,20 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
-          'Exam Management',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
-            fontFamily: 'Outfit',
+        const Expanded(
+          child: Text(
+            'Exam Management',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+              fontFamily: 'Outfit',
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+        const SizedBox(width: 12),
         ElevatedButton.icon(
           onPressed: () {
             setState(() {
@@ -764,75 +806,118 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         ? []
         : _examsList.sublist(startIndex, endIndex);
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 1000),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-          // Table Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Row(
-              children: [
-                Expanded(flex: 3, child: _buildTableHeaderText('Exam Title')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Create Date')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Questions')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Duration')),
-                Expanded(flex: 1, child: _buildTableHeaderText('Status')),
-                Expanded(
-                  flex: 1,
-                  child: _buildTableHeaderText(
-                    'Actions',
-                    align: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          // Table Body
-          currentExams.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: Center(
-                    child: Text(
-                      'No exams found.',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontFamily: 'Outfit',
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Table Header + Rows: scroll horizontally on narrow widths instead of
+          // squeezing the fixed-flex columns into an overflowing layout.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const double minTableWidth = 820;
+              final double contentWidth = constraints.maxWidth > minTableWidth
+                  ? constraints.maxWidth
+                  : minTableWidth;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: contentWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Table Header
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _buildTableHeaderText('Exam Title'),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: _buildTableHeaderText('Create Date'),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: _buildTableHeaderText('Questions'),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: _buildTableHeaderText('Duration'),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: _buildTableHeaderText('Status'),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: _buildTableHeaderText(
+                                'Actions',
+                                align: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                )
-              : ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: currentExams.length,
-                  separatorBuilder: (context, index) =>
                       const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                  itemBuilder: (context, index) {
-                    final exam = currentExams[index];
-                    return _buildExamRow(exam);
-                  },
+                      // Table Body
+                      currentExams.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(40.0),
+                              child: Center(
+                                child: Text(
+                                  'No exams found.',
+                                  style: TextStyle(
+                                    color: Color(0xFF64748B),
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: currentExams.length,
+                              separatorBuilder: (context, index) =>
+                                  const Divider(
+                                    height: 1,
+                                    color: Color(0xFFE2E8F0),
+                                  ),
+                              itemBuilder: (context, index) {
+                                final exam = currentExams[index];
+                                return _buildExamRow(exam);
+                              },
+                            ),
+                    ],
+                  ),
                 ),
+              );
+            },
+          ),
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
           // Pagination Footer
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 Text(
                   'Showing ${totalItems == 0 ? 0 : startIndex + 1} to $endIndex of $totalItems entries',
@@ -842,42 +927,43 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                     fontFamily: 'Outfit',
                   ),
                 ),
-                Row(
-                  children: [
-                    _buildPaginationButton(
-                      Icons.chevron_left,
-                      onPressed: _currentPage > 1
-                          ? () => setState(() => _currentPage--)
-                          : null,
-                    ),
-                    const SizedBox(width: 8),
-                    ...List.generate(totalPages, (index) {
-                      int pageNum = index + 1;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: _buildPaginationNumber(
-                          pageNum.toString(),
-                          isActive: pageNum == _currentPage,
-                          onPressed: () =>
-                              setState(() => _currentPage = pageNum),
-                        ),
-                      );
-                    }),
-                    _buildPaginationButton(
-                      Icons.chevron_right,
-                      onPressed: _currentPage < totalPages
-                          ? () => setState(() => _currentPage++)
-                          : null,
-                    ),
-                  ],
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildPaginationButton(
+                        Icons.chevron_left,
+                        onPressed: _currentPage > 1
+                            ? () => setState(() => _currentPage--)
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      ...List.generate(totalPages, (index) {
+                        int pageNum = index + 1;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: _buildPaginationNumber(
+                            pageNum.toString(),
+                            isActive: pageNum == _currentPage,
+                            onPressed: () =>
+                                setState(() => _currentPage = pageNum),
+                          ),
+                        );
+                      }),
+                      _buildPaginationButton(
+                        Icons.chevron_right,
+                        onPressed: _currentPage < totalPages
+                            ? () => setState(() => _currentPage++)
+                            : null,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
-    ),
-    ),
     );
   }
 
@@ -1092,6 +1178,14 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                           examTitle: exam['title'] ?? 'Untitled Exam',
                           examExpectedCount:
                               exam['expectedQuestionCount'] as int? ?? 10,
+                          examQuestionCount:
+                              exam['questionCount'] as int? ?? 0,
+                          examDurationMinutes:
+                              exam['durationMinutes'] as int? ?? 0,
+                          examCreatedAt: _formatDate(exam['createdAt']),
+                          examUpdatedAt: exam['updatedAt'] != null
+                              ? _formatDate(exam['updatedAt'])
+                              : null,
                           status: status,
                           isCourseManager: false,
                           creatorId: creatorId,
@@ -1100,7 +1194,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                           onActionSuccess: () {
                             _fetchExamsData();
                           },
-                          onEditExam: isOwnExam && status == 'REJECTED'
+                          onEditExam: isOwnExam && ['REJECTED', 'PUBLISHED'].contains(status)
                               ? () {
                                   setState(() {
                                     _editingExamData = exam;

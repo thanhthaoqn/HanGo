@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/config.dart';
@@ -26,6 +25,10 @@ class QuestionState {
   TextEditingController explanationController = TextEditingController();
   int? selectedSkillId;
   int? selectedDifficultyId;
+  String? skillError;
+  String? difficultyError;
+  String? questionTextError;
+  String? optionsError;
   List<OptionState> options = [];
 
   QuestionState() {
@@ -42,6 +45,8 @@ class QuestionGroupState {
   bool isGroup;
   TextEditingController passageController = TextEditingController();
   int? selectedGroupTypeId;
+  String? passageError;
+  String? groupTypeError;
   int aiQuantity = 2;
   List<QuestionState> questions = [QuestionState()];
   
@@ -70,9 +75,6 @@ class CourseManagerCreateQuestionPage extends StatefulWidget {
 
 class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQuestionPage> {
   final _authService = AuthService();
-  String _trainerName = 'Trainer';
-  String _trainerInitials = 'T';
-  String _trainerAvatarUrl = '';
 
   bool _isLoadingMetadata = true;
   bool _isSaving = false;
@@ -91,27 +93,9 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   @override
   void initState() {
     super.initState();
-    _loadTrainerInfo();
     _loadMetadata();
   }
 
-  Future<void> _loadTrainerInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Trainer';
-    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
-    });
-  }
 
   Future<HangoApi> _getApi() async {
     final token = await _authService.getToken();
@@ -388,35 +372,49 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   }
 
   Future<void> _handleSave() async {
-    for (int g = 0; g < _groups.length; g++) {
-      final group = _groups[g];
-      if (group.isGroup && group.passageController.text.trim().isEmpty) {
-        ToastHelper.show(context, 'Passage text cannot be empty for Group ${g + 1}.', isError: true);
-        return;
+    bool isValid = true;
+    setState(() {
+      for (int g = 0; g < _groups.length; g++) {
+        final group = _groups[g];
+        group.passageError = null;
+        group.groupTypeError = null;
+
+        if (group.isGroup && group.passageController.text.trim().isEmpty) {
+          group.passageError = 'Passage text cannot be empty';
+          isValid = false;
+        }
+        if (group.isGroup && group.selectedGroupTypeId == null) {
+          group.groupTypeError = 'Please select a Group Type';
+          isValid = false;
+        }
+        for (var i = 0; i < group.questions.length; i++) {
+          final q = group.questions[i];
+          q.skillError = null;
+          q.difficultyError = null;
+          q.questionTextError = null;
+          q.optionsError = null;
+
+          if (q.selectedSkillId == null) {
+            q.skillError = 'Please select a Skill Type';
+            isValid = false;
+          }
+          if (q.selectedDifficultyId == null) {
+            q.difficultyError = 'Please select a Difficulty';
+            isValid = false;
+          }
+          if (q.questionTextController.text.trim().isEmpty) {
+            q.questionTextError = 'Question text cannot be empty';
+            isValid = false;
+          }
+          if (!q.options.any((opt) => opt.isCorrect)) {
+            q.optionsError = 'Must have at least one correct option';
+            isValid = false;
+          }
+        }
       }
-      if (group.isGroup && group.selectedGroupTypeId == null) {
-        ToastHelper.show(context, 'Please select a Group Type for Group ${g + 1}.', isError: true);
-        return;
-      }
-      for (var i = 0; i < group.questions.length; i++) {
-        if (group.questions[i].selectedSkillId == null) {
-          ToastHelper.show(context, 'Please select a Skill Type for Question ${i + 1} (Group ${g + 1}).', isError: true);
-          return;
-        }
-        if (group.questions[i].selectedDifficultyId == null) {
-          ToastHelper.show(context, 'Please select a Difficulty for Question ${i + 1} (Group ${g + 1}).', isError: true);
-          return;
-        }
-        if (group.questions[i].questionTextController.text.trim().isEmpty) {
-          ToastHelper.show(context, 'Question ${i + 1} text (Group ${g + 1}) cannot be empty.', isError: true);
-          return;
-        }
-        if (!group.questions[i].options.any((opt) => opt.isCorrect)) {
-          ToastHelper.show(context, 'Question ${i + 1} (Group ${g + 1}) must have at least one correct option.', isError: true);
-          return;
-        }
-      }
-    }
+    });
+
+    if (!isValid) return;
 
     setState(() => _isSaving = true);
     int successCount = 0;
@@ -493,14 +491,14 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
         children: [
           if (isDesktop) 
             SizedBox(
-              width: widget.isCourseManager ? 240 : 260, 
+              width: widget.isCourseManager ? 240 : 250, 
               child: widget.isCourseManager ? const CourseManagerSidebar(currentRoute: 'question_bank') : const TrainerSidebar(activeIndex: 3)
             ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!widget.isCourseManager) _buildHeader(context, !isDesktop),
+                if (!widget.isCourseManager) InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
                 Expanded(
                   child: _isLoadingMetadata
                       ? const Center(child: CircularProgressIndicator(color: Color(0xFF38C9A6)))
@@ -738,6 +736,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             readOnly: widget.isReadOnly,
             decoration: InputDecoration(
               hintText: hint,
+              errorText: group.isGroup ? group.passageError : (group.questions.isNotEmpty ? group.questions[0].questionTextError : null),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -780,6 +779,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                   onChanged: widget.isReadOnly ? null : (val) => setState(() => group.selectedGroupTypeId = val),
                   displayKey: 'paramValue',
                   allowNone: true,
+                  errorText: group.groupTypeError,
                 ),
               ],
             ),
@@ -879,15 +879,18 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
     required Function(int?)? onChanged,
     required String displayKey,
     bool allowNone = false,
+    String? errorText,
   }) {
     final bool valueExists = value == null || items.any((item) => item['id'] == value);
     final int? safeValue = valueExists ? value : null;
 
-    return Container(
+    Widget dropdownWidget = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: errorText != null ? Colors.red : const Color(0xFFE2E8F0),
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: DropdownButtonHideUnderline(
@@ -912,6 +915,26 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
         ),
       ),
     );
+    
+    if (errorText != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          dropdownWidget,
+          const SizedBox(height: 4),
+          Text(
+            errorText,
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+              fontFamily: 'Outfit',
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return dropdownWidget;
   }
 
   Widget _buildQuestionGroupUI(QuestionGroupState group) {
@@ -1020,6 +1043,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                           items: _skills,
                           onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedSkillId = val),
                           displayKey: 'paramValue',
+                          errorText: qState.skillError,
                         ),
                       ],
                     );
@@ -1032,6 +1056,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                           items: _difficulties,
                           onChanged: widget.isReadOnly ? null : (val) => setState(() => qState.selectedDifficultyId = val),
                           displayKey: 'paramValue',
+                          errorText: qState.difficultyError,
                         ),
                       ],
                     );
@@ -1086,6 +1111,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                     readOnly: widget.isReadOnly,
                     decoration: InputDecoration(
                       hintText: 'Enter question text...',
+                      errorText: qState.questionTextError,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       border: const OutlineInputBorder(),
@@ -1100,6 +1126,18 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
                   _buildOptionRow(qState, optIndex, letters[optIndex]),
                   const SizedBox(height: 8),
                 ],
+                if (qState.optionsError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      qState.optionsError!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 _buildLabel('EXPLANATION (Optional)'),
                 TextField(
@@ -1192,106 +1230,6 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           letterSpacing: 1.0,
           fontFamily: 'Outfit',
         ),
-      ),
-    );
-  }
-
-  // --- Sidebar & Header ---
-  
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
-      child: Row(
-        children: [
-          if (showMenuButton)
-            IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            ),
-          const SizedBox(width: 8),
-          const Text(
-            'Question Bank',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF64748B),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Text(
-            '  >  ',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFFCBD5E1),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Text(
-            'Create New Question',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF0F766E),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Icon(Icons.notifications_none, size: 20, color: Color(0xFF64748B)),
-          ),
-          const SizedBox(width: 16),
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_trainerAvatarUrl.isNotEmpty)
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundImage: NetworkImage(_trainerAvatarUrl),
-                  )
-                else
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: const Color(0xFF38C9A6),
-                    child: Text(
-                      _trainerInitials,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                  ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _trainerName,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Text(
-                        'Trainer',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

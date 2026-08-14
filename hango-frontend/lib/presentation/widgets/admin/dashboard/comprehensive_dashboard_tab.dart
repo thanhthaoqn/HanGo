@@ -7,7 +7,13 @@ import 'package:intl/intl.dart';
 
 class ComprehensiveDashboardTab extends StatefulWidget {
   final bool isDesktop;
-  const ComprehensiveDashboardTab({super.key, this.isDesktop = true});
+  final void Function(int)? onNavigate;
+
+  const ComprehensiveDashboardTab({
+    super.key,
+    this.isDesktop = true,
+    this.onNavigate,
+  });
 
   @override
   State<ComprehensiveDashboardTab> createState() =>
@@ -987,23 +993,43 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
             ),
           ),
           const SizedBox(height: 24),
-          _buildActionItem(Icons.playlist_add_check, 'Review Pending Courses'),
-          _buildActionItem(Icons.money, 'Process Settlements'),
-          _buildActionItem(Icons.headset_mic, 'View Open Tickets'),
-          _buildActionItem(Icons.people_alt, 'Manage Users & Roles'),
-          _buildActionItem(Icons.settings, 'Platform Settings'),
+          _buildActionItem(
+            Icons.playlist_add_check,
+            'Review Pending Courses',
+            onTap: () => widget.onNavigate?.call(6),
+          ),
+          _buildActionItem(
+            Icons.manage_accounts,
+            'Manage Accounts',
+            onTap: () => widget.onNavigate?.call(1),
+          ),
+          _buildActionItem(
+            Icons.headset_mic,
+            'View Open Tickets',
+            onTap: () => widget.onNavigate?.call(8),
+          ),
+          _buildActionItem(
+            Icons.people_alt,
+            'Manage Users & Roles',
+            onTap: () => widget.onNavigate?.call(3),
+          ),
+          _buildActionItem(
+            Icons.forum,
+            'Moderate Comments',
+            onTap: () => widget.onNavigate?.call(4),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildActionItem(IconData icon, String label) {
+  Widget _buildActionItem(IconData icon, String label, {VoidCallback? onTap}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {},
+          onTap: onTap ?? () {},
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1080,8 +1106,11 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   Widget _buildLearningFunnel() {
     final learning = _stats!['learningPerformance'] ?? {};
     final funnel = learning['learningFunnel'] ?? {};
-    final completionRate = ((learning['completionRate'] ?? 0.0) * 100)
-        .toStringAsFixed(1);
+    final completionRate =
+        ((learning['completionRate'] ?? 0.0) * 100).toStringAsFixed(1);
+
+    final int registered = funnel['registered'] ?? 0;
+    final double maxVal = registered > 0 ? registered.toDouble() : 1.0;
 
     return Container(
       height: 400,
@@ -1135,32 +1164,32 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
           const SizedBox(height: 24),
           _buildFunnelStep(
             'Registered Users',
-            funnel['registered'] ?? 0,
-            1.0,
+            registered,
+            (registered / maxVal).clamp(0.0, 1.0),
             Colors.blue,
           ),
           _buildFunnelStep(
             'Enrolled (≥1 Course)',
             funnel['enrolledAtLeast1'] ?? 0,
-            0.8,
+            ((funnel['enrolledAtLeast1'] ?? 0) / maxVal).clamp(0.0, 1.0),
             Colors.indigo,
           ),
           _buildFunnelStep(
             'Actively Learning (30d)',
             funnel['activelyLearning'] ?? 0,
-            0.6,
+            ((funnel['activelyLearning'] ?? 0) / maxVal).clamp(0.0, 1.0),
             Colors.purple,
           ),
           _buildFunnelStep(
             'Completed (≥1 Course)',
             funnel['completedAtLeast1Course'] ?? 0,
-            0.45,
+            ((funnel['completedAtLeast1Course'] ?? 0) / maxVal).clamp(0.0, 1.0),
             Colors.orange,
           ),
           _buildFunnelStep(
             'Certified',
             funnel['certified'] ?? 0,
-            0.3,
+            ((funnel['certified'] ?? 0) / maxVal).clamp(0.0, 1.0),
             Colors.green,
           ),
         ],
@@ -1234,7 +1263,8 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
 
   Widget _buildExamPerformance() {
     final learning = _stats!['learningPerformance'] ?? {};
-    final avgScore = (learning['avgScore'] ?? 0.0).toStringAsFixed(1);
+    final avgScore = (learning['avgExamScore'] ?? 0.0).toStringAsFixed(1);
+    final passRate = ((learning['examPassRate'] ?? 0.0) * 100).toStringAsFixed(0);
 
     return Container(
       height: 400,
@@ -1272,7 +1302,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                 const Color(0xFF3B82F6),
               ),
               _buildCircularStat(
-                '82%',
+                '$passRate%',
                 'Pass Rate',
                 const Color(0xFF10B981),
               ),

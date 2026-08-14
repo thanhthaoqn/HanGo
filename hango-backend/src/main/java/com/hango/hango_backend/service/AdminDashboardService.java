@@ -76,6 +76,8 @@ public class AdminDashboardService {
         var activeLearners30dFuture = CompletableFuture.supplyAsync(() -> enrollmentRepository.countActiveLearnersSince(last30d));
         var enrolledAtLeast1Future = CompletableFuture.supplyAsync(() -> enrollmentRepository.countDistinctEnrolledUsers());
         var completedAtLeast1Future = CompletableFuture.supplyAsync(() -> enrollmentRepository.countDistinctUsersCompletedAnyCourse());
+        var passedAttemptsFuture = CompletableFuture.supplyAsync(() -> examAttemptRepository.countPassedAttempts());
+        var submittedAttemptsFuture = CompletableFuture.supplyAsync(() -> examAttemptRepository.countSubmittedAttempts());
 
         // --- TICKET HEALTH ---
         var ticketsByStatusFuture = CompletableFuture.supplyAsync(() -> ticketRepository.countGroupedByStatus());
@@ -108,6 +110,7 @@ public class AdminDashboardService {
                 totalRevenueFuture, totalPlatformFeeFuture, totalTrainerEarningsFuture, totalTxCountFuture, monthlyRevenueFuture,
                 coursesByStatusFuture, examsByStatusFuture, trainerAppsByStatusFuture, oldestPendingCourseDateFuture, oldestPendingExamDateFuture,
                 completedEnrollmentsFuture, avgExamScoreFuture, activeLearners30dFuture, enrolledAtLeast1Future, completedAtLeast1Future,
+                passedAttemptsFuture, submittedAttemptsFuture,
                 ticketsByStatusFuture, ticketsByCategoryFuture, avgFirstResponseFuture, avgResolutionFuture,
                 totalAiCallsFuture, chatCallsFuture, embeddingCallsFuture, aiSuccessCountFuture, dailyAiUsageFuture, topAiUsersFuture, avgAiSuccessDurationFuture,
                 dailyUserRegistrationFuture, dailyEnrollmentsFuture, dailyRevenueFuture,
@@ -190,9 +193,13 @@ public class AdminDashboardService {
                 .certified(totalCertificatesFuture.join())
                 .build();
 
+        long submittedAttempts = submittedAttemptsFuture.join();
+        Double examPassRate = submittedAttempts > 0 ? (double) passedAttemptsFuture.join() / submittedAttempts : 0.0;
+
         DashboardStatsDTO.LearningPerformance learningPerf = DashboardStatsDTO.LearningPerformance.builder()
                 .completionRate(completionRate)
                 .avgExamScore(avgExamScoreFuture.join())
+                .examPassRate(examPassRate)
                 .activeLearners30d(activeLearners30dFuture.join())
                 .learningFunnel(funnel)
                 .build();

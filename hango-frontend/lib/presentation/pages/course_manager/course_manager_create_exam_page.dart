@@ -11,6 +11,8 @@ import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'course_manager_exam_import_excel_page.dart';
 import 'course_manager_exam_ai_generate_page.dart';
 import 'course_manager_exam_matrix_page.dart';
+import 'course_manager_edit_exam_page.dart';
+import '../../../domain/model/trainer_ai_exam_models.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/course_manager_api.dart';
 
@@ -18,12 +20,14 @@ class CourseManagerCreateExamPage extends StatefulWidget {
   final bool isEmbedded;
   final VoidCallback? onBack;
   final bool isCourseManager;
+  final ValueChanged<Map<String, dynamic>>? onExamCreated;
 
   const CourseManagerCreateExamPage({
     super.key,
     this.isEmbedded = false,
     this.onBack,
     this.isCourseManager = true,
+    this.onExamCreated,
   });
 
   @override
@@ -290,11 +294,14 @@ class _CourseManagerCreateExamPageState
       case 'import':
         return CourseManagerExamImportExcelPage(
           onBack: onBack,
+          onImportSuccess: widget.isEmbedded ? widget.onBack : null,
+          onExamCreated: _handleExamCreated,
           isCourseManager: widget.isCourseManager,
         );
       case 'matrix':
         return CourseManagerExamMatrixPage(
           onBack: onBack,
+          onExamCreated: _handleExamCreated,
           isCourseManager: widget.isCourseManager,
           preloadedMatrices: _matrices,
           isMatricesLoading: _isMatricesLoading,
@@ -302,12 +309,36 @@ class _CourseManagerCreateExamPageState
       case 'ai':
         return CourseManagerExamAiGeneratePage(
           onBack: onBack,
+          onExamCreated: _handleExamCreated,
           isCourseManager: widget.isCourseManager,
         );
       case 'selection':
       default:
         return _buildMethodSelection();
     }
+  }
+
+  // Keeps the shared shell's sidebar/header mounted when embedded, by
+  // bubbling the newly created exam up to the parent instead of pushing a
+  // standalone route. Falls back to a normal route push only when this page
+  // isn't embedded in a shell (no onExamCreated handler was supplied).
+  void _handleExamCreated(Map<String, dynamic> examData) {
+    if (widget.onExamCreated != null) {
+      widget.onExamCreated!(examData);
+      return;
+    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CourseManagerEditExamPage(
+          examId: examData['id'] as int,
+          examTitle: examData['title'] as String? ?? 'Untitled Exam',
+          examExpectedCount: examData['expectedQuestionCount'] as int? ?? 10,
+          isCourseManager: widget.isCourseManager,
+          initialAiData: examData['aiData'] as TrainerAiExamGenerateResponse?,
+        ),
+      ),
+    );
   }
 
   Widget _buildMethodSelection() {

@@ -35,6 +35,12 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(AVG(e.score), 0) FROM ExamAttempt e WHERE e.submittedAt IS NOT NULL")
     Double avgScore();
 
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(e) FROM ExamAttempt e WHERE e.submittedAt IS NOT NULL AND COALESCE(e.score, 0.0) >= COALESCE(e.exam.passingScore, 5.0)")
+    long countPassedAttempts();
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(e) FROM ExamAttempt e WHERE e.submittedAt IS NOT NULL")
+    long countSubmittedAttempts();
+
     @org.springframework.data.jpa.repository.Query(value = "SELECT DATE(ea.submitted_at) as day, COUNT(*) as cnt " +
            "FROM exam_attempts ea WHERE ea.submitted_at IS NOT NULL AND ea.submitted_at >= :since " +
            "GROUP BY DATE(ea.submitted_at) ORDER BY day", nativeQuery = true)

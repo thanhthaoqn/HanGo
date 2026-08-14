@@ -1,4 +1,4 @@
-﻿class CourseManagerQuestion {
+class CourseManagerQuestion {
   final int id;
   final String questionText;
   final String categoryName;
@@ -28,6 +28,25 @@
     this.isGroup = false,
   });
 
+  static DateTime _parseDate(dynamic dateData) {
+    if (dateData == null) return DateTime.now();
+    if (dateData is List && dateData.isNotEmpty) {
+      try {
+        return DateTime(
+          dateData.length > 0 ? (dateData[0] as num).toInt() : 2000,
+          dateData.length > 1 ? (dateData[1] as num).toInt() : 1,
+          dateData.length > 2 ? (dateData[2] as num).toInt() : 1,
+          dateData.length > 3 ? (dateData[3] as num).toInt() : 0,
+          dateData.length > 4 ? (dateData[4] as num).toInt() : 0,
+          dateData.length > 5 ? (dateData[5] as num).toInt() : 0,
+        );
+      } catch (e) {
+        return DateTime.now();
+      }
+    }
+    return DateTime.tryParse(dateData.toString()) ?? DateTime.now();
+  }
+
   factory CourseManagerQuestion.fromJson(Map<String, dynamic> json) {
     return CourseManagerQuestion(
       id: json['id'] as int? ?? 0,
@@ -38,12 +57,8 @@
       difficultyName: json['difficultyName'] as String? ?? 'Medium',
       status: json['status'] as String? ?? 'PRIVATE',
       creatorName: json['creatorName'] as String? ?? 'Unknown',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : DateTime.now(),
+      createdAt: _parseDate(json['createdAt']),
+      updatedAt: _parseDate(json['updatedAt']),
       isGroup: json['isGroup'] as bool? ?? false,
     );
   }

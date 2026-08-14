@@ -44,10 +44,28 @@ public class GeminiClientService {
         private WebClient webClient;
         private final GeminiProperties geminiProperties;
         private final AiUsageLogRepository aiUsageLogRepository;
+        private final SystemConfigService systemConfigService;
 
-        public GeminiClientService(GeminiProperties geminiProperties, AiUsageLogRepository aiUsageLogRepository) {
+        public GeminiClientService(GeminiProperties geminiProperties, AiUsageLogRepository aiUsageLogRepository, SystemConfigService systemConfigService) {
                 this.geminiProperties = geminiProperties;
                 this.aiUsageLogRepository = aiUsageLogRepository;
+                this.systemConfigService = systemConfigService;
+        }
+
+        public String getApiKey() {
+            return systemConfigService.getConfigValue("AI", "GEMINI_API_KEY", geminiProperties.getApiKey());
+        }
+
+        public String getChatModel() {
+            return systemConfigService.getConfigValue("AI", "GEMINI_CHAT_MODEL", geminiProperties.getChatModel());
+        }
+
+        public String getEmbeddingModel() {
+            return systemConfigService.getConfigValue("AI", "GEMINI_EMBEDDING_MODEL", geminiProperties.getEmbeddingModel());
+        }
+
+        public int getTimeoutSeconds() {
+            return Integer.parseInt(systemConfigService.getConfigValue("AI", "GEMINI_TIMEOUT_SECONDS", String.valueOf(geminiProperties.getTimeoutSeconds())));
         }
 
         private void recordUsage(String callType, boolean success, long durationMs, String errorMessage) {
@@ -88,7 +106,12 @@ public class GeminiClientService {
                 this.webClient = WebClient.builder()
                                 .baseUrl(baseUrl)
                                 .defaultHeader("Content-Type", "application/json")
-                                .defaultHeader("x-goog-api-key", geminiProperties.getApiKey())
+                                .filter((request, next) -> {
+                                    org.springframework.web.reactive.function.client.ClientRequest newRequest = org.springframework.web.reactive.function.client.ClientRequest.from(request)
+                                            .header("x-goog-api-key", getApiKey())
+                                            .build();
+                                    return next.exchange(newRequest);
+                                })
                                 .build();
                 log.info("Gemini WebClient initialized successfully with base URL: {}", baseUrl);
         }

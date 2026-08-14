@@ -176,6 +176,7 @@ public class CourseManagerExamMatrixServiceImpl implements CourseManagerExamMatr
         exam.setVisibility("PRIVATE");
         exam.setCreatedBy(user);
         exam.setCreatedAt(LocalDateTime.now());
+        exam.setThumbnailUrl(Exam.DEFAULT_THUMBNAIL_URL);
         Exam savedExam = examRepository.save(exam);
 
         int currentOrder = 1;

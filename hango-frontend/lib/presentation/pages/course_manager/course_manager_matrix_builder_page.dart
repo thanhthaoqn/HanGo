@@ -201,26 +201,57 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
     }
   }
 
-  bool get _isValid {
-    if (_titleController.text.trim().isEmpty) return false;
-    if (_rules.isEmpty) return false;
-    for (var r in _rules) {
-      if (r['type'] == 'single') {
-        if (r['skillId'] == null || r['diffId'] == null) return false;
-      } else {
-        if (r['groupTypeId'] == null) return false;
-        final subQ = r['subQuestions'] as List;
-        if (subQ.isEmpty) return false;
-        for (var sq in subQ) {
-          if (sq['skillId'] == null || sq['diffId'] == null) return false;
+  String? _titleError;
+
+  bool _validate() {
+    bool isValid = true;
+    setState(() {
+      _titleError = null;
+      if (_titleController.text.trim().isEmpty) {
+        _titleError = 'Title cannot be empty';
+        isValid = false;
+      }
+      
+      for (var r in _rules) {
+        r['groupTypeError'] = null;
+        r['skillError'] = null;
+        r['diffError'] = null;
+        
+        if (r['type'] == 'single') {
+          if (r['skillId'] == null) {
+            r['skillError'] = 'Please select a Skill Type';
+            isValid = false;
+          }
+          if (r['diffId'] == null) {
+            r['diffError'] = 'Please select a Difficulty';
+            isValid = false;
+          }
+        } else {
+          if (r['groupTypeId'] == null) {
+            r['groupTypeError'] = 'Please select a Group Type';
+            isValid = false;
+          }
+          final subQ = r['subQuestions'] as List;
+          for (var sq in subQ) {
+            sq['skillError'] = null;
+            sq['diffError'] = null;
+            if (sq['skillId'] == null) {
+              sq['skillError'] = 'Please select a Skill Type';
+              isValid = false;
+            }
+            if (sq['diffId'] == null) {
+              sq['diffError'] = 'Please select a Difficulty';
+              isValid = false;
+            }
+          }
         }
       }
-    }
-    return true;
+    });
+    return isValid && _rules.isNotEmpty;
   }
 
   Future<void> _saveMatrix() async {
-    if (!_isValid) return;
+    if (!_validate()) return;
 
     setState(() => _isSaving = true);
 
@@ -481,10 +512,10 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
             ],
           ),
           const SizedBox(height: 20),
-          TextFormField(
+          TextField(
             controller: _titleController,
-            decoration: _inputDecoration('Matrix Name *', 'E.g., High School Mock Exam 2026 Matrix'),
-            onChanged: (_) => setState(() {}),
+            readOnly: widget.mode == MatrixMode.view,
+            decoration: _inputDecoration('Matrix Title *', 'e.g. Midterm English Matrix', errorText: _titleError),
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -624,25 +655,6 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
         children: [
           Row(
             children: [
-              // Drag handle
-              if (widget.mode != MatrixMode.view)
-                Tooltip(
-                  message: 'Hold to reorder',
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.grab,
-                    child: ReorderableDragStartListener(
-                      index: index,
-                      child: const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: Icon(
-                          Icons.drag_indicator,
-                          color: Color(0xFFCBD5E1),
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               Expanded(
                 child: Row(
                   children: [
@@ -695,7 +707,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                   flex: 3,
                   child: DropdownButtonFormField<int>(
                     isExpanded: true,
-                    decoration: _inputDecoration('Skill *', null),
+                    decoration: _inputDecoration('Skill *', null, errorText: rule['skillError']),
                     value: rule['skillId'],
                     items: _skills.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name'], overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['skillId'] = val),
@@ -706,7 +718,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                   flex: 1,
                   child: DropdownButtonFormField<int>(
                     isExpanded: true,
-                    decoration: _inputDecoration('Difficulty *', null),
+                    decoration: _inputDecoration('Difficulty *', null, errorText: rule['diffError']),
                     value: rule['diffId'],
                     items: _difficulties.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name']))).toList(),
                     onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['diffId'] = val),
@@ -718,7 +730,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
 
             DropdownButtonFormField<int>(
               isExpanded: true,
-              decoration: _inputDecoration('Group Type *', null),
+              decoration: _inputDecoration('Group Type *', null, errorText: rule['groupTypeError']),
               value: rule['groupTypeId'],
               items: _groupTypes.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name']))).toList(),
               onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => rule['groupTypeId'] = val),
@@ -739,7 +751,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                       flex: 2,
                       child: DropdownButtonFormField<int>(
                         isExpanded: true,
-                        decoration: _inputDecoration('Skill *', null),
+                        decoration: _inputDecoration('Skill *', null, errorText: sq['skillError']),
                         value: sq['skillId'],
                         items: _skills.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name'], overflow: TextOverflow.ellipsis))).toList(),
                         onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => sq['skillId'] = val),
@@ -750,7 +762,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
                       flex: 1,
                       child: DropdownButtonFormField<int>(
                         isExpanded: true,
-                        decoration: _inputDecoration('Difficulty *', null),
+                        decoration: _inputDecoration('Difficulty *', null, errorText: sq['diffError']),
                         value: sq['diffId'],
                         items: _difficulties.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['name']))).toList(),
                         onChanged: widget.mode == MatrixMode.view ? null : (val) => setState(() => sq['diffId'] = val),
@@ -792,7 +804,7 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
         if (widget.mode != MatrixMode.view) ...[
           const SizedBox(width: 16),
           ElevatedButton.icon(
-            onPressed: (_isValid && !_isSaving) ? _saveMatrix : null,
+            onPressed: !_isSaving ? _saveMatrix : null,
             icon: _isSaving 
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                 : const Icon(Icons.save_outlined, size: 20),
@@ -810,10 +822,11 @@ class _CourseManagerMatrixBuilderPageState extends State<CourseManagerMatrixBuil
     );
   }
 
-  InputDecoration _inputDecoration(String label, String? hint) {
+  InputDecoration _inputDecoration(String label, String? hint, {String? errorText}) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
+      errorText: errorText,
       labelStyle: const TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
       hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'Outfit', fontSize: 14),
       filled: true,

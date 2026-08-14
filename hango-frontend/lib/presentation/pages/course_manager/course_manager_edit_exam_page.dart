@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
 import '../../../domain/model/trainer_ai_exam_models.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../widgets/course_manager_sidebar.dart';
@@ -13,6 +12,7 @@ import '../../widgets/trainer/trainer_sidebar.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../../services/hango_api.dart';
 import '../../../data/services/course_manager_api.dart';
+import 'edit_exam_metadata_dialog.dart';
 
 class OptionState {
   TextEditingController textController = TextEditingController();
@@ -27,6 +27,10 @@ class QuestionState {
   TextEditingController explanationController = TextEditingController();
   int? selectedSkillId;
   int? selectedDifficultyId;
+  String? skillError;
+  String? difficultyError;
+  String? questionTextError;
+  String? optionsError;
   List<OptionState> options = [];
 
   QuestionState() {
@@ -41,9 +45,12 @@ class QuestionState {
 
 class QuestionBlockState {
   bool isQuestionGroup = true;
+  bool isGenerated = false;
   int? selectedSkillId;
   int? selectedGroupTypeId;
   int? selectedDifficultyId;
+  String? passageError;
+  String? groupTypeError;
   TextEditingController passageController = TextEditingController();
   List<QuestionState> questions = [QuestionState()];
 }
@@ -58,6 +65,7 @@ class CourseManagerEditExamPage extends StatefulWidget {
   final TrainerAiExamGenerateResponse? initialAiData;
   final bool isEmbedded;
   final VoidCallback? onBack;
+  final Map<String, dynamic>? initialExamData;
 
   const CourseManagerEditExamPage({
     Key? key,
@@ -70,6 +78,7 @@ class CourseManagerEditExamPage extends StatefulWidget {
     this.initialAiData,
     this.isEmbedded = false,
     this.onBack,
+    this.initialExamData,
   }) : super(key: key);
 
   @override
@@ -79,9 +88,6 @@ class CourseManagerEditExamPage extends StatefulWidget {
 
 class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   final _authService = AuthService();
-  String _trainerName = 'Trainer';
-  String _trainerInitials = 'T';
-  String _trainerAvatarUrl = '';
 
   bool _isLoadingMetadata = true;
   bool _isSaving = false;
@@ -96,7 +102,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   @override
   void initState() {
     super.initState();
-    _loadTrainerInfo();
     _loadData();
   }
 
@@ -105,6 +110,34 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       widget.onBack!();
     } else {
       Navigator.pop(context);
+    }
+  }
+
+  void _editBasicInfo() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => EditExamMetadataDialog(
+        initialData: widget.initialExamData!,
+        onSave: (newData) async {
+          if (widget.isCourseManager) {
+            await CourseManagerApi().updateExamInfo(widget.examId, newData);
+          } else {
+            final token = await _authService.getToken();
+            await HangoApi(
+              baseUrl: EnvConfig.apiBaseUrl,
+              token: token,
+            ).updateExamInfo(widget.examId, newData);
+          }
+        },
+      ),
+    );
+
+    if (result == true) {
+      ToastHelper.show(context, 'Exam metadata updated successfully');
+      if (widget.onBack != null) {
+        widget.onBack!(); // Go back to exam list to see updated data and possibly new status
+      }
     }
   }
 
@@ -128,11 +161,10 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     _blocks.clear();
     for (var aiBlock in aiData.blocks) {
       final block = QuestionBlockState();
+      block.isGenerated = true;
       block.isQuestionGroup = aiBlock.isQuestionGroup;
       block.passageController.text = aiBlock.passageText;
-      block.selectedGroupTypeId = aiBlock.isQuestionGroup
-          ? aiBlock.categoryId
-          : null; // Mapping groupType to categoryId
+      block.selectedGroupTypeId = aiBlock.categoryId; // Mapping groupType to categoryId
       block.selectedSkillId = aiBlock.skillParamId;
       block.selectedDifficultyId = aiBlock.difficultyId;
       block.questions = aiBlock.questions.map((aiQ) {
@@ -574,24 +606,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     return count;
   }
 
-  Future<void> _loadTrainerInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Trainer';
-    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
-    });
-  }
-
   Future<HangoApi> _getApi() async {
     final token = await _authService.getToken();
     final String apiBaseUrl = EnvConfig.apiBaseUrl;
@@ -630,6 +644,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       } else {
         for (var blockData in blocksData) {
           final block = QuestionBlockState();
+          block.isGenerated = true; // Disable toggle for existing blocks
           block.selectedGroupTypeId = blockData['categoryId'];
 
           if (blockData['passageText'] != null &&
@@ -688,93 +703,95 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     }
   }
 
-  Future<void> _handleSave() async {
-    // Basic validation
-    for (var i = 0; i < _blocks.length; i++) {
-      final block = _blocks[i];
+  bool _validateBlocks() {
+    bool isValid = true;
+    setState(() {
+      for (var i = 0; i < _blocks.length; i++) {
+        final block = _blocks[i];
+        block.passageError = null;
+        block.groupTypeError = null;
 
-      if (block.isQuestionGroup &&
-          block.passageController.text.trim().isEmpty) {
-        ToastHelper.show(
-          context,
-          'Khối ${i + 1}: Nội dung đoạn văn không được để trống.',
-          isError: true,
-        );
-        return;
-      }
-      for (var j = 0; j < block.questions.length; j++) {
-        final q = block.questions[j];
-        if (q.selectedSkillId == null) {
-          ToastHelper.show(
-            context,
-            'Khối ${i + 1} - Câu ${j + 1}: Vui lòng chọn Kỹ năng (Skill).',
-            isError: true,
-          );
-          return;
+        if (block.isQuestionGroup &&
+            block.passageController.text.trim().isEmpty) {
+          block.passageError = 'Passage text cannot be empty';
+          isValid = false;
         }
-        if (q.selectedDifficultyId == null) {
-          ToastHelper.show(
-            context,
-            'Khối ${i + 1} - Câu ${j + 1}: Vui lòng chọn Độ khó (Difficulty).',
-            isError: true,
-          );
-          return;
-        }
-        if (q.questionTextController.text.trim().isEmpty) {
-          ToastHelper.show(
-            context,
-            'Khối ${i + 1} - Câu ${j + 1}: Nội dung câu hỏi không được để trống.',
-            isError: true,
-          );
-          return;
-        }
-        if (!q.options.any((opt) => opt.isCorrect)) {
-          ToastHelper.show(
-            context,
-            'Khối ${i + 1} - Câu ${j + 1}: Phải có ít nhất 1 đáp án đúng.',
-            isError: true,
-          );
-          return;
+
+        for (var j = 0; j < block.questions.length; j++) {
+          final q = block.questions[j];
+          q.skillError = null;
+          q.difficultyError = null;
+          q.questionTextError = null;
+          q.optionsError = null;
+
+          if (q.selectedSkillId == null) {
+            q.skillError = 'Please select a Skill Type';
+            isValid = false;
+          }
+          if (q.selectedDifficultyId == null) {
+            q.difficultyError = 'Please select a Difficulty';
+            isValid = false;
+          }
+          if (q.questionTextController.text.trim().isEmpty) {
+            q.questionTextError = 'Question text cannot be empty';
+            isValid = false;
+          }
+          if (!q.options.any((opt) => opt.isCorrect)) {
+            q.optionsError = 'Must have at least one correct option';
+            isValid = false;
+          }
         }
       }
-    }
+    });
+    return isValid;
+  }
+
+  Map<String, dynamic> _buildBlocksPayload() {
+    return {
+      'blocks': _blocks
+          .map(
+            (block) => {
+              'categoryId': block.selectedGroupTypeId,
+              'skillParamId': block.questions.isNotEmpty
+                  ? block.questions.first.selectedSkillId
+                  : null,
+              'difficultyId': block.questions.isNotEmpty
+                  ? block.questions.first.selectedDifficultyId
+                  : null,
+              'passageText': block.isQuestionGroup
+                  ? block.passageController.text
+                  : null,
+              'subQuestions': block.questions
+                  .map(
+                    (q) => {
+                      'questionText': q.questionTextController.text,
+                      'explanation': q.explanationController.text,
+                      'skillParamId': q.selectedSkillId,
+                      'difficultyId': q.selectedDifficultyId,
+                      'options': q.options
+                          .map(
+                            (o) => {
+                              'optionText': o.textController.text,
+                              'isCorrect': o.isCorrect,
+                            },
+                          )
+                          .toList(),
+                    },
+                  )
+                  .toList(),
+            },
+          )
+          .toList(),
+    };
+  }
+
+  Future<void> _handleSave() async {
+    if (!_validateBlocks()) return;
 
     setState(() => _isSaving = true);
     try {
       final api = await _getApi();
-
-      final payload = {
-        'blocks': _blocks
-            .map(
-              (block) => {
-                'categoryId': block.selectedGroupTypeId,
-                'passageText': block.isQuestionGroup
-                    ? block.passageController.text
-                    : null,
-                'subQuestions': block.questions
-                    .map(
-                      (q) => {
-                        'questionText': q.questionTextController.text,
-                        'explanation': q.explanationController.text,
-                        'skillParamId': q.selectedSkillId,
-                        'difficultyId': q.selectedDifficultyId,
-                        'options': q.options
-                            .map(
-                              (o) => {
-                                'optionText': o.textController.text,
-                                'isCorrect': o.isCorrect,
-                              },
-                            )
-                            .toList(),
-                      },
-                    )
-                    .toList(),
-              },
-            )
-            .toList(),
-      };
-
-      await api.saveExamQuestions(widget.examId, payload);
+      await api.saveExamQuestions(widget.examId, _buildBlocksPayload());
 
       if (mounted) {
         ToastHelper.show(context, 'All questions saved successfully!');
@@ -889,7 +906,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
         }
       }
     } else {
-      // Normal trainer flow
+      // Trainer flow
+      if (!_validateBlocks()) return;
+
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -905,7 +924,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
               ),
               const SizedBox(width: 10),
               const Text(
-                'Submit for Review',
+                'Save & Submit for Review',
                 style: TextStyle(
                   fontFamily: 'Outfit',
                   fontWeight: FontWeight.bold,
@@ -919,7 +938,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Are you sure you want to submit the exam "${widget.examTitle}" for review?',
+                'Save the current questions and submit the exam "${widget.examTitle}" for the Course Manager\'s review?',
                 style: const TextStyle(
                   fontSize: 14,
                   color: Color(0xFF475569),
@@ -980,7 +999,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                 elevation: 0,
               ),
               child: const Text(
-                'Confirm Submission',
+                'Save & Submit',
                 style: TextStyle(
                   color: Colors.white,
                   fontFamily: 'Outfit',
@@ -997,16 +1016,23 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       setState(() => _isSubmitting = true);
       try {
         final api = await _getApi();
+        // Always persist the latest question edits before flipping the
+        // status to SUBMITTED, so a submitted exam can never end up with
+        // stale or missing questions.
+        await api.saveExamQuestions(widget.examId, _buildBlocksPayload());
         await api.updateExamStatus(widget.examId, 'SUBMITTED');
         if (mounted) {
-          ToastHelper.show(context, 'Exam submitted for review successfully!');
+          ToastHelper.show(
+            context,
+            'Exam saved and submitted for review successfully!',
+          );
           _goBack();
         }
       } catch (e) {
         if (mounted) {
           ToastHelper.show(
             context,
-            'Failed to update status: $e',
+            'Failed to save & submit exam: $e',
             isError: true,
           );
         }
@@ -1026,7 +1052,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     Widget content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!widget.isCourseManager && !widget.isEmbedded) _buildHeader(context, !isDesktop),
         if (widget.isEmbedded)
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
@@ -1051,6 +1076,21 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (!widget.isReadOnly && widget.initialExamData != null)
+                  ElevatedButton.icon(
+                    onPressed: _editBasicInfo,
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Edit Basic Info'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF20B486),
+                      side: const BorderSide(color: Color(0xFF20B486)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1072,9 +1112,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: widget.isCourseManager
-          ? InternalAppHeader(isMobile: !(isDesktop), activeTab: '',)
-          : null,
+      appBar: InternalAppHeader(isMobile: !isDesktop),
       drawer: !isDesktop
           ? Drawer(
               child: widget.isCourseManager
@@ -1103,49 +1141,71 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     return Column(
       children: [
         // Scrollable Content
+        // Lazily built with slivers: a large imported exam can have dozens
+        // of blocks, each with several TextEditingControllers wired to a
+        // page-wide setState (see _updateProgress). Eagerly building every
+        // block in a Column meant a full-page relayout on every keystroke
+        // in any field, causing severe input lag; SliverList only rebuilds
+        // the blocks currently on/near screen.
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IgnorePointer(
-                  ignoring: widget.isReadOnly,
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < _blocks.length; i++)
-                        _buildQuestionBlock(i),
-                      const SizedBox(height: 16),
-                      if (!widget.isReadOnly)
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () {
-                              setState(() {
-                                final newBlock = QuestionBlockState();
-                                _blocks.add(newBlock);
-                                _addBlockListeners(newBlock);
-                              });
-                            },
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              foregroundColor: const Color(0xFF64748B),
-                              side: const BorderSide(color: Color(0xFFCBD5E1)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              'Add More Question',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-                    ],
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => IgnorePointer(
+                      ignoring: widget.isReadOnly,
+                      child: _buildQuestionBlock(index),
+                    ),
+                    childCount: _blocks.length,
                   ),
                 ),
-                Wrap(
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: IgnorePointer(
+                    ignoring: widget.isReadOnly,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        if (!widget.isReadOnly)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setState(() {
+                                  final newBlock = QuestionBlockState();
+                                  _blocks.add(newBlock);
+                                  _addBlockListeners(newBlock);
+                                });
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                foregroundColor: const Color(0xFF64748B),
+                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Add More Question',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
                   alignment: WrapAlignment.end,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 12,
@@ -1166,7 +1226,12 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                         backgroundColor: Colors.white,
                       ),
                       child: Text(
-                        (widget.isCourseManager && widget.courseManagerActionStatus == 'SUBMITTED') ? 'Cancel' : 'Back',
+                        (!widget.isReadOnly ||
+                                (widget.isCourseManager &&
+                                    widget.courseManagerActionStatus ==
+                                        'SUBMITTED'))
+                            ? 'Cancel'
+                            : 'Back',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Outfit',
@@ -1198,7 +1263,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                           label: Text(
                             widget.isCourseManager
                                 ? 'Submit'
-                                : 'Submit for Review',
+                                : 'Save & Submit for Review',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -1380,8 +1445,10 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     ],
                   ],
                 ),
-              ],
-            ),
+                  ),
+              ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1520,6 +1587,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             maxLines: 15,
             decoration: InputDecoration(
               hintText: hint,
+              errorText: block.isQuestionGroup ? block.passageError : (block.questions.isNotEmpty ? block.questions[0].questionTextError : null),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -1573,31 +1641,12 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                           }
                         },
                         displayKey: 'paramValue',
+                        errorText: block.questions.isNotEmpty ? block.questions[0].skillError : null,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('GROUP TYPE'),
-                      _buildDropdown(
-                        value: block.selectedGroupTypeId,
-                        items: _groupTypes,
-                        onChanged: (val) =>
-                            setState(() => block.selectedGroupTypeId = val),
-                        displayKey: 'paramValue',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1617,34 +1666,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                           }
                         },
                         displayKey: 'paramValue',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('STATUS'),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Text(
-                          'Draft',
-                          style: TextStyle(
-                            color: Color(0xFF475569),
-                            fontSize: 14,
-                          ),
-                        ),
+                        errorText: block.questions.isNotEmpty ? block.questions[0].difficultyError : null,
                       ),
                     ],
                   ),
@@ -1669,34 +1691,6 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('STATUS'),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: const Text(
-                          'Draft',
-                          style: TextStyle(
-                            color: Color(0xFF475569),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ],
@@ -1710,17 +1704,20 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     required List<Map<String, dynamic>> items,
     required Function(int?) onChanged,
     required String displayKey,
+    String? errorText,
   }) {
     // Fix Dropdown crash: verify if the value actually exists in the items list
     bool valueExists =
         value != null && items.any((item) => (item['id'] as int) == value);
     final int? safeValue = valueExists ? value : null;
 
-    return Container(
+    Widget dropdownWidget = Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: errorText != null ? Colors.red : const Color(0xFFE2E8F0),
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: DropdownButtonHideUnderline(
@@ -1741,6 +1738,26 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
         ),
       ),
     );
+    
+    if (errorText != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          dropdownWidget,
+          const SizedBox(height: 4),
+          Text(
+            errorText,
+            style: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+              fontFamily: 'Outfit',
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return dropdownWidget;
   }
 
   Widget _buildQuestionTypeToggle(int blockIndex) {
@@ -1762,27 +1779,31 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                 title: 'Question Group',
                 icon: Icons.check_box_outlined,
                 isActive: block.isQuestionGroup,
-                onTap: () {
-                  setState(() {
-                    block.isQuestionGroup = true;
-                  });
-                },
+                onTap: block.isGenerated
+                    ? null
+                    : () {
+                        setState(() {
+                          block.isQuestionGroup = true;
+                        });
+                      },
               ),
               const SizedBox(width: 12),
               _buildToggleButton(
                 title: 'Single Question',
                 icon: Icons.edit_note_outlined,
                 isActive: !block.isQuestionGroup,
-                onTap: () {
-                  setState(() {
-                    block.isQuestionGroup = false;
-                    if (block.questions.length > 1) {
-                      block.questions = [
-                        block.questions.first,
-                      ]; // Keep only first question
-                    }
-                  });
-                },
+                onTap: block.isGenerated
+                    ? null
+                    : () {
+                        setState(() {
+                          block.isQuestionGroup = false;
+                          if (block.questions.length > 1) {
+                            block.questions = [
+                              block.questions.first,
+                            ]; // Keep only first question
+                          }
+                        });
+                      },
               ),
             ],
           ),
@@ -1795,37 +1816,42 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     required String title,
     required IconData icon,
     required bool isActive,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isActive ? const Color(0xFF38C9A6) : Colors.white,
+            color: isActive ? const Color(0xFFE0E7FF) : Colors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isActive
-                  ? const Color(0xFF38C9A6)
-                  : const Color(0xFFE2E8F0),
+              color: isActive ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
+              width: 1.5,
             ),
           ),
-          alignment: Alignment.center,
-          child: Column(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : const Color(0xFF1E293B),
+                color: onTap == null 
+                    ? const Color(0xFF94A3B8)
+                    : (isActive ? const Color(0xFF6366F1) : const Color(0xFF64748B)),
+                size: 18,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(width: 8),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : const Color(0xFF1E293B),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                  color: onTap == null 
+                      ? const Color(0xFF94A3B8)
+                      : (isActive ? const Color(0xFF6366F1) : const Color(0xFF64748B)),
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  fontFamily: 'Outfit',
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -1967,6 +1993,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                           onChanged: (val) =>
                               setState(() => qState.selectedSkillId = val),
                           displayKey: 'paramValue',
+                          errorText: qState.skillError,
                         ),
                       ],
                     );
@@ -1981,6 +2008,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                             () => qState.selectedDifficultyId = val,
                           ),
                           displayKey: 'paramValue',
+                          errorText: qState.difficultyError,
                         ),
                       ],
                     );
@@ -2008,14 +2036,15 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                   _buildLabel('QUESTION'),
                   TextField(
                     controller: qState.questionTextController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Enter question text...',
+                      errorText: qState.questionTextError,
                       isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 12,
                       ),
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -2034,6 +2063,18 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                   ),
                   const SizedBox(height: 8),
                 ],
+                if (qState.optionsError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      qState.optionsError!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 _buildLabel('EXPLANATION (Optional)'),
                 TextField(
@@ -2155,115 +2196,4 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     );
   }
 
-  // --- Sidebar & Header ---
-
-  Widget _buildHeader(BuildContext context, bool showMenuButton) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
-      child: Row(
-        children: [
-          if (showMenuButton)
-            IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            ),
-          const SizedBox(width: 8),
-          const Text(
-            'Exam',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF64748B),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Text(
-            '  >  ',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFFCBD5E1),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Text(
-            'Edit Exam',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF0F766E),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Icon(
-              Icons.notifications_none,
-              size: 20,
-              color: Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_trainerAvatarUrl.isNotEmpty)
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundImage: NetworkImage(_trainerAvatarUrl),
-                  )
-                else
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: const Color(0xFF38C9A6),
-                    child: Text(
-                      _trainerInitials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _trainerName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Text(
-                        'Trainer',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

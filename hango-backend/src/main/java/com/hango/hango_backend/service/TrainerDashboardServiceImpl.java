@@ -891,16 +891,20 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             String status = (String) exam[5];
             String visibility = (String) exam[6];
             String thumbnailUrl = (String) exam[7];
-            Long creatorId = (Long) exam[8];
-            String creatorName = (String) exam[9];
-            
+            String description = (String) exam[8];
+            Double passingScore = (Double) exam[9];
+            Long creatorId = (Long) exam[10];
+            String creatorName = (String) exam[11];
+
             int questionCount = questionCounts.getOrDefault(id, 0);
             return com.hango.hango_backend.dto.TrainerExamResponseDTO.builder()
                     .id(id)
                     .title(title)
+                    .description(description)
                     .createdAt(createdAt)
                     .questionCount(questionCount)
                     .expectedQuestionCount(expectedQuestionCount)
+                    .passingScore(passingScore)
                     .durationMinutes(durationMinutes)
                     .status(status != null ? status : "private")
                     .visibility(visibility != null ? visibility : "PRIVATE")
@@ -936,7 +940,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         exam.setExpectedQuestionCount(request.getExpectedQuestionCount());
         exam.setPassingScore(request.getPassingScore());
         exam.setDurationMinutes(request.getDurationMinutes());
-        exam.setThumbnailUrl(request.getThumbnailUrl());
+        exam.setThumbnailUrl(com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(request.getThumbnailUrl()));
 
         exam.setStatus("DRAFT");
         exam.setVisibility("PRIVATE");
@@ -949,6 +953,44 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
     @Override
     @Transactional
+    public void updateTrainerExamBasicInfo(Long examId, String email, com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        boolean isCourseManagerOrAdmin = user.getRoles().stream()
+                .anyMatch(role -> role.getRoleName().equals("COURSE_MANAGER") || role.getRoleName().equals("ADMINISTRATOR"));
+
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found"));
+
+        if (!isCourseManagerOrAdmin && !exam.getCreatedBy().getId().equals(user.getId())) {
+            throw new RuntimeException("You do not have permission to edit this exam");
+        }
+
+        String oldStatus = exam.getStatus();
+
+        exam.setTitle(request.getTitle());
+        exam.setDescription(request.getDescription());
+        exam.setExpectedQuestionCount(request.getExpectedQuestionCount());
+        exam.setPassingScore(request.getPassingScore());
+        exam.setDurationMinutes(request.getDurationMinutes());
+        exam.setThumbnailUrl(com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(request.getThumbnailUrl()));
+
+        if ("PUBLISHED".equals(exam.getStatus()) && !isCourseManagerOrAdmin) {
+            exam.setStatus("SUBMITTED");
+        }
+
+        exam = examRepository.save(exam);
+
+        String newStatus = exam.getStatus();
+        if (!oldStatus.equals(newStatus)) {
+            examHistoryService.log(exam, ExamHistoryService.ACTION_SUBMITTED, oldStatus, newStatus, null, "Exam metadata updated, status downgraded to SUBMITTED");
+        } else {
+            examHistoryService.log(exam, ExamHistoryService.ACTION_EDITED, oldStatus, newStatus, null, "Exam basic info updated");
+        }
+    }
+
+    @Override
+    @Transactional
     public void saveExamQuestions(Long examId, String email,
             com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO request) {
         com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
@@ -956,6 +998,17 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         if (!exam.getCreatedBy().getEmail().equals(email)) {
             throw new RuntimeException("Unauthorized to edit this exam");
+        }
+
+        if ("PUBLISHED".equalsIgnoreCase(exam.getStatus())) {
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+            boolean isCourseManagerOrAdmin = user.getRoles().stream()
+                    .anyMatch(role -> role.getRoleName().equals("COURSE_MANAGER") || role.getRoleName().equals("ADMINISTRATOR"));
+            if (!isCourseManagerOrAdmin) {
+                exam.setStatus("SUBMITTED");
+                exam = examRepository.save(exam);
+            }
         }
 
         List<com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO> oldBlocks = buildBlocksFromQuestions(examId);

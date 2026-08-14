@@ -8,9 +8,19 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 class AIPromptBuilderTest {
 
-    private final AIPromptBuilder builder = new AIPromptBuilder();
+    private final SystemConfigService systemConfigService = mock(SystemConfigService.class);
+    private final AIPromptBuilder builder;
+
+    public AIPromptBuilderTest() {
+        org.mockito.Mockito.lenient().when(systemConfigService.getConfigValue(anyString(), anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(2));
+        builder = new AIPromptBuilder(systemConfigService);
+    }
 
     private Lesson lesson(String title, String content) {
         return Lesson.builder().id(1L).title(title).content(content).build();

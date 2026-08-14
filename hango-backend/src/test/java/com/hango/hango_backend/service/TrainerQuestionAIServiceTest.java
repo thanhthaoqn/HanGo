@@ -38,7 +38,10 @@ class TrainerQuestionAIServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TrainerQuestionAIService(geminiClientService, new ObjectMapper(), systemParameterRepository);
+        SystemConfigService systemConfigService = org.mockito.Mockito.mock(SystemConfigService.class);
+        org.mockito.Mockito.lenient().when(systemConfigService.getConfigValue(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        service = new TrainerQuestionAIService(geminiClientService, new ObjectMapper(), systemParameterRepository, systemConfigService);
     }
 
     private SystemParameter param(long id, String value) {

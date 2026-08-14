@@ -317,6 +317,24 @@ public class TrainerDashboardController {
         }
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/exams/{id}/info")
+    @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasRole('COURSE_MANAGER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> updateExamBasicInfo(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO request) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            trainerDashboardService.updateTrainerExamBasicInfo(id, userDetails.getUsername(), request);
+            return ResponseEntity.ok("{\"message\": \"Exam metadata updated successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @PostMapping("/exams/{id}/questions")
     @PreAuthorize("hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> saveExamQuestions(
