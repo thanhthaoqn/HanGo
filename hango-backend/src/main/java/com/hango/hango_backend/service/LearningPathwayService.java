@@ -585,6 +585,10 @@ public class LearningPathwayService {
             if (progress > 0 && progress < 50) {
                 suggestedActions.add("TAKE_QUIZ");
             }
+        } else if (completedSteps > 0 && completedSteps == totalSteps) {
+            // Pathway is fully completed
+            suggestedActions.add("TAKE_NEW_EXAM");
+            pathway.setMentorSummary("🎉 Chúc mừng bạn đã hoàn thành xuất sắc toàn bộ lộ trình hiện tại! Để tiếp tục nâng cao trình độ, hãy làm một bài kiểm tra đánh giá năng lực mới để tôi có thể thiết kế cho bạn một lộ trình nâng cấp hơn nhé!");
         }
 
         if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus()) || "AT_RISK".equalsIgnoreCase(pathway.getScheduleStatus())) {
@@ -595,7 +599,7 @@ public class LearningPathwayService {
         suggestedActions.add("WHAT_WILL_I_LEARN");
 
         // If no contextual actions were added, add quiz as a safe default
-        if (suggestedActions.size() == 1) {
+        if (suggestedActions.size() == 1 && currentNode != null) {
             suggestedActions.add(0, "TAKE_QUIZ");
         }
 

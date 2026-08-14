@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../utils/language_manager.dart';
+import '../../pages/exam/list_exams_page.dart';
 
 class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
@@ -660,6 +661,39 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   }
 
   Widget _buildActionHub(bool dark) {
+    if (widget.pathway.suggestedActions.contains('TAKE_NEW_EXAM')) {
+      final isVi = LanguageManager.isVi;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ListExamsPage(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.rocket_launch_rounded),
+            label: Text(
+              isVi ? 'Làm bài kiểm tra đánh giá mới' : 'Take a New Assessment',
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1), // Indigo color to stand out
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 4,
+            ),
+          ),
+        ),
+      );
+    }
+
     // If we have dynamic questions, use them
     List<String> actions = _dynamicSuggestedQuestions;
 
