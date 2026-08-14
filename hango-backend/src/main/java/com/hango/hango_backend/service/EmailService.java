@@ -214,7 +214,7 @@ public class EmailService {
                 + "                </tr>"
                 + "              </table>"
                 + "              <p style=\"margin: 0; color: #94a3b8; font-size: 13px; text-align: center; line-height: 1.5;\">"
-                + "                If you have any questions, contact our support team at <a href=\"mailto:hangog92su26@gmail.com\" style=\"color: #28b79b; text-decoration: none;\">support@hangog92.online</a>."
+                + "                If you have any questions, contact our support team at <a href=\"mailto:hangog92su26@gmail.com\" style=\"color: #28b79b; text-decoration: none;\">hangog92su26@gmail.com</a>."
                 + "              </p>"
                 + "            </td>"
                 + "          </tr>"
