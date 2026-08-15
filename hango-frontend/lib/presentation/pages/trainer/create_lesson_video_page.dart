@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart' as dio;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/file_picker_helper.dart';
+import '../../../utils/config.dart';
 import '../../../data/repositories/lesson_repository.dart';
 import '../../widgets/trainer_action_required_card.dart';
 import '../../../utils/toast_helper.dart';
@@ -483,7 +484,7 @@ class _CreateLessonVideoPageState extends State<CreateLessonVideoPage> {
       
       final dioClient = dio.Dio();
       final response = await dioClient.post(
-        'http://localhost:8080/api/v1/trainer/courses/generate-transcript',
+        '${EnvConfig.v1BaseUrl}/trainer/courses/generate-transcript',
         data: {'videoUrl': videoUrl},
         options: dio.Options(
           headers: {
