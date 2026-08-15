@@ -55,17 +55,22 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       );
       if (history.isNotEmpty && mounted) {
         setState(() {
-          // Clear initial summary if we have real history to avoid duplicates
-          if (_messages.isNotEmpty &&
+          final isPathwayCompleted = widget.pathway.totalSteps > 0 && 
+                                     widget.pathway.completedSteps >= widget.pathway.totalSteps;
+          
+          // Only remove the initial summary if the pathway is NOT completed.
+          // If completed, the summary is the final congratulatory message, so keep it!
+          if (!isPathwayCompleted && _messages.isNotEmpty &&
               _messages.first['content'] == widget.pathway.mentorSummary) {
-            _messages.clear();
+            _messages.removeAt(0);
           }
 
+          final List<Map<String, String>> historyMessages = [];
           for (var item in history.reversed) {
             if (item['reply'] != null) {
               final rawRole = item['role'] as String?;
               final role = (rawRole == 'USER') ? 'user' : 'mentor';
-              _messages.add({
+              historyMessages.add({
                 'role': role,
                 'content': item['reply'] as String,
               });
@@ -74,6 +79,10 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               }
             }
           }
+          
+          // Insert the loaded history at the beginning of _messages, so that
+          // dynamic messages (like mentorSummary or unlock announcements) remain at the bottom.
+          _messages.insertAll(0, historyMessages);
         });
         _scrollToBottom();
       }
@@ -427,9 +436,11 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   }
 
   Widget _buildChatList(bool dark) {
-    // Only show action hub if there are dynamic suggestions OR we have a welcome summary but no history yet
+    // Only show action hub if there are dynamic suggestions, pathway suggested actions, OR we have a welcome summary but no history yet
     final showActionHub =
-        _dynamicSuggestedQuestions.isNotEmpty || (_messages.length <= 1);
+        widget.pathway.suggestedActions.isNotEmpty ||
+        _dynamicSuggestedQuestions.isNotEmpty || 
+        (_messages.length <= 1);
     final hasPendingReroute = widget.pathway.pendingRerouteSuggestion != null;
     final totalItems =
         _messages.length +

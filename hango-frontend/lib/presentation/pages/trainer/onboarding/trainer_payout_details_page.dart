@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
 import 'trainer_onboarding_shell_page.dart';
-import 'trainer_onboarding_status_page.dart';
 import '../trainer_dashboard_page.dart';
-import '../../login_page.dart';
 
 class TrainerPayoutDetailsPage extends StatefulWidget {
   final Map<String, dynamic> initialProfile;
@@ -26,7 +22,6 @@ class TrainerPayoutDetailsPage extends StatefulWidget {
 
 class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   final _onboardingService = TrainerOnboardingService();
-  final _authService = AuthService();
   bool _isSubmitting = false;
 
   final _bankNameController = TextEditingController();
@@ -34,20 +29,15 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   final _bankAccountNameController = TextEditingController();
   final _taxCodeController = TextEditingController();
 
-  String _userProfileFullName = '';
-  String _trainerName = '';
-  String _trainerInitials = 'T';
-  String _trainerAvatarUrl = '';
-
   String? _bankNameErrorText;
   String? _bankAccountErrorText;
   String? _bankAccountNameErrorText;
   String? _taxCodeErrorText;
 
-  final List<String> _bankSuggestions = [
+  static const List<String> _bankSuggestions = [
     'Vietcombank (VCB)',
     'Techcombank (TCB)',
-    'MB Bank (MB)',
+    'MBBank (MB)',
     'VietinBank (CTG)',
     'BIDV (BID)',
     'Agribank (VBA)',
@@ -60,38 +50,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   void initState() {
     super.initState();
     _populateFields(widget.initialProfile);
-    _loadUserProfileName();
-    _loadTrainerHeaderInfo();
     _bankAccountController.addListener(_onBankAccountChanged);
-  }
-
-  Future<void> _loadTrainerHeaderInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? '';
-    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
-    });
-  }
-
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPage()),
-        (route) => false,
-      );
-    }
   }
 
   void _populateFields(Map<String, dynamic> p) {
@@ -107,21 +66,12 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     // Keep empty until user types
   }
 
-  Future<void> _loadUserProfileName() async {
-    final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('user_fullname') ?? '';
-    if (name.isNotEmpty) {
-      setState(() {
-        _userProfileFullName = name;
-      });
-    }
-  }
-
   bool _isDummyNumber(String input) {
     if (input.isEmpty) return true;
     final allSame = RegExp(r'^(\d)\1+$').hasMatch(input);
     final dummySeq =
         input == '1234567890' ||
+        input == '123456789012' ||
         input == '1234567890123' ||
         input == '0123456789';
     return allSame || dummySeq;
@@ -146,24 +96,24 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     }
     if (!numRegex.hasMatch(bankAccount)) {
       return isVi
-          ? 'Số tài khoản chỉ được chứa chữ số.'
+          ? 'Số tài khoản ngân hàng chỉ được chứa chữ số.'
           : 'Bank account number must contain digits only.';
     }
-    if (bankAccount.length < 6 || bankAccount.length > 19) {
+    if (bankAccount.length < 6 || bankAccount.length > 20) {
       return isVi
-          ? 'Số tài khoản phải có từ 6 đến 19 chữ số.'
-          : 'Bank account number must be between 6 and 19 digits.';
+          ? 'Số tài khoản ngân hàng phải có độ dài từ 6 đến 20 chữ số.'
+          : 'Bank account number must be between 6 and 20 digits.';
     }
     if (_isDummyNumber(bankAccount)) {
       return isVi
-          ? 'Số tài khoản không được là dãy số giả như 000000 hoặc 1234567890.'
-          : 'Bank account number cannot be a dummy sequence like 000000 or 1234567890.';
+          ? 'Số tài khoản không được là dãy số giả như 0000000000.'
+          : 'Bank account cannot be a dummy sequence like 0000000000.';
     }
     return null;
   }
 
   String? _validateBankAccountName(String bankAccountName, bool isVi) {
-    final nameRegex = RegExp(r'^[A-Z]+(?: [A-Z]+)*$');
+    final nameRegex = RegExp(r'^[A-Z ]+$');
 
     if (bankAccountName.isEmpty) {
       return isVi
@@ -191,15 +141,15 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
           ? 'Mã số thuế hoặc CCCD chỉ được chứa chữ số.'
           : 'Tax ID or Citizen ID must contain digits only.';
     }
-    if (taxCode.length != 10 && taxCode.length != 13) {
+    if (taxCode.length != 12) {
       return isVi
-          ? 'Mã số thuế hoặc CCCD phải có đúng 10 hoặc 13 chữ số.'
-          : 'Tax ID or Citizen ID must be exactly 10 or 13 digits.';
+          ? 'Mã số thuế hoặc CCCD phải có đúng 12 chữ số.'
+          : 'Tax ID or Citizen ID must be exactly 12 digits.';
     }
     if (_isDummyNumber(taxCode)) {
       return isVi
-          ? 'Mã số thuế hoặc CCCD không được là dãy số giả như 0000000000.'
-          : 'Tax ID or Citizen ID cannot be a dummy sequence like 0000000000.';
+          ? 'Mã số thuế hoặc CCCD không được là dãy số giả như 000000000000.'
+          : 'Tax ID or Citizen ID cannot be a dummy sequence like 000000000000.';
     }
     return null;
   }
@@ -552,11 +502,11 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Tax Identification Number (Tax ID)
+                    // Tax Identification Number (Tax ID / Citizen ID)
                     Text(
                       isVi
-                          ? 'Mã số thuế (Tax ID) *'
-                          : 'Tax Identification Number (Tax ID) *',
+                          ? 'Mã số thuế / Số CCCD (Tax ID / Citizen ID) *'
+                          : 'Tax Identification / Citizen ID Number *',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -568,7 +518,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                     TextField(
                       controller: _taxCodeController,
                       keyboardType: TextInputType.number,
-                      maxLength: 13,
+                      maxLength: 12,
                       onChanged: (value) {
                         setState(() {
                           _taxCodeErrorText = _validateTaxCode(
@@ -584,7 +534,12 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                         ),
                         errorText: _taxCodeErrorText,
                         counterText: '',
-                        hintText: '8019283710',
+                        hintText: isVi
+                            ? 'Nhập 12 số CCCD / Mã số thuế'
+                            : 'Enter 12-digit Citizen ID / Tax ID',
+                        helperText: isVi
+                            ? 'Mã số thuế cá nhân hoặc số CCCD gắn chip (đúng 12 chữ số).'
+                            : 'Personal Tax ID or Citizen ID number (exactly 12 digits).',
                         fillColor: Colors.white,
                         filled: true,
                         border: OutlineInputBorder(
@@ -643,257 +598,6 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar(BuildContext context) {
-    final isVi = LanguageManager.isVi;
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Image.network(
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-
-                  height: 36,
-
-                  fit: BoxFit.contain,
-
-                  errorBuilder: (context, error, stackTrace) {
-                    return Row(
-                      children: [
-                        Container(
-                          width: 32,
-
-                          height: 32,
-
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE6FFFA),
-
-                            shape: BoxShape.circle,
-                          ),
-
-                          child: const Icon(
-                            Icons.school,
-
-                            size: 18,
-
-                            color: Color(0xFF20B486),
-                          ),
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        const Text(
-                          'HanGo',
-
-                          style: TextStyle(
-                            fontSize: 20,
-
-                            fontWeight: FontWeight.bold,
-
-                            color: Color(0xFF1F2937),
-
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 40),
-          _buildSidebarItem(
-            Icons.dashboard_outlined,
-            isVi ? 'Bảng điều khiển' : 'Dashboard',
-            isActive: true,
-          ),
-          _buildSidebarItem(
-            Icons.book_outlined,
-            isVi ? 'Khóa học' : 'Courses',
-            isEnabled: false,
-          ),
-          _buildSidebarItem(
-            Icons.assignment_outlined,
-            isVi ? 'Đề thi' : 'Exam',
-            isEnabled: false,
-          ),
-          _buildSidebarItem(
-            Icons.people_outline,
-            isVi ? 'Học sinh' : 'Learner',
-            isEnabled: false,
-          ),
-          _buildSidebarItem(
-            Icons.question_answer_outlined,
-            isVi ? 'Ngân hàng câu hỏi' : 'Question Bank',
-            isEnabled: false,
-          ),
-          const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 12),
-          _buildSidebarItem(
-            Icons.logout,
-            isVi ? 'Đăng xuất' : 'Logout',
-            color: Colors.redAccent,
-            isEnabled: true,
-            onTap: _handleLogout,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(
-    IconData icon,
-    String title, {
-    bool isActive = false,
-    bool isEnabled = true,
-    Color? color,
-    VoidCallback? onTap,
-  }) {
-    final activeColor = const Color(0xFF20B486);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: isEnabled
-            ? (onTap ?? () {})
-            : () {
-                ToastHelper.show(
-                  context,
-                  LanguageManager.isVi
-                      ? 'Tài khoản của bạn đang chờ phê duyệt'
-                      : 'Your account is awaiting approval',
-                );
-              },
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isActive
-                    ? Colors.white
-                    : (isEnabled
-                          ? (color ?? const Color(0xFF4B5563))
-                          : Colors.grey.shade400),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isActive
-                      ? Colors.white
-                      : (isEnabled
-                            ? (color ?? const Color(0xFF1F2937))
-                            : Colors.grey.shade400),
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _unusedLegacyHeader(bool showMenuButton) {
-    return Container(
-      color: Colors.white,
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          if (showMenuButton) ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Row(
-            children: const [
-              Icon(Icons.chevron_right, size: 16, color: Color(0xFF20B486)),
-              SizedBox(width: 4),
-              Text(
-                'Verification / Payout Configuration',
-                style: TextStyle(
-                  color: Color(0xFF20B486),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Row(
-            children: [
-              Text(
-                _trainerName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1E293B),
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE2F9F3),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: _trainerAvatarUrl.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          _trainerAvatarUrl,
-                          width: 32,
-                          height: 32,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            _trainerInitials,
-                            style: const TextStyle(
-                              color: Color(0xFF20B486),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ),
-                      )
-                    : Text(
-                        _trainerInitials,
-                        style: const TextStyle(
-                          color: Color(0xFF20B486),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-              ),
-            ],
           ),
         ],
       ),
