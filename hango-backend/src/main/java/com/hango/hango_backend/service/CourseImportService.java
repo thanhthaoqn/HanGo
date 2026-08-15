@@ -23,6 +23,7 @@ import com.hango.hango_backend.entity.TrainerProfile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import java.math.BigDecimal;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -316,21 +317,13 @@ public class CourseImportService {
     }
 
     public byte[] buildTemplateWorkbook() throws IOException {
-        for (Path candidate : templateCandidates()) {
-            if (Files.isRegularFile(candidate)) {
-                return Files.readAllBytes(candidate);
-            }
+        ClassPathResource resource = new ClassPathResource("templates/" + TEMPLATE_FILE_NAME);
+        if (resource.exists()) {
+            return resource.getInputStream().readAllBytes();
         }
+        
         throw new IOException("Course import template not found. Expected " + TEMPLATE_FILE_NAME
-                + " under doc/specs/templates or doc/templates.");
-    }
-
-    private List<Path> templateCandidates() {
-        return List.of(
-                Paths.get("doc", "specs", "templates", TEMPLATE_FILE_NAME),
-                Paths.get("..", "doc", "specs", "templates", TEMPLATE_FILE_NAME),
-                Paths.get("doc", "templates", TEMPLATE_FILE_NAME),
-                Paths.get("..", "doc", "templates", TEMPLATE_FILE_NAME));
+                + " under classpath:templates/.");
     }
 
     private void validateWorkbookFile(MultipartFile file) {

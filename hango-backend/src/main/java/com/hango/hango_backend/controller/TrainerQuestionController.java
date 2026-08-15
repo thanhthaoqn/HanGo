@@ -96,21 +96,11 @@ public class TrainerQuestionController {
     public ResponseEntity<byte[]> downloadTemplate() {
         try {
             String fileName = "Hango_Question_Bank_Import_Template.xlsx";
-            List<java.nio.file.Path> candidates = List.of(
-                    java.nio.file.Paths.get("doc", "templates", fileName),
-                    java.nio.file.Paths.get("..", "doc", "templates", fileName),
-                    java.nio.file.Paths.get("doc", "specs", "templates", fileName),
-                    java.nio.file.Paths.get("..", "doc", "specs", "templates", fileName));
-            byte[] bytes = null;
-            for (java.nio.file.Path p : candidates) {
-                if (java.nio.file.Files.isRegularFile(p)) {
-                    bytes = java.nio.file.Files.readAllBytes(p);
-                    break;
-                }
+            org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("templates/" + fileName);
+            if (!resource.exists()) {
+                throw new java.io.IOException("Template not found in classpath:templates/");
             }
-            if (bytes == null) {
-                throw new java.io.IOException("Template not found");
-            }
+            byte[] bytes = resource.getInputStream().readAllBytes();
             return ResponseEntity.ok()
                     .header("Content-Disposition", "attachment; filename=" + fileName)
                     .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
