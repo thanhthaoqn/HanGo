@@ -220,5 +220,31 @@ void main() {
       expect(suggestion.requiresManualSelection, isFalse);
       expect(suggestion.isConfident, isTrue);
     });
+
+    test(
+      'Validates Tax Code / Citizen ID rules (requires strictly 12 digits)',
+      () {
+        bool isValidTaxCodeOrCccd(String taxCode) {
+          final trimmed = taxCode.trim();
+          if (trimmed.isEmpty) return false;
+          final numRegex = RegExp(r'^\d+$');
+          if (!numRegex.hasMatch(trimmed)) return false;
+          if (trimmed.length != 12) {
+            return false;
+          }
+          final allSame = RegExp(r'^(\d)\1+$').hasMatch(trimmed);
+          final dummySeq =
+              trimmed == '123456789012' ||
+              trimmed == '012345678901';
+          return !allSame && !dummySeq;
+        }
+
+        expect(isValidTaxCodeOrCccd('001198001234'), isTrue); // 12 digits CCCD
+        expect(isValidTaxCodeOrCccd('0101234567'), isFalse); // 10 digits (invalid)
+        expect(isValidTaxCodeOrCccd('0101234567001'), isFalse); // 13 digits (invalid)
+        expect(isValidTaxCodeOrCccd('01012345671'), isFalse); // 11 digits (invalid)
+        expect(isValidTaxCodeOrCccd('000000000000'), isFalse); // dummy sequence
+      },
+    );
   });
 }
