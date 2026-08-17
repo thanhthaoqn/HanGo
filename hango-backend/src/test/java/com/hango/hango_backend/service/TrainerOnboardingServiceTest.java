@@ -29,7 +29,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -572,7 +575,7 @@ class TrainerOnboardingServiceTest {
         p1.setUser(learnerUser(1L, "user1@example.com"));
         TrainerProfile p2 = profile(2L, "PENDING_VERIFICATION", "PEER_TUTOR");
         p2.setUser(learnerUser(2L, "user2@example.com"));
-        when(trainerProfileRepository.findAll()).thenReturn(List.of(p1, p2));
+        when(trainerProfileRepository.findAllWithUser()).thenReturn(List.of(p1, p2));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin(null, "ALL");
 
@@ -585,7 +588,7 @@ class TrainerOnboardingServiceTest {
         p1.setUser(learnerUser(1L, "user1@example.com"));
         TrainerProfile p2 = profile(2L, "PENDING_VERIFICATION", "PEER_TUTOR");
         p2.setUser(learnerUser(2L, "user2@example.com"));
-        when(trainerProfileRepository.findAll()).thenReturn(List.of(p1, p2));
+        when(trainerProfileRepository.findAllWithUser()).thenReturn(List.of(p1, p2));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin(null, "VERIFIED");
 
@@ -603,7 +606,7 @@ class TrainerOnboardingServiceTest {
         u2.setFullName("Bob Trainer");
         TrainerProfile p2 = profile(2L, "VERIFIED", "PROFESSIONAL");
         p2.setUser(u2);
-        when(trainerProfileRepository.findAll()).thenReturn(List.of(p1, p2));
+        when(trainerProfileRepository.findAllWithUser()).thenReturn(List.of(p1, p2));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin("alice", "ALL");
 
@@ -613,7 +616,7 @@ class TrainerOnboardingServiceTest {
 
     @Test
     void getTrainerProfilesForAdminShouldReturnEmptyWhenNoMatch() {
-        when(trainerProfileRepository.findAll()).thenReturn(List.of(profile(1L, "VERIFIED", "PROFESSIONAL")));
+        when(trainerProfileRepository.findAllWithUser()).thenReturn(List.of(profile(1L, "VERIFIED", "PROFESSIONAL")));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin("nomatch", "ALL");
 
@@ -630,7 +633,7 @@ class TrainerOnboardingServiceTest {
         newer.setSubmittedAt(LocalDateTime.now());
         TrainerProfile neverSubmitted = profile(3L, "PENDING_VERIFICATION", "PROFESSIONAL");
         neverSubmitted.setUser(learnerUser(3L, "user3@example.com"));
-        when(trainerProfileRepository.findAll()).thenReturn(List.of(older, neverSubmitted, newer));
+        when(trainerProfileRepository.findAllWithUser()).thenReturn(List.of(older, neverSubmitted, newer));
 
         List<TrainerProfileDTO> result = service.getTrainerProfilesForAdmin(null, "ALL");
 
@@ -731,5 +734,40 @@ class TrainerOnboardingServiceTest {
         service.reviewTrainerProfile(1L, req);
 
         verify(emailService).sendTrainerStatusNotificationEmail("trainer@example.com", "VERIFIED", "Welcome aboard");
+    }
+
+    // =================================================================
+    // initSchemaFix
+    // =================================================================
+
+    @Test
+    void initSchemaFixShouldAlterScoreReportUrlColumnAndDropAllRedundantLegacyColumns() {
+        service.initSchemaFix();
+
+        verify(jdbcTemplate).execute("ALTER TABLE trainer_profiles MODIFY COLUMN score_report_url LONGTEXT");
+        verify(jdbcTemplate).execute("ALTER TABLE trainer_profiles DROP COLUMN slogan");
+        verify(jdbcTemplate).execute("ALTER TABLE trainer_profiles DROP COLUMN ielts_url");
+        verify(jdbcTemplate, times(11)).execute(anyString());
+    }
+
+    @Test
+    void initSchemaFixShouldSwallowExceptionAndSkipColumnDropsWhenAlterStatementFails() {
+        doThrow(new RuntimeException("boom")).when(jdbcTemplate)
+                .execute("ALTER TABLE trainer_profiles MODIFY COLUMN score_report_url LONGTEXT");
+
+        service.initSchemaFix();
+
+        verify(jdbcTemplate, times(1)).execute(anyString());
+    }
+
+    @Test
+    void initSchemaFixShouldContinueDroppingRemainingColumnsWhenOneDropFails() {
+        lenient().doThrow(new RuntimeException("boom")).when(jdbcTemplate)
+                .execute("ALTER TABLE trainer_profiles DROP COLUMN slogan");
+
+        service.initSchemaFix();
+
+        verify(jdbcTemplate, times(11)).execute(anyString());
+        verify(jdbcTemplate).execute("ALTER TABLE trainer_profiles DROP COLUMN ielts_url");
     }
 }
