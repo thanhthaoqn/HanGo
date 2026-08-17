@@ -1,7 +1,6 @@
 package com.hango.hango_backend.service;
 
 import com.hango.hango_backend.dto.TicketCreateDTO;
-import com.hango.hango_backend.dto.TicketMessageDTO;
 import com.hango.hango_backend.dto.TicketProcessDTO;
 import com.hango.hango_backend.dto.TicketResponseDTO;
 import com.hango.hango_backend.entity.Role;
@@ -28,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -80,7 +80,7 @@ class TicketServiceImplTest {
     }
 
     @Test
-    void createTicketShouldSaveTicketAndFirstMessageThenNotifyTrainerLead() {
+    void createTicketShouldSaveTicketAndNotifyAdministrators() {
         User learner = user(1L, "learner@example.com", "LEARNER");
         when(userRepository.findById(1L)).thenReturn(Optional.of(learner));
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(inv -> {
@@ -101,12 +101,8 @@ class TicketServiceImplTest {
         assertEquals("HIGH", ticketCaptor.getValue().getPriority());
         assertEquals("PENDING", ticketCaptor.getValue().getStatus());
 
-        ArgumentCaptor<TicketMessage> msgCaptor = ArgumentCaptor.forClass(TicketMessage.class);
-        verify(ticketMessageRepository).save(msgCaptor.capture());
-        assertEquals("The lesson video is broken", msgCaptor.getValue().getMessage());
-        assertEquals(learner, msgCaptor.getValue().getSender());
-
-        verify(notificationService).notifyRole(eq("TRAINER_LEAD"), eq("TicketCreated"), any(), any(), isNull());
+        verify(ticketMessageRepository, never()).save(any());
+        verify(notificationService).notifyRole(eq("ADMINISTRATOR"), eq("TicketCreated"), any(), any(), isNull());
     }
 
     @Test
@@ -223,7 +219,7 @@ class TicketServiceImplTest {
     void getTicketDetailShouldAllowStaffToViewAnotherUsersTicket() {
         Ticket t = ticket(1L, user(1L, "owner@example.com", "LEARNER"), "PENDING", "GENERAL_ENQUIRY");
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(t));
-        when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "manager@example.com", "TRAINER_LEAD")));
+        when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "admin@example.com", "ADMINISTRATOR")));
         when(ticketMessageRepository.findByTicketIdOrderByCreatedAtAsc(1L)).thenReturn(List.of());
 
         TicketResponseDTO result = service.getTicketDetail(99L, 1L);
@@ -307,7 +303,7 @@ class TicketServiceImplTest {
     void addMessageShouldFlipPendingTicketToProcessingWhenStaffReplies() {
         Ticket t = ticket(1L, user(1L, "owner@example.com", "LEARNER"), "PENDING", "GENERAL_ENQUIRY");
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(t));
-        when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "manager@example.com", "TRAINER_LEAD")));
+        when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "admin@example.com", "ADMINISTRATOR")));
         when(ticketMessageRepository.save(any(TicketMessage.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.addMessage(99L, 1L, "Looking into it", null);
@@ -332,7 +328,7 @@ class TicketServiceImplTest {
     void addMessageShouldNotChangeStatusWhenTicketAlreadyProcessing() {
         Ticket t = ticket(1L, user(1L, "owner@example.com", "LEARNER"), "PROCESSING", "GENERAL_ENQUIRY");
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(t));
-        when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "manager@example.com", "TRAINER_LEAD")));
+        when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "admin@example.com", "ADMINISTRATOR")));
         when(ticketMessageRepository.save(any(TicketMessage.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.addMessage(99L, 1L, "Still looking", null);
@@ -341,17 +337,13 @@ class TicketServiceImplTest {
     }
 
     @Test
-    void addMessageShouldAllowReplyingToAnotherUsersTicketWithNoAuthorizationCheck() {
-        // Real gap: unlike getTicketDetail/updateTicket, addMessage never checks that the
-        // sender owns the ticket or is staff -- any authenticated user id can post here.
+    void addMessageShouldThrowAccessDeniedWhenNonStaffReplierIsNotTicketOwner() {
         Ticket t = ticket(1L, user(1L, "owner@example.com", "LEARNER"), "PENDING", "GENERAL_ENQUIRY");
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(t));
         when(userRepository.findById(2L)).thenReturn(Optional.of(user(2L, "stranger@example.com", "LEARNER")));
-        when(ticketMessageRepository.save(any(TicketMessage.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        TicketMessageDTO result = service.addMessage(2L, 1L, "I'm not the owner but this works", null);
-
-        assertEquals("I'm not the owner but this works", result.getMessage());
+        assertThrows(RuntimeException.class, () -> service.addMessage(2L, 1L, "I'm not the owner", null));
+        verify(ticketMessageRepository, never()).save(any());
     }
 
     // =================================================================
@@ -412,24 +404,30 @@ class TicketServiceImplTest {
     }
 
     @Test
-    void processTicketShouldThrowWhenNonAdminManagerProcessesPayoutInfoUpdateCategory() {
+    void processTicketShouldAllowNonAdminManagerToProcessPayoutInfoUpdateCategory() {
         Ticket t = ticket(1L, user(1L, "owner@example.com", "LEARNER"), "PENDING", "PAYOUT_INFO_UPDATE");
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(t));
         when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "manager@example.com", "TRAINER_LEAD")));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(RuntimeException.class,
-                () -> service.processTicket(99L, 1L, TicketProcessDTO.builder().action("APPROVE").build()));
-        verify(ticketRepository, never()).save(any());
+        service.processTicket(99L, 1L, TicketProcessDTO.builder().action("APPROVE").build());
+
+        assertEquals("APPROVED", t.getStatus());
+        verify(ticketRepository).save(t);
     }
 
     @Test
-    void processTicketShouldThrowWhenNonAdminManagerProcessesRefundRequestCategory() {
+    void processTicketShouldAllowNonAdminManagerToProcessRefundRequestCategory() {
         Ticket t = ticket(1L, user(1L, "owner@example.com", "LEARNER"), "PENDING", "REFUND_REQUEST");
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(t));
         when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "manager@example.com", "TRAINER_LEAD")));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(RuntimeException.class,
-                () -> service.processTicket(99L, 1L, TicketProcessDTO.builder().action("REJECT").build()));
+        service.processTicket(99L, 1L,
+                TicketProcessDTO.builder().action("REJECT").rejectionReason("Refund window expired").build());
+
+        assertEquals("REJECTED", t.getStatus());
+        verify(ticketRepository).save(t);
     }
 
     @Test
@@ -454,7 +452,7 @@ class TicketServiceImplTest {
         service.processTicket(99L, 1L, TicketProcessDTO.builder().action("APPROVE").build());
 
         assertEquals("APPROVED", t.getStatus());
-        assertEquals("Ticket approved by manager.", t.getAdminResponse());
+        assertEquals("Ticket approved by administrator.", t.getAdminResponse());
         verify(notificationService).notifyUser(eq(t.getUser()), eq("TicketReviewed"), any(), any(), isNull());
     }
 
@@ -483,11 +481,11 @@ class TicketServiceImplTest {
 
         assertEquals("REJECTED", t.getStatus());
         assertEquals("Not a valid ticket", t.getRejectionReason());
-        assertEquals("Ticket rejected by manager.", t.getAdminResponse());
+        assertNull(t.getAdminResponse());
     }
 
     @Test
-    void processTicketShouldSaveManagerReplyMessage() {
+    void processTicketShouldNotCreateTicketMessageOnApproval() {
         Ticket t = ticket(1L, user(1L, "owner@example.com", "LEARNER"), "PENDING", "GENERAL_ENQUIRY");
         User manager = user(99L, "manager@example.com", "TRAINER_LEAD");
         when(ticketRepository.findById(1L)).thenReturn(Optional.of(t));
@@ -496,10 +494,7 @@ class TicketServiceImplTest {
 
         service.processTicket(99L, 1L, TicketProcessDTO.builder().action("APPROVE").build());
 
-        ArgumentCaptor<TicketMessage> captor = ArgumentCaptor.forClass(TicketMessage.class);
-        verify(ticketMessageRepository).save(captor.capture());
-        assertEquals(manager, captor.getValue().getSender());
-        assertEquals("ADMINISTRATOR", captor.getValue().getSenderRole());
+        verify(ticketMessageRepository, never()).save(any());
     }
 
     // =================================================================
