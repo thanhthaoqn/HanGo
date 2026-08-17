@@ -4,10 +4,68 @@ import com.hango.hango_backend.config.GeminiProperties;
 import com.hango.hango_backend.repository.AiUsageLogRepository;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class GeminiClientServiceTest {
+
+    // =================================================================
+    // getApiKey / getChatModel / getEmbeddingModel / getTimeoutSeconds
+    // =================================================================
+
+    @Test
+    void getApiKeyShouldReturnValueFromSystemConfigServiceWhenOverridePresent() {
+        GeminiProperties properties = new GeminiProperties();
+        properties.setApiKey("fallback-key");
+        SystemConfigService systemConfigService = mock(SystemConfigService.class);
+        when(systemConfigService.getConfigValue("AI", "GEMINI_API_KEY", "fallback-key")).thenReturn("override-key");
+        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class), systemConfigService);
+
+        assertEquals("override-key", service.getApiKey());
+    }
+
+    @Test
+    void getChatModelShouldFallBackToGeminiPropertiesWhenNoOverrideConfigured() {
+        GeminiProperties properties = new GeminiProperties();
+        properties.setChatModel("gemini-1.5-flash");
+        SystemConfigService systemConfigService = mock(SystemConfigService.class);
+        when(systemConfigService.getConfigValue(eq("AI"), eq("GEMINI_CHAT_MODEL"), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class), systemConfigService);
+
+        assertEquals("gemini-1.5-flash", service.getChatModel());
+    }
+
+    @Test
+    void getEmbeddingModelShouldFallBackToGeminiPropertiesWhenNoOverrideConfigured() {
+        GeminiProperties properties = new GeminiProperties();
+        properties.setEmbeddingModel("text-embedding-004");
+        SystemConfigService systemConfigService = mock(SystemConfigService.class);
+        when(systemConfigService.getConfigValue(eq("AI"), eq("GEMINI_EMBEDDING_MODEL"), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class), systemConfigService);
+
+        assertEquals("text-embedding-004", service.getEmbeddingModel());
+    }
+
+    @Test
+    void getTimeoutSecondsShouldParseOverrideValueFromSystemConfigService() {
+        GeminiProperties properties = new GeminiProperties();
+        properties.setTimeoutSeconds(30);
+        SystemConfigService systemConfigService = mock(SystemConfigService.class);
+        when(systemConfigService.getConfigValue("AI", "GEMINI_TIMEOUT_SECONDS", "30")).thenReturn("60");
+        GeminiClientService service = new GeminiClientService(properties, mock(AiUsageLogRepository.class), systemConfigService);
+
+        assertEquals(60, service.getTimeoutSeconds());
+    }
+
+    // =================================================================
+    // normalizeDocumentAnalysisPayload
+    // =================================================================
 
     @Test
     void normalizeDocumentAnalysisPayloadShouldOverrideWrongTeachingCertificateWhenEvidenceShowsBachelorDegree() {
