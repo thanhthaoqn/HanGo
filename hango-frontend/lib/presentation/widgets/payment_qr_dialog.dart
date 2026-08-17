@@ -86,7 +86,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
         _isLoading = false;
       });
       _startCountdown();
-      _startPolling();
+      _startPolling(); // Automatically start polling upon QR creation
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -157,7 +157,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
           }
         }
       } catch (_) {
-        // Continue polling on temporary network glitches
+        // Keep polling on temporary network glitches
       }
     });
   }
@@ -240,7 +240,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'VietQR Payment (PayOS)',
+                          'VietQR Express Payment',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 17,
@@ -274,15 +274,15 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
               padding: const EdgeInsets.all(24),
               child: _isLoading
                   ? const SizedBox(
-                      height: 200,
+                      height: 220,
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             CircularProgressIndicator(color: _primary),
                             SizedBox(height: 16),
-                            Text('Generating payment QR code...',
-                                style: TextStyle(color: Color(0xFF64748B))),
+                            Text('Generating VietQR payment code...',
+                                style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
                           ],
                         ),
                       ),
@@ -299,7 +299,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
 
   Widget _buildError() {
     return SizedBox(
-      height: 200,
+      height: 220,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -340,7 +340,43 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
 
     return Column(
       children: [
-        // Price
+        // Live Status Banner
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF16A34A),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _isPolling
+                      ? 'Waiting for mobile banking payment...'
+                      : 'Checking payment status...',
+                  style: const TextStyle(
+                    color: Color(0xFF15803D),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Price Card
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
@@ -365,9 +401,9 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // QR Code
+        // QR Code Container
         if (_qrCode != null || _paymentUrl != null) ...[
           Container(
             padding: const EdgeInsets.all(16),
@@ -380,28 +416,39 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                 QrImageView(
                   data: _qrCode ?? _paymentUrl!,
                   version: QrVersions.auto,
-                  size: 200,
+                  size: 190,
                   backgroundColor: Colors.white,
                   errorStateBuilder: (context, error) => const SizedBox(
-                    height: 200,
+                    height: 190,
                     child: Center(child: Text('Unable to generate QR code')),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 const Text(
-                  'Scan this QR code using any Banking App',
+                  'Scan with any Mobile Banking App (VietQR)',
                   style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 12,
+                    color: Color(0xFF334155),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (_txnRef != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Order ID: #$_txnRef',
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Countdown
+          // Countdown Timer
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -409,7 +456,7 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                   size: 16, color: Color(0xFF94A3B8)),
               const SizedBox(width: 6),
               Text(
-                'Expires in: $_countdownText',
+                'QR expires in: $_countdownText',
                 style: TextStyle(
                   color: _secondsRemaining < 60
                       ? Colors.red
@@ -420,30 +467,9 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Open PayOS checkout button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _openPaymentUrl,
-              icon: const Icon(Icons.open_in_new_rounded, size: 18),
-              label: const Text('Open PayOS Payment Page'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                textStyle: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Check payment button
+          // Manual Check / Verification Button
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -455,15 +481,16 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: _primary),
                     )
-                  : const Icon(Icons.check_circle_outline_rounded,
-                      size: 18),
+                  : const Icon(Icons.refresh_rounded, size: 18),
               label: Text(
-                _isPolling ? 'Verifying Payment Status...' : 'I Have Completed Payment',
+                _isPolling
+                    ? 'Auto-verifying payment...'
+                    : 'Check Payment Status',
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _primary,
                 side: const BorderSide(color: _primary),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 textStyle: const TextStyle(
@@ -471,10 +498,25 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
               ),
             ),
           ),
+          const SizedBox(height: 8),
 
-          const SizedBox(height: 12),
+          // Fallback option link
+          TextButton.icon(
+            onPressed: _openPaymentUrl,
+            icon: const Icon(Icons.open_in_new_rounded, size: 14),
+            label: const Text(
+              'Having trouble scanning? Open PayOS Checkout Page',
+              style: TextStyle(fontSize: 12, decoration: TextDecoration.underline),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              padding: const EdgeInsets.symmetric(vertical: 4),
+            ),
+          ),
+
+          const SizedBox(height: 4),
           const Text(
-            '🔒 Secure Payment via PayOS Gate',
+            '🔒 256-Bit Encrypted Payment via PayOS Gate',
             style: TextStyle(
               color: Color(0xFF94A3B8),
               fontSize: 11,
@@ -485,3 +527,4 @@ class _PaymentQrDialogState extends State<PaymentQrDialog> {
     );
   }
 }
+
