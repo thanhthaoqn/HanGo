@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:hango/domain/model/auth_session.dart';
 import 'package:hango/services/secure_session_store.dart';
 
-// 🚀 IMPORT các Model cần thiết cho AI Chatbox
+// IMPORT các Model cần thiết cho AI Chatbox
 import 'package:hango/domain/model/ai_health.dart';
 import 'package:hango/domain/model/ai_models.dart';
 import '../../data/services/auth_service.dart';
@@ -31,7 +31,7 @@ class AppState extends ChangeNotifier {
   }
 
   // ==========================================
-  // 🔐 LOGIC QUẢN LÝ SESSION & ĐĂNG NHẬP
+  // LOGIC QUẢN LÝ SESSION & ĐĂNG NHẬP
   // ==========================================
 
   Future<void> restoreSession() async {
@@ -45,13 +45,13 @@ class AppState extends ChangeNotifier {
       if (savedSession != null) {
         _session = savedSession;
         debugPrint(
-          '[AppState] 🔄 Đã khôi phục Session thành công. Token: ${_session?.token}',
+          '[AppState] Session restores completed. Token: ${_session?.token}',
         );
       } else {
-        debugPrint('[AppState] 📭 Không tìm thấy Session cũ.');
+        debugPrint('[AppState] No session found.');
       }
     } catch (e) {
-      debugPrint('[AppState] ❌ Lỗi khi khôi phục Session: $e');
+      debugPrint('[AppState] Error restoring Session: $e');
     } finally {
       _isInitialized = true;
       notifyListeners();
@@ -64,12 +64,23 @@ class AppState extends ChangeNotifier {
     try {
       final roles = List<String>.from(result['roles'] ?? []);
       final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
-      final isTrainerLead = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
-      final isCourseManager = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
-      final isTrainer = roles.any((r) => r.toUpperCase().contains('TRAINER')) && !isTrainerLead && !isCourseManager;
+      final isTrainerLead = roles.any(
+        (r) => r.toUpperCase().contains('COURSE_MANAGER'),
+      );
+      final isCourseManager = roles.any(
+        (r) => r.toUpperCase().contains('COURSE_MANAGER'),
+      );
+      final isTrainer =
+          roles.any((r) => r.toUpperCase().contains('TRAINER')) &&
+          !isTrainerLead &&
+          !isCourseManager;
       final primaryRole = isAdmin
           ? 'ADMIN'
-          : (isCourseManager ? 'COURSE_MANAGER' : (isTrainerLead ? 'COURSE_MANAGER' : (isTrainer ? 'TRAINER' : 'LEARNER')));
+          : (isCourseManager
+                ? 'COURSE_MANAGER'
+                : (isTrainerLead
+                      ? 'COURSE_MANAGER'
+                      : (isTrainer ? 'TRAINER' : 'LEARNER')));
 
       final nextSession = AuthSession(
         token: result['token'] ?? '',
@@ -80,9 +91,9 @@ class AppState extends ChangeNotifier {
       );
 
       await _acceptSession(nextSession);
-      debugPrint('[AppState] ✅ Đăng nhập thành công! Token đã được lưu ngầm.');
+      debugPrint('[AppState] Login successful! Token has been saved.');
     } catch (e) {
-      debugPrint('[AppState] ❌ Lỗi khi tự động xử lý lưu session: $e');
+      debugPrint('[AppState] Error automatically handling session save: $e');
     }
   }
 
@@ -98,14 +109,14 @@ class AppState extends ChangeNotifier {
     _session = null;
     await _sessionStore.clearSession();
     notifyListeners();
-    debugPrint('[AppState] 🚪 Đã đăng xuất thành công.');
+    debugPrint('[AppState] Logged out successfully.');
   }
 
   // ==========================================
-  // 🤖 LOGIC AI CHATBOX
+  // LOGIC AI CHATBOX
   // ==========================================
 
-  /// 🛠️ Hàm tiện ích giúp chuẩn hóa URL Endpoint một cách tuyệt đối
+  /// Hàm tiện ích giúp chuẩn hóa URL Endpoint một cách tuyệt đối
   String _buildAiUrl(String path) {
     // 1. Loại bỏ đoạn '/auth' nếu có
     String base = AuthService.baseUrl.replaceAll('/auth', '');
@@ -126,11 +137,11 @@ class AppState extends ChangeNotifier {
     return '$base$cleanPath';
   }
 
-  /// ✨ Kiểm tra trạng thái hoạt động của hệ thống AI (Gemini)
+  /// Kiểm tra trạng thái hoạt động của hệ thống AI (Gemini)
   Future<AiHealth> checkAiStatus() async {
     try {
       final String aiUrl = _buildAiUrl('/ai-assistant/status');
-      debugPrint('[AppState] 🔍 Đang gọi API kiểm tra AI tại: $aiUrl');
+      debugPrint('[AppState] Calling AI check API at: $aiUrl');
 
       final response = await http
           .get(
@@ -154,7 +165,7 @@ class AppState extends ChangeNotifier {
       }
 
       // Đọc thông báo lỗi thực tế từ Backend trả về nếu có thay vì tự gán cứng câu chữ
-      String errMsg = 'Dịch vụ AI bảo trì';
+      String errMsg = 'AI Service is unavailable';
       try {
         final errData = jsonDecode(response.body);
         errMsg = errData['message'] ?? errData['error'] ?? errMsg;
@@ -162,22 +173,22 @@ class AppState extends ChangeNotifier {
 
       return AiHealth(
         available: false,
-        message: '$errMsg (Mã: ${response.statusCode})',
+        message: '$errMsg (Status code: ${response.statusCode})',
         chatModel: 'N/A',
         embeddingModel: 'N/A',
       );
     } catch (e) {
-      debugPrint('[AppState] ❌ Lỗi kiểm tra AI status: $e');
+      debugPrint('[AppState] Error checking AI status: $e');
       return AiHealth(
         available: false,
-        message: 'Mất kết nối tới Server Backend hệ thống.',
+        message: 'Failed to connect to the Backend Server.',
         chatModel: 'N/A',
         embeddingModel: 'N/A',
       );
     }
   }
 
-  /// ✨ Gửi tin nhắn câu hỏi bài học lên AI Server
+  /// Gửi tin nhắn câu hỏi bài học lên AI Server
   Future<AiChatResponse> sendAiMessage({
     required int lessonId,
     required int? conversationId,
@@ -185,7 +196,7 @@ class AppState extends ChangeNotifier {
   }) async {
     try {
       final String finalChatUrl = _buildAiUrl('/ai-assistant/messages');
-      debugPrint('[AppState] 💬 Gửi tin nhắn đến: $finalChatUrl');
+      debugPrint('[AppState] Sending message to: $finalChatUrl');
 
       final response = await http
           .post(
@@ -209,10 +220,7 @@ class AppState extends ChangeNotifier {
         final data = jsonDecode(response.body);
         return AiChatResponse(
           conversationId: data['conversationId'] ?? conversationId ?? 1,
-          reply:
-              data['reply'] ??
-              data['message'] ??
-              'Không nhận được câu trả lời từ AI.',
+          reply: data['reply'] ?? data['message'] ?? 'No response from AI.',
           wasOutOfScope: data['wasOutOfScope'] ?? false,
           suggestedQuestions:
               (data['suggestedQuestions'] as List?)
@@ -222,19 +230,19 @@ class AppState extends ChangeNotifier {
               const [],
         );
       } else {
-        String serverError = 'Lỗi hệ thống xử lý AI';
+        String serverError = 'Error system AI';
         try {
           final errBody = jsonDecode(response.body);
           serverError = errBody['message'] ?? errBody['error'] ?? serverError;
         } catch (_) {}
-        throw Exception('$serverError (Mã: ${response.statusCode})');
+        throw Exception('$serverError (Status code: ${response.statusCode})');
       }
     } catch (e) {
-      debugPrint('[AppState] ❌ Lỗi kết nối gửi tin nhắn AI: $e');
+      debugPrint('[AppState] Error connecting to AI: $e');
       // Thôi giả lập câu trả lời fake, ném chuỗi lỗi trực quan để hiển thị lên UI Chatbox cho dễ debug
       return AiChatResponse(
         conversationId: conversationId ?? 0,
-        reply: '⚠️ Lỗi: ${e.toString().replaceAll('Exception:', '')}',
+        reply: ' Error: ${e.toString().replaceAll('Exception:', '')}',
         wasOutOfScope: false,
         suggestedQuestions: const [],
       );
