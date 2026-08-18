@@ -38,7 +38,7 @@ public class PathwayConversation {
     private LocalDateTime startedAt;
 
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("createdAt ASC")
+    @OrderBy("id ASC")
     @Builder.Default
     private List<PathwayMessage> messages = new ArrayList<>();
 

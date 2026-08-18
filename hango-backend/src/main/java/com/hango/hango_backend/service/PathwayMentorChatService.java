@@ -174,7 +174,8 @@ public class PathwayMentorChatService {
                 .findByLearnerIdAndPathwayIdOrderByStartedAtDesc(learnerId, pathwayId);
 
         List<PathwayChatResponseDTO> history = new ArrayList<>();
-        for (PathwayConversation conv : conversations) {
+        for (int i = conversations.size() - 1; i >= 0; i--) {
+            PathwayConversation conv = conversations.get(i);
             for (PathwayMessage msg : conv.getMessages()) {
                 history.add(PathwayChatResponseDTO.builder()
                         .conversationId(conv.getId())

@@ -66,7 +66,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           }
 
           final List<Map<String, String>> historyMessages = [];
-          for (var item in history.reversed) {
+          for (var item in history) {
             if (item['reply'] != null) {
               final rawRole = item['role'] as String?;
               final role = (rawRole == 'USER') ? 'user' : 'mentor';
@@ -213,6 +213,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     setState(() {
       _messages.add({'role': 'user', 'content': userMsg});
       _isSending = true;
+      _dynamicSuggestedQuestions.clear();
     });
     _scrollToBottom();
 
@@ -437,10 +438,10 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
   Widget _buildChatList(bool dark) {
     // Only show action hub if there are dynamic suggestions, pathway suggested actions, OR we have a welcome summary but no history yet
-    final showActionHub =
+    final showActionHub = !_isSending && (
         widget.pathway.suggestedActions.isNotEmpty ||
         _dynamicSuggestedQuestions.isNotEmpty || 
-        (_messages.length <= 1);
+        (_messages.length <= 1));
     final hasPendingReroute = widget.pathway.pendingRerouteSuggestion != null;
     final totalItems =
         _messages.length +
