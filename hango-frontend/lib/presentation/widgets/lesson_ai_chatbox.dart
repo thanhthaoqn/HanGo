@@ -77,6 +77,8 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     super.dispose();
   }
 
+  /// Loads the AI chat history (up to max limit) from the local device cache (SharedPreferences).
+  /// This prevents the user from losing their chat context when they navigate away and return.
   Future<void> _loadFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -107,6 +109,8 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     }
   }
 
+  /// Saves the current chat history to the local device cache.
+  /// To optimize storage, it trims the history and only saves the last [_maxCacheMessages] messages.
   Future<void> _saveToCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -136,6 +140,8 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     }
   }
 
+  /// Clears the chat history from both the local device cache and the UI state.
+  /// Allows the user to start a fresh conversation with the AI Assistant.
   Future<void> _clearHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cacheKey);
@@ -151,6 +157,8 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     // UX sẽ hiển thị lại dòng hướng dẫn hiện có.
   }
 
+  /// Handles the process of sending a user's message to the backend AI service.
+  /// It updates the UI optimistically, calls the provider, and handles any network errors gracefully.
   Future<void> _send() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _sending) return;
@@ -278,7 +286,9 @@ class _ChatPanel extends StatelessWidget {
         ),
         child: Column(
           children: [
+            // 1. HEADER: Contains the top decorative gradient line
             // Top Accent Gradient Line
+
             Container(
               height: 4,
               width: double.infinity,
@@ -288,6 +298,7 @@ class _ChatPanel extends StatelessWidget {
                 ),
               ),
             ),
+            // 2. HEADER CONTENT: Contains AI Logo, Lesson Title, Health Status, and Clear History Button
             // Header
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
@@ -480,11 +491,15 @@ class _ChatPanel extends StatelessWidget {
                 ],
               ),
             ),
+            // 3. MESSAGES AREA: The central chat view.
+            // Uses Expanded to automatically fill the remaining space between the Header and the Input Bar.
             // Messages Area
+
             Expanded(
               child: Container(
                 color: const Color(0xFFFAFCFF),
                 child: messages.isEmpty
+                    // 3A. IF NO MESSAGES YET: Show the Empty State screen with 3 random suggested prompts.
                     ? LessonAiChatboxEmptyState(
                         title: 'Select a suggested prompt below or ask any question to get detailed answers about this lesson.',
                         questions: defaultLessonAiSuggestedQuestions(),
@@ -495,6 +510,7 @@ class _ChatPanel extends StatelessWidget {
                           onSend();
                         },
                       )
+                    // 3B. IF MESSAGES EXIST: Use ListView.builder to render the chat history vertically.
                     : ListView.builder(
                         controller: scroll,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -502,11 +518,14 @@ class _ChatPanel extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final msg = messages[index];
                           return Column(
+                            // Alignment: User messages on the Right (end), AI messages on the Left (start).
                             crossAxisAlignment: msg.role == 'USER'
                                 ? CrossAxisAlignment.end
                                 : CrossAxisAlignment.start,
                             children: [
+                              // Render the chat bubble (Contains text and Markdown styling).
                               _ChatBubble(message: msg),
+                              // 3C. SUGGESTED QUESTIONS: If it's an AI message and contains suggestions, render the quick questions row below it.
                               if (msg.role != 'USER' &&
                                   msg.suggestedQuestions.isNotEmpty)
                                 QuickQuestionsRow(
@@ -525,11 +544,14 @@ class _ChatPanel extends StatelessWidget {
               ),
             ),
 
+            // 4. ERROR BANNER: Only displays when the error variable is not null (e.g., Network failure, Server down).
             if (error != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: _InlineError(message: error!),
               ),
+            // 5. BOTTOM INPUT BAR: The bottom chat area.
+            // Contains the TextField for user input and a rounded square Send button.
             // Bottom Input Bar
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),

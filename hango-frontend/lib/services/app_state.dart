@@ -116,28 +116,28 @@ class AppState extends ChangeNotifier {
   // LOGIC AI CHATBOX
   // ==========================================
 
-  /// Hàm tiện ích giúp chuẩn hóa URL Endpoint một cách tuyệt đối
+  /// Utility function to build absolute URL endpoints
   String _buildAiUrl(String path) {
-    // 1. Loại bỏ đoạn '/auth' nếu có
+    // 1. Remove '/auth' segment if present
     String base = AuthService.baseUrl.replaceAll('/auth', '');
 
-    // 2. Xóa dấu gạch chéo thừa ở cuối của 'base' nếu có
+    // 2. Remove trailing slash from 'base' if present
     if (base.endsWith('/')) {
       base = base.substring(0, base.length - 1);
     }
 
-    // 3. Đảm bảo có tiền tố '/v1' trong hệ thống URL
+    // 3. Ensure '/v1' prefix is included in the URL system
     if (!base.contains('/v1')) {
       base = '$base/v1';
     }
 
-    // 4. Đảm bảo 'path' truyền vào luôn bắt đầu bằng dấu '/'
+    // 4. Ensure the given 'path' always starts with a '/'
     final String cleanPath = path.startsWith('/') ? path : '/$path';
 
     return '$base$cleanPath';
   }
 
-  /// Kiểm tra trạng thái hoạt động của hệ thống AI (Gemini)
+  /// Checks the operational status of the AI system (Gemini)
   Future<AiHealth> checkAiStatus() async {
     try {
       final String aiUrl = _buildAiUrl('/ai-assistant/status');
@@ -164,7 +164,7 @@ class AppState extends ChangeNotifier {
         );
       }
 
-      // Đọc thông báo lỗi thực tế từ Backend trả về nếu có thay vì tự gán cứng câu chữ
+      // Read the actual error message from the Backend if available instead of hardcoding
       String errMsg = 'AI Service is unavailable';
       try {
         final errData = jsonDecode(response.body);
@@ -188,7 +188,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Gửi tin nhắn câu hỏi bài học lên AI Server
+  /// Sends a lesson question message to the AI Server
   Future<AiChatResponse> sendAiMessage({
     required int lessonId,
     required int? conversationId,
@@ -214,7 +214,7 @@ class AppState extends ChangeNotifier {
           )
           .timeout(
             const Duration(seconds: 30),
-          ); // Tăng timeout cho AI kịp sinh chuỗi text
+          ); // Increase timeout to allow AI enough time to generate the text response
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -239,7 +239,7 @@ class AppState extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[AppState] Error connecting to AI: $e');
-      // Thôi giả lập câu trả lời fake, ném chuỗi lỗi trực quan để hiển thị lên UI Chatbox cho dễ debug
+      // Simulate a fake AI response containing the error message directly on the UI Chatbox for easier debugging
       return AiChatResponse(
         conversationId: conversationId ?? 0,
         reply: ' Error: ${e.toString().replaceAll('Exception:', '')}',
