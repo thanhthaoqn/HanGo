@@ -57,6 +57,8 @@ class CourseManagerDashboardServiceTest {
     private LessonRepository lessonRepository;
     @Mock
     private ExamHistoryService examHistoryService;
+    @Mock
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private CourseManagerDashboardServiceImpl service;
@@ -134,6 +136,22 @@ class CourseManagerDashboardServiceTest {
         service.publishCourse(11L);
 
         verify(notificationService).notifyUser(eq(learner), eq(NotificationService.TYPE_COURSE_UPDATED), any(), any(), eq(v2));
+    }
+
+    @Test
+    void publishCourseShouldZeroOutPriceWhenEligibleForFirstCoursePromotion() {
+        User creator = user(2L);
+        Course c = course(1L, "PENDING_APPROVAL", creator);
+        c.setCode("ENG-101");
+        c.setPrice(java.math.BigDecimal.valueOf(100));
+        c.setSuggestedPrice(java.math.BigDecimal.valueOf(120));
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        when(courseRepository.isEligibleForFirstCoursePromotion(2L, "ENG-101")).thenReturn(true);
+
+        service.publishCourse(1L);
+
+        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(c.getPrice()));
+        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(c.getSuggestedPrice()));
     }
 
     // =================================================================
@@ -267,6 +285,21 @@ class CourseManagerDashboardServiceTest {
         assertEquals(NotificationService.TYPE_CONTENT_APPROVED, typeCaptor.getValue());
     }
 
+    @Test
+    void publishExamShouldPublishWhenStatusSubmitted() {
+        User creator = user(3L);
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setTitle("Exam A");
+        exam.setStatus("SUBMITTED");
+        exam.setCreatedBy(creator);
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        service.publishExam(1L);
+
+        assertEquals("PUBLISHED", exam.getStatus());
+    }
+
     // =================================================================
     // returnExamToDraft
     // =================================================================
@@ -299,6 +332,21 @@ class CourseManagerDashboardServiceTest {
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_CONTENT_REJECTED), any(), messageCaptor.capture(), any());
         assertEquals(true, messageCaptor.getValue().contains("Missing answer key"));
+    }
+
+    @Test
+    void returnExamToDraftShouldReturnToDraftWhenStatusSubmitted() {
+        User creator = user(3L);
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setTitle("Exam A");
+        exam.setStatus("SUBMITTED");
+        exam.setCreatedBy(creator);
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        service.returnExamToDraft(1L, "reason");
+
+        assertEquals("REJECTED", exam.getStatus());
     }
 
     // =================================================================
@@ -403,6 +451,26 @@ class CourseManagerDashboardServiceTest {
         assertEquals(1, result.getLessonsCount());
     }
 
+    @Test
+    void getCourseReviewDetailShouldMapQuizQuestionsFromJdbcTemplateWhenLessonIsQuiz() {
+        Course c = course(5L, "PENDING_APPROVAL", user(2L));
+        when(courseRepository.findById(5L)).thenReturn(Optional.of(c));
+        Section section = Section.builder().id(20L).title("Section A").displayOrder(1).build();
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(5L)).thenReturn(List.of(section));
+        Lesson lesson = Lesson.builder().id(30L).title("Quiz A").displayOrder(1).lessonType("quiz").build();
+        when(lessonRepository.findBySectionIdOrderByDisplayOrderAsc(20L)).thenReturn(List.of(lesson));
+        when(lessonRepository.countByCourseId(5L)).thenReturn(1L);
+        com.hango.hango_backend.dto.QuizQuestionDTO quizQuestion = com.hango.hango_backend.dto.QuizQuestionDTO.builder()
+                .id(99L).questionText("What?").options(List.of("A", "B")).correctIndex(0).build();
+        when(jdbcTemplate.query(any(String.class), any(org.springframework.jdbc.core.RowMapper.class), eq(30L)))
+                .thenReturn(List.of(quizQuestion));
+
+        CourseReviewDetailDTO result = service.getCourseReviewDetail(5L);
+
+        assertEquals(1, result.getSessions().get(0).getLessons().get(0).getQuestions().size());
+        assertEquals("What?", result.getSessions().get(0).getLessons().get(0).getQuestions().get(0).getQuestionText());
+    }
+
     // =================================================================
     // getExamsForReview
     // =================================================================
@@ -448,5 +516,19 @@ class CourseManagerDashboardServiceTest {
 
         assertEquals(0, result.get(0).getQuestionCount());
         assertEquals("Unknown", result.get(0).getCreatorName());
+    }
+
+    @Test
+    void getExamsForReviewShouldUseActualExpectedQuestionCountWhenPresent() {
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setTitle("Exam A");
+        exam.setStatus("PUBLISHED");
+        exam.setExpectedQuestionCount(25);
+        when(examRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc("PUBLISHED")).thenReturn(List.of(exam));
+
+        List<ExamResponseDTO> result = service.getExamsForReview("published");
+
+        assertEquals(25, result.get(0).getQuestionCount());
     }
 }

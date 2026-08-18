@@ -34,11 +34,13 @@ class TrainerQuestionAIServiceTest {
     @Mock
     private SystemParameterRepository systemParameterRepository;
 
+    @Mock
+    private SystemConfigService systemConfigService;
+
     private TrainerQuestionAIService service;
 
     @BeforeEach
     void setUp() {
-        SystemConfigService systemConfigService = org.mockito.Mockito.mock(SystemConfigService.class);
         org.mockito.Mockito.lenient().when(systemConfigService.getConfigValue(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
                 .thenAnswer(invocation -> invocation.getArgument(2));
         service = new TrainerQuestionAIService(geminiClientService, new ObjectMapper(), systemParameterRepository, systemConfigService);
@@ -320,6 +322,20 @@ class TrainerQuestionAIServiceTest {
     }
 
     @Test
+    void handleExamChatShouldUseSystemPromptFromConfigServiceWhenOverridden() {
+        when(systemConfigService.getConfigValue("AI", "AI_TRAINER_EXAM_CHAT_PROMPT", TrainerQuestionAIService.DEFAULT_CHAT_PROMPT))
+                .thenReturn("CUSTOM CHAT PROMPT");
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("ok");
+
+        service.handleExamChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("user", "hi"))).build());
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
+        assertEquals("CUSTOM CHAT PROMPT", promptCaptor.getValue());
+    }
+
+    @Test
     void handleExamChatShouldMapUnknownRoleToUserRole() {
         when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("ok");
 
@@ -378,6 +394,22 @@ class TrainerQuestionAIServiceTest {
         assertEquals("Grammar Basics", result.getTitle());
         assertEquals(1, result.getBlocks().size());
         assertEquals("2+2?", result.getBlocks().get(0).getQuestions().get(0).getQuestionText());
+    }
+
+    @Test
+    void generateExamFromChatShouldUseCustomBaseSystemPromptFromConfigService() {
+        when(systemConfigService.getConfigValue("AI", "AI_TRAINER_EXAM_GENERATE_PROMPT", TrainerQuestionAIService.DEFAULT_GENERATE_PROMPT))
+                .thenReturn("CUSTOM GENERATE PROMPT BASE");
+        String json = "{\"title\":\"t\",\"description\":\"d\",\"durationMinutes\":30,"
+                + "\"passingScore\":50.0,\"expectedQuestionCount\":1,\"blocks\":[]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        service.generateExamFromChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("user", "go"))).build());
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
+        assertTrue(promptCaptor.getValue().startsWith("CUSTOM GENERATE PROMPT BASE"));
     }
 
     @Test
