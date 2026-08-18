@@ -10,6 +10,9 @@ import com.hango.hango_backend.dto.ExamCourseRecommendationAIResponseDTO.Recomme
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
 import com.hango.hango_backend.repository.SystemParameterRepository;
+import com.hango.hango_backend.service.ExamResultAnalyzerService;
+import com.hango.hango_backend.service.GeminiClientService;
+import com.hango.hango_backend.service.SkillCategoryMappingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -31,6 +34,7 @@ public class ExamCourseRecommendationAIService {
     private final ExamResultAnalyzerService examResultAnalyzerService;
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
+    private final SkillCategoryMappingService skillCategoryMappingService;
 
     /**
      * Gợi ý khóa học bằng AI dựa trên examAttempt.answersJson/score.
@@ -53,6 +57,12 @@ public class ExamCourseRecommendationAIService {
         List<Course> allCourses = courseRepository.findAll().stream()
                 .filter(c -> c.getDeletedAt() == null)
                 .toList();
+
+        String mappedCategory = skillCategoryMappingService.getCategoryForSkill(weakestSkill);
+        String categoryHint = "";
+        if (mappedCategory != null) {
+            categoryHint = " (This skill belongs to the " + mappedCategory + " category. Prioritize courses from this category).";
+        }
 
         StringBuilder courseList = new StringBuilder();
         for (Course c : allCourses) {
@@ -85,7 +95,7 @@ public class ExamCourseRecommendationAIService {
                 TOOL INPUT (EXAM ANALYSIS):
                 - score_avg_hint: %s
                 - knowledge_gaps_json: %s
-                - explicit_weakest_skill: %s (Chú trọng đề xuất khóa học cải thiện kỹ năng này nhất)
+                - explicit_weakest_skill: %s%s
 
                 JSON OUTPUT SCHEMA:
                 {
@@ -99,9 +109,11 @@ public class ExamCourseRecommendationAIService {
                 """.formatted(
 
                 courseList,
+                courseList,
                 analysis.getHints() != null && analysis.getHints().get("score_avg") != null ? analysis.getHints().get("score_avg").toString() : "0",
                 analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson(),
-                weakestSkill != null ? weakestSkill : "N/A"
+                weakestSkill != null ? weakestSkill : "N/A",
+                categoryHint
         );
 
 

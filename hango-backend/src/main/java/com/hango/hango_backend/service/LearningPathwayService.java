@@ -30,6 +30,7 @@ import com.hango.hango_backend.repository.LearningPathwayRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.service.SkillCategoryMappingService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,8 +50,7 @@ public class LearningPathwayService {
     private final ExamResultAnalyzerService examResultAnalyzerService;
     private final LessonProgressRepository lessonProgressRepository;
     private final LessonRepository lessonRepository;
-
-
+    private final SkillCategoryMappingService skillCategoryMappingService;
 
     @Transactional
     public LearningPathwayResponseDTO generatePathway(Long studentId, PathwayGenerateRequestDTO requestDTO) {
@@ -104,7 +104,11 @@ public class LearningPathwayService {
             examAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(examAttempt);
         }
 
-
+        List<String> weakCategories = extractWeakCategories(examAnalysis.getKnowledgeGapsJson());
+        String categoryHint = "";
+        if (!weakCategories.isEmpty()) {
+            categoryHint = "\nHINT: The learner's weak skills belong to these categories: " + weakCategories + ". Prioritize courses from these categories.";
+        }
 
         String goalText = (requestDTO.getGoalName() != null && !requestDTO.getGoalName().isBlank())
                 ? "MỤC TIÊU CỦA NGƯỜI HỌC: " + requestDTO.getGoalName() + "\n"
@@ -130,7 +134,7 @@ public class LearningPathwayService {
                 TOOL INPUT (EXAM ANALYSIS):
                 - examAttemptId: %s
                 - score: %s
-                - knowledge_gaps_json: %s
+                - knowledge_gaps_json: %s%s
 
                 JSON format:
                 {
@@ -146,7 +150,8 @@ public class LearningPathwayService {
                 courseListBuilder,
                 examAnalysis.getExamAttemptId(),
                 examAnalysis.getScore(),
-                examAnalysis.getKnowledgeGapsJson() == null ? "" : examAnalysis.getKnowledgeGapsJson()
+                examAnalysis.getKnowledgeGapsJson() == null ? "" : examAnalysis.getKnowledgeGapsJson(),
+                categoryHint
         );
 
 
@@ -166,7 +171,7 @@ public class LearningPathwayService {
             responseDto = objectMapper.readValue(aiResponseText, LearningPathwayResponseDTO.class);
         } catch (Exception e) {
             log.warn("Falling back to deterministic learning pathway because AI generation failed: {}", e.getMessage());
-            responseDto = buildFallbackPathwayDto(examAttempt, availableCourses, usingExistingCoursesFallback);
+            responseDto = buildFallbackPathwayDto(examAttempt, availableCourses, usingExistingCoursesFallback, weakCategories);
         }
 
         archiveActivePathway(studentId);
@@ -706,14 +711,32 @@ public class LearningPathwayService {
     private LearningPathwayResponseDTO buildFallbackPathwayDto(
             ExamAttempt examAttempt,
             List<Course> availableCourses,
-            boolean usingExistingCoursesFallback) {
+            boolean usingExistingCoursesFallback,
+            List<String> weakCategories) {
+        
+        // Prioritize courses matching weak categories
+        List<Course> prioritizedCourses = new java.util.ArrayList<>();
+        List<Course> otherCourses = new java.util.ArrayList<>();
+        
+        for (Course course : availableCourses) {
+            if (course.getCategory() != null && weakCategories.contains(course.getCategory().getParamValue())) {
+                prioritizedCourses.add(course);
+            } else {
+                otherCourses.add(course);
+            }
+        }
+        
+        List<Course> selectedCourses = new java.util.ArrayList<>();
+        selectedCourses.addAll(prioritizedCourses);
+        selectedCourses.addAll(otherCourses);
+
         AtomicInteger step = new AtomicInteger(1);
         return LearningPathwayResponseDTO.builder()
                 .roadmapId("AUTO_GEN")
                 .mentorSummary(usingExistingCoursesFallback
                         ? "Tôi đã tạo một lộ trình khởi đầu từ các khóa học hiện có trong HanGo. Vui lòng đăng tải thêm khóa học để có được những gợi ý chính xác hơn."
-                        : "Tôi đã tạo một lộ trình khởi đầu từ kết quả bài kiểm tra gần nhất của bạn và các khóa học đang được công bố trong HanGo.")
-                .nodes(availableCourses.stream()
+                        : "Tôi đã tạo một lộ trình khởi đầu tập trung vào các điểm yếu của bạn từ bài kiểm tra gần nhất.")
+                .nodes(selectedCourses.stream()
                         .limit(4)
                         .map(course -> {
                             int currentStep = step.getAndIncrement();
@@ -764,6 +787,21 @@ public class LearningPathwayService {
                 : "";
         String category = course.getCategory() != null ? course.getCategory().getParamValue() : "this topic";
         return "Khóa học này giúp bạn củng cố thêm về " + category + " dựa trên kết quả gần đây nhất của bạn." + scoreText;
+    }
+
+    private List<String> extractWeakCategories(String knowledgeGapsJson) {
+        if (knowledgeGapsJson == null || knowledgeGapsJson.isBlank()) return Collections.emptyList();
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> map = objectMapper.readValue(knowledgeGapsJson, java.util.Map.class);
+            Object weakCategoriesObj = map.get("weak_categories");
+            if (weakCategoriesObj instanceof List<?> list) {
+                return list.stream().map(Object::toString).toList();
+            }
+        } catch (Exception e) {
+            log.debug("Failed to extract weak categories from knowledge gaps json: {}", e.getMessage());
+        }
+        return Collections.emptyList();
     }
 }
 

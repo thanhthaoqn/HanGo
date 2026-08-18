@@ -12,14 +12,19 @@ import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.entity.ExamAttempt;
+import static org.mockito.Mockito.mock;
 
 class ExamResultAnalyzerServiceTest {
 
+    private ObjectMapper objectMapper;
+    private SkillCategoryMappingService skillCategoryMappingService;
     private ExamResultAnalyzerService service;
 
     @BeforeEach
     void setUp() {
-        service = new ExamResultAnalyzerService(new ObjectMapper());
+        objectMapper = new ObjectMapper();
+        skillCategoryMappingService = mock(SkillCategoryMappingService.class);
+        service = new ExamResultAnalyzerService(objectMapper, skillCategoryMappingService);
     }
 
     private ExamAttempt attempt(Long id, BigDecimal score, String answersJson) {

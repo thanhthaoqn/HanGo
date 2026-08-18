@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Collections;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +33,7 @@ import java.util.stream.Collectors;
 public class ExamResultAnalyzerService {
 
     private final ObjectMapper objectMapper;
+    private final SkillCategoryMappingService skillCategoryMappingService;
 
     /**
      * Phân tích 1 attempt (giữ backward compatibility).
@@ -128,6 +132,13 @@ public class ExamResultAnalyzerService {
                 .map(Map.Entry::getKey)
                 .toList();
 
+        Set<String> weakCategoriesSet = weakSkills.stream()
+                .map(skillCategoryMappingService::getCategoryForSkill)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<String> weakCategories = new ArrayList<>(weakCategoriesSet);
+        Collections.sort(weakCategories);
+
         List<String> criticalTopics = criticalTopicCount.entrySet().stream()
                 .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
                 .limit(10)
@@ -136,6 +147,7 @@ public class ExamResultAnalyzerService {
 
         Map<String, Object> summary = new HashMap<>();
         summary.put("weak_skills", weakSkills);
+        summary.put("weak_categories", weakCategories);
         summary.put("critical_topics", criticalTopics);
         summary.put("attempts_used", attempts.size());
         summary.put("score_avg", avgScore);
@@ -243,8 +255,6 @@ public class ExamResultAnalyzerService {
                     .map(e -> e.getKey())
                     .toList();
 
-            // Weak skills: các skill có câu trả lời sai, lấy distinct.
-            // Nếu skill trống thì bỏ.
             Set<String> weakSkills = incorrectAnswers.stream()
                     .map(UserAnswerDTO::getSkill)
                     .filter(Objects::nonNull)
@@ -252,8 +262,14 @@ public class ExamResultAnalyzerService {
                     .filter(s -> !s.isBlank())
                     .collect(Collectors.toSet());
 
+            Set<String> weakCategories = weakSkills.stream()
+                    .map(skillCategoryMappingService::getCategoryForSkill)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
             Map<String, Object> summary = new HashMap<>();
             summary.put("weak_skills", weakSkills.stream().sorted().toList());
+            summary.put("weak_categories", weakCategories.stream().sorted().toList());
             summary.put("critical_topics", criticalTopics);
             summary.put("incorrect_count", incorrectCount);
 

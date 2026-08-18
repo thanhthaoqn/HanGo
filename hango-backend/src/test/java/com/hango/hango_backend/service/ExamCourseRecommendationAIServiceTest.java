@@ -38,13 +38,15 @@ class ExamCourseRecommendationAIServiceTest {
     private ExamResultAnalyzerService examResultAnalyzerService;
     @Mock
     private GeminiClientService geminiClientService;
+    @Mock
+    private SkillCategoryMappingService skillCategoryMappingService;
 
     private ExamCourseRecommendationAIService service;
 
     @BeforeEach
     void setUp() {
         service = new ExamCourseRecommendationAIService(
-                examAttemptRepository, courseRepository, examResultAnalyzerService, geminiClientService, new ObjectMapper());
+                examAttemptRepository, courseRepository, examResultAnalyzerService, geminiClientService, new ObjectMapper(), skillCategoryMappingService);
     }
 
     private ExamAttempt attempt(Long id) {

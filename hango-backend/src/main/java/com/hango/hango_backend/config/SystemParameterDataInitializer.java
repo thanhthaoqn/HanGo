@@ -154,6 +154,48 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
             ensureExistsBulk(toCreate, existingParams, "DIFFICULTY", entry.getKey(), entry.getValue());
         }
 
+        // --- STEP 4: Ensure 26 SKILL_CATEGORY_MAP exist ---
+        Map<String, String> skillCategoryMap = new LinkedHashMap<>();
+        // Grammar (8 skills)
+        skillCategoryMap.put("WORD_ORDER", "GRAMMAR");
+        skillCategoryMap.put("REDUCED_RELATIVE_CLAUSE", "GRAMMAR");
+        skillCategoryMap.put("PREPOSITION", "GRAMMAR");
+        skillCategoryMap.put("TO_INFINITIVE", "GRAMMAR");
+        skillCategoryMap.put("QUANTIFIER", "GRAMMAR");
+        skillCategoryMap.put("PREPOSITIONAL_PHRASE", "GRAMMAR");
+        skillCategoryMap.put("PASSIVE_VOICE", "GRAMMAR");
+        skillCategoryMap.put("RELATIVE_CLAUSE", "GRAMMAR");
+        
+        // Vocabulary (5 skills)
+        skillCategoryMap.put("COLLOCATION", "VOCABULARY");
+        skillCategoryMap.put("PHRASAL_VERB", "VOCABULARY");
+        skillCategoryMap.put("VOCABULARY", "VOCABULARY");
+        skillCategoryMap.put("SYNONYM_IN_CONTEXT", "VOCABULARY");
+        skillCategoryMap.put("ANTONYM_IN_CONTEXT", "VOCABULARY");
+        
+        // Reading Comprehension (9 skills)
+        skillCategoryMap.put("CONTEXTUAL_MEANING", "READING_COMPREHENSION");
+        skillCategoryMap.put("FACTUAL_DETAIL_QUESTION", "READING_COMPREHENSION");
+        skillCategoryMap.put("REFERENCE_QUESTION", "READING_COMPREHENSION");
+        skillCategoryMap.put("PARAPHRASING_QUESTION", "READING_COMPREHENSION");
+        skillCategoryMap.put("PARAGRAPH_SPECIFIC_INFORMATION_QUESTION", "READING_COMPREHENSION");
+        skillCategoryMap.put("MAIN_IDEA_CENTRAL_THEME_QUESTION", "READING_COMPREHENSION");
+        skillCategoryMap.put("TRUE_NOT_TRUE_QUESTION", "READING_COMPREHENSION");
+        skillCategoryMap.put("INFERENCE_QUESTION", "READING_COMPREHENSION");
+        skillCategoryMap.put("SENTENCE_INSERTION", "READING_COMPREHENSION");
+        
+        // Writing & Structure (3 skills)
+        skillCategoryMap.put("CONVERSATION_ORDERING", "WRITING_STRUCTURE");
+        skillCategoryMap.put("LETTER_ORDERING", "WRITING_STRUCTURE");
+        skillCategoryMap.put("PARAGRAPH_ORDERING", "WRITING_STRUCTURE");
+        
+        // Pronunciation (1 skill)
+        skillCategoryMap.put("PHONETICS", "PRONUNCIATION");
+
+        for (Map.Entry<String, String> entry : skillCategoryMap.entrySet()) {
+            ensureExistsBulk(toCreate, existingParams, "SKILL_CATEGORY_MAP", entry.getKey(), entry.getValue());
+        }
+
         if (!toCreate.isEmpty()) {
             systemParameterRepository.saveAll(toCreate);
             log.info("Created {} new SystemParameters.", toCreate.size());
