@@ -183,6 +183,45 @@ class TrainerQuestionServiceTest {
         assertTrue(sqlCaptor.getValue().contains("q.question_text LIKE ?"));
     }
 
+    @Test
+    void getTrainerQuestionsShouldAddSkillConditionAndParamWhenSkillIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
+        when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), paramsCaptor.capture())).thenReturn(List.of());
+
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, 7L, null, null);
+
+        assertTrue(sqlCaptor.getValue().contains("AND q.skill_param_id = ?"));
+        assertTrue(List.of(paramsCaptor.getValue()).contains(7L));
+    }
+
+    @Test
+    void getTrainerQuestionsShouldAddCategoryConditionAndParamWhenCategoryIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
+        when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), paramsCaptor.capture())).thenReturn(List.of());
+
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, null, 8L, null);
+
+        assertTrue(sqlCaptor.getValue().contains("AND q.category_id = ?"));
+        assertTrue(List.of(paramsCaptor.getValue()).contains(8L));
+    }
+
+    @Test
+    void getTrainerQuestionsShouldAddDifficultyConditionAndParamWhenDifficultyIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
+        when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), paramsCaptor.capture())).thenReturn(List.of());
+
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, null, null, 9L);
+
+        assertTrue(sqlCaptor.getValue().contains("AND q.difficulty_param_id = ?"));
+        assertTrue(List.of(paramsCaptor.getValue()).contains(9L));
+    }
+
     // =================================================================
     // createQuestionBankGroup
     // =================================================================
@@ -295,6 +334,42 @@ class TrainerQuestionServiceTest {
         service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQuestion("Q1", null, options))));
 
         verify(questionRepository, times(2)).save(any(Question.class));
+    }
+
+    @Test
+    void createQuestionBankGroupShouldSetCategoryFromRepositoryWhenNoPassageTextAndCategoryIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        QuestionCategory category = new QuestionCategory();
+        category.setId(1L);
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        when(systemParameterRepository.findById(2L)).thenReturn(Optional.of(SystemParameter.builder().id(2L).build()));
+        when(systemParameterRepository.findById(3L)).thenReturn(Optional.of(SystemParameter.builder().id(3L).build()));
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQuestion("Q1", null, List.of()))));
+
+        assertEquals(1L, captor.getValue().getCategory().getId());
+    }
+
+    @Test
+    void createQuestionBankGroupShouldLeaveCategoryNullWhenPassageTextProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(systemParameterRepository.findById(2L)).thenReturn(Optional.of(SystemParameter.builder().id(2L).build()));
+        when(systemParameterRepository.findById(3L)).thenReturn(Optional.of(SystemParameter.builder().id(3L).build()));
+        when(questionGroupRepository.save(any(QuestionGroup.class))).thenAnswer(inv -> {
+            QuestionGroup g = inv.getArgument(0);
+            g.setId(500L);
+            return g;
+        });
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createQuestionBankGroup("trainer@example.com",
+                groupRequest("Reading passage", List.of(subQuestion("Q1", null, List.of()))));
+
+        assertNull(captor.getValue().getCategory());
+        verify(categoryRepository, never()).findById(any());
     }
 
     @Test
@@ -514,6 +589,26 @@ class TrainerQuestionServiceTest {
 
         assertThrows(RuntimeException.class,
                 () -> service.updateQuestionBankGroup("intruder@example.com", 10L, false, groupRequest(null, List.of())));
+    }
+
+    @Test
+    void updateQuestionBankGroupSingleShouldSetCategoryFromRepositoryWhenCategoryIdProvided() {
+        User owner = trainer(1L, "trainer@example.com");
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(owner));
+        Question oldQ = new Question();
+        oldQ.setId(10L);
+        oldQ.setCreatedBy(owner);
+        when(questionRepository.findById(10L)).thenReturn(Optional.of(oldQ));
+        QuestionCategory category = new QuestionCategory();
+        category.setId(1L);
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateQuestionBankGroup("trainer@example.com", 10L, false,
+                groupRequest(null, List.of(subQuestion("Updated Q", null, null))));
+
+        assertEquals(1L, captor.getValue().getCategory().getId());
     }
 
     @Test

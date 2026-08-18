@@ -54,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -568,12 +569,11 @@ class TrainerDashboardServiceImplTest {
     @Test
     void getTrainerExamsShouldDefaultStatusAndVisibilityWhenNull() {
         User user = trainer(1L, "trainer@example.com");
-        Exam exam = new Exam();
-        exam.setId(1L);
-        exam.setTitle("Exam A");
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(user));
-        when(examRepository.findByCreatedByIdAndDeletedAtIsNullOrderByCreatedAtDesc(1L))
-                .thenReturn(new java.util.ArrayList<>(List.of(exam)));
+        Object[] row = new Object[] { 1L, "Exam A", null, null, null, null, null, null, null, null, 1L, null };
+        List<Object[]> rows = new java.util.ArrayList<>();
+        rows.add(row);
+        when(examRepository.findTrainerExamsForTrainer(1L)).thenReturn(rows);
         when(examQuestionRepository.countQuestionsByExamIds(List.of(1L)))
                 .thenReturn(List.<Object[]>of(new Object[] { 1L, 5 }));
 
@@ -590,24 +590,18 @@ class TrainerDashboardServiceImplTest {
         manager.setRoles(java.util.Set.of(Role.builder().roleName("COURSE_MANAGER").build()));
         when(userRepository.findByEmail("manager@example.com")).thenReturn(Optional.of(manager));
 
-        Exam ownDraft = new Exam();
-        ownDraft.setId(1L);
-        ownDraft.setStatus("DRAFT");
-        ownDraft.setCreatedBy(manager);
+        // The repository query itself excludes other users' DRAFT exams for managers
+        // (u.id = :trainerId OR status != 'DRAFT'), so othersDraft (id 2) never comes
+        // back from findTrainerExamsForManager.
+        Object[] ownDraft = new Object[] { 1L, "Own Draft", null, null, null, "DRAFT", null, null, null, null, 1L, null };
+        Object[] published = new Object[] { 3L, "Published", null, null, null, "PUBLISHED", null, null, null, null, 2L, null };
+        List<Object[]> rows = new java.util.ArrayList<>();
+        rows.add(ownDraft);
+        rows.add(published);
 
-        Exam othersDraft = new Exam();
-        othersDraft.setId(2L);
-        othersDraft.setStatus("DRAFT");
-        othersDraft.setCreatedBy(trainer(2L, "other@example.com"));
-
-        Exam published = new Exam();
-        published.setId(3L);
-        published.setStatus("PUBLISHED");
-        published.setCreatedBy(trainer(2L, "other@example.com"));
-
-        when(examRepository.findByDeletedAtIsNullOrderByCreatedAtDesc())
-                .thenReturn(new java.util.ArrayList<>(List.of(ownDraft, othersDraft, published)));
-        when(examQuestionRepository.countByIdExamId(any())).thenReturn(0);
+        when(examRepository.findTrainerExamsForManager(1L)).thenReturn(rows);
+        when(examQuestionRepository.countQuestionsByExamIds(any()))
+                .thenReturn(List.of());
 
         List<TrainerExamResponseDTO> result = service.getTrainerExams("manager@example.com");
 
@@ -642,6 +636,98 @@ class TrainerDashboardServiceImplTest {
         verify(examRepository).save(captor.capture());
         assertEquals("DRAFT", captor.getValue().getStatus());
         assertEquals("PRIVATE", captor.getValue().getVisibility());
+    }
+
+    // =================================================================
+    // updateTrainerExamBasicInfo
+    // =================================================================
+
+    @Test
+    void updateTrainerExamBasicInfoShouldThrowWhenUserNotFound() {
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.updateTrainerExamBasicInfo(1L, "unknown@example.com",
+                com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO.builder().title("Exam").build()));
+    }
+
+    @Test
+    void updateTrainerExamBasicInfoShouldThrowWhenExamNotFound() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(examRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> service.updateTrainerExamBasicInfo(1L, "trainer@example.com",
+                com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO.builder().title("Exam").build()));
+    }
+
+    @Test
+    void updateTrainerExamBasicInfoShouldThrowWhenNotOwnerAndNotManager() {
+        when(userRepository.findByEmail("intruder@example.com")).thenReturn(Optional.of(trainer(2L, "intruder@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setStatus("DRAFT");
+        exam.setCreatedBy(trainer(1L, "owner@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+
+        assertThrows(RuntimeException.class, () -> service.updateTrainerExamBasicInfo(1L, "intruder@example.com",
+                com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO.builder().title("Exam").build()));
+        verify(examRepository, never()).save(any());
+    }
+
+    @Test
+    void updateTrainerExamBasicInfoShouldDowngradePublishedExamToSubmittedWhenOwnerIsNotManager() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setStatus("PUBLISHED");
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+        when(examRepository.save(any(Exam.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateTrainerExamBasicInfo(1L, "trainer@example.com",
+                com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO.builder().title("Updated Title").build());
+
+        assertEquals("SUBMITTED", exam.getStatus());
+        assertEquals("Updated Title", exam.getTitle());
+        verify(examHistoryService).log(eq(exam), eq(ExamHistoryService.ACTION_SUBMITTED), eq("PUBLISHED"),
+                eq("SUBMITTED"), eq(null), anyString());
+    }
+
+    @Test
+    void updateTrainerExamBasicInfoShouldKeepPublishedStatusWhenManagerEdits() {
+        User manager = trainer(1L, "manager@example.com");
+        manager.setRoles(java.util.Set.of(Role.builder().roleName("COURSE_MANAGER").build()));
+        when(userRepository.findByEmail("manager@example.com")).thenReturn(Optional.of(manager));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setStatus("PUBLISHED");
+        exam.setCreatedBy(trainer(2L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+        when(examRepository.save(any(Exam.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateTrainerExamBasicInfo(1L, "manager@example.com",
+                com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO.builder().title("Updated Title").build());
+
+        assertEquals("PUBLISHED", exam.getStatus());
+        verify(examHistoryService).log(eq(exam), eq(ExamHistoryService.ACTION_EDITED), eq("PUBLISHED"),
+                eq("PUBLISHED"), eq(null), anyString());
+    }
+
+    @Test
+    void updateTrainerExamBasicInfoShouldLogEditedWhenStatusUnchangedForDraftExam() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        Exam exam = new Exam();
+        exam.setId(1L);
+        exam.setStatus("DRAFT");
+        exam.setCreatedBy(trainer(1L, "trainer@example.com"));
+        when(examRepository.findById(1L)).thenReturn(Optional.of(exam));
+        when(examRepository.save(any(Exam.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateTrainerExamBasicInfo(1L, "trainer@example.com",
+                com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO.builder().title("Updated Title").build());
+
+        assertEquals("DRAFT", exam.getStatus());
+        verify(examHistoryService).log(eq(exam), eq(ExamHistoryService.ACTION_EDITED), eq("DRAFT"), eq("DRAFT"),
+                eq(null), anyString());
     }
 
     // =================================================================
