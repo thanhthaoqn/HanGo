@@ -638,6 +638,10 @@ class _ScheduleChip extends StatelessWidget {
         break;
     }
 
+    if (!isDarkMode && status != ScheduleStatus.atRisk) {
+      fg = bg;
+    }
+
     final hours = node.estimatedHours;
     final dateText = startDate != null && deadline != null
         ? '${_formatDate(startDate)} - ${_formatDate(deadline)}'

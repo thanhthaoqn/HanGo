@@ -159,20 +159,6 @@ class PathwaySummaryHeader extends StatelessWidget {
                   onPressed: onAnalysisPressed,
                 ),
                 const SizedBox(width: 6),
-                _HeaderIconButton(
-                  tooltip: isDarkMode
-                      ? (isVi
-                            ? 'Chuyển sang chế độ sáng'
-                            : 'Switch to light mode')
-                      : (isVi
-                            ? 'Chuyển sang chế độ tối'
-                            : 'Switch to dark mode'),
-                  icon: isDarkMode
-                      ? Icons.light_mode_rounded
-                      : Icons.dark_mode_rounded,
-                  color: isDarkMode ? const Color(0xFFFCD34D) : Colors.white,
-                  onPressed: onThemeToggle,
-                ),
               ],
             );
           },

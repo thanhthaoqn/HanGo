@@ -24,7 +24,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
   LearningPathway? _pathway;
   PathwayNode? _selectedNode;
   bool _isLoading = true;
-  bool _isDarkMode = true;
+  bool _isDarkMode = false;
   String? _errorMessage;
 
   @override
@@ -377,7 +377,6 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           onAnalysisPressed: _showSkillAnalysis,
           onEditGoalPressed: _showEditGoalDialog,
           onRegenerateFreePressed: _showRegenerateFreeWarningDialog,
-          onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
           child: Stack(
@@ -437,7 +436,6 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           onAnalysisPressed: _showSkillAnalysis,
           onEditGoalPressed: _showEditGoalDialog,
           onRegenerateFreePressed: _showRegenerateFreeWarningDialog,
-          onThemeToggle: () => setState(() => _isDarkMode = !_isDarkMode),
         ),
         Expanded(
           child: InteractiveNodeTree(
