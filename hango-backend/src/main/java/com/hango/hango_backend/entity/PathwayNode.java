@@ -91,8 +91,7 @@ public class PathwayNode {
     @Column(name = "next_review_date")
     private java.time.LocalDateTime nextReviewDate;
 
-    @Builder.Default
     @Column(name = "review_interval_days")
-    private Integer reviewIntervalDays = 1;
+    private Integer reviewIntervalDays;
 }
 
