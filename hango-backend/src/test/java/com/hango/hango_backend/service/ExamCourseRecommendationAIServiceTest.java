@@ -257,6 +257,20 @@ class ExamCourseRecommendationAIServiceTest {
     }
 
     @Test
+    void recommendCoursesAIShouldIncludeExplicitWeakestSkillInGeneratedSystemPrompt() {
+        when(examAttemptRepository.findById(1L)).thenReturn(Optional.of(attempt(1L)));
+        when(examResultAnalyzerService.analyzeLatestExamAttempt(any())).thenReturn(analysis(5));
+        when(courseRepository.findAll()).thenReturn(List.of());
+        org.mockito.ArgumentCaptor<String> promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        when(geminiClientService.generateChatResponse(promptCaptor.capture(), any()))
+                .thenReturn("{\"weaknessSummary\":\"ok\",\"recommendedCourses\":[]}");
+
+        service.recommendCoursesAI(1L, "Listening");
+
+        assertTrue(promptCaptor.getValue().contains("Listening"));
+    }
+
+    @Test
     void recommendCoursesAIShouldDiscardEntireResponseWhenOneRecommendedCourseHasInvalidCourseId() {
         when(examAttemptRepository.findById(1L)).thenReturn(Optional.of(attempt(1L)));
         when(examResultAnalyzerService.analyzeLatestExamAttempt(any())).thenReturn(analysis(5));
