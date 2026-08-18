@@ -183,23 +183,23 @@ class _NodeCard extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: palette.gradient,
         color: palette.surface,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isSelected ? const Color(0xFF28B79B) : palette.border,
-          width: isSelected ? 2 : 1,
+          width: isSelected ? 2 : 1.5,
         ),
         boxShadow: [
           BoxShadow(
             color: (isSelected ? const Color(0xFF28B79B) : palette.glow)
-                .withOpacity(isSelected ? 0.28 : 0.14),
+                .withOpacity(isSelected ? 0.20 : 0.08),
             blurRadius: isSelected || node.status == NodeStatus.inProgress
-                ? 22
-                : 10,
-            offset: const Offset(0, 10),
+                ? 32
+                : 12,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -227,9 +227,9 @@ class _NodeCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
-              height: 1.25,
+              height: 1.35,
               color: palette.text,
             ),
           ),
@@ -267,33 +267,33 @@ class _NodeCard extends StatelessWidget {
           if (node.reasonWhy.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isDarkMode 
                     ? const Color(0xFF1F2937).withOpacity(0.5) 
-                    : const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(8),
+                    : const Color(0xFF8B5CF6).withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isDarkMode 
                       ? const Color(0xFF374151) 
-                      : const Color(0xFFE5E7EB),
+                      : const Color(0xFF8B5CF6).withOpacity(0.15),
                 ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.psychology_alt,
-                    size: 16,
-                    color: isDarkMode ? const Color(0xFFA78BFA) : const Color(0xFF8B5CF6),
+                    Icons.psychology_rounded,
+                    size: 20,
+                    color: isDarkMode ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       node.reasonWhy,
                       style: TextStyle(
-                        fontSize: 12,
-                        height: 1.4,
+                        fontSize: 13,
+                        height: 1.5,
                         color: isDarkMode ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
                         fontStyle: FontStyle.italic,
                       ),
@@ -758,7 +758,7 @@ class _NodePalette {
     if (status == NodeStatus.inProgress) {
       return _NodePalette(
         surface: dark ? const Color(0xFF12332F) : Colors.white,
-        border: const Color(0xFF28B79B),
+        border: dark ? const Color(0xFF28B79B) : const Color(0xFFE5E7EB),
         text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
         muted: dark ? const Color(0xFFB7C4D3) : const Color(0xFF64748B),
         glow: const Color(0xFF28B79B),
