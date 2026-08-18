@@ -1,10 +1,10 @@
 Feature,Course Content Management
 Test requirement,Functional integration tests for lesson content/progress (LessonController) and course-scoped question authoring (SectionQuestionController)
-Number of TCs,19
+Number of TCs,20
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,19,0
-Round 2,0,0,19,0
-Round 3,0,0,19,0
+Round 1,0,0,20,0
+Round 2,0,0,20,0
+Round 3,0,0,20,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 View Lesson Detail,,,,
@@ -50,15 +50,21 @@ COURSECONTENT_FT10,"There is no cap on quiz attempts — a learner can resubmit 
 3. Inspect each response's status and attemptNumber.
 4. Confirm all three attempts are distinct rows with incrementing attempt numbers.","1. All three succeed 200 OK, each creating a new attempt with an incrementing attemptNumber — no server-side maximum-attempts enforcement.","- Logged in; lesson with a quiz exists."
 View Sections & Question Counts,,,,
-COURSECONTENT_FT11,"There is no role gate at all on section/question-count listing — a plain LEARNER can access this trainer-authoring surface.","1. Log in as a plain LEARNER.
+COURSECONTENT_FT11,"Section/question-count listing is now gated behind MANAGE_OWN_COURSES/MANAGE_QUESTION_BANK/ADMIN (regression check: this authoring-surface endpoint previously had no @PreAuthorize at all; a plain LEARNER is now correctly rejected).","1. Log in as a plain LEARNER.
 2. Identify a course with sections and prepare GET /api/v1/trainer/courses/{courseId}/sections.
-3. Send the request.
-4. Inspect the response status and body.","1. 200 OK — the LEARNER successfully receives the section list with question counts, despite this being an authoring-surface endpoint with no @PreAuthorize.","- Logged in as LEARNER; a course with sections exists."
+3. Send the request; inspect the response status.
+4. Log in as an eligible role (TRAINER/COURSE_MANAGER/ADMINISTRATOR) and repeat the same call.","1. Step 3: 403 Forbidden for the LEARNER — @PreAuthorize now requires MANAGE_OWN_COURSES or MANAGE_QUESTION_BANK or MANAGE_ACCOUNTS_ROLES or ADMINISTRATOR.
+2. Step 4: 200 OK for the eligible role, returning the section list with question counts.","- Logged in as LEARNER and as an eligible role; a course with sections exists."
 View Section/Lesson Questions,,,,
-COURSECONTENT_FT12,"The paginated question list for a section leaks the correct-answer index to any authenticated user, due to the same missing role gate.","1. Log in as a plain LEARNER.
+COURSECONTENT_FT12,"The paginated question list for a section is now gated behind MANAGE_QUESTION_BANK/ADMIN (regression check: this endpoint previously had no role gate, leaking every correct-answer index to any authenticated user; a plain LEARNER is now correctly rejected).","1. Log in as a plain LEARNER.
 2. Identify a section with questions and prepare GET /api/v1/trainer/sections/{sectionId}/questions?page=0&size=10.
+3. Send the request; inspect the response status.
+4. Log in as an eligible role (holding MANAGE_QUESTION_BANK/ADMIN) and repeat; inspect content[] for a populated correctIndex.","1. Step 3: 403 Forbidden for the LEARNER.
+2. Step 4: 200 OK for the eligible role; each item in content[] includes a populated correctIndex — the answer-key exposure is now scoped to authoring roles, not any authenticated user.","- Logged in as LEARNER and as an eligible role; a section with questions exists."
+COURSECONTENT_FT20,"A previously-undocumented endpoint, GET /trainer/lessons/{lessonId}/questions, is reachable by a plain LEARNER (via the LEARNER-granted ATTEMPT_QUIZ_AND_EXAM authority) and returns every quiz question's correctIndex — a second, still-open answer-key leak distinct from COURSECONTENT_FT02's lesson-detail leak, and NOT closed by COURSECONTENT_FT12's fix (that fix only locked down the section-level question list, not this lesson-level one).","1. Log in as a plain LEARNER.
+2. Identify a lesson with a saved quiz (via the ""Save Questions to Lesson Quiz"" flow) and prepare GET /api/v1/trainer/lessons/{lessonId}/questions?page=0&size=10.
 3. Send the request.
-4. Inspect each item in content[] for a populated correctIndex.","1. 200 OK; each item in content[] includes a populated correctIndex — a LEARNER can read every answer key in the system this way.","- Logged in as LEARNER; a section with questions exists."
+4. Inspect each item in content[] for a populated correctIndex.","1. 200 OK — @PreAuthorize on this endpoint allows ATTEMPT_QUIZ_AND_EXAM, which LEARNER holds by default; each item in content[] includes a populated correctIndex, letting any LEARNER read the answer key for a lesson's quiz through this endpoint.","- Logged in as LEARNER; a lesson with a saved quiz exists."
 Select Questions for Quiz,,,,
 COURSECONTENT_FT13,"Boundary values for the quantity and mode parameters either degrade gracefully or fail predictably rather than being validated.","1. Log in and prepare GET /api/v1/trainer/sections/{sectionId}/questions/select?quantity=0&mode=RANDOM; send it and inspect the result.
 2. Prepare and send the same call with quantity=-1&mode=RANDOM; inspect the result.
@@ -72,14 +78,15 @@ COURSECONTENT_FT14,"Saving a lesson's quiz question selection is a full delete-t
 3. Prepare and send the same endpoint again with body {""questionIds"": []}.
 4. Re-fetch the lesson's quiz to confirm it is now empty.","1. Step 3-4: 200 OK {""message"":""Questions saved to quiz successfully""}; the lesson's quiz now has ZERO questions — this is the documented way to clear a quiz, not an error.","- Lesson with an existing saved quiz question set."
 Create / Update Question (single),,,,
-COURSECONTENT_FT15,"Creating a single question has no role gate at all — a plain LEARNER can create one, and it is auto-approved with zero review.","1. Log in as a plain LEARNER and identify a valid sectionId.
+COURSECONTENT_FT15,"Creating a single question is now gated behind MANAGE_QUESTION_BANK/ADMIN (regression check: this endpoint previously had no role gate at all, letting a plain LEARNER create one; a LEARNER is now correctly rejected); it remains auto-approved with zero review for whichever eligible role creates it.","1. Log in as a plain LEARNER and identify a valid sectionId.
 2. Prepare POST /api/v1/trainer/questions body {""sectionId"":<id>,""questionText"":""Injected question"",""options"":[...]}.
-3. Send the request.
-4. Inspect the response and query the new question's status in the database.","1. 200 OK {""message"":""Question created successfully"",""id"":<id>}; the question is persisted with status=""APPROVED"" (hardcoded) despite being created by a LEARNER with no review step.","- Logged in as LEARNER; a valid sectionId exists."
-COURSECONTENT_FT16,"Updating a question has no ownership check — any authenticated user can edit any question by ID, and its options are fully replaced rather than merged.","1. Log in as User B, who is NOT the creator of an existing question.
+3. Send the request; inspect the response status.
+4. Log in as an eligible role (holding MANAGE_QUESTION_BANK/ADMIN) and repeat with a valid payload; query the new question's status in the database.","1. Step 3: 403 Forbidden for the LEARNER.
+2. Step 4: 200 OK {""message"":""Question created successfully"",""id"":<id>} for the eligible role; the question is persisted with status=""APPROVED"" (hardcoded) despite zero review.","- Logged in as LEARNER and as an eligible role; a valid sectionId exists."
+COURSECONTENT_FT16,"Updating a question has no OWNERSHIP check — any caller holding the MANAGE_QUESTION_BANK/ADMIN authority (the endpoint's role gate) can edit ANY question by ID regardless of who created it, and its options are fully replaced rather than merged.","1. Log in as User B, an eligible-role user who is NOT the creator of an existing question.
 2. Prepare PUT /api/v1/trainer/questions/{id} with new questionText/options for that question.
 3. Send the request.
-4. Inspect the response and confirm the prior options were replaced entirely by the new set.","1. 200 OK; the question is updated despite B not owning it; the prior options are deleted and replaced entirely by the new set.","- A question created by a different user exists; caller B is any authenticated user."
+4. Inspect the response and confirm the prior options were replaced entirely by the new set.","1. 200 OK; the question is updated despite B not owning it; the prior options are deleted and replaced entirely by the new set — the PreAuthorize role gate does not imply ownership scoping.","- A question created by a different user exists; caller B holds an eligible authoring role (MANAGE_QUESTION_BANK/ADMIN) but did not create the question."
 COURSECONTENT_FT17,"Updating a question id that genuinely doesn't exist returns a proper 404 — the one exception to this area's usual masked-500 pattern.","1. Log in as any authenticated user.
 2. Prepare PUT /api/v1/trainer/questions/999999 with any valid body.
 3. Send the request.
@@ -94,3 +101,4 @@ COURSECONTENT_FT19,"If one sub-question in a multi-sub-question group fails to i
 3. Inspect the response status/message.
 4. Re-fetch the question bank / query the database to check whether the group row and the earlier successful sub-question(s) still exist.","1. Step 3: 400 {""error"":""Failed to save sub question: ...""}.
 2. Step 4: the group row AND the earlier, successfully-inserted sub-question(s) still exist in the database — no automatic rollback occurred, despite the error response implying total failure.","- Logged in; valid sectionId; ability to craft a sub-question that fails partway through a multi-sub-question group."
+NOTE,"Verification pass (2026-08-18) footer.","N/A","COURSECONTENT_FT11/FT12/FT15 were rewritten: the endpoints they cover (GET .../courses/{courseId}/sections, GET .../sections/{sectionId}/questions, POST .../questions) previously had NO @PreAuthorize at all — that has since been fixed with proper role gates (MANAGE_OWN_COURSES/MANAGE_QUESTION_BANK/MANAGE_ACCOUNTS_ROLES/ADMINISTRATOR), so a plain LEARNER is now correctly rejected (403) rather than succeeding. New COURSECONTENT_FT20 documents a DIFFERENT, still-open endpoint (GET .../lessons/{lessonId}/questions) that leaks correctIndex to any LEARNER via the LEARNER-granted ATTEMPT_QUIZ_AND_EXAM authority — flagged, not fixed, since closing it would need a product decision on whether learners should ever see this endpoint at all.","N/A"
