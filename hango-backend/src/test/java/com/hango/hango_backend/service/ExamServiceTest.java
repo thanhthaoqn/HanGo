@@ -167,6 +167,29 @@ class ExamServiceTest {
         assertEquals("0", result.get(0).getLearnerCountFormatted());
     }
 
+    @Test
+    void getAllExamsShouldMapQuestionCountFromCountQuestionsByExamIds() {
+        Exam e = exam(7L, "Exam With Questions", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
+        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examQuestionRepository.countQuestionsByExamIds(List.of(7L)))
+                .thenReturn(java.util.Collections.singletonList(new Object[] { 7L, 12 }));
+
+        List<ExamResponseDTO> result = examService.getAllExams(null);
+
+        assertEquals(12, result.get(0).getQuestionCount());
+    }
+
+    @Test
+    void getAllExamsShouldDefaultQuestionCountToZeroWhenNoQuestionRowReturned() {
+        Exam e = exam(8L, "Empty Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
+        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examQuestionRepository.countQuestionsByExamIds(List.of(8L))).thenReturn(List.of());
+
+        List<ExamResponseDTO> result = examService.getAllExams(null);
+
+        assertEquals(0, result.get(0).getQuestionCount());
+    }
+
     // =================================================================
     // getExamAttempts
     // =================================================================
@@ -219,6 +242,56 @@ class ExamServiceTest {
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
         assertEquals("FAILED", result.get(0).getStatus());
+    }
+
+    @Test
+    void getExamAttemptsShouldPopulateExamIdAndExamTitleFromAttempt() {
+        User student = user(1L, "learner@example.com", "Learner A");
+        Exam e = exam(1L, "Exam A", "PUBLISHED", 50, null);
+        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 10, 0);
+        ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
+        when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
+                .thenReturn(List.of(attempt));
+        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
+
+        List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
+
+        assertEquals(1L, result.get(0).getExamId());
+        assertEquals("Exam A", result.get(0).getExamTitle());
+    }
+
+    @Test
+    void getExamAttemptsShouldBuildCorrectAnswersMapFromCurrentQuestionOptionsInDb() {
+        User student = user(1L, "learner@example.com", "Learner A");
+        Exam e = exam(1L, "Exam A", "PUBLISHED", 50, null);
+        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 10, 0);
+        ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
+        when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
+                .thenReturn(List.of(attempt));
+        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
+        Question q0 = new Question();
+        q0.setId(10L);
+        q0.setOptions(List.of(questionOption(100L, false), questionOption(101L, true)));
+        when(questionRepository.findByExamIdOrderByQuestionOrder(1L)).thenReturn(List.of(q0));
+
+        List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
+
+        assertEquals(1, result.get(0).getCorrectAnswers().get("1"));
+    }
+
+    @Test
+    void getExamAttemptsShouldFormatDateAsSubmittedAtTruncatedToMinutes() {
+        User student = user(1L, "learner@example.com", "Learner A");
+        Exam e = exam(1L, "Exam A", "PUBLISHED", 50, null);
+        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 10, 30, 45);
+        ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
+        when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
+                .thenReturn(List.of(attempt));
+        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
+
+        List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
+
+        assertEquals("2026-01-01 10:30", result.get(0).getDate());
     }
 
     // =================================================================
