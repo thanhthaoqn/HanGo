@@ -1,10 +1,10 @@
 Feature,Payment & Revenue
 Test requirement,Functional integration tests for cart/checkout (CartController, PaymentController) and trainer/course-manager revenue statements (MonthlyStatementController)
-Number of TCs,26
+Number of TCs,32
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,26,0
-Round 2,0,0,26,0
-Round 3,0,0,26,0
+Round 1,0,0,32,0
+Round 2,0,0,32,0
+Round 3,0,0,32,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 Cart CRUD + Sync,,,,
@@ -21,10 +21,12 @@ PAYMENT_FT03,"Removing an item that isn't in the cart, and clearing an already-e
 2. Prepare and send DELETE /api/v1/cart/items/{courseIdNotInCart}; inspect the response.
 3. Prepare and send DELETE /api/v1/cart (clear an already-empty cart).
 4. Inspect both responses for a success status.","1. Both: 200 {""success"":true} — no error for a no-op.","- Logged in."
-PAYMENT_FT04,"Syncing the cart with a client-supplied course-id list replaces the cart wholesale, and any invalid/non-existent ids in the list are silently skipped.","1. Log in and note a valid course id.
+PAYMENT_FT04,"Syncing the cart with a client-supplied course-id list MERGES those ids into the existing cart (adds whatever is missing, never removes/replaces what's already there), and any invalid/already-owned/already-in-cart ids are silently skipped.","1. Log in with an empty cart and note a valid course id.
 2. Prepare POST /api/v1/cart/sync body {""courseIds"":[<valid id>, 999999]} (999999 confirmed unused).
 3. Send the request.
-4. Prepare and send GET /api/v1/cart to confirm only the valid course is present.","1. 200 OK; the cart now contains only the valid course — id 999999 is silently ignored, no error.","- Logged in; a valid course id and an unused id 999999."
+4. Prepare and send GET /api/v1/cart to confirm the valid course is present and 999999 was silently skipped.
+5. With that course still in the cart, sync again with a DIFFERENT valid course id and confirm both end up in the cart afterward.","1. Step 3-4: 200 OK; the cart contains the valid course — id 999999 is silently ignored (courseRepository.findById(...).ifPresent(...)), no error.
+2. Step 5: 200 OK; the cart now contains BOTH courses — syncCart only appends missing/not-owned/not-already-in-cart ids, it never clears or replaces existing cart rows first.","- Logged in; a valid course id and an unused id 999999."
 Create Payment (Checkout),,,,
 PAYMENT_FT05,"Checking out a fully-free course (price 0 or unset) bypasses PayOS entirely and enrolls the learner immediately.","1. Log in and identify a course with price ≤0.
 2. Prepare POST /api/v1/payment/create body {""courseId"":<a free course>}.
@@ -120,3 +122,42 @@ PAYMENT_FT26,"A role lacking the required authority is correctly rejected with a
 2. Prepare POST /api/v1/course-manager/statements/generate?periodMonth=2026-08 with that account's Authorization header.
 3. Send the request.
 4. Inspect the response status and message.","1. 403 Forbidden, {""message"": ""Access denied. You do not have permission to use this function or it has been deactivated by an administrator.""} — this specific denial IS cleanly surfaced, since @PreAuthorize fires before the controller method body (and its lack of local try/catch) ever runs.","- Plain LEARNER logged in."
+Live PayOS Dependency & On-Demand Expiry,,,,
+PAYMENT_FT27,"Checking out a single unowned paid course calls the LIVE PayOS sandbox API and returns a real checkout URL/QR code — a genuine external-dependency boundary that cannot be mocked.","1. Log in and pick a Published, paid, unowned course.
+2. Prepare and send POST /api/v1/payment/create body {""courseId"":<paid course>}.
+3. Inspect the response's paymentUrl/qrCode/txnRef.
+4. Confirm a Payment row was created with status=PENDING and txnRef equal to that Payment's numeric id.","1. 200 OK; paymentUrl is a real PayOS checkout link and qrCode a non-null payload (NOT ""FREE_SUCCESS""/null, which only the free-course path returns); txnRef = the numeric Payment id.
+2. Because createPayOSPaymentLink() builds `new RestTemplate()` inline with no injectable seam and calls https://api-merchant.payos.vn directly, this case cannot be automated/mocked — the manual tester must run it against real, valid PayOS sandbox credentials (payos.client-id/api-key/checksum-key) configured in the test environment; a credentials/outage problem surfaces as a masked 500 {""error"":""Failed to generate payment link: ...""} rather than a clean error (see GAP-PAY-03 below).","- Valid PayOS sandbox credentials configured; a Published, paid, unowned course."
+PAYMENT_FT28,"Polling a still-PENDING payment's status live-queries PayOS and can self-expire it after 15 minutes — a SEPARATE, earlier expiry path than the 30-minute background scheduler.","1. Create a PENDING payment (PAYMENT_FT27) and do NOT complete it in the PayOS sandbox.
+2. Seed/wait until the payment's createdAt is more than 15 minutes old.
+3. Prepare and send GET /api/v1/payment/status/{txnRef}.
+4. Inspect the response and the Payment row.","1. If PayOS reports the order as PAID, this SAME poll call fulfills the payment itself (status→SUCCESS, enrollment/notification fire) even with no webhook delivered.
+2. Otherwise, once createdAt is >15 minutes old, this poll call flips the Payment straight to EXPIRED on the spot — independent of, and earlier than, PaymentExpirationScheduler's 30-minute sweep (which only catches payments nobody has polled).","- A PENDING payment older than 15 minutes; PayOS sandbox reachable."
+Course-Manager Statement Listing & Export,,,,
+PAYMENT_FT29,"Course Manager lists and filters Monthly Statements by period month and/or status.","1. Log in as COURSE_MANAGER with statements across ≥2 periods/statuses.
+2. Prepare and send GET /api/v1/course-manager/statements (no params).
+3. Repeat with ?periodMonth=2026-08, then with ?status=PAID, then with both together.
+4. Compare each result set against the full list.","1. No params: every statement returned (findAll()).
+2. periodMonth only: only that period's statements (findByPeriodMonth). status only: only that status (findByStatus). Both: only rows matching both (findByPeriodMonthAndStatus) — filters combine with AND, never OR.","- COURSE_MANAGER logged in; statements exist across ≥2 periods/statuses."
+PAYMENT_FT30,"[Gap] Any account holding a plain TRAINER/TEACHER authority — not just the statement's own trainer or a Course Manager/Administrator — can view another trainer's full payment breakdown via the statement items endpoint, since neither its authorization nor its service method checks statement ownership.","1. As Trainer A, have a statement generated with ≥1 linked payment; note its id.
+2. Log in as unrelated Trainer B (holds only a plain TRAINER/TEACHER authority, no COURSE_MANAGER/ADMINISTRATOR).
+3. Prepare and send GET /api/v1/course-manager/statements/{idOwnedByTrainerA}/items as Trainer B.
+4. Inspect the response.","1. 200 OK — Trainer B receives Trainer A's full linked-payment list (buyer names, emails, amounts), despite owning neither the statement nor a manager role.
+2. Root cause: MonthlyStatementController's @PreAuthorize on this endpoint uses hasAnyAuthority('TRAINER_LEAD','COURSE_MANAGER','ADMINISTRATOR',...,'TRAINER','ROLE_TRAINER','TEACHER','ROLE_TEACHER') — far broader than every other course-manager statement endpoint — and MonthlyStatementServiceImpl.getStatementPayments performs no ownership check at all, unlike confirmTrainerStatement/rejectTrainerStatement which both verify statement.getTrainer().getId().equals(trainerId). See GAP-PAY-04 below; NOT fixed here (security-sensitive authorization change).","- A statement belonging to Trainer A with ≥1 linked payment; an unrelated Trainer B account with only TRAINER/TEACHER authority."
+PAYMENT_FT31,"Course Manager exports the Monthly Statements list to Excel, with the active period filter reflected in the downloaded filename.","1. Log in as COURSE_MANAGER.
+2. Prepare and send GET /api/v1/course-manager/statements/export-excel?periodMonth=2026-08.
+3. Inspect the Content-Disposition filename and file contents.
+4. Repeat with no periodMonth param.","1. Step 2-3: 200 OK, a binary .xlsx; filename = ""HanGo_Revenue_Settlement_2026-08.xlsx"".
+2. Step 4: filename = ""HanGo_Revenue_Settlement_All.xlsx"".","- At least one statement exists."
+PAYMENT_FT32,"[CRITICAL, cross-module GAP] A paid course can be enrolled for free by calling the generic course-enroll endpoint directly, completely bypassing PaymentService/PayOS - the price gate that keeps ""Enroll now"" hidden for paid courses in the UI is client-side ONLY.","1. Log in as a plain LEARNER (holding only ENROLL_AND_LEARN_COURSES) and pick a Published, paid (price>0), unowned course.
+2. Prepare and send POST /api/v1/courses/{id}/enroll directly (bypassing the UI, which would normally hide the ""Enroll now"" button for this course and force Cart/PayOS checkout).
+3. Inspect the response and the resulting Enrollment row.
+4. Confirm no Payment row was created and no charge occurred.","1. 200 OK {""message"":""Enrollment successful""} - the learner is enrolled in the PAID course at zero cost. CourseServiceImpl.enrollCourse(courseId, userId) (backing POST /api/v1/courses/{id}/enroll in CourseController) never reads course.getPrice() or requires a Payment row; it only checks ""not already enrolled"" and ""trainer profile VERIFIED"". The price-based Enroll-now/Add-to-Cart split (course.price <= 0 in course_detail_page.dart) is a UI-only convenience, not a server-side rule.
+2. No Payment row is created for this enrollment at all - the trainer never accrues revenue for it.","- Plain LEARNER account; a Published, paid, unowned course."
+
+Note (GAP-PAY-01, fixed 2026-08-17): PaymentServiceImpl.fulfillPaymentSuccess previously called cartItemRepository.deleteByUserIdAndCourseId() twice in the already-enrolled branch of its per-course loop (once unconditionally, once again in the else branch) — a harmless idempotent no-op duplicate, not a data-corruption bug. Fixed to call once; PAYMENT_FT15 above describes the current (fixed) single-call behavior. See doc/test_doc/utc-sheet-payment.csv's own GAP-PAY-01 note for the unit-level regression guard.
+Note (GAP-PAY-02, informational, not fixed): MonthlyStatementServiceImpl.settleStatement(Long,String,String) — the 3-argument overload — always throws IllegalArgumentException because it delegates to the 4-argument overload with payoutReceiptUrl=null, which is now mandatory. It is not reachable via any HTTP endpoint (MonthlyStatementController only ever calls the 4-arg overload through SettleRequestDTO), so no ITC/HTTP-level coverage is required; flagged here for completeness only. See utc-sheet-payment.csv GAP-PAY-02.
+Note (GAP-PAY-03, informational): See PAYMENT_FT27 — createPayment's PayOS checkout-link creation instantiates `new RestTemplate()` inline with no injectable seam and calls the live PayOS API (https://api-merchant.payos.vn) directly. This is a genuine external-dependency boundary: manual testers must have valid PayOS sandbox credentials configured to exercise the paid (non-free) checkout path at all; it cannot be mocked, stubbed, or automated within this test suite.
+Note (GAP-PAY-04, confirmed real gap, NOT fixed — flagged only per instructions): See PAYMENT_FT30. GET /api/v1/course-manager/statements/{id}/items authorizes any TRAINER/TEACHER-role account, and the underlying service method performs no statement-ownership check, unlike its sibling confirm/reject endpoints. This is a genuine authorization/IDOR gap allowing any trainer to read any other trainer's buyer PII and earnings breakdown by statement id. Left unfixed here as a security-relevant production change outside a docs-verification pass' safe scope — recommend either narrowing the @PreAuthorize list to COURSE_MANAGER/ADMINISTRATOR only, or adding the same statement.getTrainer().getId().equals(callerId) check used by confirm/reject.
+Note (GAP-PAY-05, informational): MonthlyStatementScheduler.autoGenerateMonthlyCutoff automatically runs generateMonthlyCutoff for the PREVIOUS calendar month at 00:00 on the 1st of every month, independent of and in addition to Course Manager's manual ""Trigger Monthly Cutoff"" (PAYMENT_FT20/FT21). Testers may observe statements already generated at the start of a period without anyone having triggered cutoff manually.
+Note (GAP-PAY-06, CRITICAL, confirmed real gap, NOT fixed — flagged only per instructions): See PAYMENT_FT32. CourseServiceImpl.enrollCourse (called by POST /api/v1/courses/{id}/enroll in CourseController.java, a course-module endpoint outside this pass' file scope) performs no price check at all — it only verifies the caller isn't already enrolled and that the course's trainer profile is VERIFIED. Every genuine payment enforcement in this module (createPayment's free-vs-paid branch, PayOS webhook fulfillment) is entirely bypassable by any account holding plain ENROLL_AND_LEARN_COURSES simply calling this other endpoint directly for a paid course — they get enrolled at zero cost and the trainer never accrues revenue for that sale. The UI's price>0 gate (course_detail_page.dart) that decides between showing ""Enroll now"" vs. ""Add to Cart""/checkout is client-side convenience only, not a server-side rule. This is a revenue-integrity bug, not merely a docs mismatch — left unfixed here since the vulnerable code lives in CourseServiceImpl/CourseController (course module, outside this Payment & Revenue pass' assigned files) and a real fix is a security-relevant production change outside a docs-verification pass' safe scope. Strongly recommend the course-module owner add a server-side price check (mirroring PaymentServiceImpl.createPayment's free-course branch) before this ships further, and add corresponding coverage to itc-sheet-course.csv.
