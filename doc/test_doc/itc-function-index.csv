@@ -96,10 +96,14 @@ No,Function Name,Sheet Name,Description,Pre-Condition
 95,Create Ticket,Ticket Management,Learner support ticket creation (no category whitelist),logged in (any role)
 96,Update / View Ticket,Ticket Management,Own-ticket edit, owner-or-staff detail view,logged in
 97,Ticket Messages,Ticket Management,Thread messaging (no ownership check on add),logged in
-98,Staff Queue / Process Ticket,Ticket Management,Approve/reject with category-based RBAC rule,ADMINISTRATOR/TRAINER_LEAD/COURSE_MANAGER
+98,Staff Queue / Process Ticket,Ticket Management,Approve/reject (PAYOUT_INFO_UPDATE/REFUND_REQUEST category-based RBAC check has been removed -- any staff can now process these; flagged as a gap),ADMINISTRATOR/TRAINER_LEAD/COURSE_MANAGER
 99,View Report (Admin Dashboard),Dashboard & Reports,Platform-wide stats + registration trend,ADMINISTRATOR
 100,View Audit Log,Dashboard & Reports,Admin action log,ADMINISTRATOR
 101,View AI Usage Stats,Dashboard & Reports,Gemini call usage/cost stats,ADMINISTRATOR
 102,View Trainer Dashboard,Dashboard & Reports,Own courses/learners/revenue/rating summary,TRAINER/ADMIN/TRAINER_LEAD/COURSE_MANAGER
 103,View Course-Manager Dashboard,Dashboard & Reports,Platform learner/course counts (inactive count undercounts),TRAINER_LEAD/COURSE_MANAGER/ADMIN
 104,Trainer Course List (bundled counts),Dashboard & Reports,Own course list with unfiltered status-count badges,TRAINER/ADMIN/TRAINER_LEAD/COURSE_MANAGER
+105,Submit Node Mastery Quiz,Learning Pathway,Spaced-repetition review-interval scheduling on a pathway node (score>=80 mastered; interval escalates 1->3->7->14->30 then caps),LEARNER
+106,View / Issue Certificate,Learning Pathway,Course-completion certificate auto-issued on 100% progress; lookup by user+course or public credential ID,LEARNER (issue is automatic); none for public credential lookup
+107,Entry Placement Exam,Exam Management,Seeded Entry Placement Exam (auto-published at startup) suggested to new Learners from the home screen,LEARNER
+108,Import Exam/Questions from Excel (history),Exam Management,Apache-POI-based bulk import with a real per-import audit history and 403 on unauthorized history view (no dedicated Service -- logic lives in the Controller),TRAINER/ADMIN/TRAINER_LEAD
