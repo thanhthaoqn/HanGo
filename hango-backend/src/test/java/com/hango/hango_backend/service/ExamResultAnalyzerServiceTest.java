@@ -18,13 +18,15 @@ class ExamResultAnalyzerServiceTest {
 
     private ObjectMapper objectMapper;
     private SkillCategoryMappingService skillCategoryMappingService;
+    private com.hango.hango_backend.repository.ExamAttemptRepository examAttemptRepository;
     private ExamResultAnalyzerService service;
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
         skillCategoryMappingService = mock(SkillCategoryMappingService.class);
-        service = new ExamResultAnalyzerService(objectMapper, skillCategoryMappingService);
+        examAttemptRepository = mock(com.hango.hango_backend.repository.ExamAttemptRepository.class);
+        service = new ExamResultAnalyzerService(objectMapper, skillCategoryMappingService, examAttemptRepository);
     }
 
     private ExamAttempt attempt(Long id, BigDecimal score, String answersJson) {
@@ -135,8 +137,14 @@ class ExamResultAnalyzerServiceTest {
 
         ExamResultAnalysisDTO result = service.analyzeLearnerAttempts(1L, List.of(a3, a2, a1));
 
-        assertTrue(result.getKnowledgeGapsJson().indexOf("Reading") < result.getKnowledgeGapsJson().indexOf("Listening"),
-                "Reading appears in 2 attempts vs Listening's 1 — should be sorted first by frequency");
+        try {
+            java.util.Map<String, Object> map = new com.fasterxml.jackson.databind.ObjectMapper().readValue(result.getKnowledgeGapsJson(), java.util.Map.class);
+            java.util.List<String> weakSkills = (java.util.List<String>) map.get("weak_skills");
+            assertTrue(weakSkills.indexOf("Reading") < weakSkills.indexOf("Listening"),
+                    "Reading appears in 2 attempts vs Listening's 1 — should be sorted first by frequency");
+        } catch (Exception e) {
+            org.junit.jupiter.api.Assertions.fail("Failed to parse JSON");
+        }
     }
 
     @Test

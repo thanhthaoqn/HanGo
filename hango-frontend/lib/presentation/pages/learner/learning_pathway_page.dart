@@ -181,6 +181,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
         ),
         child: SkillAnalysisPanel(
           weakSkills: pathway.weakSkills,
+          latestWeakSkills: pathway.latestWeakSkills,
           attemptsUsed: 10,
           isDarkMode: _isDarkMode,
         ),

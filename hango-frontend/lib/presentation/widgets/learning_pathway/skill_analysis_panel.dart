@@ -3,12 +3,14 @@ import '../../../utils/language_manager.dart';
 
 class SkillAnalysisPanel extends StatelessWidget {
   final List<String> weakSkills;
+  final List<String> latestWeakSkills;
   final int attemptsUsed;
   final bool isDarkMode;
 
   const SkillAnalysisPanel({
     super.key,
     required this.weakSkills,
+    this.latestWeakSkills = const [],
     this.attemptsUsed = 0,
     this.isDarkMode = false,
   });
@@ -85,7 +87,7 @@ class SkillAnalysisPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isVi ? 'Phân tích điểm yếu kỹ năng' : 'Skill Weakness Analysis',
+                        isVi ? 'Phân tích lỗ hổng kiến thức' : 'Learning Gap Analysis',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: titleColor, fontFamily: 'Outfit'),
                       ),
                       if (attemptsUsed > 0)
@@ -100,7 +102,8 @@ class SkillAnalysisPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          if (weakSkills.isEmpty)
+          
+          if (weakSkills.isEmpty && latestWeakSkills.isEmpty)
             Padding(
               padding: const EdgeInsets.all(32),
               child: Column(
@@ -115,26 +118,62 @@ class SkillAnalysisPanel extends StatelessWidget {
                 ],
               ),
             )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Column(
-                children: weakSkills.asMap().entries.map((entry) {
-                  final meta = _getSkillMeta(entry.value);
-                  return _SkillBar(
-                    skill: entry.value,
-                    percent: _genWeakPercent(entry.key),
-                    color: meta['color'] as Color,
-                    icon: meta['icon'] as IconData,
-                    isDarkMode: isDarkMode,
-                    delay: Duration(milliseconds: entry.key * 100),
-                  );
-                }).toList(),
+          else ...[
+            // Section 1: Latest Exam Vulnerabilities
+            if (latestWeakSkills.isNotEmpty) ...[
+              _buildSectionHeader(
+                isVi ? 'Lỗi sai từ bài thi gần nhất' : 'Latest Exam Vulnerabilities',
+                Icons.warning_amber_rounded,
+                const Color(0xFFEF4444),
+                titleColor,
               ),
-            ),
-          if (weakSkills.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                child: Column(
+                  children: latestWeakSkills.asMap().entries.map((entry) {
+                    final meta = _getSkillMeta(entry.value);
+                    return _SkillBar(
+                      skill: entry.value,
+                      percent: _genWeakPercent(entry.key) + 15, // Mức độ khẩn cấp cao hơn
+                      color: const Color(0xFFEF4444), // Đỏ cảnh báo
+                      icon: meta['icon'] as IconData,
+                      isDarkMode: isDarkMode,
+                      delay: Duration(milliseconds: entry.key * 100),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+
+            // Section 2: Chronic Areas for Improvement
+            if (weakSkills.isNotEmpty) ...[
+              _buildSectionHeader(
+                isVi ? 'Điểm yếu cần củng cố dài hạn' : 'Chronic Areas for Improvement',
+                Icons.history_rounded,
+                const Color(0xFF8B5CF6),
+                titleColor,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Column(
+                  children: weakSkills.asMap().entries.map((entry) {
+                    final meta = _getSkillMeta(entry.value);
+                    return _SkillBar(
+                      skill: entry.value,
+                      percent: _genWeakPercent(entry.key),
+                      color: const Color(0xFF8B5CF6), // Tím củng cố
+                      icon: meta['icon'] as IconData,
+                      isDarkMode: isDarkMode,
+                      delay: Duration(milliseconds: entry.key * 100),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+            
+            // Suggestion Box
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
@@ -148,7 +187,7 @@ class SkillAnalysisPanel extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        isVi ? 'AI đề xuất tập trung vào: ${weakSkills.first}' : 'AI suggests focusing on: ${weakSkills.first}',
+                        isVi ? 'AI đã phân bổ khóa học ưu tiên sửa lỗi mới trước.' : 'AI structured the pathway to fix recent vulnerabilities first.',
                         style: const TextStyle(color: Color(0xFF6366F1), fontSize: 13, fontWeight: FontWeight.w600, fontFamily: 'Outfit'),
                       ),
                     ),
@@ -156,6 +195,28 @@ class SkillAnalysisPanel extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, Color color, Color titleColor) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: titleColor,
+              fontFamily: 'Outfit',
+            ),
+          ),
         ],
       ),
     );

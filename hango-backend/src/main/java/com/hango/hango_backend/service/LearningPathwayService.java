@@ -105,9 +105,14 @@ public class LearningPathwayService {
         }
 
         List<String> weakCategories = extractWeakCategories(examAnalysis.getKnowledgeGapsJson());
+        List<String> latestWeakCategories = extractLatestWeakCategories(examAnalysis.getKnowledgeGapsJson());
+
         String categoryHint = "";
+        if (!latestWeakCategories.isEmpty()) {
+            categoryHint += "\nHINT (LATEST EXAM): The learner JUST failed these categories in their most recent exam: " + latestWeakCategories + ". These should be addressed FIRST in the pathway.";
+        }
         if (!weakCategories.isEmpty()) {
-            categoryHint = "\nHINT: The learner's weak skills belong to these categories: " + weakCategories + ". Prioritize courses from these categories.";
+            categoryHint += "\nHINT (HISTORICAL): The learner has a chronic weakness in these categories across past exams: " + weakCategories + ". These should be reinforced AFTER addressing the latest failures.";
         }
 
         String goalText = (requestDTO.getGoalName() != null && !requestDTO.getGoalName().isBlank())
@@ -124,25 +129,29 @@ public class LearningPathwayService {
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
                 2. Prioritize foundations first, then harder reading or advanced skills.
-                3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó.
-                4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT TỔNG QUAN LỘ TRÌNH (ví dụ: "Chào bạn, lộ trình của bạn gồm X khóa học tập trung vào..."). TUYỆT ĐỐI KHÔNG sinh ra bài tập, mini-quiz, hay câu hỏi trắc nghiệm trong mentor_summary.
+                3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó. "reason_why" phải giải thích cụ thể "Khóa này giải quyết lỗi vừa mắc" hay "Khóa này củng cố điểm yếu kinh niên".
+                4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT THÔNG MINH, MẶC ĐỊNH SỬ DỤNG TIẾNG VIỆT (có thể dùng tiếng Anh nếu người dùng hỏi bằng tiếng Anh). Bạn PHẢI so sánh điểm số bài thi gần nhất (latest_score) với điểm trung bình lịch sử (lấy từ "score_avg" trong knowledge_gaps_json). Ví dụ: "Dựa trên lịch sử làm bài, điểm trung bình của bạn đang là [score_avg]/10. Tuy nhiên, trong bài thi vừa rồi (được [latest_score]/10 điểm), bạn đang gặp khó khăn ở phần [X]. Đồng thời, [Y] vẫn là điểm yếu kinh niên cần khắc phục...". TUYỆT ĐỐI KHÔNG trộn lẫn ngôn ngữ (nửa Anh nửa Việt) trong một câu.
                 5. Return valid JSON only, without markdown fences.
+                6. PATHWAY PRIORITY ORDER: 
+                   - First courses should address the learner's LATEST exam weaknesses (most recent failures). Include EXACT tag "#New Vulnerability".
+                   - Subsequent courses should reinforce HISTORICAL chronic weaknesses (patterns across exams). Include EXACT tag "#Chronic Weakness".
+                   - Add topical tags like "#Grammar" as well. Max 2 tags total.
 
                 [AVAILABLE_COURSES]
                 %s
 
                 TOOL INPUT (EXAM ANALYSIS):
                 - examAttemptId: %s
-                - score: %s
+                - latest_score: %s
                 - knowledge_gaps_json: %s%s
 
                 JSON format:
                 {
                   "roadmap_id": "AUTO_GEN",
-                  "mentor_summary": "Short mentor analysis...",
+                  "mentor_summary": "Dựa trên lịch sử làm bài, điểm trung bình của bạn đang là 7.6/10. Tuy nhiên, trong bài thi vừa rồi (được 5.6/10 điểm), bạn đang gặp khó khăn ở phần Reading Comprehension. Đồng thời, Grammar vẫn là điểm yếu kinh niên...",
                   "nodes": [
-                    { "step": 1, "course_id": 1, "reason_why": "Why this course helps...", "status": "IN_PROGRESS", "tags": ["#Grammar"] },
-                    { "step": 2, "course_id": 2, "reason_why": "Why this course helps...", "status": "LOCKED", "tags": ["#Reading"] }
+                    { "step": 1, "course_id": 1, "reason_why": "Khóa học này giải quyết lỗi vừa mắc ở phần Đọc hiểu...", "status": "IN_PROGRESS", "tags": ["#New Vulnerability", "#Reading"] },
+                    { "step": 2, "course_id": 2, "reason_why": "Khóa này củng cố điểm yếu kinh niên về Ngữ pháp...", "status": "LOCKED", "tags": ["#Chronic Weakness", "#Grammar"] }
                   ]
                 }
                 """.formatted(
@@ -204,6 +213,9 @@ public class LearningPathwayService {
                             .reasonWhy(nodeDto.getReasonWhy() != null
                                     ? nodeDto.getReasonWhy()
                                     : defaultReasonForCourse(course, examAttempt))
+                            .tags(nodeDto.getTags() != null && !nodeDto.getTags().isEmpty() 
+                                    ? String.join(",", nodeDto.getTags()) 
+                                    : (course.getCategory() != null ? "#" + course.getCategory().getParamValue() : null))
                             .progressPercent(0)
                             .build();
                     newPathway.addNode(node);
@@ -536,9 +548,12 @@ public class LearningPathwayService {
                     .skillType(skillType)
                     .totalLessons(Math.toIntExact(Math.min(totalLessons, Integer.MAX_VALUE)))
                     .completedLessons(Math.toIntExact(Math.min(completedLessons, Integer.MAX_VALUE)))
-                    .tags(node.getCourse().getCategory() != null
-                            ? List.of("#" + node.getCourse().getCategory().getParamValue())
-                            : Collections.emptyList())
+                    .completedLessons(Math.toIntExact(Math.min(completedLessons, Integer.MAX_VALUE)))
+                    .tags(node.getTags() != null && !node.getTags().isBlank()
+                            ? java.util.Arrays.asList(node.getTags().split(","))
+                            : (node.getCourse().getCategory() != null
+                                    ? List.of("#" + node.getCourse().getCategory().getParamValue())
+                                    : Collections.emptyList()))
                     .startDate(node.getStartDate() != null ? node.getStartDate().toString() : null)
                     .deadline(node.getDeadline() != null ? node.getDeadline().toString() : null)
                     .estimatedHours(node.getEstimatedHours())
@@ -800,6 +815,21 @@ public class LearningPathwayService {
             }
         } catch (Exception e) {
             log.debug("Failed to extract weak categories from knowledge gaps json: {}", e.getMessage());
+        }
+        return Collections.emptyList();
+    }
+
+    private List<String> extractLatestWeakCategories(String knowledgeGapsJson) {
+        if (knowledgeGapsJson == null || knowledgeGapsJson.isBlank()) return Collections.emptyList();
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> map = objectMapper.readValue(knowledgeGapsJson, java.util.Map.class);
+            Object weakCategoriesObj = map.get("latest_weak_categories");
+            if (weakCategoriesObj instanceof List<?> list) {
+                return list.stream().map(Object::toString).toList();
+            }
+        } catch (Exception e) {
+            log.debug("Failed to extract latest weak categories from knowledge gaps json: {}", e.getMessage());
         }
         return Collections.emptyList();
     }

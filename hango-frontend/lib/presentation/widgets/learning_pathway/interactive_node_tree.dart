@@ -264,6 +264,45 @@ class _NodeCard extends StatelessWidget {
                 ),
             ],
           ),
+          if (node.reasonWhy.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDarkMode 
+                    ? const Color(0xFF1F2937).withOpacity(0.5) 
+                    : const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDarkMode 
+                      ? const Color(0xFF374151) 
+                      : const Color(0xFFE5E7EB),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.psychology_alt,
+                    size: 16,
+                    color: isDarkMode ? const Color(0xFFA78BFA) : const Color(0xFF8B5CF6),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      node.reasonWhy,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: isDarkMode ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           _ScheduleChip(node: node, isDarkMode: isDarkMode),
           const SizedBox(height: 10),
@@ -515,13 +554,29 @@ class _SkillTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locked = status == NodeStatus.locked;
-    final color = locked ? const Color(0xFF94A3B8) : const Color(0xFF6366F1);
+    
+    // Default color
+    Color color = locked ? const Color(0xFF94A3B8) : const Color(0xFF6366F1);
+    Color bgColor = color.withOpacity(isDarkMode ? 0.16 : 0.10);
+    Color borderColor = color.withOpacity(0.22);
+    
+    // Premium styling for special tags
+    if (label == "#FocusNow" || label == "#LỗiMới" || label == "#Mới Phát Hiện" || label == "#New Vulnerability") {
+      color = const Color(0xFFEF4444); // Red/Orange for urgency
+      bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
+      borderColor = color.withOpacity(0.4);
+    } else if (label == "#LongTerm" || label == "#KinhNiên" || label == "#Kinh Niên" || label == "#Chronic Weakness") {
+      color = const Color(0xFF8B5CF6); // Purple for long-term mastery
+      bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
+      borderColor = color.withOpacity(0.4);
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDarkMode ? 0.16 : 0.10),
+        color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.22)),
+        border: Border.all(color: borderColor),
       ),
       child: Text(
         label,

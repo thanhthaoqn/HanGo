@@ -15,7 +15,7 @@ public class ExamResultAnalysisDTO {
 
     private Long examAttemptId;
 
-    private Integer score;
+    private Double score;
 
     /** JSON thô từ examAttempt.answersJson. */
     private String rawAnswersJson;

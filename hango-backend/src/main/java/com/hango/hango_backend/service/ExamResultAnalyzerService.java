@@ -5,6 +5,7 @@ import com.hango.hango_backend.dto.UserAnswerDTO;
 import com.hango.hango_backend.entity.ExamAttempt;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hango.hango_backend.repository.ExamAttemptRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ public class ExamResultAnalyzerService {
 
     private final ObjectMapper objectMapper;
     private final SkillCategoryMappingService skillCategoryMappingService;
+    private final ExamAttemptRepository examAttemptRepository;
 
     /**
      * Phân tích 1 attempt (giữ backward compatibility).
@@ -50,7 +52,7 @@ public class ExamResultAnalyzerService {
 
         return ExamResultAnalysisDTO.builder()
                 .examAttemptId(examAttempt.getId())
-                .score(examAttempt.getScore() != null ? examAttempt.getScore().intValue() : null)
+                .score(examAttempt.getScore() != null ? examAttempt.getScore().doubleValue() : null)
                 .rawAnswersJson(answersJson)
                 .knowledgeGapsJson(extractKnowledgeGapsPlaceholder(answersJson))
                 .hints(hints)
@@ -77,9 +79,9 @@ public class ExamResultAnalyzerService {
         Map<String, Integer> weakSkillCount = new HashMap<>();
         Map<String, Integer> criticalTopicCount = new HashMap<>();
 
-        Integer minScore = null;
-        Integer maxScore = null;
-        Integer sumScore = 0;
+        Double minScore = null;
+        Double maxScore = null;
+        Double sumScore = 0.0;
         int scoredAttempts = 0;
 
         List<Long> attemptIds = attempts.stream().map(ExamAttempt::getId).toList();
@@ -90,7 +92,7 @@ public class ExamResultAnalyzerService {
 
         for (ExamAttempt attempt : attempts) {
             if (attempt.getScore() != null) {
-                int s = attempt.getScore().intValue();
+                double s = attempt.getScore().doubleValue();
                 sumScore += s;
                 scoredAttempts++;
                 minScore = (minScore == null) ? s : Math.min(minScore, s);
@@ -124,7 +126,7 @@ public class ExamResultAnalyzerService {
             }
         }
 
-        double avgScore = scoredAttempts > 0 ? (double) sumScore / scoredAttempts : 0.0;
+        double avgScore = scoredAttempts > 0 ? sumScore / scoredAttempts : 0.0;
 
         List<String> weakSkills = weakSkillCount.entrySet().stream()
                 .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
@@ -139,6 +141,30 @@ public class ExamResultAnalyzerService {
         List<String> weakCategories = new ArrayList<>(weakCategoriesSet);
         Collections.sort(weakCategories);
 
+        // --- NEW: Extract LATEST weak skills explicitly ---
+        List<String> latestWeakSkills = new ArrayList<>();
+        try {
+            String latestGaps = extractKnowledgeGapsPlaceholder(latest.getAnswersJson());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> parsedLatest = objectMapper.readValue(latestGaps, Map.class);
+            Object weakSkillsObj = parsedLatest.get("weak_skills");
+            if (weakSkillsObj instanceof List<?> weakSkillsList) {
+                for (Object s : weakSkillsList) {
+                    if (s != null && !s.toString().trim().isBlank()) {
+                        latestWeakSkills.add(s.toString().trim());
+                    }
+                }
+            }
+        } catch (Exception ignore) {}
+
+        List<String> latestWeakCategories = latestWeakSkills.stream()
+                .map(skillCategoryMappingService::getCategoryForSkill)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+        // ------------------------------------------------
+
         List<String> criticalTopics = criticalTopicCount.entrySet().stream()
                 .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
                 .limit(10)
@@ -148,6 +174,10 @@ public class ExamResultAnalyzerService {
         Map<String, Object> summary = new HashMap<>();
         summary.put("weak_skills", weakSkills);
         summary.put("weak_categories", weakCategories);
+        summary.put("latest_weak_skills", latestWeakSkills);
+        summary.put("latest_weak_categories", latestWeakCategories);
+        summary.put("historical_weak_skills", weakSkills); // Keeping backwards compatibility
+        summary.put("historical_weak_categories", weakCategories);
         summary.put("critical_topics", criticalTopics);
         summary.put("attempts_used", attempts.size());
         summary.put("score_avg", avgScore);
@@ -156,7 +186,7 @@ public class ExamResultAnalyzerService {
 
         return ExamResultAnalysisDTO.builder()
                 .examAttemptId(latest.getId())
-                .score(latest.getScore() != null ? latest.getScore().intValue() : null)
+                .score(latest.getScore() != null ? latest.getScore().doubleValue() : null)
                 .rawAnswersJson(rawLatestAnswers)
                 .knowledgeGapsJson(serializeSafe(summary))
                 .hints(Map.of(
@@ -282,6 +312,57 @@ public class ExamResultAnalyzerService {
             log.warn("Unexpected error while extracting knowledge gaps. Using raw fallback. error={}", e.getMessage());
             return answersJson;
         }
+    }
+
+    /**
+     * Lấy thống kê độ chính xác của từng kỹ năng dựa trên 10 bài thi gần nhất.
+     */
+    public Map<String, Double> getSkillAnalytics(Long learnerId) {
+        List<ExamAttempt> attempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(learnerId);
+        if (attempts == null || attempts.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Integer> totalQuestionsPerSkill = new HashMap<>();
+        Map<String, Integer> correctQuestionsPerSkill = new HashMap<>();
+
+        for (ExamAttempt attempt : attempts) {
+            String answersJson = attempt.getAnswersJson();
+            if (answersJson == null || answersJson.isBlank()) continue;
+
+            try {
+                List<UserAnswerDTO> answers = objectMapper.readValue(
+                        answersJson,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, UserAnswerDTO.class)
+                );
+
+                for (UserAnswerDTO a : answers) {
+                    if (a.getSkill() == null || a.getSkill().isBlank()) continue;
+                    String skill = a.getSkill().trim();
+
+                    totalQuestionsPerSkill.merge(skill, 1, Integer::sum);
+                    if (Boolean.TRUE.equals(a.getIsCorrect())) {
+                        correctQuestionsPerSkill.merge(skill, 1, Integer::sum);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse answersJson for skill analytics. error={}", e.getMessage());
+            }
+        }
+
+        Map<String, Double> skillAccuracy = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : totalQuestionsPerSkill.entrySet()) {
+            String skill = entry.getKey();
+            int total = entry.getValue();
+            int correct = correctQuestionsPerSkill.getOrDefault(skill, 0);
+            double accuracy = total > 0 ? (double) correct / total : 0.0;
+            
+            // Round to 2 decimal places
+            accuracy = Math.round(accuracy * 100.0) / 100.0;
+            skillAccuracy.put(skill, accuracy);
+        }
+
+        return skillAccuracy;
     }
 
 }

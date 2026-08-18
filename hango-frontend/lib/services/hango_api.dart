@@ -559,4 +559,16 @@ class HangoApi {
       throw ApiFailure('Failed to count questions: ${response.statusCode}');
     }
   }
+
+  Future<Map<String, double>> getSkillAnalytics() async {
+    final response = await _send(
+      http.get(_uri('/exams/users/me/analytics/skills'), headers: _headers),
+    );
+    if (response.statusCode == 200) {
+      final json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return json.map((key, value) => MapEntry(key, (value as num).toDouble()));
+    } else {
+      throw ApiFailure('Failed to fetch skill analytics: ${response.statusCode}');
+    }
+  }
 }

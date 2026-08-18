@@ -5,6 +5,7 @@ import com.hango.hango_backend.dto.ExamAttemptRequestDTO;
 import com.hango.hango_backend.dto.ExamAttemptResponseDTO;
 import com.hango.hango_backend.dto.LearnerExamQuestionDTO;
 import com.hango.hango_backend.service.ExamService;
+import com.hango.hango_backend.service.ExamResultAnalyzerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/exams")
@@ -19,6 +21,7 @@ import java.util.List;
 public class ExamController {
 
     private final ExamService examService;
+    private final ExamResultAnalyzerService examResultAnalyzerService;
 
     private Long getCurrentUserId() {
         org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -81,5 +84,16 @@ public class ExamController {
         }
         ExamAttemptResponseDTO response = examService.saveExamAttempt(id, currentUserId, request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/users/me/analytics/skills")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<Map<String, Double>> getMySkillAnalytics() {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Map<String, Double> analytics = examResultAnalyzerService.getSkillAnalytics(currentUserId);
+        return ResponseEntity.ok(analytics);
     }
 }

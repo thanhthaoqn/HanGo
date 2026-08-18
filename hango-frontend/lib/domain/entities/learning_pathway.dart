@@ -348,6 +348,7 @@ class LearningPathway {
   final String mentorSummary;
   final List<PathwayNode> nodes;
   final List<String> weakSkills;
+  final List<String> latestWeakSkills; // <--- New field
   final int totalSteps;
   final int completedSteps;
   final List<String> suggestedActions; // <--- New field
@@ -366,6 +367,7 @@ class LearningPathway {
     required this.mentorSummary,
     required this.nodes,
     this.weakSkills = const [],
+    this.latestWeakSkills = const [],
     this.totalSteps = 0,
     this.completedSteps = 0,
     this.suggestedActions = const [],
@@ -383,6 +385,7 @@ class LearningPathway {
     String? mentorSummary,
     List<PathwayNode>? nodes,
     List<String>? weakSkills,
+    List<String>? latestWeakSkills,
     int? totalSteps,
     int? completedSteps,
     List<String>? suggestedActions,
@@ -400,6 +403,7 @@ class LearningPathway {
       mentorSummary: mentorSummary ?? this.mentorSummary,
       nodes: nodes ?? this.nodes,
       weakSkills: weakSkills ?? this.weakSkills,
+      latestWeakSkills: latestWeakSkills ?? this.latestWeakSkills,
       totalSteps: totalSteps ?? this.totalSteps,
       completedSteps: completedSteps ?? this.completedSteps,
       suggestedActions: suggestedActions ?? this.suggestedActions,
@@ -451,14 +455,19 @@ class LearningPathway {
                 PathwayNode.fromJson(nodeJson as Map<String, dynamic>),
           )
           .toList(),
-      weakSkills: List<String>.from(
-        json['weak_skills'] ?? json['weakSkills'] ?? [],
-      ),
+      weakSkills: (json['weak_skills'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      latestWeakSkills: (json['latest_weak_skills'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
       totalSteps: json['total_steps'] ?? json['totalSteps'] ?? 0,
       completedSteps: json['completed_steps'] ?? json['completedSteps'] ?? 0,
-      suggestedActions: List<String>.from(
-        json['suggested_actions'] ?? json['suggestedActions'] ?? [],
-      ),
+      suggestedActions: (json['suggested_actions'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ?? [],
       goalName: json['goal_name'] ?? json['goalName'],
       targetDate: json['target_date'] ?? json['targetDate'],
       hoursPerWeek: json['hours_per_week'] ?? json['hoursPerWeek'],

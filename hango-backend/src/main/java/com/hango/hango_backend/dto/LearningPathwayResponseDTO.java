@@ -45,8 +45,11 @@ public class LearningPathwayResponseDTO {
     private PathwayRerouteSuggestionDTO pendingRerouteSuggestion;
 
     // Skill analysis metadata for FE Skill Analysis Panel
-    @JsonProperty("weak_skills")
+    @JsonProperty("weak_skills") // Historical
     private List<String> weakSkills;
+
+    @JsonProperty("latest_weak_skills") // Latest Exam
+    private List<String> latestWeakSkills;
 
     @JsonProperty("total_steps")
     private Integer totalSteps;

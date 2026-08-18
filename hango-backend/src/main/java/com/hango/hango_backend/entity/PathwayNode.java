@@ -41,6 +41,9 @@ public class PathwayNode {
     @Column(name = "progress_percent")
     private Integer progressPercent = 0;
 
+    @Column(name = "tags", columnDefinition = "TEXT")
+    private String tags;
+
     // FE-11 agentic upgrade metadata (nullable; schema migration may be required)
     @Column(name = "node_type", length = 40)
     private String nodeType;

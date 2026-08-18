@@ -89,8 +89,8 @@ class AdminControllerTest {
     @Test
     void getUsersShouldFilterByLearnerRoleType() {
         User learner = userWithRole(1L, "learner@example.com", "LEARNER");
-        User trainer = userWithRole(2L, "trainer@example.com", "TRAINER");
-        when(userRepository.findAll()).thenReturn(List.of(learner, trainer));
+        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(learner)));
 
         ResponseEntity<?> response = adminController.getUsers("learner", null, 0, 10);
 
@@ -102,7 +102,8 @@ class AdminControllerTest {
     @Test
     void getUsersShouldTreatCourseManagerAsAliasForTrainerLead() {
         User courseManager = userWithRole(1L, "cm@example.com", "COURSE_MANAGER");
-        when(userRepository.findAll()).thenReturn(List.of(courseManager));
+        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(courseManager)));
 
         ResponseEntity<?> response = adminController.getUsers("course_manager", null, 0, 10);
 
@@ -117,7 +118,8 @@ class AdminControllerTest {
         alice.setFullName("Alice Nguyen");
         User bob = targetUser(2L, "bob@example.com");
         bob.setFullName("Bob Tran");
-        when(userRepository.findAll()).thenReturn(List.of(alice, bob));
+        when(userRepository.findUsersNotInRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(alice)));
 
         ResponseEntity<?> response = adminController.getUsers("staff", "alice", 0, 10);
 
@@ -130,7 +132,8 @@ class AdminControllerTest {
     void getUsersShouldDefaultToStaffFilterExcludingLearners() {
         User learner = userWithRole(1L, "learner@example.com", "LEARNER");
         User trainer = userWithRole(2L, "trainer@example.com", "TRAINER");
-        when(userRepository.findAll()).thenReturn(List.of(learner, trainer));
+        when(userRepository.findUsersNotInRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(trainer)));
 
         ResponseEntity<?> response = adminController.getUsers("staff", null, 0, 10);
 
@@ -145,7 +148,8 @@ class AdminControllerTest {
         for (long i = 1; i <= 15; i++) {
             users.add(userWithRole(i, "trainer" + i + "@example.com", "TRAINER"));
         }
-        when(userRepository.findAll()).thenReturn(users);
+        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(users.subList(10, 15), org.springframework.data.domain.PageRequest.of(1, 10), 15));
 
         ResponseEntity<?> response = adminController.getUsers("trainer", null, 1, 10);
 
@@ -161,8 +165,8 @@ class AdminControllerTest {
     @Test
     void getUsersShouldFilterByAdminRoleType() {
         User admin = userWithRole(1L, "admin@example.com", "ADMINISTRATOR");
-        User trainer = userWithRole(2L, "trainer@example.com", "TRAINER");
-        when(userRepository.findAll()).thenReturn(List.of(admin, trainer));
+        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(admin)));
 
         ResponseEntity<?> response = adminController.getUsers("admin", null, 0, 10);
 
@@ -173,8 +177,8 @@ class AdminControllerTest {
 
     @Test
     void getUsersShouldReturnEmptyContentWhenPageExceedsTotalElements() {
-        User trainer = userWithRole(1L, "trainer@example.com", "TRAINER");
-        when(userRepository.findAll()).thenReturn(List.of(trainer));
+        when(userRepository.findUsersNotInRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.Collections.emptyList()));
 
         ResponseEntity<?> response = adminController.getUsers("trainer", null, 5, 10);
 
