@@ -141,33 +141,37 @@ public class AIAssistantService {
 
                 userMessage.setWasOutOfScope(outOfScope);
 
-                // Sinh suggestedQuestions (3 câu) dựa theo ngữ cảnh bài học + câu trả lời vừa tạo.
+                // Sinh suggestedQuestions (3 câu) dựa theo ngữ cảnh bài học + câu trả lời vừa
+                // tạo.
                 // Nếu out-of-scope thì vẫn trả về null/empty để UI có thể ẩn.
                 java.util.List<String> suggestedQuestions = new java.util.ArrayList<>();
                 try {
                         if (!outOfScope) {
                                 // Yêu cầu Gemini trả đúng 3 câu hỏi, mỗi câu 1 dòng.
                                 String systemForSuggestions = """
-                                Bạn là trợ lý học tập AI.
-                                Dựa trên BÀI HỌC, CÂU HỎI NGƯỜI HỌC và đặc biệt là NỘI DUNG TRẢ LỜI của trợ lý (TRỢ LÝ ĐÃ TRẢ LỜI), hãy đề xuất đúng 3 câu hỏi tiếp theo (tiếng Việt) để người học tiếp tục đào sâu.
+                                                Bạn là trợ lý học tập AI.
+                                                Dựa trên BÀI HỌC, CÂU HỎI NGƯỜI HỌC và đặc biệt là NỘI DUNG TRẢ LỜI của trợ lý (TRỢ LÝ ĐÃ TRẢ LỜI),
+                                                hãy đề xuất đúng 3 câu hỏi tiếp theo (tiếng Việt hoặc tiếng Anh tùy vào câu trả lời trước đó của bạn)
+                                                để người học tiếp tục đào sâu.
 
-                                QUAN TRỌNG (BẮT BUỘC):
-                                - 3 câu gợi ý này CHỈ LÀ CÂU HỎI (không phải đáp án).
-                                - TUYỆT ĐỐI KHÔNG kèm đáp án/giải thích đầy đủ cho quiz vừa được tạo trong đoạn chat.
-                                - Không được đưa các cụm như: "Đáp án là", "Correct answer", "đúng là", "A/B/C", hoặc các phương án kèm đáp án.
-                                - Không được trả lời luôn câu hỏi/quiz mà trước đó trợ lý vừa tạo.
-                                - Nếu trợ lý vừa tạo quiz trắc nghiệm nhiều lựa chọn, câu gợi ý phải hỏi một ý/khái niệm khác, ví dụ khác, hoặc yêu cầu luyện tập tương tự nhưng KHÔNG kèm đáp án.
+                                                QUAN TRỌNG (BẮT BUỘC):
+                                                - 3 câu gợi ý này CHỈ LÀ CÂU HỎI (không phải đáp án).
+                                                - TUYỆT ĐỐI KHÔNG kèm đáp án/giải thích đầy đủ cho quiz vừa được tạo trong đoạn chat.
+                                                - Không được đưa các cụm như: "Đáp án là", "Correct answer", "đúng là", "A/B/C", hoặc các phương án kèm đáp án.
+                                                - Không được trả lời luôn câu hỏi/quiz mà trước đó trợ lý vừa tạo.
+                                                - Nếu trợ lý vừa tạo quiz trắc nghiệm nhiều lựa chọn, câu gợi ý phải hỏi một ý/khái niệm khác, ví dụ khác, hoặc
+                                                yêu cầu luyện tập tương tự nhưng KHÔNG kèm đáp án.
 
-                                Mỗi câu hỏi phải:
-                                - bám sát TRỢ LÝ ĐÃ TRẢ LỜI (ví dụ: hỏi rõ một ý, hỏi ví dụ minh hoạ khác, hỏi bước tiếp theo, hỏi cách áp dụng)
-                                - liên quan trực tiếp đến bài học và có thể trả lời được trong phạm vi bài học
-                                - độ dài ngắn gọn (<= 80 ký tự)
-                                - không hỏi ngoài lề
+                                                Mỗi câu hỏi phải:
+                                                - bám sát TRỢ LÝ ĐÃ TRẢ LỜI (ví dụ: hỏi rõ một ý, hỏi ví dụ minh hoạ khác, hỏi bước tiếp theo, hỏi cách áp dụng)
+                                                - liên quan trực tiếp đến bài học và có thể trả lời được trong phạm vi bài học
+                                                - độ dài ngắn gọn (<= 80 ký tự)
+                                                - không hỏi ngoài lề
 
-                                YÊU CẦU FORMAT BẮT BUỘC:
-                                Trả về JSON thuần, đúng như:
-                                {"suggestedQuestions":["...","...","..."]}
-                                """;
+                                                YÊU CẦU FORMAT BẮT BUỘC:
+                                                Trả về JSON thuần, đúng như:
+                                                {"suggestedQuestions":["...","...","..."]}
+                                                """;
 
                                 // Dùng promptbuilder hệ thống hiện tại cho scope, nhưng thêm ràng buộc format.
                                 // Ta gửi: systemForSuggestions + history gồm câu hỏi hiện tại & replyText.
@@ -179,11 +183,16 @@ public class AIAssistantService {
                                                                 .role("user")
                                                                 .parts(
                                                                                 java.util.List.of(
-                                                                                                com.hango.hango_backend.dto.GeminiGenerateRequest.Part.builder()
-                                                                                                                .text("Bài học: " + lesson.getTitle()
-                                                                                                                                + "\n\nNội dung: " + lesson.getContentText()
-                                                                                                                                + "\n\nCâu hỏi learner: " + request.getMessage()
-                                                                                                                                + "\n\nTrợ lý đã trả lời: " + replyText)
+                                                                                                com.hango.hango_backend.dto.GeminiGenerateRequest.Part
+                                                                                                                .builder()
+                                                                                                                .text("Bài học: "
+                                                                                                                                + lesson.getTitle()
+                                                                                                                                + "\n\nNội dung: "
+                                                                                                                                + lesson.getContentText()
+                                                                                                                                + "\n\nCâu hỏi learner: "
+                                                                                                                                + request.getMessage()
+                                                                                                                                + "\n\nTrợ lý đã trả lời: "
+                                                                                                                                + replyText)
                                                                                                                 .build()))
                                                                 .build());
 
@@ -204,14 +213,17 @@ public class AIAssistantService {
                                                 String q = m.group(1);
                                                 if (q != null) {
                                                         q = q.trim();
-                                                        if (!q.isEmpty()) suggestedQuestions.add(q);
+                                                        if (!q.isEmpty())
+                                                                suggestedQuestions.add(q);
                                                 }
-                                                if (suggestedQuestions.size() >= 3) break;
+                                                if (suggestedQuestions.size() >= 3)
+                                                        break;
                                         }
                                 }
 
                                 // fallback: đảm bảo đúng 3 phần tử (nếu Gemini trả ít)
-                                if (suggestedQuestions.size() > 3) suggestedQuestions = suggestedQuestions.subList(0, 3);
+                                if (suggestedQuestions.size() > 3)
+                                        suggestedQuestions = suggestedQuestions.subList(0, 3);
                                 if (suggestedQuestions.size() < 3) {
                                         // để empty/thiếu thì UI vẫn chạy; không ép thêm.
                                 }
@@ -237,7 +249,6 @@ public class AIAssistantService {
                                 .wasOutOfScope(outOfScope)
                                 .suggestedQuestions(suggestedQuestions)
                                 .build();
-
 
         }
 
@@ -285,4 +296,3 @@ public class AIAssistantService {
                 return conversationRepository.findByLearnerIdOrderByStartedAtDesc(learnerId);
         }
 }
-

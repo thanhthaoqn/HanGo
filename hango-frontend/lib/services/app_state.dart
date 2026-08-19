@@ -200,17 +200,18 @@ class AppState extends ChangeNotifier {
 
       final response = await http
           .post(
-            Uri.parse(finalChatUrl),
+            Uri.parse(finalChatUrl), // Đường dẫn: /api/v1/ai-assistant/messages
             headers: {
               'Content-Type': 'application/json',
               if (_session?.token != null)
-                'Authorization': 'Bearer ${_session!.token}',
+                'Authorization':
+                    'Bearer ${_session!.token}', // Đính kèm vé bảo mật
             },
             body: jsonEncode({
               'lessonId': lessonId,
               if (conversationId != null) 'conversationId': conversationId,
               'message': message,
-            }),
+            }), // Gói JSON chứa lessonId và message
           )
           .timeout(
             const Duration(seconds: 30),

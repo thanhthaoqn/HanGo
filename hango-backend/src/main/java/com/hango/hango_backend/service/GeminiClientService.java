@@ -92,6 +92,11 @@ public class GeminiClientService {
                 }
         }
 
+        /**
+         * Hàm khởi tạo (Lifecycle hook): Chạy ngay khi Spring Boot vừa khởi động.
+         * Tác dụng: Cấu hình sẵn WebClient với BaseURL (địa chỉ máy chủ Google) 
+         * và tự động nhúng API_KEY vào Header (x-goog-api-key) để dùng chung cho mọi cuộc gọi mạng sau này.
+         */
         @PostConstruct
         public void init() {
                 String baseUrl = geminiProperties.getBaseUrl();
@@ -116,6 +121,11 @@ public class GeminiClientService {
                 log.info("Gemini WebClient initialized successfully with base URL: {}", baseUrl);
         }
 
+        /**
+         * Hàm Bắt Mạch (Health Check): Dùng để ping kiểm tra Google Gemini xem có bị sập không.
+         * Cơ chế: Gửi một câu lệnh siêu ngắn "Reply with OK only." để thử.
+         * Cải tiến: Kết quả được Cache (lưu tạm) lại để tránh gọi API liên tục gây tốn tiền.
+         */
         @Cacheable(value = "geminiStatus")
         public AiHealthResponse checkAvailability() {
                 if (geminiProperties.getApiKey() == null || geminiProperties.getApiKey().isBlank()) {
@@ -166,8 +176,10 @@ public class GeminiClientService {
         }
 
         /**
-         * Calls the Gemini chat model to generate a response, including the ENTIRE chat
-         * history.
+         * Hàm Giao Tiếp Chính (Chat Completion): Nơi chính thức "nói chuyện" với con bot Gemini.
+         * Đầu vào: Lời nhắc hệ thống (System Prompt - Ép AI làm giáo viên) và Toàn bộ Lịch sử Chat.
+         * Cải tiến: Được tích hợp cơ chế tự động thử lại (Retry.backoff) tối đa 2 lần 
+         * nếu máy chủ Google báo lỗi 429 quá tải (Too Many Requests).
          */
         public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
                 GeminiGenerateRequest request = GeminiGenerateRequest.builder()
@@ -267,6 +279,12 @@ public class GeminiClientService {
 <<<<<<< Updated upstream
          * Auto-generate transcript for a video using Gemini 1.5 Flash Audio/Video
          * capability.
+         */
+        /**
+         * Tính năng Trích xuất Phụ đề Video (Multimodal Video Processing).
+         * Tác dụng: Khi giảng viên upload một video bài giảng, hàm này sẽ nhờ Gemini 
+         * nghe và dịch lại toàn bộ lời thoại trong video thành văn bản (Transcript). 
+         * Văn bản này sau đó được dùng làm ngữ cảnh (Context) để AI Chatbox trả lời sinh viên.
          */
         public String generateVideoTranscript(String videoUrl) {
                 long startedAt = System.currentTimeMillis();
@@ -392,6 +410,12 @@ public class GeminiClientService {
          * Vision API.
          * Extracts document title, issuing institution, holder name, and pedagogical
          * classification.
+         */
+        /**
+         * Tính năng Đọc Hiểu Hình Ảnh Bằng Cấp (Vision AI / OCR).
+         * Tác dụng: Dành riêng cho luồng Đăng ký làm Giảng viên (Trainer Onboarding).
+         * Khi ứng viên up ảnh chứng chỉ (IELTS, bằng đại học), hàm này nhờ Gemini đọc ảnh, 
+         * bóc tách họ tên, loại văn bằng và tự động chấm điểm hồ sơ.
          */
         public String analyzeDocumentImage(byte[] imageBytes, String mimeType) {
                 String base64Data = java.util.Base64.getEncoder().encodeToString(imageBytes);

@@ -23,7 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ai-assistant")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true") // ✨ THÊM DÒNG NÀY ĐỂ FIX LỖI CORS CHO
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true") // THÊM DÒNG NÀY ĐỂ FIX LỖI CORS CHO
                                                                            // FLUTTER WEB
 public class AIAssistantController {
 
@@ -90,7 +90,7 @@ public class AIAssistantController {
                     // Thử parse xem có phải chuỗi ID số hay không
                     return Long.parseLong(principalStr);
                 } catch (NumberFormatException e) {
-                    // ✨ MẤU CHỐT: Nếu là Email/Username, tiến hành truy vấn DB để lấy ID chuẩn
+                    // MẤU CHỐT: Nếu là Email/Username, tiến hành truy vấn DB để lấy ID chuẩn
                     return userRepository.findByEmail(principalStr)
                             .map(User::getId)
                             .orElse(null);
