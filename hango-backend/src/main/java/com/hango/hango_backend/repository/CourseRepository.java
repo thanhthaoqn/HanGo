@@ -153,12 +153,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     Optional<Course> findByIdAndParentIdIsNullAndDeletedAtIsNull(Long id);
 
-    @EntityGraph(attributePaths = {"categories", "category", "difficulty", "creator"})
-    @Query("SELECT c FROM Course c WHERE c.id = :id")
+    @Query("SELECT c FROM Course c LEFT JOIN FETCH c.category LEFT JOIN FETCH c.difficulty LEFT JOIN FETCH c.creator LEFT JOIN FETCH c.categories WHERE c.id = :id")
     Optional<Course> findByIdWithDetails(@Param("id") Long id);
 
-    @EntityGraph(attributePaths = {"categories", "category", "difficulty", "creator"})
-    @Query("SELECT c FROM Course c WHERE c.id IN :ids")
+    @Query("SELECT c FROM Course c LEFT JOIN FETCH c.category LEFT JOIN FETCH c.difficulty LEFT JOIN FETCH c.creator LEFT JOIN FETCH c.categories WHERE c.id IN :ids")
     List<Course> findAllByIdWithDetails(@Param("ids") List<Long> ids);
 
     @org.springframework.data.jpa.repository.Modifying

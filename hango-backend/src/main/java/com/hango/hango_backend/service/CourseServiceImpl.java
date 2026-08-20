@@ -169,6 +169,12 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
 
         if (course.getDeletedAt() != null) {
+            if (course.getLatestVersionId() != null && !course.getLatestVersionId().equals(course.getId())) {
+                Course latestCourse = courseRepository.findById(course.getLatestVersionId()).orElse(null);
+                if (latestCourse != null && "PUBLISHED".equalsIgnoreCase(latestCourse.getStatus()) && latestCourse.getDeletedAt() == null) {
+                    return getCourseDetail(latestCourse.getId(), currentUserId);
+                }
+            }
             throw new RuntimeException("Course not found");
         }
 
@@ -189,7 +195,26 @@ public class CourseServiceImpl implements CourseService {
         if (!"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
             boolean isCreator = (currentUserId != null && course.getCreator() != null && course.getCreator().getId().equals(currentUserId));
             boolean isHiddenOrArchivedAndEnrolled = ("HIDDEN".equalsIgnoreCase(course.getStatus()) || "ARCHIVED".equalsIgnoreCase(course.getStatus())) && isEnrolled;
-            if (!isCreator && !isHiddenOrArchivedAndEnrolled) {
+            
+            boolean isAdminOrManager = false;
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                isAdminOrManager = auth.getAuthorities().stream().anyMatch(a -> 
+                    a.getAuthority().equals("ROLE_ADMINISTRATOR") || 
+                    a.getAuthority().equals("MANAGE_ACCOUNTS_ROLES") ||
+                    a.getAuthority().equals("VIEW_PLATFORM_DASHBOARD") ||
+                    a.getAuthority().equals("APPROVE_REJECT_COURSES") ||
+                    a.getAuthority().equals("MANAGE_ALL_COURSES")
+                );
+            }
+            
+            if (!isCreator && !isHiddenOrArchivedAndEnrolled && !isAdminOrManager) {
+                if (course.getLatestVersionId() != null && !course.getLatestVersionId().equals(course.getId())) {
+                    Course latestCourse = courseRepository.findById(course.getLatestVersionId()).orElse(null);
+                    if (latestCourse != null && "PUBLISHED".equalsIgnoreCase(latestCourse.getStatus()) && latestCourse.getDeletedAt() == null) {
+                        return getCourseDetail(latestCourse.getId(), currentUserId);
+                    }
+                }
                 throw new RuntimeException("Course not found");
             }
         }
