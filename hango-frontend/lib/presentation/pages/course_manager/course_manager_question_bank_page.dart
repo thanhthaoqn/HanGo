@@ -52,6 +52,9 @@ class _CourseManagerQuestionBankPageState
   int? _selectedGroupTypeId;
   int? _selectedDifficultyId;
 
+  CourseManagerQuestion? _viewingQuestion;
+  CourseManagerQuestion? _editingQuestion;
+
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   void initState() {
@@ -376,30 +379,14 @@ class _CourseManagerQuestionBankPageState
                                   });
                                 },
                                 onViewPressed: (q) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          CourseManagerCreateQuestionPage(
-                                            question: q,
-                                            isReadOnly: true,
-                                            isCourseManager: true,
-                                          ),
-                                    ),
-                                  );
+                                  setState(() {
+                                    _viewingQuestion = q;
+                                  });
                                 },
                                 onEditPressed: (q) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          CourseManagerCreateQuestionPage(
-                                            question: q,
-                                            isEdit: true,
-                                            isCourseManager: true,
-                                          ),
-                                    ),
-                                  ).then((_) => _fetchQuestions());
+                                  setState(() {
+                                    _editingQuestion = q;
+                                  });
                                 },
                                 onStatusToggled: (q, isPublic) async {
                                   final oldStatus = q.status;
@@ -457,8 +444,35 @@ class _CourseManagerQuestionBankPageState
               ],
             );
 
+    final Widget content = _editingQuestion != null
+        ? CourseManagerCreateQuestionPage(
+            question: _editingQuestion,
+            isEdit: true,
+            isCourseManager: true,
+            isEmbedded: true,
+            onBack: () {
+              setState(() {
+                _editingQuestion = null;
+              });
+              _fetchQuestions();
+            },
+          )
+        : _viewingQuestion != null
+            ? CourseManagerCreateQuestionPage(
+                question: _viewingQuestion,
+                isReadOnly: true,
+                isCourseManager: true,
+                isEmbedded: true,
+                onBack: () {
+                  setState(() {
+                    _viewingQuestion = null;
+                  });
+                },
+              )
+            : bodyContent;
+
     if (widget.isEmbedded) {
-      return bodyContent;
+      return content;
     }
 
     return Scaffold(
@@ -476,7 +490,7 @@ class _CourseManagerQuestionBankPageState
               width: 240,
               child: CourseManagerSidebar(currentRoute: 'question_bank'),
             ),
-          Expanded(child: bodyContent),
+          Expanded(child: content),
         ],
       ),
     );

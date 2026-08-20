@@ -57,6 +57,9 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   int? _selectedGroupTypeId;
   int? _selectedDifficultyId;
 
+  CourseManagerQuestion? _viewingQuestion;
+  CourseManagerQuestion? _editingQuestion;
+
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
   @override
@@ -337,8 +340,35 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         ? []
         : _allQuestions.sublist(startIndex, endIndex);
 
+    final Widget content = _editingQuestion != null
+        ? CourseManagerCreateQuestionPage(
+            question: _editingQuestion,
+            isEdit: true,
+            isCourseManager: false,
+            isEmbedded: true,
+            onBack: () {
+              setState(() {
+                _editingQuestion = null;
+              });
+              _fetchQuestions();
+            },
+          )
+        : _viewingQuestion != null
+            ? CourseManagerCreateQuestionPage(
+                question: _viewingQuestion,
+                isReadOnly: true,
+                isCourseManager: false,
+                isEmbedded: true,
+                onBack: () {
+                  setState(() {
+                    _viewingQuestion = null;
+                  });
+                },
+              )
+            : _buildBodyContent(isDesktop);
+
     if (widget.isEmbedded) {
-      return _buildBodyContent(isDesktop);
+      return content;
     }
 
     return Scaffold(
@@ -355,7 +385,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
-                Expanded(child: _buildBodyContent(isDesktop)),
+                Expanded(child: content),
               ],
             ),
           ),
@@ -424,28 +454,14 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
               });
             },
             onViewPressed: (q) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CourseManagerCreateQuestionPage(
-                    question: q,
-                    isReadOnly: true,
-                    isCourseManager: false,
-                  ),
-                ),
-              );
+              setState(() {
+                _viewingQuestion = q;
+              });
             },
             onEditPressed: (q) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CourseManagerCreateQuestionPage(
-                    question: q,
-                    isEdit: true,
-                    isCourseManager: false,
-                  ),
-                ),
-              ).then((_) => _fetchQuestions());
+              setState(() {
+                _editingQuestion = q;
+              });
             },
             onStatusToggled: (q, isPublic) async {
               final oldStatus = q.status;

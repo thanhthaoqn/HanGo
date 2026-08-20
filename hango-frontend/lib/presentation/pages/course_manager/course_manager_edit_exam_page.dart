@@ -23,6 +23,7 @@ class OptionState {
 }
 
 class QuestionState {
+  int? id;
   TextEditingController questionTextController = TextEditingController();
   TextEditingController explanationController = TextEditingController();
   int? selectedSkillId;
@@ -44,6 +45,7 @@ class QuestionState {
 }
 
 class QuestionBlockState {
+  int? id;
   bool isQuestionGroup = true;
   bool isGenerated = false;
   int? selectedSkillId;
@@ -191,7 +193,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     }
   }
 
-  Future<void> _updateExamStatus(String newStatus) async {
+  Future<void> _updateExamStatus(String newStatus, {String? successMessage}) async {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
@@ -209,12 +211,12 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
 
       if (response.statusCode == 200) {
         if (mounted) {
-          ToastHelper.show(context, 'Thành công!');
+          ToastHelper.show(context, successMessage ?? 'Updated successfully!');
           _goBack();
         }
       } else {
         if (mounted) {
-          ToastHelper.show(context, 'Lỗi cập nhật', isError: true);
+          ToastHelper.show(context, 'Failed to update exam status.', isError: true);
         }
       }
     } catch (e) {
@@ -225,8 +227,9 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
   void _showActionDialog(
     String actionName,
     String newStatus,
-    Color confirmColor,
-  ) {
+    Color confirmColor, {
+    required String successMessage,
+  }) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -253,7 +256,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                _updateExamStatus(newStatus);
+                _updateExamStatus(newStatus, successMessage: successMessage);
               },
               style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
               child: const Text(
@@ -644,6 +647,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       } else {
         for (var blockData in blocksData) {
           final block = QuestionBlockState();
+          block.id = blockData['id'];
           block.isGenerated = true; // Disable toggle for existing blocks
           block.selectedGroupTypeId = blockData['categoryId'];
 
@@ -660,6 +664,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             block.questions.clear(); // Clear default empty question
             for (var qData in subQData) {
               final qState = QuestionState();
+              qState.id = qData['id'];
               qState.questionTextController.text = qData['questionText'] ?? '';
               qState.explanationController.text = qData['explanation'] ?? '';
               qState.selectedSkillId =
@@ -751,6 +756,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       'blocks': _blocks
           .map(
             (block) => {
+              'id': block.id,
               'categoryId': block.selectedGroupTypeId,
               'skillParamId': block.questions.isNotEmpty
                   ? block.questions.first.selectedSkillId
@@ -764,6 +770,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
               'subQuestions': block.questions
                   .map(
                     (q) => {
+                      'id': q.id,
                       'questionText': q.questionTextController.text,
                       'explanation': q.explanationController.text,
                       'skillParamId': q.selectedSkillId,
@@ -1382,6 +1389,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                             'Hide',
                             'HIDDEN',
                             Colors.orange,
+                            successMessage: 'Exam hidden successfully!',
                           ),
                           icon: const Icon(
                             Icons.visibility_off,
@@ -1415,6 +1423,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
                             'Publish',
                             'PUBLISHED',
                             const Color(0xFF38C9A6),
+                            successMessage: 'Exam published successfully!',
                           ),
                           icon: const Icon(
                             Icons.visibility,

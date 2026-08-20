@@ -59,6 +59,8 @@ class CourseManagerCreateQuestionPage extends StatefulWidget {
   final bool isEdit;
   final bool isCourseManager;
   final Map<String, dynamic>? initialData;
+  final bool isEmbedded;
+  final VoidCallback? onBack;
 
   const CourseManagerCreateQuestionPage({
     Key? key,
@@ -67,6 +69,8 @@ class CourseManagerCreateQuestionPage extends StatefulWidget {
     this.isEdit = false,
     this.isCourseManager = false,
     this.initialData,
+    this.isEmbedded = false,
+    this.onBack,
   }) : super(key: key);
 
   @override
@@ -94,6 +98,14 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   void initState() {
     super.initState();
     _loadMetadata();
+  }
+
+  void _goBack() {
+    if (widget.isEmbedded && widget.onBack != null) {
+      widget.onBack!();
+    } else {
+      Navigator.pop(context);
+    }
   }
 
 
@@ -458,7 +470,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       if (mounted) {
         if (errorCount == 0) {
           ToastHelper.showSuccess(context, 'Saved $successCount questions successfully!');
-          Navigator.pop(context);
+          _goBack();
         } else {
           ToastHelper.showError(context, 'Saved $successCount questions, failed $errorCount questions.');
         }
@@ -478,6 +490,12 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 1024;
+
+    if (widget.isEmbedded) {
+      return _isLoadingMetadata
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF38C9A6)))
+          : _buildMainContent();
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -668,7 +686,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       runSpacing: 12,
       children: [
         OutlinedButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _goBack,
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF64748B),
             side: const BorderSide(color: Color(0xFFCBD5E1)),

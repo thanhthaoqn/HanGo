@@ -317,7 +317,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                 examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
                 examExpectedCount:
                     _editingExamData!['expectedQuestionCount'] as int? ?? 10,
-                isReadOnly: (examStatus != 'DRAFT' && examStatus != 'REJECTED' && examStatus != 'PUBLISHED'),
+                isReadOnly: (examStatus != 'DRAFT' && examStatus != 'REJECTED' && examStatus != 'PUBLISHED' && examStatus != 'HIDDEN'),
                 courseManagerActionStatus: examStatus,
                 isCourseManager: true,
                 initialExamData: _editingExamData,
@@ -1002,7 +1002,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                                   onActionSuccess: () {
                                     _fetchExamsData();
                                   },
-                                  onEditExam: isCreator && ['REJECTED', 'PUBLISHED'].contains(status)
+                                  onEditExam: isCreator && ['REJECTED', 'PUBLISHED', 'HIDDEN'].contains(status)
                                       ? () {
                                           setState(() {
                                             _editingExamData = exam as Map<String, dynamic>;

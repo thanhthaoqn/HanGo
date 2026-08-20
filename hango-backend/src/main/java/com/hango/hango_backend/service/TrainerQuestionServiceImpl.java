@@ -4,14 +4,18 @@ import com.hango.hango_backend.dto.QuestionDTO;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import com.hango.hango_backend.exception.ApiException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 import com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO;
 import com.hango.hango_backend.dto.CreateSubQuestionDTO;
@@ -189,6 +193,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
     @Override
     @Transactional
     public Map<String, Object> createQuestionBankGroup(String email, CreateGroupQuestionRequestDTO request) {
+        validateSubQuestions(request.getSubQuestions());
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
@@ -207,24 +213,45 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             difficulty = systemParameterRepository.findById(request.getDifficultyId()).orElse(null);
         }
 
-        // 1. Create QuestionGroup if passage text exists
+        // 1. Reuse the existing QuestionGroup (if the request references one we own) or create a new one
         QuestionGroup group = null;
         if (request.getPassageText() != null && !request.getPassageText().trim().isEmpty()) {
-            group = new QuestionGroup();
+            if (request.getId() != null) {
+                group = questionGroupRepository.findById(request.getId()).orElse(null);
+                if (group != null) {
+                    List<Question> groupQuestions = questionRepository.findByQuestionGroup(group);
+                    boolean ownedByUser = groupQuestions.isEmpty()
+                            || groupQuestions.get(0).getCreatedBy().getId().equals(user.getId());
+                    if (!ownedByUser) {
+                        group = null;
+                    }
+                }
+            }
+            if (group == null) {
+                group = new QuestionGroup();
+            }
             group.setContextText(request.getPassageText());
-
-            SystemParameter groupType = skillParam;
-            group.setGroupTypeParam(groupType);
+            group.setGroupTypeParam(skillParam);
             group = questionGroupRepository.save(group);
         }
 
         List<Long> questionIds = new ArrayList<>();
 
-        // 2. Create Questions
+        // 2. Create or update questions. Reusing the id (when it belongs to this user) keeps the
+        // question's identity stable so it doesn't get duplicated in the bank or unlinked from
+        // other exams that reference it.
         if (request.getSubQuestions() != null) {
             for (CreateSubQuestionDTO subQ : request.getSubQuestions()) {
-                Question q = new Question();
-                q.setCreatedBy(user);
+                Question q = null;
+                if (subQ.getId() != null) {
+                    q = questionRepository.findById(subQ.getId())
+                            .filter(existing -> existing.getCreatedBy().getId().equals(user.getId()))
+                            .orElse(null);
+                }
+                if (q == null) {
+                    q = new Question();
+                    q.setCreatedBy(user);
+                }
                 q.setCategory(category);
                 q.setQuestionGroup(group);
                 q.setQuestionText(subQ.getQuestionText());
@@ -246,17 +273,21 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 q = questionRepository.save(q);
                 questionIds.add(q.getId());
 
-                // 3. Create Options
+                // 3. Replace options. Past exam attempts store a frozen snapshot of the answer
+                // (not a live foreign key to question_options.id), so it's safe to swap them.
                 if (subQ.getOptions() != null) {
-                    List<QuestionOption> options = new ArrayList<>();
+                    if (q.getOptions() == null) {
+                        q.setOptions(new ArrayList<>());
+                    } else {
+                        q.getOptions().clear();
+                    }
                     for (CreateOptionDTO optDTO : subQ.getOptions()) {
                         QuestionOption opt = new QuestionOption();
                         opt.setQuestion(q);
                         opt.setOptionText(optDTO.getOptionText());
                         opt.setIsCorrect(optDTO.getIsCorrect() != null && optDTO.getIsCorrect());
-                        options.add(opt);
+                        q.getOptions().add(opt);
                     }
-                    q.setOptions(options);
                     questionRepository.save(q);
                 }
             }
@@ -322,6 +353,22 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         }
     }
 
+    private void validateSubQuestions(List<CreateSubQuestionDTO> subQuestions) {
+        if (subQuestions == null || subQuestions.isEmpty()) {
+            throw new ApiException("At least one question is required.", HttpStatus.BAD_REQUEST);
+        }
+        for (int i = 0; i < subQuestions.size(); i++) {
+            List<CreateOptionDTO> options = subQuestions.get(i).getOptions();
+            boolean hasCorrectOption = options != null
+                    && options.stream().anyMatch(opt -> Boolean.TRUE.equals(opt.getIsCorrect()));
+            if (!hasCorrectOption) {
+                throw new ApiException(
+                        "Question " + (i + 1) + " must have at least one correct option.",
+                        HttpStatus.BAD_REQUEST);
+            }
+        }
+    }
+
     private CreateSubQuestionDTO mapToSubQuestionDTO(Question q) {
         CreateSubQuestionDTO sub = new CreateSubQuestionDTO();
         sub.setId(q.getId());
@@ -347,6 +394,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
     @Override
     @Transactional
     public void updateQuestionBankGroup(String email, Long id, boolean isGroup, CreateGroupQuestionRequestDTO request) {
+        validateSubQuestions(request.getSubQuestions());
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
@@ -366,6 +415,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         }
 
         QuestionGroup group = null;
+        List<Question> existingQuestions;
         if (isGroup) {
             group = questionGroupRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Question Group not found"));
@@ -376,26 +426,37 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
 
             questionGroupRepository.save(group);
 
-            // For simplicity, we just delete old questions and create new ones
-            List<Question> oldQuestions = questionRepository.findByQuestionGroup(group);
-            if (!oldQuestions.isEmpty() && !oldQuestions.get(0).getCreatedBy().getId().equals(user.getId())) {
+            existingQuestions = questionRepository.findByQuestionGroup(group);
+            if (!existingQuestions.isEmpty() && !existingQuestions.get(0).getCreatedBy().getId().equals(user.getId())) {
                 throw new RuntimeException("No permission");
             }
-            questionRepository.deleteAll(oldQuestions);
         } else {
             Question oldQ = questionRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Question not found"));
             if (!oldQ.getCreatedBy().getId().equals(user.getId())) {
                 throw new RuntimeException("No permission");
             }
-            questionRepository.delete(oldQ);
+            existingQuestions = new ArrayList<>();
+            existingQuestions.add(oldQ);
         }
 
-        // Recreate questions
+        // Match sub-questions back to their existing rows by id so unchanged questions keep their
+        // identity (avoids duplicating them in the bank and unlinking them from other exams).
+        Map<Long, Question> existingById = new HashMap<>();
+        for (Question existing : existingQuestions) {
+            existingById.put(existing.getId(), existing);
+        }
+        Set<Long> keptIds = new HashSet<>();
+
         if (request.getSubQuestions() != null) {
             for (CreateSubQuestionDTO subQ : request.getSubQuestions()) {
-                Question q = new Question();
-                q.setCreatedBy(user);
+                Question q = subQ.getId() != null ? existingById.get(subQ.getId()) : null;
+                if (q == null) {
+                    q = new Question();
+                    q.setCreatedBy(user);
+                } else {
+                    keptIds.add(q.getId());
+                }
                 q.setCategory(category);
                 q.setQuestionGroup(group);
                 q.setQuestionText(subQ.getQuestionText());
@@ -417,18 +478,32 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 q = questionRepository.save(q);
 
                 if (subQ.getOptions() != null) {
-                    List<QuestionOption> options = new ArrayList<>();
+                    if (q.getOptions() == null) {
+                        q.setOptions(new ArrayList<>());
+                    } else {
+                        q.getOptions().clear();
+                    }
                     for (CreateOptionDTO optDTO : subQ.getOptions()) {
                         QuestionOption opt = new QuestionOption();
                         opt.setQuestion(q);
                         opt.setOptionText(optDTO.getOptionText());
                         opt.setIsCorrect(optDTO.getIsCorrect() != null && optDTO.getIsCorrect());
-                        options.add(opt);
+                        q.getOptions().add(opt);
                     }
-                    q.setOptions(options);
                     questionRepository.save(q);
                 }
             }
+        }
+
+        // Delete only the questions that were actually removed from this group/edit.
+        List<Question> removed = new ArrayList<>();
+        for (Question existing : existingQuestions) {
+            if (!keptIds.contains(existing.getId())) {
+                removed.add(existing);
+            }
+        }
+        if (!removed.isEmpty()) {
+            questionRepository.deleteAll(removed);
         }
     }
 

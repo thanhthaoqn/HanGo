@@ -1074,6 +1074,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
             if (groupId == null || !groupId.equals(currentGroupId) || currentBlock == null) {
                 currentBlock = new com.hango.hango_backend.dto.CreateGroupQuestionRequestDTO();
+                currentBlock.setId(groupId);
                 currentBlock.setCategoryId((groupId != null && q.getQuestionGroup() != null
                         && q.getQuestionGroup().getGroupTypeParam() != null)
                                 ? q.getQuestionGroup().getGroupTypeParam().getId()
@@ -1094,6 +1095,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             }
 
             com.hango.hango_backend.dto.CreateSubQuestionDTO subQ = new com.hango.hango_backend.dto.CreateSubQuestionDTO();
+            subQ.setId(q.getId());
             subQ.setQuestionText(q.getQuestionText());
             subQ.setExplanation(q.getExplanation());
             subQ.setSkillParamId(q.getSkillParam() != null ? q.getSkillParam().getId() : null);

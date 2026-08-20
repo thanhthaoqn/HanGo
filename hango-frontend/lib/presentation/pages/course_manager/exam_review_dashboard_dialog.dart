@@ -148,7 +148,7 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
     return found['paramValue']?.toString();
   }
 
-  Future<void> _updateExamStatus(String newStatus) async {
+  Future<void> _updateExamStatus(String newStatus, {String? successMessage}) async {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
@@ -165,6 +165,9 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
       if (response.statusCode == 200) {
         if (mounted) {
           Navigator.pop(context); // close dialog
+          if (successMessage != null) {
+            ToastHelper.show(context, successMessage);
+          }
           widget.onActionSuccess();
         }
       } else {
@@ -177,6 +180,46 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
         ToastHelper.show(context, 'Error: $e', isError: true);
       }
     }
+  }
+
+  void _confirmUpdateExamStatus(
+    String actionName,
+    String newStatus,
+    Color confirmColor, {
+    required String successMessage,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          '$actionName Exam',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to $actionName the exam "${widget.examTitle}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _updateExamStatus(newStatus, successMessage: successMessage);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
+            child: Text(
+              actionName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _publishExamAsManager() async {
@@ -880,7 +923,7 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
             ),
           ),
           if (_isOwnExam &&
-              ['REJECTED', 'PUBLISHED'].contains(widget.status.toUpperCase()) &&
+              ['REJECTED', 'PUBLISHED', 'HIDDEN'].contains(widget.status.toUpperCase()) &&
               widget.onEditExam != null) ...[
             const SizedBox(width: 12),
             ElevatedButton.icon(
@@ -1033,7 +1076,12 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
             ),
             const SizedBox(width: 12),
             ElevatedButton(
-              onPressed: () => _updateExamStatus('HIDDEN'),
+              onPressed: () => _confirmUpdateExamStatus(
+                'Hide',
+                'HIDDEN',
+                const Color(0xFFF59E0B),
+                successMessage: 'Exam hidden successfully!',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFFF59E0B),
@@ -1053,16 +1101,21 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
               widget.status.toUpperCase() == 'HIDDEN') ...[
             const SizedBox(width: 12),
             ElevatedButton(
-              onPressed: () => _updateExamStatus('PUBLISHED'),
+              onPressed: () => _confirmUpdateExamStatus(
+                'Publish',
+                'PUBLISHED',
+                const Color(0xFF6366F1),
+                successMessage: 'Exam published successfully!',
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20B486),
+                backgroundColor: const Color(0xFF6366F1),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 12,
                 ),
               ),
               child: const Text(
-                'Unhide Exam',
+                'Publish Exam Again',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
