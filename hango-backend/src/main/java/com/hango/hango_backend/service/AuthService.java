@@ -92,6 +92,9 @@ public class AuthService {
     @Autowired
     private AuditLogService auditLogService;
 
+    @Autowired
+    private UserLockoutService userLockoutService;
+
     private static String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
@@ -154,7 +157,7 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, loginRequest.getPassword()));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (AuthenticationException ex) {
-            registerFailedLoginAttempt(user);
+            userLockoutService.registerFailedLoginAttempt(user.getId());
             logAudit(user, "LOGIN_FAILURE", user.getId(), "Bad credentials");
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
@@ -189,17 +192,6 @@ public class AuthService {
 
         return new LoginResponse(jwt, refreshToken, user.getId(), user.getEmail(), user.getFullName(), roles,
                 user.getAvatarUrl());
-    }
-
-    private void registerFailedLoginAttempt(User user) {
-        int attempts = (user.getFailedLoginAttempts() == null ? 0 : user.getFailedLoginAttempts()) + 1;
-        if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
-            user.setFailedLoginAttempts(0);
-            user.setLockedUntil(LocalDateTime.now().plusMinutes(LOGIN_LOCK_MINUTES));
-        } else {
-            user.setFailedLoginAttempts(attempts);
-        }
-        userRepository.save(user);
     }
 
 

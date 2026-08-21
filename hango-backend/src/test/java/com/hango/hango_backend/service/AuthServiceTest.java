@@ -87,6 +87,8 @@ class AuthServiceTest {
     @Mock
     private AuditLogService auditLogService;
     @Mock
+    private UserLockoutService userLockoutService;
+    @Mock
     private Authentication authentication;
 
     @InjectMocks
@@ -193,35 +195,28 @@ class AuthServiceTest {
     @Test
     void authenticateUserShouldRejectBadCredentialsAndIncrementFailedAttempts() {
         User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setFailedLoginAttempts(2);
+        user.setId(10L);
         when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
 
         assertApiException(HttpStatus.UNAUTHORIZED,
                 () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
 
-        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(savedUser.capture());
-        assertEquals(3, savedUser.getValue().getFailedLoginAttempts());
-        assertNull(savedUser.getValue().getLockedUntil());
+        verify(userLockoutService).registerFailedLoginAttempt(10L);
         verify(jwtUtils, never()).generateJwtTokenFromUsername(anyString());
     }
 
     @Test
     void authenticateUserShouldLockAccountAfterFifthFailedAttempt() {
         User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setFailedLoginAttempts(4);
+        user.setId(10L);
         when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
 
         assertApiException(HttpStatus.UNAUTHORIZED,
                 () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
 
-        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(savedUser.capture());
-        assertEquals(0, savedUser.getValue().getFailedLoginAttempts());
-        assertNotNull(savedUser.getValue().getLockedUntil());
-        assertTrue(savedUser.getValue().getLockedUntil().isAfter(LocalDateTime.now().plusMinutes(14)));
+        verify(userLockoutService).registerFailedLoginAttempt(10L);
     }
 
     @Test
