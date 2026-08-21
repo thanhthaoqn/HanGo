@@ -73,16 +73,6 @@ public class PathwayNode {
     @Column(name = "schedule_status", length = 30)
     private String scheduleStatus;
 
-    // Feature C: Multi-goal merge metadata
-    /**
-     * JSON array of goal labels this node serves, e.g. ["THPT", "Communication"]
-     */
-    @Column(name = "source_goal_labels", columnDefinition = "TEXT")
-    private String sourceGoalLabels;
-
-    @Column(name = "merge_reason", columnDefinition = "TEXT")
-    private String mergeReason;
-
     // Feature Phase 2: Retention Engine (Mastery & Spaced Repetition)
     @Column(name = "mastery_score")
     private Integer masteryScore;

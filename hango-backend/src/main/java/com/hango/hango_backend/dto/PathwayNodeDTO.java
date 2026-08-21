@@ -48,13 +48,6 @@ public class PathwayNodeDTO {
     @JsonProperty("reroute_reason")
     private String rerouteReason;
 
-    // Feature C: Multi-goal merge metadata
-    @JsonProperty("source_goal_labels")
-    private List<String> sourceGoalLabels;
-
-    @JsonProperty("merge_reason")
-    private String mergeReason;
-
     @JsonProperty("is_optional")
     private Boolean isOptional;
 
