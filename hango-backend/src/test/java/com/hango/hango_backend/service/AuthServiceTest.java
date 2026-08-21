@@ -87,8 +87,6 @@ class AuthServiceTest {
     @Mock
     private AuditLogService auditLogService;
     @Mock
-    private UserLockoutService userLockoutService;
-    @Mock
     private Authentication authentication;
 
     @InjectMocks
@@ -193,57 +191,15 @@ class AuthServiceTest {
     }
 
     @Test
-    void authenticateUserShouldRejectBadCredentialsAndIncrementFailedAttempts() {
+    void authenticateUserShouldRejectBadCredentials() {
         User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setId(10L);
         when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
 
         assertApiException(HttpStatus.UNAUTHORIZED,
                 () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
 
-        verify(userLockoutService).registerFailedLoginAttempt(10L);
         verify(jwtUtils, never()).generateJwtTokenFromUsername(anyString());
-    }
-
-    @Test
-    void authenticateUserShouldLockAccountAfterFifthFailedAttempt() {
-        User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setId(10L);
-        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
-        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
-
-        assertApiException(HttpStatus.UNAUTHORIZED,
-                () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
-
-        verify(userLockoutService).registerFailedLoginAttempt(10L);
-    }
-
-    @Test
-    void authenticateUserShouldRejectLoginWhileAccountIsLockedWithoutCallingAuthenticationManager() {
-        User user = activeVerifiedUser("locked@example.com", "ACTIVE");
-        user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
-        when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
-
-        assertApiException(HttpStatus.LOCKED,
-                () -> authService.authenticateUser(loginRequest("locked@example.com", "correct-password")));
-
-        verify(authenticationManager, never()).authenticate(any());
-    }
-
-    @Test
-    void authenticateUserShouldAllowLoginAfterLockExpires() {
-        User user = activeVerifiedUser("locked@example.com", "ACTIVE");
-        user.setLockedUntil(LocalDateTime.now().minusMinutes(1));
-        when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
-        when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(jwtUtils.generateJwtTokenFromUsername(anyString())).thenReturn("mock-jwt-token");
-        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
-        when(jwtUtils.hashToken(anyString())).thenReturn("hashed");
-        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        assertDoesNotThrow(() -> authService.authenticateUser(loginRequest("locked@example.com", "correct-password")));
     }
 
     @Test

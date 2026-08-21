@@ -52,8 +52,6 @@ import com.hango.hango_backend.util.JwtUtils;
 public class AuthService {
 
 
-    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
-    private static final long LOGIN_LOCK_MINUTES = 15;
     private static final int MAX_OTP_ATTEMPTS = 5;
     private static final long OTP_RESEND_COOLDOWN_SECONDS = 60;
     private static final long VERIFICATION_TOKEN_VALIDITY_HOURS = 12;
@@ -91,9 +89,6 @@ public class AuthService {
 
     @Autowired
     private AuditLogService auditLogService;
-
-    @Autowired
-    private UserLockoutService userLockoutService;
 
     private static String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
@@ -145,19 +140,11 @@ public class AuthService {
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
 
-        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
-            logAudit(user, "LOGIN_FAILURE", user.getId(), "Account locked until " + user.getLockedUntil());
-            throw new ApiException(
-                    "Account temporarily locked due to too many failed login attempts. Please try again later.",
-                    HttpStatus.LOCKED);
-        }
-
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, loginRequest.getPassword()));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (AuthenticationException ex) {
-            userLockoutService.registerFailedLoginAttempt(user.getId());
             logAudit(user, "LOGIN_FAILURE", user.getId(), "Bad credentials");
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
@@ -175,8 +162,6 @@ public class AuthService {
             throw new ApiException("Your account is not active. Please contact support.", HttpStatus.FORBIDDEN);
         }
 
-        user.setFailedLoginAttempts(0);
-        user.setLockedUntil(null);
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
