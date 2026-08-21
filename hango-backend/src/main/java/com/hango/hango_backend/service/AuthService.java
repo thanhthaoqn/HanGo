@@ -51,6 +51,7 @@ import com.hango.hango_backend.util.JwtUtils;
 @Service
 public class AuthService {
 
+
     private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
     private static final long LOGIN_LOCK_MINUTES = 15;
     private static final int MAX_OTP_ATTEMPTS = 5;
@@ -200,6 +201,8 @@ public class AuthService {
         }
         userRepository.save(user);
     }
+
+
 
     // =================================================================
     // registerUser
