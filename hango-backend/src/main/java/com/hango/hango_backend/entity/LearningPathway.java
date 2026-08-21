@@ -62,10 +62,7 @@ public class LearningPathway {
     @Builder.Default
     private List<PathwayNode> nodes = new ArrayList<>();
 
-    // Feature C: Multi-goal merging
-    @OneToMany(mappedBy = "learningPathway", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<LearningPathwayGoal> goals = new ArrayList<>();
+
 
     @PrePersist
     protected void onCreate() {
