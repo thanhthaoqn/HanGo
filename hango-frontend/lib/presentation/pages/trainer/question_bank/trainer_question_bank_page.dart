@@ -39,7 +39,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _errorMessage = '';
 
   // Filter States
-  String _selectedType = 'PUBLIC';
+  String _selectedType = 'ALL';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
   int _usageType = 1; // New state for usageType

@@ -230,7 +230,7 @@ public class ExamImportController {
                         GeneratedKeyHolder qkh = new GeneratedKeyHolder();
                         jdbcTemplate.update(con -> {
                             var ps = con.prepareStatement(
-                                    "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, group_id, skill_param_id) VALUES (?, ?, ?, ?, ?, 'PRIVATE', ?, ?)",
+                                    "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, group_id, skill_param_id, usage_type) VALUES (?, ?, ?, ?, ?, 'PRIVATE', ?, ?, 2)",
                                     java.sql.Statement.RETURN_GENERATED_KEYS);
                             ps.setLong(1, userId);
                             if (fCategory != null) ps.setLong(2, fCategory);

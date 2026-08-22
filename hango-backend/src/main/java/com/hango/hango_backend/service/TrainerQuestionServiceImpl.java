@@ -60,7 +60,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         String skillCondition = (skillId != null) ? "AND q.skill_param_id = ? " : "";
         String categoryCondition = (categoryId != null) ? "AND q.category_id = ? " : "";
         String difficultyCondition = (difficultyId != null) ? "AND q.difficulty_param_id = ? " : "";
-        String usageTypeCondition = (usageType != null) ? "AND q.usage_type = ? " : "";
+        String usageTypeCondition = (usageType != null) ? "AND COALESCE(q.usage_type, '1') = ? " : "";
 
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
@@ -117,7 +117,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         if (difficultyId != null)
             params.add(difficultyId);
         if (usageType != null)
-            params.add(usageType);
+            params.add(String.valueOf(usageType));
 
         sql.append(" UNION ALL ");
 
@@ -163,7 +163,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         if (difficultyId != null)
             params.add(difficultyId);
         if (usageType != null)
-            params.add(usageType);
+            params.add(String.valueOf(usageType));
 
         sql.append(") AS combined_results ");
 
@@ -184,6 +184,24 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             LocalDateTime updatedAt = updatedTimestamp != null ? updatedTimestamp.toLocalDateTime()
                     : LocalDateTime.now();
 
+            String usageStr = rs.getString("usage_type");
+            Integer parsedUsageType = 1;
+            if (usageStr != null) {
+                if (usageStr.equals("BOTH")) {
+                    parsedUsageType = 3;
+                } else if (usageStr.equals("EXAM_ONLY")) {
+                    parsedUsageType = 2;
+                } else if (usageStr.equals("QUIZ_ONLY")) {
+                    parsedUsageType = 1;
+                } else {
+                    try {
+                        parsedUsageType = Integer.parseInt(usageStr);
+                    } catch (NumberFormatException e) {
+                        parsedUsageType = 1;
+                    }
+                }
+            }
+
             return QuestionDTO.builder()
                     .id(rs.getLong("item_id"))
                     .isGroup(rs.getBoolean("is_group"))
@@ -196,8 +214,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                     .creatorName(rs.getString("creator_name"))
                     .createdAt(createdAt)
                     .updatedAt(updatedAt)
-                    .usageType(rs.getObject("usage_type") != null ? rs.getInt("usage_type") : 1)
-                    .usageTypeLabel(QuestionUsageType.fromValue(rs.getObject("usage_type") != null ? rs.getInt("usage_type") : 1).getDescription())
+                    .usageType(parsedUsageType)
+                    .usageTypeLabel(QuestionUsageType.fromValue(parsedUsageType).getDescription())
                     .build();
         }, params.toArray());
     }
