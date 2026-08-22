@@ -29,12 +29,13 @@ public class TrainerQuestionController {
             @RequestParam(required = false) Long skillId,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long difficultyId,
+            @RequestParam(required = false) Integer usageType,
             @RequestParam(defaultValue = "NEWEST") String sortBy) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
         List<QuestionDTO> questions = trainerQuestionService.getTrainerQuestions(
-                userDetails.getUsername(), type, search, sortBy, skillId, categoryId, difficultyId);
+                userDetails.getUsername(), type, search, sortBy, skillId, categoryId, difficultyId, usageType);
         return ResponseEntity.ok(questions);
     }
 

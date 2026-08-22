@@ -296,7 +296,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         final token = await _authService.getToken();
         if (token == null) return;
         
-        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy';
+        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy&usageType=QUIZ_ONLY';
         if (selectedSkillId != null) url += '&skillId=$selectedSkillId';
         if (selectedCategoryId != null) url += '&categoryId=$selectedCategoryId';
         if (selectedDifficultyId != null) url += '&difficultyId=$selectedDifficultyId';

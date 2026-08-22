@@ -460,6 +460,7 @@ class _AddMultipleChoiceQuestionPageState
         'skillParamId': 1,
         'groupTypeName': _selectedGroupType,
         'difficultyId': _aiDifficultyId,
+        'usageType': 1,
         'subQuestions': payloadSubQuestions,
       };
 

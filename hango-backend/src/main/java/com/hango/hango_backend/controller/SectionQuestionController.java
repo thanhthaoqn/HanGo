@@ -274,7 +274,7 @@ public class SectionQuestionController {
             @RequestParam String mode) { // START or RANDOM
 
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT id FROM questions WHERE section_id = ? ");
+        sql.append("SELECT id FROM questions WHERE section_id = ? AND (usage_type IS NULL OR usage_type != 2) ");
         
         List<Object> params = new ArrayList<>();
         params.add(sectionId);
@@ -311,10 +311,20 @@ public class SectionQuestionController {
         List<Long> questionIds = request.getQuestionIds();
         if (questionIds != null && !questionIds.isEmpty()) {
             for (int i = 0; i < questionIds.size(); i++) {
+                Long qId = questionIds.get(i);
+                List<Integer> usageTypes = jdbcTemplate.query(
+                        "SELECT usage_type FROM questions WHERE id = ?",
+                        (rs, rowNum) -> rs.getObject("usage_type") != null ? rs.getInt("usage_type") : 1,
+                        qId
+                );
+                if (!usageTypes.isEmpty() && usageTypes.get(0) == 2) {
+                    return ResponseEntity.badRequest().body("{\"error\": \"Cannot add EXAM_ONLY questions to a Quiz.\"}");
+                }
+                
                 jdbcTemplate.update(
                         "INSERT INTO lesson_quizzes (lesson_id, question_id, display_order) VALUES (?, ?, ?)",
                         lessonId,
-                        questionIds.get(i),
+                        qId,
                         i + 1
                 );
             }

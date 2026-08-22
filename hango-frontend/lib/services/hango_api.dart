@@ -242,6 +242,7 @@ class HangoApi {
     int? skillId,
     int? categoryId,
     int? difficultyId,
+    String? usageType,
   }) async {
     final queryParams = <String, String>{
       'type': type,
@@ -250,6 +251,7 @@ class HangoApi {
       if (skillId != null) 'skillId': skillId.toString(),
       if (categoryId != null) 'categoryId': categoryId.toString(),
       if (difficultyId != null) 'difficultyId': difficultyId.toString(),
+      if (usageType != null && usageType.isNotEmpty) 'usageType': usageType,
     };
 
     // Build URL with query params

@@ -60,6 +60,7 @@ class CourseManagerCreateQuestionPage extends StatefulWidget {
   final bool isCourseManager;
   final Map<String, dynamic>? initialData;
   final bool isEmbedded;
+  final int initialUsageType; // 1=QUIZ, 2=EXAM, 3=BOTH
   final VoidCallback? onBack;
 
   const CourseManagerCreateQuestionPage({
@@ -70,6 +71,7 @@ class CourseManagerCreateQuestionPage extends StatefulWidget {
     this.isCourseManager = false,
     this.initialData,
     this.isEmbedded = false,
+    this.initialUsageType = 1,
     this.onBack,
   }) : super(key: key);
 
@@ -91,12 +93,17 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   List<Map<String, dynamic>> _difficulties = [];
 
   String _status = 'PRIVATE';
+  int _usageType = 1;
 
   List<QuestionGroupState> _groups = [];
 
   @override
   void initState() {
     super.initState();
+    _usageType = widget.initialUsageType;
+    if (widget.question != null && widget.question!.usageType != null) {
+      _usageType = widget.question!.usageType!;
+    }
     _loadMetadata();
   }
 
@@ -440,6 +447,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           if (widget.question != null) 'id': widget.question!.id,
           'categoryId': group.selectedGroupTypeId,
           'status': _status,
+          'usageType': _usageType,
           'passageText': group.isGroup ? group.passageController.text : null,
           'subQuestions': group.questions.map((q) => {
             if (q.id != null) 'id': q.id,

@@ -10,6 +10,7 @@ class CourseManagerQuestion {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isGroup;
+  final int? usageType;
 
   final String? displayNo;
 
@@ -26,6 +27,7 @@ class CourseManagerQuestion {
     required this.createdAt,
     required this.updatedAt,
     this.isGroup = false,
+    this.usageType,
   });
 
   static DateTime _parseDate(dynamic dateData) {
@@ -60,6 +62,7 @@ class CourseManagerQuestion {
       createdAt: _parseDate(json['createdAt']),
       updatedAt: _parseDate(json['updatedAt']),
       isGroup: json['isGroup'] as bool? ?? false,
+      usageType: json['usageType'] as int?,
     );
   }
 }

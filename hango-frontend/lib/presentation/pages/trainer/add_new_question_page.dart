@@ -271,6 +271,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           'categoryId': _aiCategoryId,
           'skillParamId': _aiSkillId,
           'difficultyId': _aiDifficultyId,
+          'usageType': 1,
           'options': payloadOptions,
         };
 

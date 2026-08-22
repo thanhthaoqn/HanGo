@@ -22,5 +22,6 @@ public class CreateGroupQuestionRequestDTO {
     private String groupTypeName;
     private String status;
     private List<CreateSubQuestionDTO> subQuestions;
+    private Integer usageType;
 }
 

@@ -292,6 +292,7 @@ public class CourseImportService {
             question.setSection(targetLesson.getSection());
             question.setQuestionGroup(questionGroup);
             question.setStatus("APPROVED");
+            question.setUsageType(1);
 
             Question savedQuestion = questionRepository.save(question);
             saveQuestionOptions(savedQuestion, questionRow);

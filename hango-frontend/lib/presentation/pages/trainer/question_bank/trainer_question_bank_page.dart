@@ -42,6 +42,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _selectedType = 'PUBLIC';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
+  String _usageType = 'QUIZ_ONLY'; // New state for usageType
   int _currentPage = 1;
   static const int _pageSize = 5;
 
@@ -135,6 +136,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         skillId: _selectedSkillId,
         categoryId: _selectedGroupTypeId,
         difficultyId: _selectedDifficultyId,
+        usageType: _usageType,
       );
 
       if (!mounted) return;
@@ -315,7 +317,8 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           MaterialPageRoute(
             builder: (context) => CourseManagerCreateQuestionPage(
               initialData: initialData,
-              isCourseManager: true,
+              isCourseManager: false,
+              initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
             ),
           ),
         ).then((_) => _fetchQuestions());
@@ -371,25 +374,28 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       return content;
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop
-          ? const Drawer(child: TrainerSidebar(activeIndex: 3))
-          : null,
-      body: Row(
-        children: [
-          if (isDesktop)
-            const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 3)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
-                Expanded(child: content),
-              ],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        drawer: !isDesktop
+            ? const Drawer(child: TrainerSidebar(activeIndex: 3))
+            : null,
+        body: Row(
+          children: [
+            if (isDesktop)
+              const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 3)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
+                  Expanded(child: content),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -401,6 +407,23 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildWelcomeSection(),
+          const SizedBox(height: 16),
+          TabBar(
+            onTap: (index) {
+              setState(() {
+                _usageType = index == 0 ? 'QUIZ_ONLY' : 'EXAM_ONLY';
+                _currentPage = 1;
+              });
+              _fetchQuestions();
+            },
+            labelColor: const Color(0xFF20B486),
+            unselectedLabelColor: const Color(0xFF64748B),
+            indicatorColor: const Color(0xFF20B486),
+            tabs: const [
+              Tab(text: 'Quiz Questions'),
+              Tab(text: 'Exam Questions'),
+            ],
+          ),
           const SizedBox(height: 24),
           QuestionSearchBar(
             searchController: _searchController,
@@ -585,8 +608,9 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const CourseManagerCreateQuestionPage(
+                    builder: (context) => CourseManagerCreateQuestionPage(
                       isCourseManager: false,
+                      initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
                     ),
                   ),
                 ).then((_) => _fetchQuestions());

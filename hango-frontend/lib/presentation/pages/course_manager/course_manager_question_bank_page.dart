@@ -37,6 +37,7 @@ class _CourseManagerQuestionBankPageState
   String _selectedType = '';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
+  String _usageType = 'QUIZ_ONLY'; // New state for usageType
   int _currentPage = 1;
   static const int _pageSize = 5;
 
@@ -110,6 +111,7 @@ class _CourseManagerQuestionBankPageState
         skillId: _selectedSkillId,
         categoryId: _selectedGroupTypeId,
         difficultyId: _selectedDifficultyId,
+        usageType: _usageType,
       );
 
       setState(() {
@@ -317,6 +319,26 @@ class _CourseManagerQuestionBankPageState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildContentHeader(context, isDesktop),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: TabBar(
+                    onTap: (index) {
+                      setState(() {
+                        _usageType = index == 0 ? 'QUIZ_ONLY' : 'EXAM_ONLY';
+                        _currentPage = 1;
+                      });
+                      _fetchQuestions();
+                    },
+                    labelColor: const Color(0xFF20B486),
+                    unselectedLabelColor: const Color(0xFF64748B),
+                    indicatorColor: const Color(0xFF20B486),
+                    tabs: const [
+                      Tab(text: 'Quiz Questions'),
+                      Tab(text: 'Exam Questions'),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
@@ -450,6 +472,7 @@ class _CourseManagerQuestionBankPageState
             isEdit: true,
             isCourseManager: true,
             isEmbedded: true,
+            initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
             onBack: () {
               setState(() {
                 _editingQuestion = null;
@@ -475,23 +498,26 @@ class _CourseManagerQuestionBankPageState
       return content;
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
-      drawer: !isDesktop
-          ? const Drawer(
-              child: CourseManagerSidebar(currentRoute: 'question_bank'),
-            )
-          : null,
-      body: Row(
-        children: [
-          if (isDesktop)
-            const SizedBox(
-              width: 240,
-              child: CourseManagerSidebar(currentRoute: 'question_bank'),
-            ),
-          Expanded(child: content),
-        ],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
+        drawer: !isDesktop
+            ? const Drawer(
+                child: CourseManagerSidebar(currentRoute: 'question_bank'),
+              )
+            : null,
+        body: Row(
+          children: [
+            if (isDesktop)
+              const SizedBox(
+                width: 240,
+                child: CourseManagerSidebar(currentRoute: 'question_bank'),
+              ),
+            Expanded(child: content),
+          ],
+        ),
       ),
     );
   }
@@ -600,8 +626,9 @@ class _CourseManagerQuestionBankPageState
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const CourseManagerCreateQuestionPage(
+                  builder: (context) => CourseManagerCreateQuestionPage(
                     isCourseManager: true,
+                    initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
                   ),
                 ),
               ).then((_) => _fetchQuestions());

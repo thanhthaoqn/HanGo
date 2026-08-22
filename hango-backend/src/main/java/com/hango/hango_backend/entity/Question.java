@@ -58,6 +58,9 @@ public class Question {
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     private java.util.List<QuestionOption> options;
 
+    @Column(name = "usage_type", columnDefinition = "int default 1")
+    private Integer usageType = 1;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = true, updatable = false)
     private LocalDateTime createdAt;

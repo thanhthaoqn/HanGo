@@ -2,6 +2,7 @@ package com.hango.hango_backend.service;
 
 import com.hango.hango_backend.dto.QuestionDTO;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.enums.QuestionUsageType;
 import com.hango.hango_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -43,7 +44,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
 
     @Override
     public List<QuestionDTO> getTrainerQuestions(String email, String type, String search, String sortBy, Long skillId,
-            Long categoryId, Long difficultyId) {
+            Long categoryId, Long difficultyId, Integer usageType) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
@@ -59,6 +60,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         String skillCondition = (skillId != null) ? "AND q.skill_param_id = ? " : "";
         String categoryCondition = (categoryId != null) ? "AND q.category_id = ? " : "";
         String difficultyCondition = (difficultyId != null) ? "AND q.difficulty_param_id = ? " : "";
+        String usageTypeCondition = (usageType != null) ? "AND q.usage_type = ? " : "";
 
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
@@ -84,7 +86,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append("  MAX(q.status) as status, ")
                 .append("  MAX(u.full_name) as creator_name, ")
                 .append("  MAX(q.created_at) as created_at, ")
-                .append("  MAX(q.updated_at) as updated_at ")
+                .append("  MAX(q.updated_at) as updated_at, ")
+                .append("  MAX(q.usage_type) as usage_type ")
                 .append("FROM question_groups qg ")
                 .append("JOIN questions q ON q.group_id = qg.id ")
                 .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
@@ -96,6 +99,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append(skillCondition)
                 .append(categoryCondition)
                 .append(difficultyCondition)
+                .append(usageTypeCondition)
                 .append("GROUP BY qg.id, qg.context_text ");
 
         params.add(user.getId());
@@ -112,6 +116,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(categoryId);
         if (difficultyId != null)
             params.add(difficultyId);
+        if (usageType != null)
+            params.add(usageType);
 
         sql.append(" UNION ALL ");
 
@@ -127,7 +133,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append("  q.status, ")
                 .append("  u.full_name as creator_name, ")
                 .append("  q.created_at, ")
-                .append("  q.updated_at ")
+                .append("  q.updated_at, ")
+                .append("  q.usage_type ")
                 .append("FROM questions q ")
                 .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
                 .append("LEFT JOIN system_parameters sp_skill ON q.skill_param_id = sp_skill.id ")
@@ -138,7 +145,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append(searchConditionSingle)
                 .append(skillCondition)
                 .append(categoryCondition)
-                .append(difficultyCondition);
+                .append(difficultyCondition)
+                .append(usageTypeCondition);
 
         params.add(user.getId());
         if (statusFilter != null)
@@ -154,6 +162,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(categoryId);
         if (difficultyId != null)
             params.add(difficultyId);
+        if (usageType != null)
+            params.add(usageType);
 
         sql.append(") AS combined_results ");
 
@@ -186,6 +196,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                     .creatorName(rs.getString("creator_name"))
                     .createdAt(createdAt)
                     .updatedAt(updatedAt)
+                    .usageType(rs.getObject("usage_type") != null ? rs.getInt("usage_type") : 1)
+                    .usageTypeLabel(QuestionUsageType.fromValue(rs.getObject("usage_type") != null ? rs.getInt("usage_type") : 1).getDescription())
                     .build();
         }, params.toArray());
     }
@@ -257,6 +269,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 q.setQuestionText(subQ.getQuestionText());
                 q.setExplanation(subQ.getExplanation());
                 q.setStatus(request.getStatus() != null ? request.getStatus() : "PRIVATE");
+                q.setUsageType(request.getUsageType() != null ? request.getUsageType() : 1);
 
                 SystemParameter qDifficulty = difficulty;
                 if (subQ.getDifficultyId() != null) {
@@ -323,6 +336,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 // SystemParameter ID
                 dto.setCategoryId(group.getGroupTypeParam() != null ? group.getGroupTypeParam().getId() : null);
                 dto.setStatus(questions.get(0).getStatus());
+                dto.setUsageType(questions.get(0).getUsageType() != null ? questions.get(0).getUsageType() : 1);
             }
 
             List<CreateSubQuestionDTO> subDTOs = new ArrayList<>();
@@ -344,6 +358,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             dto.setDifficultyId(q.getDifficulty() != null ? q.getDifficulty().getId() : null);
             dto.setSkillParamId(q.getSkillParam() != null ? q.getSkillParam().getId() : null);
             dto.setStatus(q.getStatus());
+            dto.setUsageType(q.getUsageType() != null ? q.getUsageType() : 1);
 
             List<CreateSubQuestionDTO> subDTOs = new ArrayList<>();
             subDTOs.add(mapToSubQuestionDTO(q));
@@ -462,6 +477,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 q.setQuestionText(subQ.getQuestionText());
                 q.setExplanation(subQ.getExplanation());
                 q.setStatus(request.getStatus() != null ? request.getStatus() : "PRIVATE");
+                q.setUsageType(request.getUsageType() != null ? request.getUsageType() : 1);
 
                 SystemParameter qDifficulty = difficulty;
                 if (subQ.getDifficultyId() != null) {
