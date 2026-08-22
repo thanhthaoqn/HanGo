@@ -1,5 +1,6 @@
 services:
   backend:
+    image: hango-backend:latest
     build:
       context: ./hango-backend
       dockerfile: Dockerfile
@@ -19,6 +20,7 @@ services:
     restart: always
 
   frontend:
+    image: hango-frontend:latest
     build:
       context: .
       dockerfile: hango-frontend/Dockerfile
