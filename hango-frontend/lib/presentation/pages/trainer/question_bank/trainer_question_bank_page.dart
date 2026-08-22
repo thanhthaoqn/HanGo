@@ -42,7 +42,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _selectedType = 'PUBLIC';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
-  String _usageType = 'QUIZ_ONLY'; // New state for usageType
+  int _usageType = 1; // New state for usageType
   int _currentPage = 1;
   static const int _pageSize = 5;
 
@@ -135,7 +135,6 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         sortBy: _sortBy,
         skillId: _selectedSkillId,
         categoryId: _selectedGroupTypeId,
-        difficultyId: _selectedDifficultyId,
         usageType: _usageType,
       );
 
@@ -317,8 +316,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           MaterialPageRoute(
             builder: (context) => CourseManagerCreateQuestionPage(
               initialData: initialData,
-              isCourseManager: false,
-              initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
+              initialUsageType: _usageType,
             ),
           ),
         ).then((_) => _fetchQuestions());
@@ -371,7 +369,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             : _buildBodyContent(isDesktop);
 
     if (widget.isEmbedded) {
-      return content;
+      return DefaultTabController(
+        length: 2,
+        child: content,
+      );
     }
 
     return DefaultTabController(
@@ -411,7 +412,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           TabBar(
             onTap: (index) {
               setState(() {
-                _usageType = index == 0 ? 'QUIZ_ONLY' : 'EXAM_ONLY';
+                _usageType = index == 0 ? 1 : 2;
                 _currentPage = 1;
               });
               _fetchQuestions();
@@ -610,7 +611,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   MaterialPageRoute(
                     builder: (context) => CourseManagerCreateQuestionPage(
                       isCourseManager: false,
-                      initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
+                      initialUsageType: _usageType,
                     ),
                   ),
                 ).then((_) => _fetchQuestions());

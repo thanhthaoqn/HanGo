@@ -274,7 +274,7 @@ public class SectionQuestionController {
             @RequestParam String mode) { // START or RANDOM
 
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT id FROM questions WHERE section_id = ? AND (usage_type IS NULL OR usage_type != 2) ");
+        sql.append("SELECT id FROM questions WHERE section_id = ? AND usage_type = 1 ");
         
         List<Object> params = new ArrayList<>();
         params.add(sectionId);
@@ -304,23 +304,27 @@ public class SectionQuestionController {
             @PathVariable Long lessonId,
             @RequestBody QuizQuestionSelectionRequestDTO request) {
 
-        // 1. Delete existing quiz questions
-        jdbcTemplate.update("DELETE FROM lesson_quizzes WHERE lesson_id = ?", lessonId);
-
-        // 2. Insert new quiz questions
         List<Long> questionIds = request.getQuestionIds();
         if (questionIds != null && !questionIds.isEmpty()) {
-            for (int i = 0; i < questionIds.size(); i++) {
-                Long qId = questionIds.get(i);
+            for (Long qId : questionIds) {
                 List<Integer> usageTypes = jdbcTemplate.query(
                         "SELECT usage_type FROM questions WHERE id = ?",
                         (rs, rowNum) -> rs.getObject("usage_type") != null ? rs.getInt("usage_type") : 1,
                         qId
                 );
-                if (!usageTypes.isEmpty() && usageTypes.get(0) == 2) {
-                    return ResponseEntity.badRequest().body("{\"error\": \"Cannot add EXAM_ONLY questions to a Quiz.\"}");
+                if (usageTypes.isEmpty() || usageTypes.get(0) != 1) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Cannot add EXAM_ONLY or BOTH questions to a Quiz."));
                 }
-                
+            }
+        }
+
+        // 1. Delete existing quiz questions
+        jdbcTemplate.update("DELETE FROM lesson_quizzes WHERE lesson_id = ?", lessonId);
+
+        // 2. Insert new quiz questions
+        if (questionIds != null && !questionIds.isEmpty()) {
+            for (int i = 0; i < questionIds.size(); i++) {
+                Long qId = questionIds.get(i);
                 jdbcTemplate.update(
                         "INSERT INTO lesson_quizzes (lesson_id, question_id, display_order) VALUES (?, ?, ?)",
                         lessonId,
@@ -369,7 +373,7 @@ public class SectionQuestionController {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
-                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, skill_param_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, skill_param_id, usage_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
                 ps.setLong(1, currentUserId);
@@ -384,6 +388,7 @@ public class SectionQuestionController {
                     ps.setNull(7, java.sql.Types.BIGINT);
                 }
                 ps.setLong(8, finalSkillParamId);
+                ps.setInt(9, request.getUsageType() != null ? request.getUsageType() : 1);
                 return ps;
             }, keyHolder);
 
@@ -579,7 +584,7 @@ public class SectionQuestionController {
                     final Long finalGroupId = questionGroupId;
                     jdbcTemplate.update(connection -> {
                         java.sql.PreparedStatement ps = connection.prepareStatement(
-                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id, skill_param_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id, skill_param_id, usage_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 
                                 java.sql.Statement.RETURN_GENERATED_KEYS
                         );
@@ -596,6 +601,7 @@ public class SectionQuestionController {
                         }
                         ps.setLong(8, finalGroupId);
                         ps.setLong(9, finalSkillParamId);
+                        ps.setInt(10, request.getUsageType() != null ? request.getUsageType() : 1);
                         return ps;
 
                     }, keyHolder);

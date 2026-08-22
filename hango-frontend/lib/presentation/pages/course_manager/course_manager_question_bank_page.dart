@@ -37,7 +37,7 @@ class _CourseManagerQuestionBankPageState
   String _selectedType = '';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
-  String _usageType = 'QUIZ_ONLY'; // New state for usageType
+  int _usageType = 1; // New state for usageType
   int _currentPage = 1;
   static const int _pageSize = 5;
 
@@ -325,7 +325,7 @@ class _CourseManagerQuestionBankPageState
                   child: TabBar(
                     onTap: (index) {
                       setState(() {
-                        _usageType = index == 0 ? 'QUIZ_ONLY' : 'EXAM_ONLY';
+                        _usageType = index == 0 ? 1 : 2;
                         _currentPage = 1;
                       });
                       _fetchQuestions();
@@ -472,7 +472,7 @@ class _CourseManagerQuestionBankPageState
             isEdit: true,
             isCourseManager: true,
             isEmbedded: true,
-            initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
+            initialUsageType: _usageType,
             onBack: () {
               setState(() {
                 _editingQuestion = null;
@@ -495,7 +495,10 @@ class _CourseManagerQuestionBankPageState
             : bodyContent;
 
     if (widget.isEmbedded) {
-      return content;
+      return DefaultTabController(
+        length: 2,
+        child: content,
+      );
     }
 
     return DefaultTabController(
@@ -628,7 +631,7 @@ class _CourseManagerQuestionBankPageState
                 MaterialPageRoute(
                   builder: (context) => CourseManagerCreateQuestionPage(
                     isCourseManager: true,
-                    initialUsageType: _usageType == 'QUIZ_ONLY' ? 1 : 2,
+                    initialUsageType: _usageType,
                   ),
                 ),
               ).then((_) => _fetchQuestions());
