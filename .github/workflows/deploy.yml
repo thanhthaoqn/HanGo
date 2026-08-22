@@ -18,7 +18,7 @@ jobs:
       # 2. Package source files required by the multi-stage Docker builds
       - name: Create Deploy Zip
         run: |
-          zip -r deploy.zip docker-compose.yml .dockerignore hango-backend hango-frontend doc/templates nginx \
+          zip -r deploy.zip docker-compose.yml .dockerignore hango-backend hango-frontend doc/templates nginx/conf.d \
             -x "hango-backend/target/*" \
                "hango-backend/.idea/*" \
                "hango-frontend/build/*" \
@@ -68,7 +68,6 @@ jobs:
             unzip -o /home/ubuntu/deploy.zip -d /home/ubuntu/hango
             rm -f /home/ubuntu/deploy.zip
             cd /home/ubuntu/hango
-            chmod -R 755 /home/ubuntu/hango
             docker-compose up -d --build backend frontend
             docker-compose restart nginx
             docker image prune -f
