@@ -309,7 +309,14 @@ public class SectionQuestionController {
             for (Long qId : questionIds) {
                 List<Integer> usageTypes = jdbcTemplate.query(
                         "SELECT usage_type FROM questions WHERE id = ?",
-                        (rs, rowNum) -> rs.getObject("usage_type") != null ? rs.getInt("usage_type") : 1,
+                        (rs, rowNum) -> {
+                            String usageStr = rs.getString("usage_type");
+                            if (usageStr == null) return 1;
+                            if (usageStr.equals("BOTH")) return 3;
+                            if (usageStr.equals("EXAM_ONLY")) return 2;
+                            if (usageStr.equals("QUIZ_ONLY")) return 1;
+                            try { return Integer.parseInt(usageStr); } catch(Exception e) { return 1; }
+                        },
                         qId
                 );
                 if (usageTypes.isEmpty() || usageTypes.get(0) != 1) {
@@ -373,7 +380,7 @@ public class SectionQuestionController {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
-                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, skill_param_id, usage_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, skill_param_id, usage_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6), NOW(6))",
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
                 ps.setLong(1, currentUserId);
@@ -547,12 +554,11 @@ public class SectionQuestionController {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
-                        "INSERT INTO question_groups (title, group_type_param_id, context_text) VALUES (?, ?, ?)",
+                        "INSERT INTO question_groups (group_type_param_id, context_text) VALUES (?, ?)",
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
-                ps.setString(1, "Multiple Choice Group");
-                ps.setLong(2, finalGroupTypeParamId); 
-                ps.setString(3, request.getPassageText());
+                ps.setLong(1, finalGroupTypeParamId); 
+                ps.setString(2, request.getPassageText());
                 return ps;
             }, keyHolder);
 
@@ -584,8 +590,7 @@ public class SectionQuestionController {
                     final Long finalGroupId = questionGroupId;
                     jdbcTemplate.update(connection -> {
                         java.sql.PreparedStatement ps = connection.prepareStatement(
-                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id, skill_param_id, usage_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-
+                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id, skill_param_id, usage_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6), NOW(6))",
                                 java.sql.Statement.RETURN_GENERATED_KEYS
                         );
                         ps.setLong(1, currentUserId);

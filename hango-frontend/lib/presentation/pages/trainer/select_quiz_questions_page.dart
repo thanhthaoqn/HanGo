@@ -296,7 +296,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         final token = await _authService.getToken();
         if (token == null) return;
         
-        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy&usageType=QUIZ_ONLY';
+        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy&usageType=1';
         if (selectedSkillId != null) url += '&skillId=$selectedSkillId';
         if (selectedCategoryId != null) url += '&categoryId=$selectedCategoryId';
         if (selectedDifficultyId != null) url += '&difficultyId=$selectedDifficultyId';
@@ -528,9 +528,13 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                           });
                                         },
                                         title: Text(q['questionText'] ?? '', style: const TextStyle(fontSize: 14, fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
-                                        subtitle: Text(q['categoryName'] ?? 'Multiple Choice', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                                        subtitle: Text(q['categoryName'] == 'Multiple Choice' ? 'Multiple Question' : (q['categoryName'] ?? 'Multiple Question'), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
                                         controlAffinity: ListTileControlAffinity.leading,
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        secondary: IconButton(
+                                          icon: const Icon(Icons.remove_red_eye, color: Color(0xFF64748B)),
+                                          onPressed: () => _showQuestionDetailsDialog(qId, q['isGroup'] == true),
+                                        ),
                                       ),
                                     );
                                   },
@@ -1460,7 +1464,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                                   borderRadius: BorderRadius.circular(4),
                                                 ),
                                                 child: Text(
-                                                  catName == 'Multiple Choice' ? 'Multiple Choice' : 'Single Answer',
+                                                  catName == 'Multiple Choice' ? 'Multiple Question' : 'Single Answer',
                                                   style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
@@ -1715,6 +1719,136 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showQuestionDetailsDialog(int qId, bool isGroup) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))),
+    );
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        Navigator.pop(context);
+        return;
+      }
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/question-bank/detail/$qId?isGroup=$isGroup');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      Navigator.pop(context); // Close loading dialog
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
+        _showDetailsContentDialog(data, isGroup);
+      } else {
+        ToastHelper.showError(context, 'Failed to fetch question details.');
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      debugPrint('Error fetching question details: $e');
+      ToastHelper.showError(context, 'Error loading details.');
+    }
+  }
+
+  void _showDetailsContentDialog(Map<String, dynamic> data, bool isGroup) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final subQs = data['subQuestions'] as List<dynamic>? ?? [];
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Question Details', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B))),
+              IconButton(
+                icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isGroup && data['passageText'] != null && data['passageText'].toString().isNotEmpty) ...[
+                    const Text('Passage', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit')),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      width: double.infinity,
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
+                      child: Text(data['passageText'], style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B))),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  ...subQs.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final sub = entry.value;
+                    final options = sub['options'] as List<dynamic>? ?? [];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(isGroup ? 'Question ${idx + 1}:' : 'Question:', style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B))),
+                          const SizedBox(height: 8),
+                          Text(sub['questionText'] ?? '', style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF475569))),
+                          const SizedBox(height: 12),
+                          ...options.map((opt) {
+                            final isCorrect = opt['isCorrect'] == true;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFE2E8F0)),
+                                borderRadius: BorderRadius.circular(8),
+                                color: isCorrect ? const Color(0xFFE2F9F3) : Colors.white,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(isCorrect ? Icons.check_circle : Icons.circle_outlined, color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFCBD5E1), size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text(opt['optionText'] ?? '', style: TextStyle(fontFamily: 'Outfit', fontSize: 13, color: isCorrect ? const Color(0xFF047857) : const Color(0xFF475569), fontWeight: isCorrect ? FontWeight.w500 : FontWeight.normal))),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          if (sub['explanation'] != null && sub['explanation'].toString().isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            const Text('Explanation:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Outfit', color: Color(0xFF64748B))),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              width: double.infinity,
+                              decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFDE68A))),
+                              child: Text(sub['explanation'], style: const TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF92400E))),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     );
   }
 }

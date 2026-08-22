@@ -60,7 +60,16 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         String skillCondition = (skillId != null) ? "AND q.skill_param_id = ? " : "";
         String categoryCondition = (categoryId != null) ? "AND q.category_id = ? " : "";
         String difficultyCondition = (difficultyId != null) ? "AND q.difficulty_param_id = ? " : "";
-        String usageTypeCondition = (usageType != null) ? "AND COALESCE(q.usage_type, '1') = ? " : "";
+        String usageTypeCondition = "";
+        if (usageType != null) {
+            if (usageType == 1) {
+                usageTypeCondition = "AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY' OR q.usage_type IS NULL) ";
+            } else if (usageType == 2) {
+                usageTypeCondition = "AND (q.usage_type = '2' OR q.usage_type = 'EXAM_ONLY') ";
+            } else if (usageType == 3) {
+                usageTypeCondition = "AND (q.usage_type = '3' OR q.usage_type = 'BOTH') ";
+            }
+        }
 
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
@@ -116,8 +125,6 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(categoryId);
         if (difficultyId != null)
             params.add(difficultyId);
-        if (usageType != null)
-            params.add(String.valueOf(usageType));
 
         sql.append(" UNION ALL ");
 
@@ -162,8 +169,6 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(categoryId);
         if (difficultyId != null)
             params.add(difficultyId);
-        if (usageType != null)
-            params.add(String.valueOf(usageType));
 
         sql.append(") AS combined_results ");
 

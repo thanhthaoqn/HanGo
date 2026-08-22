@@ -1717,7 +1717,7 @@ class _AddMultipleChoiceQuestionPageState
                       ),
                       SizedBox(width: 6),
                       Text(
-                        'Multiple Choice',
+                        'Multiple Question',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
