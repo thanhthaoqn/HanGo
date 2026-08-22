@@ -118,8 +118,6 @@ public class AdminCommentController {
         String contextTitle = "General";
         if (c.getLesson() != null) {
             contextTitle = c.getLesson().getTitle();
-        } else if (c.getCourse() != null) {
-            contextTitle = c.getCourse().getTitle();
         }
         map.put("quizOrLesson", contextTitle);
         map.put("course", resolveCourseTitle(c));
@@ -131,9 +129,6 @@ public class AdminCommentController {
     }
 
     private String resolveCourseTitle(Comment c) {
-        if (c.getCourse() != null) {
-            return c.getCourse().getTitle();
-        }
         if (c.getLesson() != null && c.getLesson().getSection() != null
                 && c.getLesson().getSection().getCourse() != null) {
             return c.getLesson().getSection().getCourse().getTitle();
