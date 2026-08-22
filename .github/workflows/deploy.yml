@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev   # Triggers on push to dev branch
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -25,28 +26,49 @@ jobs:
                "hango-frontend/.idea/*" \
                "hango-frontend/.vscode/*"
 
-      # 3. Copy package to AWS EC2 via SCP
+      # 3. Verify the remote destination before uploading
+      - name: Prepare EC2 Deploy Directory
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 2m
+          script: |
+            set -eu
+            test -d /home/ubuntu
+            test -w /home/ubuntu
+            rm -f /home/ubuntu/deploy.zip
+            mkdir -p /home/ubuntu/hango
+            df -h /home/ubuntu
+
+      # 4. Copy package to AWS EC2 via SCP
       - name: Copy Deploy Package to EC2
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "deploy.zip"
-          target: "~/"
+          target: "/home/ubuntu"
+          overwrite: true
+          command_timeout: 5m
+          debug: true
 
-      # 4. Deploy and Restart Containers on EC2 via SSH
+      # 5. Deploy and Restart Containers on EC2 via SSH
       - name: SSH and Restart Containers
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 30m
           script: |
-            cd ~/
-            unzip -o deploy.zip -d ~/hango
-            cd ~/hango
-            chmod -R 755 ~/hango
+            set -eu
+            unzip -o /home/ubuntu/deploy.zip -d /home/ubuntu/hango
+            rm -f /home/ubuntu/deploy.zip
+            cd /home/ubuntu/hango
+            chmod -R 755 /home/ubuntu/hango
             docker-compose up -d --build backend frontend
             docker-compose restart nginx
             docker image prune -f
