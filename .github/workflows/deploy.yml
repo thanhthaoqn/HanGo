@@ -6,6 +6,10 @@ on:
       - dev   # Triggers on push to dev branch
   workflow_dispatch:
 
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -15,47 +19,56 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Package source files required by the multi-stage Docker builds
-      - name: Create Deploy Zip
+      # 2. Build on the runner so the small EC2 host only stores runtime layers
+      - name: Build Runtime Images
         run: |
-          zip -r deploy.zip docker-compose.yml .dockerignore hango-backend hango-frontend doc/templates nginx/conf.d \
-            -x "hango-backend/target/*" \
-               "hango-backend/.idea/*" \
-               "hango-frontend/build/*" \
-               "hango-frontend/.dart_tool/*" \
-               "hango-frontend/.idea/*" \
-               "hango-frontend/.vscode/*"
+          set -euo pipefail
+          docker build --tag hango-backend:latest hango-backend
+          docker builder prune --all --force
+          docker build --tag hango-frontend:latest --file hango-frontend/Dockerfile .
+          docker builder prune --all --force
 
-      # 3. Verify the remote destination before uploading
+      # 3. Package only the runtime images and deployment configuration
+      - name: Create Deploy Package
+        run: |
+          set -euo pipefail
+          docker save hango-backend:latest hango-frontend:latest | gzip > hango-images.tar.gz
+          zip -r deploy.zip docker-compose.yml nginx/conf.d
+          sha256sum deploy.zip hango-images.tar.gz > deploy.sha256
+          ls -lh deploy.zip hango-images.tar.gz deploy.sha256
+
+      # 4. Reclaim build artifacts without touching containers or volumes
       - name: Prepare EC2 Deploy Directory
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 2m
+          command_timeout: 5m
           script: |
             set -eu
             test -d /home/ubuntu
             test -w /home/ubuntu
-            rm -f /home/ubuntu/deploy.zip
+            rm -f /home/ubuntu/deploy.zip /home/ubuntu/hango-images.tar.gz /home/ubuntu/deploy.sha256
+            docker builder prune --all --force || true
+            docker image prune --all --force || true
             mkdir -p /home/ubuntu/hango
             df -h /home/ubuntu
 
-      # 4. Copy package to AWS EC2 via SCP
+      # 5. Copy the runtime images and configuration to AWS EC2
       - name: Copy Deploy Package to EC2
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy.zip"
+          source: "deploy.zip,hango-images.tar.gz,deploy.sha256"
           target: "/home/ubuntu"
           overwrite: true
-          command_timeout: 5m
+          command_timeout: 15m
           debug: true
 
-      # 5. Deploy and Restart Containers on EC2 via SSH
+      # 6. Load the pre-built images and restart the application
       - name: SSH and Restart Containers
         uses: appleboy/ssh-action@v1.2.5
         with:
@@ -65,9 +78,24 @@ jobs:
           command_timeout: 30m
           script: |
             set -eu
+            cd /home/ubuntu
+            sha256sum --check deploy.sha256
             unzip -o /home/ubuntu/deploy.zip -d /home/ubuntu/hango
-            rm -f /home/ubuntu/deploy.zip
+            docker load --input /home/ubuntu/hango-images.tar.gz
+            rm -f /home/ubuntu/deploy.zip /home/ubuntu/hango-images.tar.gz /home/ubuntu/deploy.sha256
             cd /home/ubuntu/hango
-            docker-compose up -d --build backend frontend
-            docker-compose restart nginx
-            docker image prune -f
+            docker-compose up -d --no-build --force-recreate backend frontend nginx
+            sleep 30
+            for container in hango-backend hango-frontend hango-nginx; do
+              running="$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null || true)"
+              restarts="$(docker inspect --format '{{.RestartCount}}' "$container" 2>/dev/null || echo 0)"
+              if [ "$running" != "true" ] || [ "$restarts" -gt 0 ]; then
+                echo "$container failed to start cleanly"
+                docker logs --tail 200 "$container" || true
+                exit 1
+              fi
+            done
+            docker image prune --all --force
+            docker builder prune --all --force
+            docker-compose ps
+            df -h /home/ubuntu
