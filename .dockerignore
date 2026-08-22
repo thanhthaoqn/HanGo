@@ -1,0 +1,16 @@
+**
+
+!hango-frontend/
+!hango-frontend/Dockerfile
+!hango-frontend/pubspec.yaml
+!hango-frontend/pubspec.lock
+!hango-frontend/lib/
+!hango-frontend/lib/**
+!hango-frontend/assets/
+!hango-frontend/assets/**
+!hango-frontend/web/
+!hango-frontend/web/**
+
+!doc/
+!doc/templates/
+!doc/templates/**
