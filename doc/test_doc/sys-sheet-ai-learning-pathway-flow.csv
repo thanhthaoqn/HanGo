@@ -1,10 +1,10 @@
 Workflow,AI-Generated Learning Pathway Flow
 Test requirement,"Verify the complete end-to-end Learning Pathway journey through the actual UI: generating a roadmap from the Exam Result page's AI recommendation panel, viewing the node roadmap and its live-recomputed progress, editing the study goal/schedule, the automatic (silent) and AI-suggested reroute mechanics after Lesson Quiz results, and chatting with the AI Pathway Mentor. Crosses the Exam, Lesson Learning, and AI Assistant modules."
-Number of TCs,18
+Number of TCs,20
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,18,0
-Round 2,0,0,18,0
-Round 3,0,0,18,0
+Round 1,0,0,20,0
+Round 2,0,0,20,0
+Round 3,0,0,20,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 Weakness Analysis & Pathway Generation,,,,
@@ -66,3 +66,12 @@ SYS_FLOW_PWY_TC18,"Full loop: a weak Exam result drives pathway generation, a fa
 3. Fail the first node's Lesson Quiz (score below 60%) and reopen the pathway to confirm the silent relock (TC10).
 4. Open ""Edit Your Goal"", extend the Timeframe to a feasible combo, and tap ""Update Schedule"".
 5. Ask the AI Mentor ""What should I do next?"" and confirm the reply reflects the just-updated plan.","Each stage's individually-verified behavior (weak-skill-driven generation, silent auto-reroute, schedule edit, Mentor awareness) holds together as one continuous journey with no dead ends or crashes between screens.","Fresh Exam attempt for this journey; nothing else pre-built."
+Mastery & Spaced Repetition (Daily Plan),,,,
+SYS_FLOW_PWY_TC19,"Tapping ""Take Mastery Quiz"" on a completed node instantly submits a HARDCODED mock score of 90 — there is no real quiz UI behind this button in the current build.","1. Complete a pathway node's course so it reaches COMPLETED but is not yet mastered.
+2. On the Learning Pathway page's Daily Plan / node card, locate the pink ""Take Mastery Quiz"" button.
+3. Tap it and watch closely for any quiz screen, question, or dialog appearing first.
+4. Observe the resulting snackbar and the node's Mastery badge afterward.","No quiz questions are ever shown - tapping the button calls learning_pathway_page.dart's _submitMastery(node.id, 90) directly with a hard-coded score of 90 (see the ""// Mock score"" comments at the call sites), which POSTs straight to /api/v1/pathways/{id}/nodes/{nodeId}/mastery. A green ""Mastery updated successfully! Score: 90"" snackbar appears and the node's badge switches to ""Mastery: 90%"" - confirms this is currently a fully mocked, non-interactive action, not a real assessment.","A node reaches COMPLETED status but is not yet mastered (masteryScore < 80 or unset)."
+SYS_FLOW_PWY_TC20,"Tapping ""Review Now"" on a due spaced-repetition review likewise submits a hardcoded mock score of 100, with no real review content.","1. Reach a node whose nextReviewDate has passed (isReviewDue=true per PATHWAY_FT32/33's interval progression), so its Daily Plan card shows the amber ""Review Now"" button.
+2. Tap it and watch for any review content/quiz.
+3. Observe the resulting snackbar and the node's updated reviewIntervalDays/nextReviewDate.","No review content is shown - the button calls _submitMastery(node.id, 100), another hard-coded mock score, escalating reviewIntervalDays to the next step in the 1→3→7→14→30 sequence (PATHWAY_FT33) purely from the tap, with no actual spaced-repetition exercise presented to the learner.","A node with isReviewDue=true (its spaced-repetition interval has elapsed)."
+Footer Note,,,,"2026-08-18 retest (AI Assistant + Learning Pathway scope): the ""Node Mastery / Spaced Repetition"" feature (LearningPathwayController POST /pathways/{id}/nodes/{nodeId}/mastery, part of the 2026-08-15 pathway feature drop) was completely undocumented anywhere - added itc PATHWAY_FT32-35 and SYS_FLOW_PWY_TC19/TC20 above. Genuine, NOT-fixed finding from live code review (hango-frontend/lib/presentation/pages/learner/learning_pathway_page.dart lines ~403-404 and ~460-461): both the ""Take Mastery Quiz"" and ""Review Now"" buttons call _submitMastery() with a HARD-CODED mock score (90 and 100 respectively, marked ""// Mock score"" in the source) instead of presenting any real quiz/review content to the learner - flagged to dev team as a product gap, not silently built out here. PathwayMentorChatService and CertificateService were also checked per the retest brief: PathwayMentorChatService is already well covered (itc PATHWAY_FT27-30, this sheet's TC13-16); CertificateService is out of this sheet's module and is instead covered in sys-sheet-lesson-learning-progress-flow.csv (TC18/TC19), where a genuine masked-500-instead-of-404 bug was also found and flagged there."

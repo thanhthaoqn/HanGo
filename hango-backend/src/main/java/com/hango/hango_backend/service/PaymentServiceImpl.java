@@ -425,8 +425,6 @@ public class PaymentServiceImpl implements PaymentService {
                         log.warn("Failed to send enrollment email to {}: {}", payment.getUser().getEmail(), e.getMessage());
                     }
                 }
-            } else {
-                cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
             }
         }
     }

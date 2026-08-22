@@ -272,6 +272,21 @@ class CourseRatingServiceTest {
     }
 
     @Test
+    void addCourseReviewShouldUseNoCommentFallbackTextInLowRatingNotificationWhenContentIsNull() {
+        Course c = course(1L, 0.0, 0);
+        stubEligibleLearner(1L, 1L, c);
+        when(courseRatingRepository.findByCourseIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(
+                rating(1L, student(1L, "a@example.com"), (short) 2, null)));
+
+        courseRatingService.addCourseReview(1L, 1L, (short) 2, null);
+
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(notificationService).notifyCourseManagers(
+                org.mockito.ArgumentMatchers.eq(NotificationService.TYPE_LOW_RATING), anyString(), messageCaptor.capture(), any());
+        assertTrue(messageCaptor.getValue().contains("(no comment provided)"));
+    }
+
+    @Test
     void addCourseReviewShouldNotNotifyLowRatingWhenRatingIsAboveThreeStars() {
         Course c = course(1L, 0.0, 0);
         stubEligibleLearner(1L, 1L, c);

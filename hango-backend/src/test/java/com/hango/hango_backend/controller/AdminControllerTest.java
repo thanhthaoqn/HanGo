@@ -10,20 +10,18 @@ import com.hango.hango_backend.dto.RegisterRequest;
 import com.hango.hango_backend.dto.RoleDTO;
 import com.hango.hango_backend.dto.RolePermissionsUpdateRequest;
 import com.hango.hango_backend.dto.UserResponse;
+import com.hango.hango_backend.dto.admin.DashboardStatsDTO;
 import com.hango.hango_backend.entity.AiUsageLog;
 import com.hango.hango_backend.entity.AuditLog;
-import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Permission;
 import com.hango.hango_backend.entity.Role;
 import com.hango.hango_backend.entity.User;
 import com.hango.hango_backend.repository.AiUsageLogRepository;
 import com.hango.hango_backend.repository.AuditLogRepository;
-import com.hango.hango_backend.repository.CourseRepository;
-import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.PermissionRepository;
 import com.hango.hango_backend.repository.RoleRepository;
-import com.hango.hango_backend.repository.TopCourseProjection;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.service.AdminDashboardService;
 import com.hango.hango_backend.service.AuthService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +29,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -39,7 +41,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -60,9 +61,7 @@ class AdminControllerTest {
     @Mock
     private AiUsageLogRepository aiUsageLogRepository;
     @Mock
-    private CourseRepository courseRepository;
-    @Mock
-    private EnrollmentRepository enrollmentRepository;
+    private AdminDashboardService adminDashboardService;
     @Mock
     private PermissionRepository permissionRepository;
 
@@ -86,76 +85,176 @@ class AdminControllerTest {
     }
 
 
+    private Pageable defaultPageable(int page, int size) {
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+    }
+
+    // =================================================================
+    // getComprehensiveDashboardStats
+    // =================================================================
+
     @Test
-    void getUsersShouldFilterByLearnerRoleType() {
+    void getComprehensiveDashboardStatsShouldReturnStatsFromDashboardServiceUsingRequestedPeriod() {
+        DashboardStatsDTO stats = DashboardStatsDTO.builder()
+                .overview(DashboardStatsDTO.Overview.builder().totalActiveUsers(42).build())
+                .build();
+        when(adminDashboardService.getComprehensiveStats(7)).thenReturn(stats);
+
+        ResponseEntity<?> response = adminController.getComprehensiveDashboardStats(7);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(stats, response.getBody());
+    }
+
+    @Test
+    void getComprehensiveDashboardStatsShouldDefaultPeriodToThirtyDays() {
+        DashboardStatsDTO stats = DashboardStatsDTO.builder().build();
+        when(adminDashboardService.getComprehensiveStats(30)).thenReturn(stats);
+
+        adminController.getComprehensiveDashboardStats(30);
+
+        verify(adminDashboardService).getComprehensiveStats(30);
+    }
+
+    @Test
+    void getComprehensiveDashboardStatsShouldReturn400WhenServiceThrows() {
+        when(adminDashboardService.getComprehensiveStats(30)).thenThrow(new RuntimeException("aggregation failed"));
+
+        ResponseEntity<?> response = adminController.getComprehensiveDashboardStats(30);
+
+        assertEquals(400, response.getStatusCode().value());
+    }
+
+    // =================================================================
+    // getUsers
+    // =================================================================
+
+    @Test
+    void getUsersShouldQueryLearnerRoleNamesForLearnerRoleType() {
         User learner = userWithRole(1L, "learner@example.com", "LEARNER");
-        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(learner)));
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersByRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(learner), pageable, 1));
 
         ResponseEntity<?> response = adminController.getUsers("learner", null, 0, 10);
 
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
-        assertEquals(1, body.get("totalElements"));
+        assertEquals(1L, body.get("totalElements"));
     }
 
     @Test
-    void getUsersShouldTreatCourseManagerAsAliasForTrainerLead() {
+    void getUsersShouldQueryTrainerRoleNamesForTrainerRoleType() {
+        User trainer = userWithRole(1L, "trainer@example.com", "TRAINER");
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersByRoleNamesAndSearch(List.of("TRAINER", "ROLE_TRAINER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(trainer), pageable, 1));
+
+        ResponseEntity<?> response = adminController.getUsers("trainer", null, 0, 10);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
+        assertEquals(1L, body.get("totalElements"));
+    }
+
+    @Test
+    void getUsersShouldQueryCourseManagerRoleNamesForCourseManagerRoleType() {
         User courseManager = userWithRole(1L, "cm@example.com", "COURSE_MANAGER");
-        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(courseManager)));
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersByRoleNamesAndSearch(List.of("COURSE_MANAGER", "ROLE_COURSE_MANAGER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(courseManager), pageable, 1));
 
         ResponseEntity<?> response = adminController.getUsers("course_manager", null, 0, 10);
 
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
-        assertEquals(1, body.get("totalElements"));
+        assertEquals(1L, body.get("totalElements"));
     }
 
     @Test
-    void getUsersShouldFilterBySearchQueryMatchingNameOrEmail() {
-        User alice = targetUser(1L, "alice@example.com");
-        alice.setFullName("Alice Nguyen");
-        User bob = targetUser(2L, "bob@example.com");
-        bob.setFullName("Bob Tran");
-        when(userRepository.findUsersNotInRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(alice)));
+    void getUsersShouldQueryAdminRoleNamesForAdminRoleType() {
+        User admin = userWithRole(1L, "admin@example.com", "ADMINISTRATOR");
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersByRoleNamesAndSearch(List.of("ADMINISTRATOR", "ROLE_ADMINISTRATOR", "ADMIN"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(admin), pageable, 1));
 
-        ResponseEntity<?> response = adminController.getUsers("staff", "alice", 0, 10);
+        ResponseEntity<?> response = adminController.getUsers("admin", null, 0, 10);
 
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
-        assertEquals(1, body.get("totalElements"));
+        assertEquals(1L, body.get("totalElements"));
     }
 
     @Test
     void getUsersShouldDefaultToStaffFilterExcludingLearners() {
-        User learner = userWithRole(1L, "learner@example.com", "LEARNER");
         User trainer = userWithRole(2L, "trainer@example.com", "TRAINER");
-        when(userRepository.findUsersNotInRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(trainer)));
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersNotInRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(trainer), pageable, 1));
 
         ResponseEntity<?> response = adminController.getUsers("staff", null, 0, 10);
 
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
-        assertEquals(1, body.get("totalElements"));
+        assertEquals(1L, body.get("totalElements"));
+        verify(userRepository).findUsersNotInRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), null, pageable);
     }
 
     @Test
-    void getUsersShouldPaginateResults() {
-        List<User> users = new java.util.ArrayList<>();
-        for (long i = 1; i <= 15; i++) {
-            users.add(userWithRole(i, "trainer" + i + "@example.com", "TRAINER"));
+    void getUsersShouldTrimWhitespaceFromSearchQueryBeforeQuerying() {
+        User alice = targetUser(1L, "alice@example.com");
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersNotInRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), "alice", pageable))
+                .thenReturn(new PageImpl<>(List.of(alice), pageable, 1));
+
+        ResponseEntity<?> response = adminController.getUsers("staff", "  alice  ", 0, 10);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
+        assertEquals(1L, body.get("totalElements"));
+    }
+
+    @Test
+    void getUsersShouldTreatBlankSearchAsNoFilter() {
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersNotInRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        ResponseEntity<?> response = adminController.getUsers("staff", "   ", 0, 10);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
+        assertEquals(0L, body.get("totalElements"));
+    }
+
+    @Test
+    void getUsersShouldForceTotalPagesToOneWhenRepositoryReturnsZeroTotalPages() {
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersNotInRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        ResponseEntity<?> response = adminController.getUsers("staff", null, 0, 10);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
+        assertEquals(1, body.get("totalPages"));
+    }
+
+    @Test
+    void getUsersShouldMapPagedRepositoryResultIntoResponseBody() {
+        List<User> pageContent = new java.util.ArrayList<>();
+        for (long i = 11; i <= 15; i++) {
+            pageContent.add(userWithRole(i, "trainer" + i + "@example.com", "TRAINER"));
         }
-        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new org.springframework.data.domain.PageImpl<>(users.subList(10, 15), org.springframework.data.domain.PageRequest.of(1, 10), 15));
+        Pageable pageable = defaultPageable(1, 10);
+        when(userRepository.findUsersByRoleNamesAndSearch(List.of("TRAINER", "ROLE_TRAINER"), null, pageable))
+                .thenReturn(new PageImpl<>(pageContent, pageable, 15));
 
         ResponseEntity<?> response = adminController.getUsers("trainer", null, 1, 10);
 
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
-        assertEquals(15, body.get("totalElements"));
+        assertEquals(15L, body.get("totalElements"));
         assertEquals(2, body.get("totalPages"));
         @SuppressWarnings("unchecked")
         List<?> content = (List<?>) body.get("content");
@@ -163,36 +262,50 @@ class AdminControllerTest {
     }
 
     @Test
-    void getUsersShouldFilterByAdminRoleType() {
-        User admin = userWithRole(1L, "admin@example.com", "ADMINISTRATOR");
-        when(userRepository.findUsersByRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(admin)));
-
-        ResponseEntity<?> response = adminController.getUsers("admin", null, 0, 10);
-
-        @SuppressWarnings("unchecked")
-        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
-        assertEquals(1, body.get("totalElements"));
-    }
-
-    @Test
     void getUsersShouldReturnEmptyContentWhenPageExceedsTotalElements() {
-        when(userRepository.findUsersNotInRoleNamesAndSearch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
-            .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.Collections.emptyList()));
+        Pageable pageable = defaultPageable(5, 10);
+        when(userRepository.findUsersByRoleNamesAndSearch(List.of("TRAINER", "ROLE_TRAINER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 1));
 
         ResponseEntity<?> response = adminController.getUsers("trainer", null, 5, 10);
 
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
-        assertEquals(1, body.get("totalElements"));
+        assertEquals(1L, body.get("totalElements"));
         @SuppressWarnings("unchecked")
         List<?> content = (List<?>) body.get("content");
         assertTrue(content.isEmpty());
     }
 
     @Test
+    void getUsersShouldMapUserFieldsIncludingRoleNamesAndDefaultStatusWhenNull() {
+        User user = User.builder().id(1L).email("trainer@example.com").fullName("Trainer One")
+                .status(null)
+                .roles(new java.util.HashSet<>(java.util.Set.of(Role.builder().id(1L).roleName("TRAINER").build())))
+                .build();
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersByRoleNamesAndSearch(List.of("TRAINER", "ROLE_TRAINER"), null, pageable))
+                .thenReturn(new PageImpl<>(List.of(user), pageable, 1));
+
+        ResponseEntity<?> response = adminController.getUsers("trainer", null, 0, 10);
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> body = (java.util.Map<String, Object>) response.getBody();
+        @SuppressWarnings("unchecked")
+        List<java.util.Map<String, Object>> content = (List<java.util.Map<String, Object>>) body.get("content");
+        java.util.Map<String, Object> mapped = content.get(0);
+        assertEquals(1L, mapped.get("id"));
+        assertEquals("Trainer One", mapped.get("fullName"));
+        assertEquals("trainer@example.com", mapped.get("email"));
+        assertEquals("ACTIVE", mapped.get("status"));
+        assertEquals(List.of("TRAINER"), mapped.get("roles"));
+    }
+
+    @Test
     void getUsersShouldReturn400WhenRepositoryThrows() {
-        when(userRepository.findAll()).thenThrow(new RuntimeException("DB error"));
+        Pageable pageable = defaultPageable(0, 10);
+        when(userRepository.findUsersNotInRoleNamesAndSearch(List.of("LEARNER", "ROLE_LEARNER"), null, pageable))
+                .thenThrow(new RuntimeException("DB error"));
 
         ResponseEntity<?> response = adminController.getUsers("staff", null, 0, 10);
 
