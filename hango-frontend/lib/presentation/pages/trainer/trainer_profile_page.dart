@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
 import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
 import '../../../../utils/file_picker_helper.dart';
 import '../../../../utils/trainer_document_utils.dart';
+import '../../../../utils/trainer_onboarding_validation_utils.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
 
 class TrainerProfilePage extends StatefulWidget {
@@ -23,15 +24,15 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   final _onboardingService = TrainerOnboardingService();
 
   int _activeTab =
-      0; // 0: Personal Info, 1: CV & Experience, 2: Bank Account, 3: Security
+      0; // 0: Personal Info, 1: CV & Degrees, 2: Bank Account, 3: Security
   bool _isLoading = true;
   bool _isSaving = false;
 
   String _maskAccountNumber(String acc) {
-    if (acc.isEmpty) return 'â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢';
+    if (acc.isEmpty) return '•••• •••• ••••';
     if (acc.length <= 4) return acc;
     final last4 = acc.substring(acc.length - 4);
-    return 'â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ $last4';
+    return '•••• •••• $last4';
   }
 
   Map<String, dynamic> _profileData = {};
@@ -43,9 +44,9 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   final _addressController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   final _bioController = TextEditingController();
-  final _workplaceController = TextEditingController();
   final _bankAccountController = TextEditingController();
   final _bankAccountNameController = TextEditingController();
+  final _taxCodeController = TextEditingController();
   final _citizenIdController = TextEditingController();
 
   String _userEmail = '';
@@ -62,12 +63,14 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
 
   // Degrees & Certificates (Dynamic unlimited list)
   List<Map<String, String>> _certificates = [];
+  String _initialCertificateJson = '[]';
 
   bool _fullNameError = false;
   bool _phoneNumberError = false;
   bool _bioError = false;
   bool _bankAccountError = false;
   bool _bankAccountNameError = false;
+  bool _taxCodeError = false;
   bool _citizenIdError = false;
 
   final List<String> _bankSuggestions = [
@@ -96,9 +99,9 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     _addressController.dispose();
     _phoneNumberController.dispose();
     _bioController.dispose();
-    _workplaceController.dispose();
     _bankAccountController.dispose();
     _bankAccountNameController.dispose();
+    _taxCodeController.dispose();
     _citizenIdController.dispose();
     super.dispose();
   }
@@ -138,7 +141,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         _userEmail = p['email'] ?? '';
         _phoneNumberController.text = p['phoneNumber'] ?? '';
         _bioController.text = p['bio'] ?? '';
-        _workplaceController.text = p['workplace'] ?? '';
         _avatarUrl = p['avatarUrl'] ?? avatarUrl;
         _gender = (p['gender'] == 'MALE' || p['gender'] == 'FEMALE')
             ? p['gender']
@@ -147,6 +149,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         _selectedBank = p['bankName'];
         _bankAccountController.text = p['bankAccount'] ?? '';
         _bankAccountNameController.text = p['bankAccountName'] ?? '';
+        _taxCodeController.text = p['taxCode'] ?? '';
         _citizenIdController.text = p['citizenId'] ?? '';
 
         _certificates = decodeTrainerDocuments(
@@ -157,18 +160,17 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
           degreeUrl: p['degreeUrl'],
           ieltsUrl: p['ieltsUrl'],
         );
+        _initialCertificateJson = jsonEncode(_certificates);
         _isLoading = false;
       });
-    } else {
+    } else if (mounted) {
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ToastHelper.showError(
-          context,
-          result['message'] ?? 'KhÃ´ng thá»ƒ táº£i thÃ´ng tin há»“ sÆ¡.',
-        );
-      }
+      ToastHelper.showError(
+        context,
+        result['message'] ?? 'Không thể tải thông tin hồ sơ.',
+      );
     }
   }
 
@@ -177,29 +179,30 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       final picked = await pickImage();
       if (picked == null) return;
 
+      final validationError = validateTrainerUploadFile(
+        fileName: picked.name,
+        fileSizeBytes: picked.bytes.length,
+        maxSizeBytes: 2 * 1024 * 1024,
+        allowPdf: false,
+        isVi: LanguageManager.isVi,
+      );
+      if (validationError != null) {
+        if (mounted) ToastHelper.showError(context, validationError);
+        return;
+      }
+
+      if (!mounted) return;
       setState(() {
         _isUploadingAvatar = true;
       });
 
-      final url = Uri.parse(
-        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      final result = await _onboardingService.uploadTrainerAvatar(
+        bytes: picked.bytes,
+        fileName: picked.name,
       );
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            picked.bytes,
-            filename: picked.name,
-          ),
-        );
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
-        final uploadedUrl = data['secure_url'] ?? data['url'];
+      if (!mounted) return;
+      if (result['success'] == true) {
+        final uploadedUrl = result['data']['url'].toString();
 
         setState(() {
           _avatarUrl = uploadedUrl;
@@ -211,20 +214,19 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         await prefs.setString('user_avatar_url', uploadedUrl);
 
         if (mounted) {
-          ToastHelper.showSuccess(
-            context,
-            'Táº£i lÃªn áº£nh Ä‘áº¡i diá»‡n thÃ nh cÃ´ng!',
-          );
+          ToastHelper.showSuccess(context, 'Tải ảnh đại diện thành công!');
         }
       } else {
-        throw Exception('Cloudinary error: ${response.statusCode}');
+        setState(() => _isUploadingAvatar = false);
+        ToastHelper.showError(
+          context,
+          result['message'] ?? 'Tải ảnh thất bại. Vui lòng thử lại.',
+        );
       }
-    } catch (e) {
-      setState(() {
-        _isUploadingAvatar = false;
-      });
+    } catch (_) {
       if (mounted) {
-        ToastHelper.showError(context, 'Lá»—i táº£i áº£nh: $e');
+        setState(() => _isUploadingAvatar = false);
+        ToastHelper.showError(context, 'Tải ảnh thất bại. Vui lòng thử lại.');
       }
     }
   }
@@ -236,48 +238,58 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final bio = _bioController.text.trim();
     final bankAccount = _bankAccountController.text.trim();
     final bankAccountName = _bankAccountNameController.text.trim();
+    final taxCode = _taxCodeController.text.trim();
     final citizenId = _citizenIdController.text.trim();
 
-    final numRegex = RegExp(r'^\d+$');
-    final nameRegex = RegExp(r'^[A-Z ]+$');
+    final phoneErrorText = validateVietnamesePhoneNumber(
+      phoneNumber,
+      isVi: isVi,
+    );
 
     setState(() {
       _fullNameError = fullName.isEmpty;
-      _phoneNumberError =
-          phoneNumber.isEmpty ||
-          phoneNumber.length != 10 ||
-          !numRegex.hasMatch(phoneNumber);
+      _phoneNumberError = phoneErrorText != null;
       _bioError = bio.isEmpty || bio.length < 50;
       _bankAccountError =
-          bankAccount.isNotEmpty && !numRegex.hasMatch(bankAccount);
+          validateTrainerBankAccount(
+            bankAccount,
+            isVi: isVi,
+            requiredField: false,
+          ) !=
+          null;
       _bankAccountNameError =
-          bankAccountName.isNotEmpty && !nameRegex.hasMatch(bankAccountName);
+          validateTrainerBankAccountName(
+            bankAccountName,
+            isVi: isVi,
+            requiredField: false,
+          ) !=
+          null;
+      _taxCodeError = validateTrainerTaxCode(taxCode, isVi: isVi) != null;
       _citizenIdError =
-          citizenId.isNotEmpty &&
-          (citizenId.length != 12 || !numRegex.hasMatch(citizenId));
+          validateTrainerCitizenId(
+            citizenId,
+            isVi: isVi,
+            requiredField: false,
+          ) !=
+          null;
     });
 
     if (_fullNameError) {
       ToastHelper.showError(
         context,
-        isVi ? 'Vui lÃ²ng nháº­p há» vÃ  tÃªn.' : 'Please enter full name.',
+        isVi ? 'Vui lòng nhập họ và tên.' : 'Please enter full name.',
       );
       return false;
     }
     if (_phoneNumberError) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng há»£p lá»‡ (10 chá»¯ sá»‘).'
-            : 'Invalid phone number (10 digits).',
-      );
+      ToastHelper.showError(context, phoneErrorText!);
       return false;
     }
     if (_bioError) {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Giá»›i thiá»‡u báº£n thÃ¢n cáº§n tá»‘i thiá»ƒu 50 kÃ½ tá»±.'
+            ? 'Giới thiệu bản thân cần tối thiểu 50 ký tự.'
             : 'Bio must be at least 50 characters.',
       );
       return false;
@@ -285,7 +297,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     if (_gender == null) {
       ToastHelper.showError(
         context,
-        isVi ? 'Vui lÃ²ng chá»n giá»›i tÃ­nh.' : 'Please select gender.',
+        isVi ? 'Vui lòng chọn giới tính.' : 'Please select gender.',
       );
       return false;
     }
@@ -293,7 +305,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Sá»‘ tÃ i khoáº£n ngÃ¢n hÃ ng chá»‰ Ä‘Æ°á»£c phÃ©p chá»©a kÃ½ tá»± sá»‘.'
+            ? 'Số tài khoản ngân hàng chỉ được phép chứa ký tự số.'
             : 'Bank account digits only.',
       );
       return false;
@@ -302,8 +314,17 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       ToastHelper.showError(
         context,
         isVi
-            ? 'TÃªn chá»§ tÃ i khoáº£n viáº¿t hoa khÃ´ng dáº¥u.'
+            ? 'Tên chủ tài khoản viết hoa không dấu.'
             : 'Owner name must be UPPERCASE.',
+      );
+      return false;
+    }
+    if (_taxCodeError) {
+      ToastHelper.showError(
+        context,
+        isVi
+            ? 'Mã số thuế phải có 10 hoặc 13 chữ số.'
+            : 'Tax ID must contain 10 or 13 digits.',
       );
       return false;
     }
@@ -311,7 +332,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Sá»‘ CCCD pháº£i gá»“m Ä‘Ãºng 12 chá»¯ sá»‘.'
+            ? 'Số CCCD phải gồm đúng 12 chữ số.'
             : 'Citizen ID must be 12 digits.',
       );
       return false;
@@ -324,7 +345,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Vui lÃ²ng táº£i lÃªn Ã­t nháº¥t má»™t báº±ng cáº¥p hoáº·c chá»©ng chá»‰ nÄƒng lá»±c.'
+            ? 'Vui lòng tải lên ít nhất một bằng cấp hoặc chứng chỉ năng lực.'
             : 'Please upload at least one credentials proof.',
       );
       return false;
@@ -337,8 +358,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       ToastHelper.showError(
         context,
         isVi
-            ? 'Giáº£ng viÃªn chuyÃªn mÃ´n cáº§n cÃ³ Ã­t nháº¥t má»™t minh chá»©ng sÆ° pháº¡m, chá»©ng chá»‰ giáº£ng dáº¡y hoáº·c CV giáº£ng dáº¡y.'
-            : 'Professional trainers must provide at least one pedagogical proof, teaching certificate, or teaching CV.',
+            ? 'Giảng viên chuyên môn cần có ít nhất một bằng sư phạm hoặc chứng chỉ giảng dạy.'
+            : 'Professional trainers must provide at least one pedagogical degree or teaching certificate.',
       );
       return false;
     }
@@ -357,7 +378,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     payload['fullName'] = _fullNameController.text.trim();
     payload['phoneNumber'] = _phoneNumberController.text.trim();
     payload['bio'] = _bioController.text.trim();
-    payload['workplace'] = _workplaceController.text.trim();
     payload['gender'] = _gender;
     payload['avatarUrl'] = _avatarUrl ?? '';
     payload['username'] = _usernameController.text.trim();
@@ -373,19 +393,44 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     payload['bankAccountName'] = _bankAccountNameController.text
         .trim()
         .toUpperCase();
-    payload.addAll(buildTrainerDocumentPayload(_certificates));
+    payload['taxCode'] = _taxCodeController.text.trim();
+    final documentPayload = buildTrainerDocumentPayload(_certificates);
+    payload.addAll(documentPayload);
     payload['citizenId'] = _citizenIdController.text.trim();
 
-    debugPrint('[TrainerProfile] Saving draft payload: $payload');
-    final result = await _onboardingService.saveProfileDraft(payload);
-    debugPrint('[TrainerProfile] Save result: $result');
+    final currentCertificateJson = jsonEncode(
+      normalizeTrainerDocuments(_certificates),
+    );
+    final credentialsChanged =
+        currentCertificateJson != _initialCertificateJson;
+    final isVerified = _profileData['status'] == 'VERIFIED';
 
+    Map<String, dynamic> result;
+    if (isVerified && credentialsChanged) {
+      final personalPayload = Map<String, dynamic>.from(payload)
+        ..remove('certificates')
+        ..remove('scoreReportUrl')
+        ..remove('pedagogicalDegreeUrl')
+        ..remove('cvUrl');
+      result = await _onboardingService.saveProfileDraft(personalPayload);
+      if (result['success'] == true) {
+        result = await _onboardingService.submitCredentialUpdate(
+          documentPayload,
+        );
+      }
+    } else {
+      result = await _onboardingService.saveProfileDraft(payload);
+    }
+
+    if (!mounted) return;
     setState(() {
       _isSaving = false;
     });
 
     if (mounted) {
       if (result['success'] == true) {
+        _profileData = Map<String, dynamic>.from(result['data'] ?? payload);
+        _initialCertificateJson = currentCertificateJson;
         // Sync shared preferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_fullname', _fullNameController.text.trim());
@@ -405,15 +450,19 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         if (mounted) {
           ToastHelper.showSuccess(
             context,
-            LanguageManager.isVi
-                ? 'Cáº­p nháº­t há»“ sÆ¡ thÃ nh cÃ´ng!'
-                : 'Profile updated successfully!',
+            credentialsChanged && isVerified
+                ? (LanguageManager.isVi
+                      ? 'Đã gửi chứng chỉ cập nhật để xét duyệt.'
+                      : 'Updated credentials were submitted for review.')
+                : (LanguageManager.isVi
+                      ? 'Cập nhật hồ sơ thành công!'
+                      : 'Profile updated successfully!'),
           );
         }
       } else if (mounted) {
         ToastHelper.showError(
           context,
-          result['message'] ?? 'Cáº­p nháº­t tháº¥t báº¡i.',
+          result['message'] ?? 'Cập nhật thất bại.',
         );
       }
     }
@@ -465,7 +514,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isVi ? 'Há»“ sÆ¡ cá»§a tÃ´i' : 'My Profile',
+            isVi ? 'Hồ sơ của tôi' : 'My Profile',
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -524,31 +573,31 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final tabs = [
       {
         'index': 0,
-        'title': isVi ? 'ThÃ´ng tin cÃ¡ nhÃ¢n' : 'Personal Info',
-        'subtitle': isVi ? 'Há» tÃªn, email & bio' : 'Name, contact & bio',
+        'title': isVi ? 'Thông tin cá nhân' : 'Personal Info',
+        'subtitle': isVi ? 'Họ tên, email & bio' : 'Name, contact & bio',
         'icon': Icons.person_outline_rounded,
         'activeColor': const Color(0xFF28B79B),
       },
       {
         'index': 1,
-        'title': isVi ? 'CV & Báº±ng cáº¥p' : 'CV & Degrees',
+        'title': isVi ? 'CV & Bằng cấp' : 'CV & Degrees',
         'subtitle': isVi
-            ? 'Kinh nghiá»‡m & chá»©ng chá»‰'
-            : 'Experience & certificates',
+            ? 'Thông tin & chứng chỉ'
+            : 'Credentials & certificates',
         'icon': Icons.badge_outlined,
         'activeColor': const Color(0xFF0284C7),
       },
       {
         'index': 2,
-        'title': isVi ? 'TÃ i khoáº£n NgÃ¢n hÃ ng' : 'Bank Account',
-        'subtitle': isVi ? 'Nháº­n tiá»n doanh thu' : 'Payout & Tax ID',
+        'title': isVi ? 'Tài khoản Ngân hàng' : 'Bank Account',
+        'subtitle': isVi ? 'Nhận tiền doanh thu' : 'Payout & Tax ID',
         'icon': Icons.account_balance_outlined,
         'activeColor': const Color(0xFF8B5CF6),
       },
       {
         'index': 3,
-        'title': isVi ? 'Äá»•i máº­t kháº©u' : 'Security',
-        'subtitle': isVi ? 'Máº­t kháº©u & báº£o máº­t' : 'Password & security',
+        'title': isVi ? 'Đổi mật khẩu' : 'Security',
+        'subtitle': isVi ? 'Mật khẩu & bảo mật' : 'Password & security',
         'icon': Icons.lock_reset_rounded,
         'activeColor': const Color(0xFFF59E0B),
       },
@@ -676,31 +725,31 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final tabs = [
       {
         'index': 0,
-        'title': isVi ? 'ThÃ´ng tin cÃ¡ nhÃ¢n' : 'Personal Info',
-        'subtitle': isVi ? 'Há» tÃªn, email & bio' : 'Name, contact & bio',
+        'title': isVi ? 'Thông tin cá nhân' : 'Personal Info',
+        'subtitle': isVi ? 'Họ tên, email & bio' : 'Name, contact & bio',
         'icon': Icons.person_outline_rounded,
         'activeColor': const Color(0xFF28B79B),
       },
       {
         'index': 1,
-        'title': isVi ? 'CV & Báº±ng cáº¥p' : 'CV & Degrees',
+        'title': isVi ? 'CV & Bằng cấp' : 'CV & Degrees',
         'subtitle': isVi
-            ? 'Kinh nghiá»‡m & chá»©ng chá»‰'
-            : 'Experience & certificates',
+            ? 'Thông tin & chứng chỉ'
+            : 'Credentials & certificates',
         'icon': Icons.badge_outlined,
         'activeColor': const Color(0xFF0284C7),
       },
       {
         'index': 2,
-        'title': isVi ? 'TÃ i khoáº£n NgÃ¢n hÃ ng' : 'Bank Account',
-        'subtitle': isVi ? 'Nháº­n tiá»n doanh thu' : 'Payout & Tax ID',
+        'title': isVi ? 'Tài khoản Ngân hàng' : 'Bank Account',
+        'subtitle': isVi ? 'Nhận tiền doanh thu' : 'Payout & Tax ID',
         'icon': Icons.account_balance_outlined,
         'activeColor': const Color(0xFF8B5CF6),
       },
       {
         'index': 3,
-        'title': isVi ? 'Äá»•i máº­t kháº©u' : 'Security',
-        'subtitle': isVi ? 'Máº­t kháº©u & báº£o máº­t' : 'Password & security',
+        'title': isVi ? 'Đổi mật khẩu' : 'Security',
+        'subtitle': isVi ? 'Mật khẩu & bảo mật' : 'Password & security',
         'icon': Icons.lock_reset_rounded,
         'activeColor': const Color(0xFFF59E0B),
       },
@@ -943,10 +992,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                   ),
                   child: Text(
                     _trainerType == 'PROFESSIONAL'
-                        ? (isVi
-                              ? 'GiÃ¡o viÃªn ChuyÃªn nghiá»‡p'
-                              : 'Professional')
-                        : (isVi ? 'Gia sÆ°' : 'Tutor'),
+                        ? (isVi ? 'Giáo viên Chuyên nghiệp' : 'Professional')
+                        : (isVi ? 'Gia sư' : 'Tutor'),
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1001,7 +1048,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   }
 
   // Box 1: ThÃ´ng tin cÃ¡ nhÃ¢n
-    Widget _buildBox0PersonalInfo(bool isVi) {
+  Widget _buildBox0PersonalInfo(bool isVi) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1041,7 +1088,10 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF28B79B),
                 side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1111,7 +1161,11 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                       Expanded(
                         child: _buildReadOnlyField(
                           isVi ? 'Giới tính' : 'Gender',
-                          _gender == 'MALE' ? (isVi ? 'Nam' : 'Male') : (_gender == 'FEMALE' ? (isVi ? 'Nữ' : 'Female') : ''),
+                          _gender == 'MALE'
+                              ? (isVi ? 'Nam' : 'Male')
+                              : (_gender == 'FEMALE'
+                                    ? (isVi ? 'Nữ' : 'Female')
+                                    : ''),
                         ),
                       ),
                     ],
@@ -1121,17 +1175,37 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             }
             return Column(
               children: [
-                _buildReadOnlyField(isVi ? 'Họ và tên' : 'Full Name', _fullNameController.text),
+                _buildReadOnlyField(
+                  isVi ? 'Họ và tên' : 'Full Name',
+                  _fullNameController.text,
+                ),
                 const SizedBox(height: 16),
-                _buildReadOnlyField(isVi ? 'Tên đăng nhập' : 'Name account', _usernameController.text),
+                _buildReadOnlyField(
+                  isVi ? 'Tên đăng nhập' : 'Name account',
+                  _usernameController.text,
+                ),
                 const SizedBox(height: 16),
-                _buildReadOnlyField(isVi ? 'Số điện thoại' : 'Phone Number', _phoneNumberController.text),
+                _buildReadOnlyField(
+                  isVi ? 'Số điện thoại' : 'Phone Number',
+                  _phoneNumberController.text,
+                ),
                 const SizedBox(height: 16),
-                _buildReadOnlyField(isVi ? 'Ngày sinh' : 'Date of birth', _dobController.text),
+                _buildReadOnlyField(
+                  isVi ? 'Ngày sinh' : 'Date of birth',
+                  _dobController.text,
+                ),
                 const SizedBox(height: 16),
-                _buildReadOnlyField(isVi ? 'Địa chỉ' : 'Address', _addressController.text),
+                _buildReadOnlyField(
+                  isVi ? 'Địa chỉ' : 'Address',
+                  _addressController.text,
+                ),
                 const SizedBox(height: 16),
-                _buildReadOnlyField(isVi ? 'Giới tính' : 'Gender', _gender == 'MALE' ? (isVi ? 'Nam' : 'Male') : (_gender == 'FEMALE' ? (isVi ? 'Nữ' : 'Female') : '')),
+                _buildReadOnlyField(
+                  isVi ? 'Giới tính' : 'Gender',
+                  _gender == 'MALE'
+                      ? (isVi ? 'Nam' : 'Male')
+                      : (_gender == 'FEMALE' ? (isVi ? 'Nữ' : 'Female') : ''),
+                ),
               ],
             );
           },
@@ -1167,7 +1241,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                   _addressController.text = data['address'];
                   _phoneNumberController.text = data['phone'];
                   _gender = data['gender'];
-                  if (data['avatarUrl'] != null && data['avatarUrl'].isNotEmpty) {
+                  if (data['avatarUrl'] != null &&
+                      data['avatarUrl'].isNotEmpty) {
                     _avatarUrl = data['avatarUrl'];
                   }
                 });
@@ -1180,7 +1255,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     );
   }
 
-  // Box 2: CV, Kinh nghiá»‡m & Báº±ng cáº¥p
+  // Box 2: CV and credentials
   Widget _buildBox1CvAndDegrees(bool isVi) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1201,9 +1276,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             ),
             const SizedBox(width: 12),
             Text(
-              isVi
-                  ? '2. CV & Kinh nghiá»‡m giáº£ng dáº¡y'
-                  : '2. CV & Teaching Experience',
+              isVi ? '2. CV & Thông tin chuyên môn' : '2. CV & Credentials',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -1215,29 +1288,18 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         ),
         const SizedBox(height: 24),
         _buildInputField(
-          isVi
-              ? 'NÆ¡i lÃ m viá»‡c / TrÆ°á»ng Ä‘Ã o táº¡o'
-              : 'Workplace / Organization',
-          _workplaceController,
-        ),
-        const SizedBox(height: 16),
-        _buildInputField(
-          isVi
-              ? 'Giá»›i thiá»‡u báº£n thÃ¢n & Kinh nghiá»‡m *'
-              : 'Bio & Experience *',
+          isVi ? 'Giới thiệu bản thân *' : 'Bio *',
           _bioController,
           maxLines: 5,
           errorText: _bioError
               ? (isVi
-                    ? 'Giá»›i thiá»‡u cáº§n tá»« 50 kÃ½ tá»±'
+                    ? 'Giới thiệu cần từ 50 ký tự'
                     : 'Bio must be >= 50 characters')
               : null,
         ),
         const SizedBox(height: 24),
         Text(
-          isVi
-              ? 'Báº±ng cáº¥p & Chá»©ng chá»‰ nÄƒng lá»±c'
-              : 'Degrees & Certificates',
+          isVi ? 'Bằng cấp & Chứng chỉ năng lực' : 'Degrees & Certificates',
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
@@ -1248,7 +1310,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         const SizedBox(height: 6),
         Text(
           isVi
-              ? 'Táº£i lÃªn Ã­t nháº¥t má»™t tÃ i liá»‡u chá»©ng minh nÄƒng lá»±c Ä‘á»ƒ hoÃ n táº¥t há»“ sÆ¡.'
+              ? 'Tải lên ít nhất một tài liệu chứng minh năng lực để hoàn tất hồ sơ.'
               : 'Upload at least one credentials proof to complete your profile.',
           style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
         ),
@@ -1282,7 +1344,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             const SizedBox(width: 12),
             Text(
               isVi
-                  ? '3. Cáº¥u hÃ¬nh TÃ i khoáº£n thá»¥ hÆ°á»Ÿng'
+                  ? '3. Cấu hình Tài khoản thụ hưởng'
                   : '3. Bank Account & Payout',
               style: const TextStyle(
                 fontSize: 18,
@@ -1330,7 +1392,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                       const SizedBox(width: 6),
                       Text(
                         isVi
-                            ? 'TÃ€I KHOáº¢N THá»¤ HÆ¯á»žNG Báº¢O Máº¬T'
+                            ? 'TÀI KHOẢN THỤ HƯỞNG BẢO MẬT'
                             : 'SECURED PAYOUT ACCOUNT',
                         style: const TextStyle(
                           fontSize: 11,
@@ -1342,7 +1404,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                     ],
                   ),
                   Text(
-                    _selectedBank ?? (isVi ? 'NGÃ‚N HÃ€NG' : 'BANK'),
+                    _selectedBank ?? (isVi ? 'NGÂN HÀNG' : 'BANK'),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.white70,
@@ -1370,7 +1432,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isVi ? 'CHá»¦ TÃ€I KHOáº¢N' : 'ACCOUNT OWNER',
+                        isVi ? 'CHỦ TÀI KHOẢN' : 'ACCOUNT OWNER',
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xFF94A3B8),
@@ -1380,7 +1442,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                       Text(
                         _bankAccountNameController.text.isNotEmpty
                             ? _bankAccountNameController.text.toUpperCase()
-                            : (isVi ? 'CHÆ¯A Cáº¬P NHáº¬T' : 'NOT UPDATED'),
+                            : (isVi ? 'CHƯA CẬP NHẬT' : 'NOT UPDATED'),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -1393,7 +1455,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        isVi ? 'MÃƒ Sá» THUáº¾' : 'TAX ID',
+                        isVi ? 'MÃ SỐ THUẾ' : 'TAX ID',
                         style: const TextStyle(
                           fontSize: 10,
                           color: Color(0xFF94A3B8),
@@ -1401,8 +1463,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _citizenIdController.text.isNotEmpty
-                            ? _citizenIdController.text
+                        _taxCodeController.text.isNotEmpty
+                            ? _taxCodeController.text
                             : '---',
                         style: const TextStyle(
                           fontSize: 13,
@@ -1420,7 +1482,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         const SizedBox(height: 24),
 
         Text(
-          isVi ? 'NgÃ¢n hÃ ng thá»¥ hÆ°á»Ÿng' : 'Beneficiary Bank',
+          isVi ? 'Ngân hàng thụ hưởng' : 'Beneficiary Bank',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
@@ -1441,7 +1503,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
               value: _selectedBank,
               dropdownColor: Colors.white,
               isExpanded: true,
-              hint: Text(isVi ? 'Chá»n ngÃ¢n hÃ ng' : 'Select bank'),
+              hint: Text(isVi ? 'Chọn ngân hàng' : 'Select bank'),
               items: _bankSuggestions.map((String b) {
                 return DropdownMenuItem<String>(value: b, child: Text(b));
               }).toList(),
@@ -1455,22 +1517,24 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         ),
         const SizedBox(height: 16),
         _buildInputField(
-          isVi ? 'Sá»‘ tÃ i khoáº£n ngÃ¢n hÃ ng' : 'Bank Account Number',
+          isVi ? 'Số tài khoản ngân hàng' : 'Bank Account Number',
           _bankAccountController,
           keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: 20,
           errorText: _bankAccountError
-              ? (isVi ? 'Chá»‰ nháº­p sá»‘' : 'Digits only')
+              ? (isVi ? 'Chỉ nhập số' : 'Digits only')
               : null,
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 16),
         _buildInputField(
           isVi
-              ? 'TÃªn chá»§ tÃ i khoáº£n (viáº¿t hoa khÃ´ng dáº¥u)'
+              ? 'Tên chủ tài khoản (viết hoa không dấu)'
               : 'Account Owner Name',
           _bankAccountNameController,
           errorText: _bankAccountNameError
-              ? (isVi ? 'Viáº¿t hoa khÃ´ng dáº¥u' : 'UPPERCASE only')
+              ? (isVi ? 'Viết hoa không dấu' : 'UPPERCASE only')
               : null,
           onChanged: (val) {
             _bankAccountNameController.value = _bankAccountNameController.value
@@ -1483,14 +1547,29 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         ),
         const SizedBox(height: 16),
         _buildInputField(
-          isVi
-              ? 'MÃ£ sá»‘ thuáº¿ (Tax ID)'
-              : 'Tax Identification Number (Tax ID)',
+          isVi ? 'Mã số thuế (Tax ID)' : 'Tax Identification Number (Tax ID)',
+          _taxCodeController,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: 13,
+          errorText: _taxCodeError
+              ? (isVi
+                    ? 'Mã số thuế phải có 10 hoặc 13 số'
+                    : 'Tax ID must have 10 or 13 digits')
+              : null,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 16),
+        _buildInputField(
+          isVi ? 'Số CCCD' : 'Citizen ID Number',
           _citizenIdController,
           keyboardType: TextInputType.number,
-          maxLength: 13,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: 12,
           errorText: _citizenIdError
-              ? (isVi ? 'MÃ£ sá»‘ thuáº¿ khÃ´ng há»£p lá»‡' : 'Invalid Tax ID')
+              ? (isVi
+                    ? 'CCCD phải có đúng 12 số'
+                    : 'Citizen ID must have 12 digits')
               : null,
           onChanged: (_) => setState(() {}),
         ),
@@ -1521,7 +1600,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                   ),
                 )
               : const Icon(Icons.save_rounded, size: 18),
-          label: Text(isVi ? 'LÆ°u thay Ä‘á»•i' : 'Save Changes'),
+          label: Text(isVi ? 'Lưu thay đổi' : 'Save Changes'),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF20B486),
             foregroundColor: Colors.white,
@@ -1544,7 +1623,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          isVi ? '4. Äá»•i máº­t kháº©u' : '4. Security & Change Password',
+          isVi ? '4. Đổi mật khẩu' : '4. Security & Change Password',
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -1555,25 +1634,25 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         const SizedBox(height: 8),
         Text(
           isVi
-              ? 'Cáº­p nháº­t máº­t kháº©u Ä‘Äƒng nháº­p tÃ i khoáº£n cá»§a báº¡n.'
+              ? 'Cập nhật mật khẩu đăng nhập tài khoản của bạn.'
               : 'Update your account login password.',
           style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
         ),
         const SizedBox(height: 16),
         _buildInputField(
-          isVi ? 'Máº­t kháº©u hiá»‡n táº¡i *' : 'Current Password *',
+          isVi ? 'Mật khẩu hiện tại *' : 'Current Password *',
           currentPwdController,
           isPassword: true,
         ),
         const SizedBox(height: 12),
         _buildInputField(
-          isVi ? 'Máº­t kháº©u má»›i *' : 'New Password *',
+          isVi ? 'Mật khẩu mới *' : 'New Password *',
           newPwdController,
           isPassword: true,
         ),
         const SizedBox(height: 12),
         _buildInputField(
-          isVi ? 'XÃ¡c nháº­n máº­t kháº©u má»›i *' : 'Confirm New Password *',
+          isVi ? 'Xác nhận mật khẩu mới *' : 'Confirm New Password *',
           confirmPwdController,
           isPassword: true,
         ),
@@ -1590,7 +1669,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 ToastHelper.showError(
                   context,
                   isVi
-                      ? 'Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin máº­t kháº©u.'
+                      ? 'Vui lòng nhập đầy đủ thông tin mật khẩu.'
                       : 'Please fill out all password fields.',
                 );
                 return;
@@ -1599,7 +1678,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 ToastHelper.showError(
                   context,
                   isVi
-                      ? 'Máº­t kháº©u má»›i pháº£i cÃ³ tá»‘i thiá»ƒu 6 kÃ½ tá»±.'
+                      ? 'Mật khẩu mới phải có tối thiểu 6 ký tự.'
                       : 'New password must be at least 6 characters.',
                 );
                 return;
@@ -1608,7 +1687,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 ToastHelper.showError(
                   context,
                   isVi
-                      ? 'Máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p.'
+                      ? 'Mật khẩu xác nhận không khớp.'
                       : 'Confirm password does not match.',
                 );
                 return;
@@ -1621,7 +1700,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                   ToastHelper.showSuccess(
                     context,
                     isVi
-                        ? 'Äá»•i máº­t kháº©u thÃ nh cÃ´ng!'
+                        ? 'Đổi mật khẩu thành công!'
                         : 'Password changed successfully!',
                   );
                   currentPwdController.clear();
@@ -1632,7 +1711,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                     context,
                     res['message'] ??
                         (isVi
-                            ? 'Äá»•i máº­t kháº©u tháº¥t báº¡i.'
+                            ? 'Đổi mật khẩu thất bại.'
                             : 'Failed to change password.'),
                   );
                 }
@@ -1644,7 +1723,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
               size: 18,
             ),
             label: Text(
-              isVi ? 'Cáº­p nháº­t máº­t kháº©u' : 'Update Password',
+              isVi ? 'Cập nhật mật khẩu' : 'Update Password',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF28B79B),
@@ -1668,6 +1747,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     String label,
     TextEditingController controller, {
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
     int maxLines = 1,
     int? maxLength,
     String? errorText,
@@ -1690,6 +1770,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           maxLines: maxLines,
           maxLength: maxLength,
           obscureText: isPassword,
@@ -1834,42 +1915,88 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   }
 
   Future<Map<String, String>?> _uploadFileToCloudinaryWithDetails() async {
+    return _uploadValidatedFileToCloudinaryWithDetails(
+      allowPdf: true,
+      maxSizeBytes: 5 * 1024 * 1024,
+    );
+  }
+
+  Future<Map<String, String>?> _uploadValidatedFileToCloudinaryWithDetails({
+    required bool allowPdf,
+    required int maxSizeBytes,
+  }) async {
     try {
-      final picked = await pickImage();
-      if (picked == null || picked.bytes == null) return null;
+      final picked = allowPdf ? await pickImageOrPdf() : await pickImage();
+      if (picked == null || picked.bytes.isEmpty) {
+        return null;
+      }
 
-      final url = Uri.parse(
-        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      final validationError = validateTrainerUploadFile(
+        fileName: picked.name,
+        fileSizeBytes: picked.bytes.length,
+        maxSizeBytes: maxSizeBytes,
+        allowPdf: allowPdf,
+        isVi: LanguageManager.isVi,
       );
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            picked.bytes!,
-            filename: picked.name,
-          ),
-        );
+      if (validationError != null) {
+        if (mounted) {
+          ToastHelper.showError(context, validationError);
+        }
+        return null;
+      }
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
+      final result = allowPdf
+          ? await _onboardingService.uploadTrainerDocument(
+              bytes: picked.bytes,
+              fileName: picked.name,
+            )
+          : await _onboardingService.uploadTrainerAvatar(
+              bytes: picked.bytes,
+              fileName: picked.name,
+            );
+      if (result['success'] == true) {
         return {
-          'url': (data['secure_url'] ?? data['url']).toString(),
+          'url': result['data']['url'].toString(),
           'fileName': picked.name,
         };
       }
-    } catch (e) {
-      debugPrint('Cloudinary upload error: $e');
+      if (mounted) {
+        ToastHelper.showError(
+          context,
+          result['message'] ?? 'File upload failed. Please try again.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ToastHelper.showError(
+          context,
+          LanguageManager.isVi
+              ? 'Tải file thất bại. Vui lòng thử lại.'
+              : 'File upload failed. Please try again.',
+        );
+      }
     }
     return null;
   }
 
   Future<String?> _uploadFileToCloudinary() async {
-    final res = await _uploadFileToCloudinaryWithDetails();
-    return res?['url'];
+    setState(() {
+      _isUploadingAvatar = true;
+    });
+
+    try {
+      final res = await _uploadValidatedFileToCloudinaryWithDetails(
+        allowPdf: false,
+        maxSizeBytes: 2 * 1024 * 1024,
+      );
+      return res?['url'];
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingAvatar = false;
+        });
+      }
+    }
   }
 
   void _showAddCertificateModal(bool isVi) {
@@ -2254,9 +2381,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isVi
-                    ? 'Danh sÃ¡ch tÃ i liá»‡u Ä‘Ã£ táº£i lÃªn'
-                    : 'Uploaded Documents',
+                isVi ? 'Danh sách tài liệu đã tải lên' : 'Uploaded Documents',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF334155),
@@ -2264,7 +2389,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 ),
               ),
               Text(
-                '${_certificates.length} ${isVi ? 'tÃ i liá»‡u' : 'documents'}',
+                '${_certificates.length} ${isVi ? 'tài liệu' : 'documents'}',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
             ],
@@ -2276,7 +2401,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
               child: Center(
                 child: Text(
                   isVi
-                      ? 'ChÆ°a cÃ³ tÃ i liá»‡u nÃ o Ä‘Æ°á»£c táº£i lÃªn.'
+                      ? 'Chưa có tài liệu nào được tải lên.'
                       : 'No documents uploaded yet.',
                   style: const TextStyle(
                     color: Color(0xFF64748B),
@@ -2293,9 +2418,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 final item = entry.value;
                 final certName =
                     item['name'] ??
-                    (isVi
-                        ? 'Chá»©ng chá»‰ ${idx + 1}'
-                        : 'Certificate ${idx + 1}');
+                    (isVi ? 'Chứng chỉ ${idx + 1}' : 'Certificate ${idx + 1}');
                 final url = item['url'] ?? '';
 
                 return Container(
@@ -2375,7 +2498,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                               },
                               child: Text(
                                 isVi
-                                    ? 'Xem áº£nh chá»©ng chá»‰'
+                                    ? 'Xem ảnh chứng chỉ'
                                     : 'View certificate image',
                                 style: const TextStyle(
                                   fontSize: 11,
@@ -2430,7 +2553,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                     const SizedBox(width: 10),
                     Text(
                       isVi
-                          ? 'ThÃªm chá»©ng chá»‰, báº±ng cáº¥p'
+                          ? 'Thêm chứng chỉ, bằng cấp'
                           : 'Add Degree & Certificate',
                       style: const TextStyle(
                         color: Color(0xFF28B79B),
@@ -2475,10 +2598,12 @@ class _UpdateTrainerProfileModal extends StatefulWidget {
   });
 
   @override
-  State<_UpdateTrainerProfileModal> createState() => _UpdateTrainerProfileModalState();
+  State<_UpdateTrainerProfileModal> createState() =>
+      _UpdateTrainerProfileModalState();
 }
 
-class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> {
+class _UpdateTrainerProfileModalState
+    extends State<_UpdateTrainerProfileModal> {
   final _formKey = GlobalKey<FormState>();
 
   late TextEditingController _nameController;
@@ -2549,11 +2674,7 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
           );
         }
         return Column(
-          children: [
-            children[0],
-            const SizedBox(height: 20),
-            children[1],
-          ],
+          children: [children[0], const SizedBox(height: 20), children[1]],
         );
       },
     );
@@ -2593,7 +2714,10 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
             hintText: hint,
             suffixIcon: suffixIcon,
             hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -2604,7 +2728,10 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF28B79B),
+                width: 1.5,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -2640,7 +2767,7 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                       color: Colors.black.withOpacity(0.04),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -2650,13 +2777,17 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
               Icon(
                 icon,
                 size: 18,
-                color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
+                color: isSelected
+                    ? const Color(0xFF28B79B)
+                    : const Color(0xFF94A3B8),
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFF1E293B) : const Color(0xFF64748B),
+                  color: isSelected
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFF64748B),
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   fontFamily: 'Outfit',
                   fontSize: 14,
@@ -2692,8 +2823,18 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
           ),
           child: Row(
             children: [
-              _buildGenderOption('Male', Icons.male_rounded, _gender, (val) => setState(() => _gender = val)),
-              _buildGenderOption('Female', Icons.female_rounded, _gender, (val) => setState(() => _gender = val)),
+              _buildGenderOption(
+                'Male',
+                Icons.male_rounded,
+                _gender,
+                (val) => setState(() => _gender = val),
+              ),
+              _buildGenderOption(
+                'Female',
+                Icons.female_rounded,
+                _gender,
+                (val) => setState(() => _gender = val),
+              ),
             ],
           ),
         ),
@@ -2717,7 +2858,10 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
                 ),
@@ -2735,7 +2879,10 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                      ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       splashRadius: 20,
@@ -2743,7 +2890,7 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                   ],
                 ),
               ),
-              
+
               Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Form(
@@ -2760,7 +2907,10 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: const Color(0xFFE2E8F0),
-                                border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+                                border: Border.all(
+                                  color: const Color(0xFFCBD5E1),
+                                  width: 2,
+                                ),
                               ),
                               child: ClipOval(
                                 child: _avatarUrl.isNotEmpty
@@ -2793,7 +2943,9 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                                   ),
                                   child: const Center(
                                     child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -2822,48 +2974,55 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                         ),
                       ),
                       const SizedBox(height: 30),
-                      
+
                       // Input Fields Row 1
                       _buildFieldsRow([
                         _buildInputField(
                           label: 'Full name*',
                           controller: _nameController,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter your full name' : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Please enter your full name'
+                              : null,
                         ),
                         _buildInputField(
                           label: 'Name account*',
                           controller: _usernameController,
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a username' : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Please enter a username'
+                              : null,
                         ),
                       ]),
                       const SizedBox(height: 20),
-                      
+
                       // Input Fields Row 2
                       _buildFieldsRow([
                         _buildInputField(
                           label: 'Phone number*',
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Please enter your phone number';
-                            if (!RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$').hasMatch(v)) {
-                              return 'Please enter a valid 10-digit Vietnamese phone number (e.g. 0912345678)';
-                            }
-                            return null;
-                          },
+                          validator: (v) =>
+                              validateVietnamesePhoneNumber(v, isVi: false),
                         ),
                         _buildInputField(
                           label: 'date of birth*',
                           controller: _dobController,
                           hint: 'DD/MM/YYYY',
                           readOnly: true,
-                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                          suffixIcon: const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 18,
+                            color: Color(0xFF64748B),
+                          ),
                           onTap: () async {
-                            DateTime initialDate = DateTime.now().subtract(const Duration(days: 365 * 18));
+                            DateTime initialDate = DateTime.now().subtract(
+                              const Duration(days: 365 * 18),
+                            );
                             if (_dobController.text.isNotEmpty) {
                               final parts = _dobController.text.split('/');
                               if (parts.length == 3) {
-                                final parsed = DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+                                final parsed = DateTime.tryParse(
+                                  '${parts[2]}-${parts[1]}-${parts[0]}',
+                                );
                                 if (parsed != null) {
                                   initialDate = parsed;
                                 }
@@ -2889,21 +3048,26 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                             );
                             if (picked != null) {
                               final day = picked.day.toString().padLeft(2, '0');
-                              final month = picked.month.toString().padLeft(2, '0');
+                              final month = picked.month.toString().padLeft(
+                                2,
+                                '0',
+                              );
                               final year = picked.year.toString();
                               _dobController.text = '$day/$month/$year';
                             }
                           },
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Please select your date of birth';
+                            if (v == null || v.trim().isEmpty)
+                              return 'Please select your date of birth';
                             final parts = v.split('/');
-                            if (parts.length != 3) return 'Please enter date in DD/MM/YYYY format';
+                            if (parts.length != 3)
+                              return 'Please enter date in DD/MM/YYYY format';
                             return null;
                           },
                         ),
                       ]),
                       const SizedBox(height: 20),
-                      
+
                       // Input Fields Row 3
                       _buildFieldsRow([
                         _buildInputField(
@@ -2912,7 +3076,7 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
                         ),
                         _buildGenderSelector(),
                       ]),
-                      
+
                       const SizedBox(height: 30),
                       SizedBox(
                         width: double.infinity,

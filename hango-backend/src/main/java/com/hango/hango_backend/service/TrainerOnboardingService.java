@@ -10,6 +10,7 @@ public interface TrainerOnboardingService {
     TrainerProfileDTO getTrainerProfile(String email);
     TrainerProfileDTO saveProfileDraft(String email, TrainerProfileDTO dto);
     TrainerProfileDTO submitProfileForReview(String email, TrainerProfileDTO dto);
+    TrainerProfileDTO submitCredentialUpdate(String email, TrainerProfileDTO dto);
     List<TrainerProfileDTO> getTrainerProfilesForAdmin(String search, String status);
     TrainerProfileDTO reviewTrainerProfile(Long userId, TrainerReviewRequest request);
 }

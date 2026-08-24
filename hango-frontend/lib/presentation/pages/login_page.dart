@@ -6,18 +6,14 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/web_only.dart' as web;
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
+import '../../utils/language_manager.dart';
+import '../../utils/trainer_onboarding_flow_utils.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
 import 'learner/learner_home_page.dart';
 import 'admin/admin_dashboard_page.dart';
-import 'trainer/trainer_dashboard_page.dart';
 import 'trainer/trainer_shell_page.dart';
 import 'course_manager/course_manager_shell_page.dart';
-import 'trainer/onboarding/trainer_type_selection_page.dart';
-import 'trainer/onboarding/trainer_onboarding_status_page.dart';
-import 'trainer/onboarding/trainer_onboarding_details_page.dart';
-import 'trainer/onboarding/trainer_onboarding_agreement_page.dart';
-import 'trainer/onboarding/trainer_payout_details_page.dart';
 import '../../data/services/trainer_onboarding_service.dart';
 import '../../utils/cart_manager.dart';
 
@@ -39,15 +35,11 @@ class _LoginPageState extends State<LoginPage> {
 
   final _authService = AuthService();
 
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: kIsWeb
-        ? null
-        : '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
-    clientId:
-        '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
-  );
+  static final GoogleSignIn _googleSignIn = AuthService.googleSignIn;
 
   StreamSubscription<GoogleSignInAccount?>? _googleSignInSubscription;
+  Future<bool>? _webGoogleSignInInitialization;
+  Widget? _webGoogleSignInButton;
 
   @override
   void initState() {
@@ -59,7 +51,14 @@ class _LoginPageState extends State<LoginPage> {
         _handleGoogleSignInSuccess(account);
       }
     });
-    _googleSignIn.signInSilently();
+    if (kIsWeb) {
+      // The web-only renderButton API reads the plugin initialization state
+      // synchronously. Wait for the shared GoogleSignIn instance to finish its
+      // asynchronous initialization before creating that widget.
+      _webGoogleSignInInitialization = _googleSignIn.isSignedIn();
+    } else {
+      _googleSignIn.signInSilently();
+    }
   }
 
   @override
@@ -119,42 +118,45 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    final result = await _authService.login(email, password, rememberMe: _rememberMe);
+    final result = await _authService.login(
+      email,
+      password,
+      rememberMe: _rememberMe,
+    );
 
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
     });
 
-    if (mounted) {
-      if (result['success']) {
-        final roles = List<String>.from(result['data']['roles'] ?? []);
-        debugPrint('Sign in success! Roles: $roles');
+    if (result['success']) {
+      final roles = List<String>.from(result['data']['roles'] ?? []);
+      debugPrint('Sign in success! Roles: $roles');
 
-        // Check if this was a new email registration to set the onboarding flag
-        SharedPreferences.getInstance().then((prefs) async {
-          final isNewReg = prefs.getBool('is_new_registration_$email') ?? false;
-          if (isNewReg) {
-            final userId = result['data']['id'];
-            await prefs.setBool('show_onboarding_for_$userId', true);
-            await prefs.remove('is_new_registration_$email');
-          }
-        });
-
-        ToastHelper.showSuccess(context, 'Sign in successful!');
-        _navigateAfterSuccess(roles);
-      } else {
-        debugPrint('Sign in failed! Error: ${result['message']}');
-        final message = result['message'] ?? 'Sign in failed. Please try again.';
-        if (message.toString().toLowerCase().contains('verify your email')) {
-          // No other screen is guaranteed to still be open for this account
-          // (e.g. the original 12h-valid link expired long after the
-          // post-registration "check your email" screen was closed) -- login
-          // is the one place a returning, unverified user always lands, so it
-          // must offer a way to get a fresh link.
-          _showResendVerificationDialog(email);
-        } else {
-          ToastHelper.showError(context, message);
+      // Check if this was a new email registration to set the onboarding flag
+      SharedPreferences.getInstance().then((prefs) async {
+        final isNewReg = prefs.getBool('is_new_registration_$email') ?? false;
+        if (isNewReg) {
+          final userId = result['data']['id'];
+          await prefs.setBool('show_onboarding_for_$userId', true);
+          await prefs.remove('is_new_registration_$email');
         }
+      });
+
+      ToastHelper.showSuccess(context, 'Sign in successful!');
+      _navigateAfterSuccess(roles);
+    } else {
+      debugPrint('Sign in failed! Error: ${result['message']}');
+      final message = result['message'] ?? 'Sign in failed. Please try again.';
+      if (message.toString().toLowerCase().contains('verify your email')) {
+        // No other screen is guaranteed to still be open for this account
+        // (e.g. the original 12h-valid link expired long after the
+        // post-registration "check your email" screen was closed) -- login
+        // is the one place a returning, unverified user always lands, so it
+        // must offer a way to get a fresh link.
+        _showResendVerificationDialog(email);
+      } else {
+        ToastHelper.showError(context, message);
       }
     }
   }
@@ -174,7 +176,9 @@ class _LoginPageState extends State<LoginPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isResending ? null : () => Navigator.of(dialogContext).pop(),
+                  onPressed: isResending
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
                   child: const Text('Cancel'),
                 ),
                 TextButton(
@@ -182,17 +186,23 @@ class _LoginPageState extends State<LoginPage> {
                       ? null
                       : () async {
                           setDialogState(() => isResending = true);
-                          final result = await _authService.resendVerificationEmail(email);
+                          final result = await _authService
+                              .resendVerificationEmail(email);
                           if (dialogContext.mounted) {
                             Navigator.of(dialogContext).pop();
                           }
                           if (mounted) {
                             if (result['success']) {
-                              ToastHelper.showSuccess(context,
-                                  'A new verification link has been sent to $email. Please check your inbox.');
+                              ToastHelper.showSuccess(
+                                context,
+                                'A new verification link has been sent to $email. Please check your inbox.',
+                              );
                             } else {
-                              ToastHelper.showError(context,
-                                  result['message'] ?? 'Failed to resend verification link.');
+                              ToastHelper.showError(
+                                context,
+                                result['message'] ??
+                                    'Failed to resend verification link.',
+                              );
                             }
                           }
                         },
@@ -224,7 +234,8 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const TrainerTypeSelectionPage(),
+            builder: (context) =>
+                buildTrainerOnboardingStagePage(const <String, dynamic>{}),
           ),
         );
       }
@@ -261,7 +272,20 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } else if (isTrainer) {
-      _checkStatusAndRouteForLogin();
+      if (!mounted) return;
+
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        // AuthService has already updated AppState, so the first route now
+        // contains TrainerRouteGate. Reveal that route instead of starting a
+        // second profile request and competing pushReplacement operation.
+        navigator.popUntil((route) => route.isFirst);
+      } else {
+        // Logout can install LoginPage as the first route. In that case there
+        // is no AppState-controlled route underneath it, so resolve the trainer
+        // destination here exactly once.
+        _checkStatusAndRouteForLogin();
+      }
     } else {
       if (mounted) {
         Navigator.pushReplacement(
@@ -291,110 +315,44 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       if (result['success'] == true) {
-        final profile = result['data'];
-        final status = profile['status'] ?? 'PENDING_VERIFICATION';
-        final trainerType = profile['trainerType'];
-        final agreementSigned = profile['agreementSigned'] ?? false;
-        final bankAccount = profile['bankAccount'] ?? '';
+        final profile = Map<String, dynamic>.from(result['data'] ?? const {});
+        final stage = resolveTrainerOnboardingStage(profile);
+        final nextPage = stage == TrainerOnboardingStage.complete
+            ? const TrainerShellPage()
+            : buildTrainerOnboardingStagePage(profile);
 
-        if (status == 'VERIFIED') {
-          if (!agreementSigned) {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TrainerOnboardingAgreementPage(
-                    profilePayload: profile,
-                    trainerType: trainerType ?? 'PROFESSIONAL',
-                  ),
-                ),
-              );
-            }
-          } else if (bankAccount.toString().trim().isEmpty) {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      TrainerPayoutDetailsPage(initialProfile: profile),
-                ),
-              );
-            }
-          } else {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerShellPage(),
-                ),
-              );
-            }
-          }
-        } else if (status == 'AWAITING_APPROVAL' ||
-            status == 'SUSPENDED' ||
-            (status == 'PENDING_VERIFICATION' &&
-                profile['adminNotes'] != null &&
-                profile['adminNotes'].toString().trim().isNotEmpty)) {
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    TrainerOnboardingStatusPage(initialProfile: profile),
-              ),
-            );
-          }
-        } else {
-          // PENDING_VERIFICATION (Draft)
-          if (trainerType == null) {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TrainerTypeSelectionPage(),
-                ),
-              );
-            }
-          } else if (agreementSigned != true) {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TrainerOnboardingAgreementPage(
-                    profilePayload: profile,
-                    trainerType: trainerType,
-                  ),
-                ),
-              );
-            }
-          } else {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      TrainerOnboardingDetailsPage(initialProfile: profile),
-                ),
-              );
-            }
-          }
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => nextPage),
+          );
         }
       } else {
         if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => const TrainerTypeSelectionPage(),
+              builder: (context) =>
+                  buildTrainerOnboardingStagePage(const <String, dynamic>{}),
             ),
           );
         }
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         Navigator.pop(context);
+        ToastHelper.showError(
+          context,
+          LanguageManager.isVi
+              ? 'Không thể kiểm tra trạng thái hồ sơ. Vui lòng thử lại.'
+              : 'Unable to verify your trainer profile. Please try again.',
+        );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
+          MaterialPageRoute(
+            builder: (context) =>
+                buildTrainerOnboardingStagePage(const <String, dynamic>{}),
+          ),
         );
       }
     }
@@ -403,7 +361,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isProcessingGoogleLogin = false;
 
   void _handleGoogleSignInSuccess(GoogleSignInAccount googleUser) async {
-    if (_isProcessingGoogleLogin) return;
+    if (_isProcessingGoogleLogin || !mounted) return;
     _isProcessingGoogleLogin = true;
 
     setState(() {
@@ -416,6 +374,7 @@ class _LoginPageState extends State<LoginPage> {
       final String? idToken = googleAuth.idToken;
 
       if (idToken == null) {
+        if (!mounted) return;
         setState(() {
           _isLoading = false;
         });
@@ -430,36 +389,28 @@ class _LoginPageState extends State<LoginPage> {
 
       final result = await _authService.loginWithGoogle(idToken: idToken);
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
 
-      if (mounted) {
-        if (result['success']) {
-          final String name = googleUser.displayName ?? 'Google User';
-          final roles = List<String>.from(result['data']['roles'] ?? []);
-          ToastHelper.showSuccess(
-            context,
-            'Sign in successful: Welcome, $name!',
-          );
-          _navigateAfterSuccess(roles);
-        } else {
-          ToastHelper.showError(
-            context,
-            result['message'] ?? 'Google Sign In failed.',
-          );
-        }
+      if (result['success']) {
+        final String name = googleUser.displayName ?? 'Google User';
+        final roles = List<String>.from(result['data']['roles'] ?? []);
+        ToastHelper.showSuccess(context, 'Sign in successful: Welcome, $name!');
+        _navigateAfterSuccess(roles);
+      } else {
+        ToastHelper.showError(
+          context,
+          result['message'] ?? 'Google Sign In failed.',
+        );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ToastHelper.showError(
-          context,
-          'Google Sign In failed: ${e.toString()}',
-        );
-      }
+      ToastHelper.showError(context, 'Google Sign In failed: ${e.toString()}');
     } finally {
       _isProcessingGoogleLogin = false;
     }
@@ -467,19 +418,47 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildGoogleSignInButton() {
     if (kIsWeb) {
-      return SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: web.renderButton(
-          configuration: web.GSIButtonConfiguration(
-            type: web.GSIButtonType.standard,
-            theme: web.GSIButtonTheme.outline,
-            size: web.GSIButtonSize.large,
-            text: web.GSIButtonText.signinWith,
-            minimumWidth: 400,
-            locale: 'en',
-          ),
-        ),
+      return FutureBuilder<bool>(
+        future: _webGoogleSignInInitialization,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return const SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: Center(child: Text('Google Sign-In is unavailable.')),
+            );
+          }
+
+          _webGoogleSignInButton ??= web.renderButton(
+            configuration: web.GSIButtonConfiguration(
+              type: web.GSIButtonType.standard,
+              theme: web.GSIButtonTheme.outline,
+              size: web.GSIButtonSize.large,
+              text: web.GSIButtonText.signinWith,
+              minimumWidth: 400,
+              locale: 'en',
+            ),
+          );
+          return SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: _webGoogleSignInButton,
+          );
+        },
       );
     }
 
@@ -487,13 +466,16 @@ class _LoginPageState extends State<LoginPage> {
       width: double.infinity,
       height: 48,
       child: MouseRegion(
-        cursor: _isLoading ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        cursor: _isLoading
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
         child: OutlinedButton(
           onPressed: _isLoading
               ? null
               : () async {
                   try {
-                    final GoogleSignInAccount? account = await _googleSignIn.signIn();
+                    final GoogleSignInAccount? account = await _googleSignIn
+                        .signIn();
                     if (account != null) {
                       _handleGoogleSignInSuccess(account);
                     }
@@ -506,7 +488,9 @@ class _LoginPageState extends State<LoginPage> {
                 },
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             side: const BorderSide(color: Color(0xFFD1D5DB)),
             elevation: 0,
           ),
@@ -517,7 +501,13 @@ class _LoginPageState extends State<LoginPage> {
                 'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
                 width: 20,
                 height: 20,
-                errorBuilder: (context, error, stackTrace) => const Text('G', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                errorBuilder: (context, error, stackTrace) => const Text(
+                  'G',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               const Text(

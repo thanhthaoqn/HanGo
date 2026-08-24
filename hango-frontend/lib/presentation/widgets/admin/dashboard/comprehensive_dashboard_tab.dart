@@ -39,6 +39,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   }
 
   Future<void> _fetchStats() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
@@ -47,6 +48,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     try {
       final token = await _authService.getToken();
       if (token == null) {
+        if (!mounted) return;
         setState(() {
           _error = 'Unauthorized';
           _isLoading = false;
@@ -65,6 +67,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
         },
       );
 
+      if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
           _stats = jsonDecode(response.body);
@@ -77,6 +80,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Error fetching stats: $e';
         _isLoading = false;
@@ -200,10 +204,14 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
 
         int totalUsers = overview['totalActiveUsers'] ?? 0;
         int totalEnrollments = overview['totalEnrollments'] ?? 0;
-        double avgEnrollments = totalUsers > 0 ? totalEnrollments / totalUsers : 0.0;
-        
+        double avgEnrollments = totalUsers > 0
+            ? totalEnrollments / totalUsers
+            : 0.0;
+
         final learning = _stats!['learningPerformance'] ?? {};
-        double avgScore = (learning['avgExamScore'] is num) ? (learning['avgExamScore'] as num).toDouble() : 0.0;
+        double avgScore = (learning['avgExamScore'] is num)
+            ? (learning['avgExamScore'] as num).toDouble()
+            : 0.0;
 
         return Wrap(
           spacing: 16,
@@ -325,7 +333,10 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
               ),
               if (countToday != null && countToday > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   margin: const EdgeInsets.only(bottom: 4, left: 8),
                   decoration: BoxDecoration(
                     color: Colors.green.shade50,
@@ -335,7 +346,11 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.arrow_upward, color: Colors.green.shade600, size: 12),
+                      Icon(
+                        Icons.arrow_upward,
+                        color: Colors.green.shade600,
+                        size: 12,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         '$countToday today',
@@ -1080,12 +1095,22 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: _buildDateInfo('Oldest Course', contentHealth['oldestPendingCourseDate'] as String?)),
+                Expanded(
+                  child: _buildDateInfo(
+                    'Oldest Course',
+                    contentHealth['oldestPendingCourseDate'] as String?,
+                  ),
+                ),
                 Container(width: 1, height: 24, color: const Color(0xFFE2E8F0)),
-                Expanded(child: Padding(
-                  padding: const EdgeInsets.only(left: 12.0),
-                  child: _buildDateInfo('Oldest Exam', contentHealth['oldestPendingExamDate'] as String?),
-                )),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12.0),
+                    child: _buildDateInfo(
+                      'Oldest Exam',
+                      contentHealth['oldestPendingExamDate'] as String?,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1114,7 +1139,6 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
       ],
     );
   }
-
 
   Widget _buildPipelineItem(String label, int count, MaterialColor color) {
     return Column(
@@ -1292,8 +1316,8 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   Widget _buildLearningFunnel() {
     final learning = _stats!['learningPerformance'] ?? {};
     final funnel = learning['learningFunnel'] ?? {};
-    final completionRate =
-        ((learning['completionRate'] ?? 0.0) * 100).toStringAsFixed(1);
+    final completionRate = ((learning['completionRate'] ?? 0.0) * 100)
+        .toStringAsFixed(1);
 
     final int registered = funnel['registered'] ?? 0;
     final double maxVal = registered > 0 ? registered.toDouble() : 1.0;
@@ -1450,7 +1474,9 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   Widget _buildExamPerformance() {
     final learning = _stats!['learningPerformance'] ?? {};
     final avgScore = (learning['avgExamScore'] ?? 0.0).toStringAsFixed(1);
-    final passRate = ((learning['examPassRate'] ?? 0.0) * 100).toStringAsFixed(0);
+    final passRate = ((learning['examPassRate'] ?? 0.0) * 100).toStringAsFixed(
+      0,
+    );
 
     return Container(
       height: 400,
@@ -1783,7 +1809,10 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.purple.shade50,
                     borderRadius: BorderRadius.circular(4),

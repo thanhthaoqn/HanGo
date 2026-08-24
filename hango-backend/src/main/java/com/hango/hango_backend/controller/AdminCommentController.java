@@ -111,7 +111,12 @@ public class AdminCommentController {
         map.put("comment", c.getContent());
 
         // Format status nicely (Approved, Rejected, Pending)
-        String rawStatus = c.getStatus() != null ? c.getStatus() : "PENDING";
+        String rawStatus = c.getStatus();
+        if (rawStatus == null || rawStatus.isBlank()) {
+            rawStatus = "PENDING";
+        } else {
+            rawStatus = rawStatus.trim();
+        }
         String formattedStatus = rawStatus.substring(0, 1).toUpperCase() + rawStatus.substring(1).toLowerCase();
         map.put("status", formattedStatus);
 

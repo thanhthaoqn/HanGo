@@ -23,11 +23,10 @@ import 'learning_pathway_page.dart';
 import '../exam/entry_exam_instruction_page.dart';
 import 'my_information_page.dart';
 import '../trainer/trainer_dashboard_page.dart';
-import '../trainer/onboarding/trainer_type_selection_page.dart';
-import '../trainer/onboarding/trainer_onboarding_status_page.dart';
 import '../../../data/services/trainer_onboarding_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/permission_utils.dart';
+import '../../../utils/trainer_onboarding_flow_utils.dart';
 
 class LearnerHomePage extends StatefulWidget {
   final bool isEmbedded;
@@ -233,7 +232,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const TrainerTypeSelectionPage(),
+            builder: (context) =>
+                buildTrainerOnboardingStagePage(const <String, dynamic>{}),
           ),
         );
       }
@@ -261,10 +261,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       }
 
       if (result['success'] == true) {
-        final profile = result['data'];
-        final status = profile['status'] ?? 'PENDING_VERIFICATION';
+        final profile = Map<String, dynamic>.from(result['data'] ?? const {});
+        final stage = resolveTrainerOnboardingStage(profile);
 
-        if (status == 'VERIFIED') {
+        if (stage == TrainerOnboardingStage.complete) {
           if (mounted) {
             Navigator.push(
               context,
@@ -279,7 +279,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               context,
               MaterialPageRoute(
                 builder: (context) =>
-                    TrainerOnboardingStatusPage(initialProfile: profile),
+                    buildTrainerOnboardingStagePage(profile),
               ),
             );
           }
@@ -289,7 +289,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TrainerTypeSelectionPage(),
+              builder: (context) =>
+                  buildTrainerOnboardingStagePage(const <String, dynamic>{}),
             ),
           );
         }

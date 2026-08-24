@@ -330,7 +330,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                   separatorBuilder: (context, index) => const Divider(height: 24, color: Color(0xFFF1F5F9)),
                   itemBuilder: (context, index) {
                     final msg = _ticket!.messages[index];
-                    final isStaff = msg.senderRole == 'ADMINISTRATOR' || msg.senderRole == 'COURSE_MANAGER';
+                    final isStaff = msg.senderRole == 'ADMINISTRATOR';
 
                     return Container(
                       padding: const EdgeInsets.all(12),

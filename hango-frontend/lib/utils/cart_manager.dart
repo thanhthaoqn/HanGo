@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/repositories/cart_repository.dart';
 import '../data/repositories/course_repository.dart';
 import '../domain/model/course.dart';
+import 'permission_utils.dart';
 
 class CartManager {
   static final ValueNotifier<int> cartCountNotifier = ValueNotifier<int>(0);
@@ -34,9 +35,8 @@ class CartManager {
 
   static Future<List<String>> getCartIds() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
 
-    if (token != null && token.isNotEmpty) {
+    if (_canUseRemoteCart(prefs)) {
       final cachedCourses = cartCoursesNotifier.value
           .where((c) => !_pendingDeletedCourseIds.contains(c.id))
           .toList();
@@ -79,7 +79,6 @@ class CartManager {
 
     // 2. Async background sync (SharedPreferences + DB)
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
     final key = await getCartKey();
     final localIds = prefs.getStringList(key) ?? [];
     if (!localIds.contains(courseIdStr)) {
@@ -87,7 +86,7 @@ class CartManager {
       await prefs.setStringList(key, localIds);
     }
 
-    if (token != null && token.isNotEmpty) {
+    if (_canUseRemoteCart(prefs)) {
       try {
         await _cartRepository.addItemToCart(courseId);
         _markRemoteSyncFresh();
@@ -109,13 +108,12 @@ class CartManager {
 
     // 2. Async background sync (SharedPreferences + DB)
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
     final key = await getCartKey();
     final localIds = prefs.getStringList(key) ?? [];
     localIds.remove(courseIdStr);
     await prefs.setStringList(key, localIds);
 
-    if (token != null && token.isNotEmpty) {
+    if (_canUseRemoteCart(prefs)) {
       try {
         await _cartRepository.removeItemFromCart(courseId);
         _markRemoteSyncFresh();
@@ -159,6 +157,11 @@ class CartManager {
   static Future<void> syncGuestCartOnLogin() async {
     _lastRemoteSyncAt = null;
     final prefs = await SharedPreferences.getInstance();
+    if (!_canUseRemoteCart(prefs)) {
+      cartCoursesNotifier.value = [];
+      cartCountNotifier.value = 0;
+      return;
+    }
     final guestCart = prefs.getStringList('guest_cart_course_ids') ?? [];
     if (guestCart.isNotEmpty) {
       final intIds = guestCart
@@ -196,9 +199,8 @@ class CartManager {
 
   static Future<void> _updateCountInternal({required bool forceRefresh}) async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
 
-    if (token != null && token.isNotEmpty) {
+    if (_canUseRemoteCart(prefs)) {
       try {
         final items = await _cartRepository.getCartItems();
         final filteredItems = items
@@ -251,5 +253,18 @@ class CartManager {
 
   static void _markRemoteSyncFresh() {
     _lastRemoteSyncAt = DateTime.now();
+  }
+
+  static bool _canUseRemoteCart(SharedPreferences prefs) {
+    final token = prefs.getString('auth_token');
+    final roles = prefs.getStringList('user_roles') ?? const <String>[];
+    return canUseRemoteCartForSession(token, roles);
+  }
+
+  @visibleForTesting
+  static bool canUseRemoteCartForSession(String? token, List<String> roles) {
+    return token != null &&
+        token.isNotEmpty &&
+        PermissionUtils.canEnrollAndLearn(roles);
   }
 }

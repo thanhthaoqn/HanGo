@@ -27,8 +27,8 @@ ONBOARDING_FT04,"A user who already holds the TRAINER role but has no profile ro
 3. Send the request.
 4. Inspect the response body and confirm a new row was persisted for that user.","1. 200 OK; a new TrainerProfileDTO is returned with status=PENDING_VERIFICATION, revenueShare=0.70 defaults, and is now persisted.","- Logged in as TRAINER (or ADMIN/TRAINER_LEAD) with no prior TrainerProfile row."
 Save Trainer Profile Draft,,,,
-ONBOARDING_FT05,"Saving a profile draft with bio/workplace/bank details updates every field, and the bank account holder name is normalized to upper-case.","1. Log in as a TRAINER whose profile status is not AWAITING_APPROVAL/SUSPENDED.
-2. Prepare PUT /api/v1/trainers/profile body {""bio"":""...50+ chars..."",""workplace"":""ABC Corp"",""bankName"":""VCB"",""bankAccount"":""123456"",""bankAccountName"":""nguyen van a""}.
+ONBOARDING_FT05,"Saving a profile draft with bio/bank details updates every field, and the bank account holder name is normalized to upper-case.","1. Log in as a TRAINER whose profile status is not AWAITING_APPROVAL/SUSPENDED.
+2. Prepare PUT /api/v1/trainers/profile body {""bio"":""...50+ chars..."",""bankName"":""VCB"",""bankAccount"":""123456"",""bankAccountName"":""nguyen van a""}.
 3. Send the request.
 4. Inspect the response body's bankAccountName casing and confirm every field was saved.","1. 200 OK; returned profile reflects the updated fields; bankAccountName is stored upper-cased (""NGUYEN VAN A"").","- Logged in as TRAINER with a profile in PENDING_VERIFICATION or REJECTED-equivalent status (not AWAITING_APPROVAL/SUSPENDED)."
 ONBOARDING_FT06,"Attempting to save a draft while the application is already AWAITING_APPROVAL is blocked, since edits should be frozen during admin review.","1. Submit a valid profile for review so its status becomes AWAITING_APPROVAL (per ONBOARDING_FT08).
@@ -48,7 +48,7 @@ ONBOARDING_FT08,"Submitting the trainer profile for review succeeds once every m
 ONBOARDING_FT09,"Submitting with a bio shorter than the 50-character minimum is rejected, and the application stays out of the review queue.","1. Log in as a TRAINER and set bio to a short, 10-character string while leaving every other mandatory field valid.
 2. Prepare POST /api/v1/trainers/profile/submit.
 3. Send the request.
-4. Inspect the response message and confirm the profile status did not change.","1. 400/error; message ""Teaching experience & bio must be at least 50 characters long.""; status not changed.","- Other fields may be valid; bio is too short."
+4. Inspect the response message and confirm the profile status did not change.","1. 400/error; message ""Bio must be at least 50 characters long.""; status not changed.","- Other fields may be valid; bio is too short."
 ONBOARDING_FT10,"Submitting with a phone number that fails the required prefix/length/blacklist rules is rejected.","1. Log in as a TRAINER and set phone to a value that fails validation — try one of: a wrong-prefix number (""02912345678""), a repeated-digit number (""1111111111""), or the blacklisted ""1234567890"" — while leaving every other field valid.
 2. Prepare POST /api/v1/trainers/profile/submit.
 3. Send the request.

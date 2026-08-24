@@ -76,9 +76,9 @@ HanGo **không tự sản xuất nội dung**; nền tảng kết nối Trainer 
 | **Weakness Analysis** | Phân tích điểm yếu suy ra từ các câu trả lời sai trong Exam Attempt gần nhất (nhóm theo topic/skill), phục vụ AI Recommendation & Learning Pathway. |
 | **Recommendation** | Gợi ý Course/lộ trình dựa trên kết quả Exam — kênh AI (Gemini) là chính; không còn tách riêng một nhánh "rule-based" độc lập trong code hiện tại (xem §7.11). |
 | **Learning Pathway** | Lộ trình học cá nhân hoá do AI sinh sau khi làm Exam — gồm chuỗi `PathwayNode` (mỗi node tương ứng 1 Course), có thể reroute (tự động hoặc "agentic" gợi ý/chấp nhận), lên lịch (time-boxing), và mastery-check theo spaced-repetition. |
-| **Ticket** | Yêu cầu hỗ trợ do bất kỳ user nào (Learner/Trainer/Course Manager/Admin) tạo ra, staff (Course Manager/Admin) xử lý Approve/Reject. |
+| **Ticket** | Yêu cầu hỗ trợ do Trainer tạo; Administrator xem, phản hồi và xử lý Approve/Reject. |
 | **Trainer** | Người tạo nội dung; hai loại: `PROFESSIONAL` (Teacher) / `PEER_TUTOR` (Tutor). |
-| **Course Manager** | Role kiểm duyệt trình bày & xuất bản nội dung (Course/Exam), quản lý Exam Matrix, xử lý Ticket, chi trả doanh thu. **Tên chính thức hiện tại là "Course Manager"** — đây từng được gọi là "Trainer Lead" trong giai đoạn đầu phát triển, đã đổi tên nghiệp vụ sang Course Manager (chức năng giữ nguyên). Code hiện còn sót một vài chỗ dùng chuỗi cũ `TRAINER_LEAD` (xem §22) — đây là nợ kỹ thuật cần dọn, **không phải** một role thứ hai đang tồn tại song song. |
+| **Course Manager** | Role kiểm duyệt trình bày & xuất bản nội dung (Course/Exam), quản lý Exam Matrix và chi trả doanh thu; không tham gia luồng Ticket. **Tên chính thức hiện tại là "Course Manager"** — đây từng được gọi là "Trainer Lead" trong giai đoạn đầu phát triển, đã đổi tên nghiệp vụ sang Course Manager (chức năng giữ nguyên). Code hiện còn sót một vài chỗ dùng chuỗi cũ `TRAINER_LEAD` (xem §22) — đây là nợ kỹ thuật cần dọn, **không phải** một role thứ hai đang tồn tại song song. |
 | **Monthly Statement** | Báo cáo doanh thu hàng tháng của Trainer, có trừ thuế TNCN (PIT) nếu vượt ngưỡng. |
 | **Permission** | Đơn vị quyền hạn rời rạc (ví dụ `MANAGE_OWN_COURSES`), gán cho Role qua bảng `role_permissions`; Admin có thể xem & cấu hình lại tập permission của từng Role qua UI (xem §4, §7.4). |
 
@@ -139,9 +139,9 @@ Backend **tự tính** một mức giá gợi ý dựa trên công thức cộng
 |          Role           |         Vai trò          |         Giới hạn chính          |
 |-------------------------|--------------------------|---------------------------------|
 |       **Guest**         | Chưa đăng nhập; xem nội dung công khai, đăng ký. | Không xem Lesson (trừ 1 ngoại lệ kỹ thuật, xem §22); không làm Quiz/Exam yêu cầu đăng nhập. |
-|       **Learner**       | Học, luyện đề, nhận recommendation/AI pathway, mua/giỏ hàng, gửi Ticket. | Không tạo nội dung; không publish. |
+|       **Learner**       | Học, luyện đề, nhận recommendation/AI pathway, mua/giỏ hàng. | Không tạo nội dung; không publish; không tham gia luồng Ticket. |
 |       **Trainer**       | Tạo Course/Lesson/Quiz/Exam; quản lý Question Bank & Exam Matrix của mình; theo dõi doanh thu; gửi Ticket. Có **Learner mode**. | Cần `TrainerProfile.status = VERIFIED` mới publish/bán được Course (xem §7.5 BR-TRN-01). |
-| **Course Manager**  | Review & publish Course/Exam; quản lý Exam Matrix (kể cả matrix riêng); xử lý Ticket (trừ 2 category tài chính nhạy cảm dành riêng Admin); settlement doanh thu; xem Platform Dashboard cơ bản. | Không tự tạo/sửa nội dung Course của Trainer khác (chỉ Approve/Reject/Hide); không xử lý Ticket loại `PAYOUT_INFO_UPDATE`/`REFUND_REQUEST`. |
+| **Course Manager**  | Review & publish Course/Exam; quản lý Exam Matrix (kể cả matrix riêng); settlement doanh thu; xem Platform Dashboard cơ bản. | Không tự tạo/sửa nội dung Course của Trainer khác (chỉ Approve/Reject/Hide); không tham gia luồng Ticket. |
 | **Administrator**   | Quản trị user/role/permission, duyệt Trainer Application, moderate Comment, xem Platform Dashboard + AI Usage + Audit Log, xử lý mọi loại Ticket (kể cả 2 loại tài chính). | Không sửa nội dung Course của Trainer; không xuất hiện trực tiếp trong luồng settlement doanh thu (đó là việc của Course Manager), dù có thể tạo tài khoản Course Manager. |
 
 ### 4.3 RBAC — cơ chế phân quyền thật (đã đổi so với thiết kế ban đầu)
@@ -155,8 +155,8 @@ RBAC hiện là **hybrid**, không còn "chỉ `hasRole()` tĩnh":
   - `ADMINISTRATOR` → `MANAGE_ACCOUNTS_ROLES, MODERATE_COMMENTS, REVIEW_TRAINER_APPLICATIONS, AUDIT_LOG_AI_USAGE`
   - *(Một vài permission code khác xuất hiện rải rác trong `@PreAuthorize`, ví dụ `REVIEW_COURSE` ở `CourseController`, chưa xác nhận độc lập có nằm trong danh sách seed mặc định hay không — cần grep lại trước khi coi là đã seed.)*
 - **Admin có thể xem & cấu hình lại** ma trận role→permission qua UI thật (tab "Roles" trong Admin Dashboard, `RoleMatrixTab`/`RoleDetailDrawer`) gọi `GET /api/admin/permissions`, `GET /api/admin/roles`, **`PUT /api/admin/roles/{roleName}/permissions`** — đây chính là tính năng **"Configure Permission"** trong Feature Map (§6, FE-04), là một API thật có ghi DB, không còn là "tĩnh/chỉ đọc" như thiết kế trước đó. Mỗi `Permission` có `coreForRoles`/`restrictedForRoles` (CSV role name) giới hạn Admin không gán/gỡ bừa bãi.
-- **Ở tầng Controller**, phần lớn endpoint dùng `@PreAuthorize("hasAuthority('MÃ_PERMISSION') or ... or hasRole('ADMINISTRATOR')")` — tức Administrator luôn có một cửa hardcode đi tắt qua mọi permission check, bất kể ma trận permission thật sự cấu hình gì. Một số controller (đáng chú ý: toàn bộ `CourseManagerDashboardController`, `ManagementTicketController`) vẫn dùng thuần `hasAnyRole('COURSE_MANAGER','ADMINISTRATOR')`/`hasRole(...)` theo tên role, không qua permission code — nghĩa là với riêng các endpoint đó, việc Admin "gỡ" permission của Course Manager qua UI Configure Permission sẽ **không** chặn được truy cập, vì check không nhìn vào permission code.
-- Một vài controller (`CartController`, `TicketController` phía người tạo, `LessonController`, `CommentController`, `NotificationController`, `MetadataController`, `UserController`, `PaymentController`'s tạo-thanh-toán) **không có `@PreAuthorize` nào cả** — chỉ yêu cầu đã đăng nhập (`isAuthenticated()` mặc định hoặc tự kiểm tra `currentUser == null` trong code), tức mọi role đã login đều gọi được như nhau, không phân biệt Learner/Trainer/CM/Admin.
+- **Ở tầng Controller**, phần lớn endpoint dùng `@PreAuthorize("hasAuthority('MÃ_PERMISSION') or ... or hasRole('ADMINISTRATOR')")` — tức Administrator thường có một cửa hardcode đi tắt qua permission check. Riêng `ManagementTicketController` dùng thuần `hasRole('ADMINISTRATOR')` và không mở cho Course Manager.
+- Một vài controller (`CartController`, `LessonController`, `CommentController`, `NotificationController`, `MetadataController`, `UserController`, `PaymentController`'s tạo-thanh-toán) **không có `@PreAuthorize` nào cả** — chỉ yêu cầu đã đăng nhập (`isAuthenticated()` mặc định hoặc tự kiểm tra `currentUser == null` trong code), tức mọi role đã login đều gọi được như nhau, không phân biệt Learner/Trainer/CM/Admin. `TicketController` đã có role-gate Trainer/Admin và siết riêng endpoint tạo/sửa/danh sách cho Trainer.
 
 ### 4.4 RBAC Matrix (theo nghiệp vụ)
 
@@ -185,8 +185,8 @@ RBAC hiện là **hybrid**, không còn "chỉ `hasRole()` tĩnh":
 | View AI Recommendation / Learning Pathway | ❌ | ✅ | ✅ (Learner mode) | ❌ | ❌ |
 | Dùng AI Assistant (trong Lesson) | ❌ | ✅ | ✅ (Learner mode) | ❌ | ❌ |
 | AI Content Generation (Question/Exam) | ❌ | ❌ | ⚠️ hiện **không** có role-gate (bug, xem §22) | ⚠️ tương tự | ⚠️ tương tự |
-| Tạo & tự trả lời Ticket của mình | ❌ | ✅ | ✅ | ✅ | ✅ (nhưng **không có UI** để dùng, xem §22) |
-| Duyệt/xử lý (Approve/Reject) Ticket của người khác | ❌ | ❌ | ❌ | ✅ (trừ 2 category tài chính) | ✅ (mọi category) |
+| Tạo & tự trả lời Ticket của mình | ❌ | ❌ | ✅ Own | ❌ | ❌ |
+| Xem/trả lời/xử lý Ticket của Trainer | ❌ | ❌ | ❌ | ❌ | ✅ (mọi category) |
 | View own Revenue / Confirm Statement | ❌ | ❌ | ✅ Own | — | — |
 | Generate Statement / Settle (Paid) / Cancel / Export | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Comment / Reply / Like (Lesson & Quiz) | ❌ | ✅ | ✅ | ❌ | ❌ (nhưng moderate được) |
@@ -416,7 +416,7 @@ FE-19 Dashboard
 | FR-PROF-01/02 | Xem & cập nhật profile cá nhân: họ tên, avatar, số điện thoại, giới tính, ngày sinh, địa chỉ, username, email (đổi email → `isVerified` reset về `false`). |
 | FR-PROF-03 | Đổi mật khẩu (yêu cầu đúng mật khẩu hiện tại), thu hồi toàn bộ refresh token khi đổi thành công. |
 | FR-PROF-04 | Learner xem **Learning History**: các Course đã enroll/hoàn thành, lịch sử Exam attempt — hiện được phục vụ qua endpoint danh sách Course có `filterType=ENROLLED\|IN_PROGRESS\|COMPLETED`, không phải một endpoint "learning-profile" tổng hợp riêng. |
-| FR-PROF-05 | Trainer có trang public profile hiển thị bio/kinh nghiệm/danh sách Course — nội dung phần này (bio, CV & Experience) đã có trong `TrainerProfilePage`; mức độ "public" (Guest xem được không cần login) **chưa xác nhận độc lập** trong đợt audit này, cần kiểm tra lại route/API cụ thể trước khi coi là hoàn tất. |
+| FR-PROF-05 | Trainer có trang public profile hiển thị bio/danh sách Course — nội dung hồ sơ gồm bio và chứng chỉ/CV; mức độ "public" (Guest xem được không cần login) **chưa xác nhận độc lập** trong đợt audit này, cần kiểm tra lại route/API cụ thể trước khi coi là hoàn tất. |
 
 **BR-PROF-01:** `ProfileUpdateRequest` hiện **không có validation annotation** nào ở backend (`@Email`/`@NotBlank`/`@Size`) — cập nhật profile với dữ liệu sai định dạng vẫn được lưu (xem §22).
 
@@ -443,7 +443,7 @@ FE-19 Dashboard
 | FR-RBAC-04 | **Configure Permission** — `PUT /api/admin/roles/{roleName}/permissions`: Admin thay thế toàn bộ tập permission của 1 Role bằng danh sách permission code mới, có ràng buộc theo `Permission.coreForRoles`/`restrictedForRoles`. Đây là API thật, có hiệu lực (ảnh hưởng runtime tới các endpoint dùng `hasAuthority(...)`) — **không phải** màn hình tĩnh/chỉ đọc. |
 
 **BR-RBAC-01:** `hasRole('ADMINISTRATOR')` là cửa hardcode luôn được phép ở hầu hết endpoint dùng `hasAuthority(...)`, bất kể ma trận permission thật sự cấu hình gì cho role Administrator.
-**BR-RBAC-02:** một nhóm endpoint (đáng chú ý: toàn bộ Course Manager dashboard/review, toàn bộ staff-side Ticket) không đọc permission code mà chỉ kiểm tra tên role — Configure Permission (FR-RBAC-04) **không** có tác dụng lên nhóm endpoint này.
+**BR-RBAC-02:** một nhóm endpoint (đáng chú ý: toàn bộ Course Manager dashboard/review và Ticket management phía Administrator) không đọc permission code mà chỉ kiểm tra tên role — Configure Permission (FR-RBAC-04) **không** có tác dụng lên nhóm endpoint này.
 
 ### 7.5 Trainer Application Management (`TRN`) — FE-05
 **Actors:** Guest/Learner (nộp đơn), Administrator (duyệt).
@@ -452,14 +452,15 @@ FE-19 Dashboard
 |---|---|
 | FR-TRN-01 | Tạo/kích hoạt hồ sơ Trainer — `POST /api/v1/trainers/become-trainer`: gán role **Trainer ngay lập tức**, tạo `TrainerProfile{status=PENDING_VERIFICATION}` với `revenueShare` mặc định theo loại (0.70 `PROFESSIONAL` / 0.60 `PEER_TUTOR`). |
 | FR-TRN-02 | Lưu nháp hồ sơ nhiều lần (`PUT /trainers/profile`) — bị chặn nếu status đang `AWAITING_APPROVAL` hoặc `SUSPENDED`. |
-| FR-TRN-03 | Submit hồ sơ để duyệt (`POST /trainers/profile/submit`) — validate: bio ≥ 50 ký tự, số điện thoại đúng định dạng VN (`^(03\|05\|07\|08\|09)\d{8}$`, không cho số lặp/số dãy `1234567890`), có giới tính, có avatar, có minh chứng (`scoreReportUrl`) → chuyển `AWAITING_APPROVAL`, thông báo mọi Admin. |
+| FR-TRN-03 | Submit hồ sơ để duyệt (`POST /trainers/profile/submit`) — validate: bio ≥ 50 ký tự, số điện thoại đúng định dạng VN (`^(03\|05\|07\|08\|09)\d{8}$`, không cho số lặp/số dãy `1234567890`), có giới tính, avatar HTTPS tin cậy, đã chấp nhận đúng version thỏa thuận và có tài liệu Cloudinary do HanGo quản lý; `PROFESSIONAL` phải có bằng sư phạm/chứng chỉ giảng dạy, CV không thay thế minh chứng này → chuyển `AWAITING_APPROVAL`, thông báo Admin. |
 | FR-TRN-04 | Theo dõi trạng thái đơn — `GET /trainers/profile`, hiển thị `adminNotes` nếu có. |
 | FR-TRN-05 | Admin xem danh sách + duyệt (`GET /admin/trainer-profiles`, `PUT /admin/trainer-profiles/{id}/review`) — chỉ khi set `VERIFIED` mới áp dụng/validate lại `revenueShare` (0.50–0.95 nếu Admin ghi đè, ngược lại theo mặc định 70/60 theo loại) và publish/bán Course được mở khoá. Gửi cả email lẫn notification khi duyệt (dù verified hay không). |
 | FR-TRN-06 | Request for edit — khi Admin trả về trạng thái khác `VERIFIED` (khác `SUSPENDED`), Trainer sửa & submit lại được, quay lại vòng lặp FR-TRN-02/03. |
+| FR-TRN-07 | Trainer đã `VERIFIED` thay đổi chứng chỉ qua `POST /trainers/profile/credentials/submit`; không được thay trực tiếp qua save draft. Hồ sơ quay lại `AWAITING_APPROVAL` để Admin duyệt lại. |
 
 **BR-TRN-01:** role **Trainer** (và quyền vào Trainer Dashboard, tạo Course/Exam ở Draft) được cấp **ngay lập tức** lúc chọn role ở Register hoặc gọi `become-trainer` — **không** chờ Admin duyệt. Ranh giới Admin duyệt chỉ chặn ở bước **publish/bán Course**, enforced tại `TrainerDashboardServiceImpl.publishTrainerCourse`: publish bị chặn trừ khi `TrainerProfile.status = VERIFIED`.
 **BR-TRN-02:** Course đầu tiên bắt buộc miễn phí (kiểm tra ở tầng Course, không phải tầng Trainer Application).
-**BR-TRN-03:** Admin gửi trường `status` khi review hiện **không có whitelist ở server** — về mặt hợp đồng API chỉ nên gửi 1 trong 3 giá trị `VERIFIED`/`PENDING_VERIFICATION`/`SUSPENDED`, nhưng code không tự chặn giá trị khác (xem §22).
+**BR-TRN-03:** Admin review chỉ chấp nhận `VERIFIED`/`PENDING_VERIFICATION`/`SUSPENDED` và validate state transition phía server; thao tác review khóa pessimistic theo profile để tránh hai Admin ghi đè nhau.
 
 ### 7.6 Course Management (`CRS`) — FE-06
 **Actors:** Guest/Learner (discovery), Trainer (authoring), Course Manager (review).
@@ -643,21 +644,21 @@ FE-19 Dashboard
 **BR-CART-01:** giỏ hàng được dọn (xoá item tương ứng) ngay sau khi thanh toán thành công (cả trường hợp free lẫn paid).
 
 ### 7.16 Ticket Management (`TKT`) — FE-16 *(module mới, chưa có ở thiết kế trước)*
-**Actors:** mọi role đã đăng nhập (tạo/tự trả lời ticket của mình), Course Manager & Administrator (xử lý ticket của người khác).
+**Actors:** Trainer (tạo, xem và trả lời ticket của mình), Administrator (xem, trả lời và xử lý mọi ticket).
 
 | ID | Requirement |
 |---|---|
 | FR-TKT-01 | Send Ticket — `POST /api/v1/tickets`: tiêu đề, mô tả, category (`GENERAL_ENQUIRY` mặc định, hoặc `CONTENT_ISSUE`/`REVENUE_STATEMENT_DISPUTE`/`PAYOUT_INFO_UPDATE`/`REFUND_REQUEST`); tự sinh `ticketCode` duy nhất, snapshot role người tạo, tạo sẵn `TicketMessage` đầu tiên từ chính nội dung mô tả. |
 | FR-TKT-02 | View Ticket List — của chính mình (`GET /tickets/my-tickets?status=`, có filter tổng hợp `PROCESSED` = `APPROVED`∪`REJECTED`) hoặc hàng chờ toàn hệ thống cho staff (`GET /management/tickets`, filter theo status/category/từ khoá). |
 | FR-TKT-03 | View Ticket Detail — nội dung + toàn bộ thread `TicketMessage`. |
-| FR-TKT-04 | Reply to Ticket — `POST /tickets/{id}/messages` (chủ ticket **và** staff đều dùng chung API này để trả lời). |
-| FR-TKT-05 | Staff xử lý ticket — `POST /management/tickets/{id}/process` với `action=APPROVE\|REJECT`, kèm `adminResponse` (Approve) hoặc bắt buộc `rejectionReason` (Reject); tự thêm 1 `TicketMessage` từ phía staff và báo notification cho chủ ticket. |
+| FR-TKT-04 | Reply to Ticket — `POST /tickets/{id}/messages` (Trainer sở hữu ticket và Administrator dùng chung API này để trả lời; message chỉ có text, không có attachment). |
+| FR-TKT-05 | Administrator xử lý ticket — `POST /management/tickets/{id}/process` với `action=APPROVE\|REJECT`, kèm `adminResponse` (Approve) hoặc `rejectionReason` (Reject), sau đó báo notification cho chủ ticket. |
 | FR-TKT-06 | Xem thống kê ticket theo status (`GET /management/tickets/stats`) — tổng/pending/processing/approved/rejected. |
 
-**BR-TKT-01:** ai cũng tạo/tự trả lời ticket của chính mình được — `TicketController` phía người tạo **không có role-gate**, chỉ cần đăng nhập.
-**BR-TKT-02:** xử lý ticket của người khác (`ManagementTicketController`) chỉ dành cho **Course Manager** và **Administrator** — không mở cho Trainer thường.
-**BR-TKT-03:** trong nhóm staff, **chỉ Administrator** được xử lý 2 category nhạy cảm tài chính `PAYOUT_INFO_UPDATE`/`REFUND_REQUEST`; Course Manager cố xử lý 2 category này sẽ bị chặn ở tầng Service với lỗi rõ ràng ("Assigned to System Admin").
-**BR-TKT-04:** ticket **chưa có cơ chế khoá thread** khi đã `APPROVED`/`REJECTED` — chủ ticket vẫn sửa được tiêu đề/mô tả hoặc thêm message sau khi ticket đã xử lý xong (xem §22).
+**BR-TKT-01:** chỉ **Trainer** được tạo/sửa/xem danh sách ticket của mình; `tickets.user_role` được snapshot cố định là `TRAINER`.
+**BR-TKT-02:** chỉ **Administrator** được truy cập `ManagementTicketController` và xử lý ticket; Learner/Course Manager không tham gia luồng.
+**BR-TKT-03:** Trainer sở hữu ticket và Administrator được xem chi tiết/trả lời; tin nhắn từ Administrator chuyển ticket `PENDING → PROCESSING`.
+**BR-TKT-04:** ticket `APPROVED`/`REJECTED` không nhận thêm message, nhưng chủ ticket vẫn sửa được tiêu đề/mô tả.
 
 ### 7.17 Comment Management (`CMT`) — FE-17
 **Actors:** Learner, Trainer (comment/reply/xóa comment của mình), Administrator (moderate).
@@ -714,8 +715,8 @@ FE-19 Dashboard
 - **BR-G08 — Unlimited attempts:** Quiz & Exam làm lại không giới hạn; lưu toàn bộ attempt.
 - **BR-G09 — AI is draft-only:** đầu ra AI cần Trainer/Course Manager duyệt/sửa trước khi lưu chính thức.
 - **BR-G10 — Re-approval + versioning:** sửa Course đã Published tạo bản mới cần duyệt lại; bản live giữ nguyên (§9.3). Exam hiện **không** có cơ chế versioning tương tự — sửa Exam sửa thẳng trên bản ghi hiện có.
-- **BR-G11 — Separation of duties (đã mở rộng):** Administrator không cầm tiền, không tự settlement; Course Manager quản lý & chi trả doanh thu. Nhưng ở mảng cảnh báo vận hành (rating thấp) và Ticket tài chính nhạy cảm, Administrator **có** vai trò song song/vượt trên Course Manager.
-- **BR-G12 — RBAC động (mới):** phân quyền không còn thuần `hasRole()` tĩnh — có ma trận Role→Permission lưu DB, Admin cấu hình được qua UI, nhưng Administrator luôn có cửa hardcode đi tắt và một số controller quan trọng (Course Manager dashboard, Ticket quản lý) chưa đọc permission code (§4.3).
+- **BR-G11 — Separation of duties (đã mở rộng):** Administrator không cầm tiền, không tự settlement; Course Manager quản lý & chi trả doanh thu. Administrator phụ trách riêng toàn bộ Ticket, bao gồm category tài chính nhạy cảm.
+- **BR-G12 — RBAC động (mới):** phân quyền không còn thuần `hasRole()` tĩnh — có ma trận Role→Permission lưu DB, Admin cấu hình được qua UI, nhưng một số controller quan trọng vẫn kiểm tra trực tiếp tên role; Ticket management kiểm tra cứng `ADMINISTRATOR` (§4.3).
 
 ---
 
@@ -737,6 +738,8 @@ PENDING_VERIFICATION --saveProfileDraft (lặp lại)--> PENDING_VERIFICATION
 PENDING_VERIFICATION --submitProfileForReview (đủ bio≥50 ký tự + phone hợp lệ + giới tính + avatar + minh chứng)--> AWAITING_APPROVAL
 AWAITING_APPROVAL --Admin review: status=VERIFIED--> VERIFIED (publish/bán Course mở khóa; revenueShare áp dụng)
 AWAITING_APPROVAL --Admin review: status khác (SUSPENDED hoặc quay lại PENDING_VERIFICATION)--> (SUSPENDED chặn saveProfileDraft; còn lại sửa & submit lại được)
+VERIFIED --submitCredentialUpdate--> AWAITING_APPROVAL
+VERIFIED --Admin suspend--> SUSPENDED --Admin reactivate--> VERIFIED
 ```
 
 ### 9.3 Course (theo từng version)
@@ -778,10 +781,11 @@ PENDING_TRAINER_CONFIRM --Trainer reject (kèm lý do)--> REJECTED
 ### 9.7 Ticket (mới)
 ```
 (tạo) --> PENDING
-PENDING --staff (Course Manager/Admin) trả lời lần đầu--> PROCESSING (tự động chuyển, không cần hành động Approve/Reject riêng)
-PROCESSING --staff process: action=APPROVE--> APPROVED
-PROCESSING --staff process: action=REJECT (kèm lý do)--> REJECTED
-(mọi trạng thái) --chủ ticket/staff thêm message--> (không đổi status, kể cả sau APPROVED/REJECTED — chưa có khoá thread)
+PENDING --Administrator trả lời lần đầu--> PROCESSING (tự động chuyển, không cần hành động Approve/Reject riêng)
+PROCESSING --Administrator process: action=APPROVE--> APPROVED
+PROCESSING --Administrator process: action=REJECT (kèm lý do)--> REJECTED
+(PENDING/PROCESSING) --Trainer sở hữu ticket hoặc Administrator thêm message--> (không đổi status)
+(APPROVED/REJECTED) --thêm message--> bị từ chối
 ```
 
 ### 9.8 Versioning (chỉ áp dụng cho Course, không áp dụng cho Exam)
@@ -835,7 +839,7 @@ gom Payment SUCCESS + chưa vào statement theo Trainer → MonthlyStatement (PE
 
 ### 10.5 Ticket (mới)
 ```
-Bất kỳ role nào: Send Ticket (chọn category) → staff (Course Manager, hoặc Admin nếu category tài chính) trả lời lần đầu → PROCESSING
+Trainer: Send Ticket (chọn category) → Administrator trả lời lần đầu → PROCESSING
 → staff Approve (kèm phản hồi) hoặc Reject (kèm lý do) → chủ ticket nhận notification
 ```
 
@@ -867,7 +871,7 @@ Bất kỳ role nào: Send Ticket (chọn category) → staff (Course Manager, h
 | ActiveMode *(Trainer UI)* | TrainerMode · LearnerMode — UI/session state, không phải claim riêng trong JWT. |
 | TrainerType | `PROFESSIONAL` (Teacher, 70/30) · `PEER_TUTOR` (Tutor, 60/40) — free-text field trên `TrainerProfile.trainerType`. |
 | AccountStatus | `User.status` — chuỗi tự do; hệ thống chỉ chặn login khi khác `ACTIVE`. |
-| ApplicationStatus | `TrainerProfile.status`: `PENDING_VERIFICATION → AWAITING_APPROVAL → VERIFIED` (hoặc `SUSPENDED`), không có server-side whitelist khi Admin ghi giá trị mới (§22). |
+| ApplicationStatus | `TrainerProfile.status`: `PENDING_VERIFICATION → AWAITING_APPROVAL → VERIFIED` (hoặc `SUSPENDED`); server whitelist status và state transition khi Admin review. |
 | CourseStatus | `Course.status`: `DRAFT` · `PENDING_APPROVAL` · `PUBLISHED` · `REJECTED` · `ARCHIVED` · `HIDDEN` — 6 giá trị thật. |
 | ExamStatus | `Exam.status`: `DRAFT` · `PENDING_APPROVAL`/`SUBMITTED` (cả 2 chuỗi được chấp nhận) · `PUBLISHED` · `REJECTED` · `ARCHIVED`. |
 | LessonType | field tự do trên `Lesson.lessonType` (không phải enum Java) — không có entity `LessonBlock`/`Quiz` tách riêng. |
@@ -908,7 +912,7 @@ Bất kỳ role nào: Send Ticket (chọn category) → staff (Course Manager, h
 
 ## 14. Decision Log & Future Items
 
-### 14.1 Đã chốt (v1, tính tới 2026-08-10)
+### 14.1 Đã chốt (v1, tính tới 2026-08-24)
 
 | Vấn đề | Quyết định |
 |---|---|
@@ -917,7 +921,10 @@ Bất kỳ role nào: Send Ticket (chọn category) → staff (Course Manager, h
 | Payment / tiền tệ | **PayOS**, VND; pay-in auto, payout thủ công, trừ thêm 10% thuế TNCN nếu đủ ngưỡng |
 | RBAC | Chuyển từ "tĩnh/chỉ đọc" sang **ma trận Role→Permission động, Admin cấu hình được** qua UI (`PUT /api/admin/roles/{roleName}/permissions`) |
 | Tên role Course Manager | Chốt dùng **"Course Manager"** (`COURSE_MANAGER`) làm tên chính thức, thay cho tên gọi cũ thời kỳ đầu "Trainer Lead" (`TRAINER_LEAD`) — chức năng giữ nguyên, chỉ đổi tên gọi; dọn dẹp nốt các chỗ code còn dùng tên cũ là việc kỹ thuật còn tồn đọng (§22) |
-| Ticket Management | Module mới hoàn toàn — hỗ trợ mọi role gửi ticket, Course Manager/Admin xử lý, phân luồng riêng cho ticket tài chính nhạy cảm |
+| Ticket Management | Chỉ Trainer tạo/xem/trả lời ticket của mình; chỉ Administrator quản lý/xử lý. Loại Learner và Course Manager khỏi luồng; bỏ `Ticket.assignedTo`, `TicketMessage.attachmentUrls` |
+| Trainer Profile cleanup (2026-08-22) | Bỏ `experience` và `workplace` khỏi schema/API/UI; kinh nghiệm không còn là field riêng, hồ sơ giữ `bio` và chứng chỉ/CV |
+| Trainer onboarding hardening (2026-08-23) | Tài liệu/avatar upload qua backend và kiểm tra magic-byte; thỏa thuận lưu `agreement_version`/`agreement_accepted_at`; thay chứng chỉ sau duyệt bắt buộc tái duyệt; review có whitelist, state transition và row lock. |
+| Deployment memory hardening (2026-08-24) | Image backend/frontend được build trên GitHub Actions và lưu ở GHCR; EC2 chỉ pull/deploy, chờ health check và rollback khi lỗi. Backend có heap/container limit, Docker log rotation; máy 1 GB dùng thêm swap 2 GB làm lớp dự phòng. |
 | Exam Matrix | Tách thành module riêng (trước đây gộp trong Exam Management) — blueprint tái sử dụng để sinh Exam |
 | Cart Management | Tách thành module riêng (trước đây gộp trong Payment) |
 | Dashboard | Tách thành module riêng (trước đây là "Platform Monitoring" trong RBAC) |
@@ -1063,7 +1070,7 @@ erDiagram
 | **AI** | `AIConversation`, `AIMessage`, `AiUsageLog` | `AIMessage.MessageRole` (USER/ASSISTANT) — enum Java thật duy nhất. |
 | **Learning Pathway** | `LearningPathway`, `LearningPathwayGoal`, `PathwayNode`, `PathwayEvent`, `PathwayConversation`, `PathwayMessage` | `PathwayConversation`/`PathwayMessage` mới — hội thoại AI Mentor tách riêng khỏi `AIConversation`/`AIMessage` (lesson-scoped). |
 | **Commerce** | `CartItem`, `Payment`, `MonthlyStatement` | `Payment.statementId` là plain Long. `Payment.vnpayTxnNo` là tên cột cũ còn sót từ thiết kế VNPay — cổng thanh toán thật là PayOS. |
-| **Ticket (mới)** | `Ticket`, `TicketMessage` | `Ticket.assignedTo` khai báo nhưng chưa từng được set trong code (cột chết). |
+| **Ticket (mới)** | `Ticket`, `TicketMessage` | Không có assignment/attachment; Trainer là người tạo, Administrator quản lý. |
 | **Notification & Audit** | `Notification`, `AuditLog` | `Notification` hỗ trợ 2 chế độ target: theo `user` hoặc theo `recipientRole` (broadcast, materialize 1 dòng/user). |
 | **Lookup chung** | `SystemParameter` | Bảng EAV dùng chung cho SkillType/Difficulty/Category/GroupType. |
 
@@ -1098,8 +1105,8 @@ erDiagram
 | `PaymentController` | `/api/v1/payment` | `permitAll()` ở filter (delegate xuống code); `/manager/*` cần `hasAnyAuthority(...)` | Create, webhook, history, status; CM/Admin xem toàn bộ giao dịch |
 | `CartController` | `/api/v1/cart` | Không `@PreAuthorize`, tự check đăng nhập | Get/add/remove/clear/sync |
 | `MonthlyStatementController` | `/api/v1` (`/trainer/*`, `/course-manager/*`) | `VIEW_OWN_REVENUE`/`VIEW_PLATFORM_DASHBOARD` tuỳ nhánh | Trainer confirm/reject; CM/Admin generate/settle/cancel/regenerate/export |
-| `TicketController` | `/api/v1/tickets` | Không `@PreAuthorize`, chỉ cần đăng nhập | Tạo/sửa/xem/trả lời ticket của chính mình |
-| `ManagementTicketController` | `/api/v1/management/tickets` | `hasAnyRole('ADMINISTRATOR','TRAINER_LEAD','COURSE_MANAGER')` (thực tế chỉ Admin+CM có user) | Queue, process (approve/reject), stats |
+| `TicketController` | `/api/v1/tickets` | Trainer tạo/sửa/xem danh sách; Trainer owner hoặc Admin xem chi tiết/trả lời | Ticket hỗ trợ giữa Trainer và Admin |
+| `ManagementTicketController` | `/api/v1/management/tickets` | `hasRole('ADMINISTRATOR')` | Queue, process (approve/reject), stats |
 | `NotificationController` | `/api/v1/notifications` | Không `@PreAuthorize`, tự check đăng nhập | Inbox chung mọi role |
 | `MetadataController` | `/api/v1/metadata` | Không `@PreAuthorize`, cần đăng nhập | System parameter, category lookup |
 | `TestDBController` | `/api/test-db*` | `@Profile("dev")` + `MANAGE_ACCOUNTS_ROLES`/`ADMINISTRATOR` | Seed/debug dữ liệu — chỉ chạy ở profile dev, có gate quyền (đã siết so với trước) |
@@ -1208,17 +1215,17 @@ sequenceDiagram
 
 ## 19. Deployment
 
-> Hướng dẫn từng bước đầy đủ: [`DEPLOY_GUIDE.md`](../DEPLOY_GUIDE.md). Mục này giữ nguyên mô tả kiến trúc triển khai từ lần audit gần nhất — **chưa được kiểm chứng lại độc lập trong đợt cập nhật tài liệu 2026-08-10 này** (không nằm trong phạm vi yêu cầu lần này); nếu hạ tầng đã đổi khác kể từ đó, cần audit lại riêng trước khi coi mục này là chính xác 100%.
+> Hướng dẫn từng bước đầy đủ: [`DEPLOY_GUIDE.md`](../DEPLOY_GUIDE.md). Cấu hình triển khai được cập nhật và kiểm tra lại ngày 2026-08-24 sau sự cố EC2 cạn RAM/OOM-kill backend.
 
 **Hạ tầng:** 1 AWS EC2 (Ubuntu 24.04) chạy Docker Compose gồm 4 service — `backend` (Spring Boot JAR, port 8080 nội bộ), `frontend` (Flutter Web build tĩnh, phục vụ qua Nginx port 80 nội bộ), `nginx` (reverse proxy + TLS, expose 80/443 ra ngoài), `certbot` (tự renew Let's Encrypt mỗi 12h). Database: MySQL ngoài (Aiven Cloud), không chạy trong Docker Compose.
 
 **Domain:** `hangog92.online`/`www.hangog92.online` → Frontend; `api.hangog92.online` → Backend.
 
-**Build image:** Backend `eclipse-temurin:17-jre-alpine`; Frontend `nginx:alpine` (copy `build/web`).
+**Build image:** Docker multi-stage build — backend build bằng `eclipse-temurin:17-jdk-alpine`, runtime `eclipse-temurin:17-jre-alpine`; frontend build bằng Flutter `3.44.0`, runtime `nginx:alpine`.
 
-**CI/CD (`.github/workflows/`):** `backend-ci.yml` (PR → main/develop, `mvn clean verify -DskipTests`), `frontend-ci.yml` (PR → main/develop, `flutter analyze` + `flutter test`), `deploy.yml` (push → `dev`, build + SCP + `docker-compose up -d --build`).
+**CI/CD (`.github/workflows/`):** `backend-ci.yml` (PR → main/develop, `mvn clean verify -DskipTests`), `frontend-ci.yml` (PR → main/develop, `flutter analyze` + `flutter test`), `deploy.yml` (push → `dev`, build/push image commit-SHA lên GHCR, SCP cấu hình, EC2 pull và `docker-compose up --no-build --wait`; tự rollback image cũ nếu health check lỗi).
 
-**Lưu ý vận hành:** secrets (PayOS, JWT, Cloudinary, DB, mail) truyền qua `.env`/GitHub Secrets, không hardcode trong repo. Deploy tự động chỉ chạy khi push vào `dev`, không tự động deploy `main`.
+**Lưu ý vận hành:** secrets (PayOS, JWT, Cloudinary, DB, mail) truyền qua `.env`/GitHub Secrets, không hardcode trong repo. Backend có heap Java 256 MiB, giới hạn container 600 MiB, health check `/api/health` và Docker log rotation. EC2 1 GB cần swap dự phòng 2 GB và không được build image trực tiếp trên production. Deploy tự động chỉ chạy khi push vào `dev`, không tự động deploy `main`.
 
 ---
 
@@ -1273,8 +1280,7 @@ sequenceDiagram
 **🟠 Đúng-sai nghiệp vụ (logic bugs, không phải lỗ hổng bảo mật):**
 - **2 đường publish Course** vẫn tồn tại song song: luồng chuẩn (Submit → Course Manager Review → Publish) và luồng "legacy self-publish" của Trainer (`TrainerDashboardServiceImpl.publishTrainerCourse`, không có điều kiện tiên quyết) — chưa hợp nhất.
 - **`generate` Monthly Statement thủ công mặc định tháng hiện tại**, trong khi `MonthlyStatementScheduler` tự động nhắm **tháng trước** — 2 hành vi khác nhau cho cùng 1 việc, dễ tạo nhầm statement sai kỳ nếu gọi API thủ công không truyền `periodMonth`.
-- Ticket mới tạo cố gắng thông báo cho staff bằng `notifyRole("TRAINER_LEAD", ...)` — chuỗi role này **không map tới user thật nào** (role thật là `COURSE_MANAGER`) → thông báo "có ticket mới" hiện **không tới được ai cả**.
-- Ticket đã `APPROVED`/`REJECTED` vẫn sửa được tiêu đề/mô tả/thêm message — chưa có cơ chế khoá thread.
+- Ticket đã `APPROVED`/`REJECTED` vẫn sửa được tiêu đề/mô tả, nhưng không thể thêm message.
 - Ticket category `REFUND_REQUEST` được Admin Approve xong nhưng **không có code nào** đảo trạng thái `Payment`/`Enrollment` tương ứng — hoàn tiền hiện chỉ dừng ở việc đổi status Ticket, chưa có tác động tài chính thật.
 - `AdminCommentController` kiểm tra permission `MANAGE_ACCOUNTS_ROLES` thay vì `MODERATE_COMMENTS` (permission được seed đúng cho mục đích này) — chưa gây vấn đề vì Admin đang có cả hai, nhưng sẽ lệch nếu Admin dùng Configure Permission (§7.4) để tách quyền.
 
@@ -1286,13 +1292,13 @@ sequenceDiagram
 - `PathwayProgressSnapshotService.hasWeakSkillOverlap` hardcode `false` — điều kiện "không trùng kỹ năng yếu" của Fast-track reroute hiện luôn thoả, chưa lọc thật theo điểm yếu.
 - Không có config timezone tường minh cho `PaymentExpirationScheduler`/`MonthlyStatementScheduler` — chạy theo giờ mặc định JVM/host, chưa xác nhận là Asia/Ho_Chi_Minh.
 - Course dùng parser XML tự viết để đọc `.xlsx` (không dùng Apache POI dù có sẵn dependency); Exam/Question Bank dùng Apache POI thật — 2 cách đọc Excel khác nhau trong cùng hệ thống.
-- Code còn sót nhiều chỗ dùng tên role cũ `TRAINER_LEAD` (Ticket, Payment, MonthlyStatement `@PreAuthorize`) dù role thật/duy nhất là `COURSE_MANAGER` — nợ kỹ thuật cần dọn theo quyết định đổi tên ở §14.1.
+- Code còn sót nhiều chỗ dùng tên role cũ `TRAINER_LEAD` (Payment, MonthlyStatement `@PreAuthorize`) dù role thật/duy nhất là `COURSE_MANAGER` — nợ kỹ thuật cần dọn theo quyết định đổi tên ở §14.1.
 
 **🟡 Frontend:**
 - Vẫn `StatefulWidget` + `setState()` + 1 `ChangeNotifierProvider` gốc — không phải Riverpod; routing thủ công `Navigator`/`MaterialPageRoute` — không phải `go_router`.
 - 2 vị trí lưu session song song (`SharedPreferences` và `flutter_secure_storage`).
 - `lesson_ai_chatbox_fix.dart` là bản sao gần như trùng của `lesson_ai_chatbox.dart`, không được import ở đâu — code chết, an toàn để xoá.
-- Admin Dashboard import `ManagementTicketsPage` nhưng **không bao giờ render nó** — Admin hiện **không có UI** để xử lý Ticket dù backend cho phép role Admin làm việc này qua `ManagementTicketController`.
+- Admin Dashboard render `ManagementTicketsPage` trong tab Support Tickets; đây là UI quản lý Ticket dành riêng Administrator.
 - Gần như chưa có test coverage (4/75 trang có test gián tiếp).
 
 **🟡 Data modeling:** hầu hết field trạng thái là `String` tự do, không phải Java enum; một số quan hệ là `Long` thô thay vì JPA association (`Course.parentId`, `Payment.statementId`, `PathwayNode.parentNodeId`).
@@ -1305,17 +1311,14 @@ sequenceDiagram
 
 **Ưu tiên cao (ảnh hưởng bảo mật/đúng-sai nghiệp vụ):**
 1. Thêm `@PreAuthorize` cho `SectionQuestionController` (8 endpoint) và `TrainerQuestionAIController` (3 endpoint).
-2. Sửa `TicketServiceImpl` gọi `notifyRole("TRAINER_LEAD", ...)` → đổi thành `"COURSE_MANAGER"` để thông báo ticket mới thực sự tới được staff.
-3. Thống nhất 1 luồng publish Course duy nhất (bỏ hoặc rào lại đường "legacy self-publish").
-4. Verify ownership `examAttemptId` trước khi trả AI recommendation.
-5. Nối Admin Dashboard với `ManagementTicketsPage` đã import sẵn, hoặc bỏ import chết nếu Admin không cần trực tiếp xử lý Ticket.
+2. Thống nhất 1 luồng publish Course duy nhất (bỏ hoặc rào lại đường "legacy self-publish").
+3. Verify ownership `examAttemptId` trước khi trả AI recommendation.
 
 **Ưu tiên trung bình (nợ kỹ thuật, chưa gây hại ngay):**
-6. Dọn các chỗ code còn dùng tên role cũ `TRAINER_LEAD` → `COURSE_MANAGER` (Payment/MonthlyStatement `@PreAuthorize`, comment code).
-7. Thêm test cho module Ticket (hiện chưa có test nào).
-8. Enforce sequential lesson unlock ở server (hiện chỉ ở Frontend).
-9. Quyết định rõ: bật thật lớp guardrail embedding-similarity của AI Assistant (set `scopeSimilarityThreshold`) hoặc bỏ hẳn cấu hình chưa dùng.
-10. Nối `PathwayGoalMergeService` vào 1 Controller thật, hoặc xoá nếu không còn nằm trong kế hoạch.
+4. Dọn các chỗ code còn dùng tên role cũ `TRAINER_LEAD` → `COURSE_MANAGER` (Payment/MonthlyStatement `@PreAuthorize`, comment code).
+5. Enforce sequential lesson unlock ở server (hiện chỉ ở Frontend).
+6. Quyết định rõ: bật thật lớp guardrail embedding-similarity của AI Assistant (set `scopeSimilarityThreshold`) hoặc bỏ hẳn cấu hình chưa dùng.
+7. Nối `PathwayGoalMergeService` vào 1 Controller thật, hoặc xoá nếu không còn nằm trong kế hoạch.
 
 **Ngoài phạm vi v1 (giữ nguyên định hướng dài hạn):** mobile app; refund/auto-payout thật (đảo trạng thái Payment/Enrollment khi Ticket hoàn tiền được duyệt); AI usage limit & cost model theo token; pass-score cho Quiz; đa ngôn ngữ giao diện; công thức price-tier chi tiết hơn; role Finance riêng tách khỏi Course Manager; WebSocket push thật cho Notification.
 

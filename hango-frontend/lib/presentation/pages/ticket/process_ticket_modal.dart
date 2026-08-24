@@ -462,7 +462,7 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final msg = _fullTicket!.messages[index];
-        final isStaff = msg.senderRole == 'ADMINISTRATOR' || msg.senderRole == 'COURSE_MANAGER';
+        final isStaff = msg.senderRole == 'ADMINISTRATOR';
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(

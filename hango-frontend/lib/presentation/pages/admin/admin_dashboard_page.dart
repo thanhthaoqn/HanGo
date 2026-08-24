@@ -1182,13 +1182,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // HEADER
   // ------------------------------------------------------------------------
   Widget _buildHeader(BuildContext context, bool isDesktop) {
+    final isCompactHeader = MediaQuery.sizeOf(context).width < 700;
+
     return Container(
       height: 70,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: isCompactHeader ? 12 : 32),
       child: Row(
         children: [
           // Left: Hamburger menu for mobile drawer trigger
@@ -1215,7 +1217,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               children: [
                 Image.network(
                   'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                  height: 36,
+                  width: isCompactHeader ? 126 : null,
+                  height: isCompactHeader ? 32 : 36,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return Row(
@@ -1331,6 +1334,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const Spacer(),
           // Right: Bell notification & Profile avatar
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               // Notification Bell with Badge
               Stack(
@@ -1512,7 +1516,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                 ],
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: isCompactHeader ? 8 : 16),
 
               // Profile Avatar and Name Dropdown
               PopupMenuButton<String>(
@@ -1537,8 +1541,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCompactHeader ? 8 : 14,
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
@@ -1609,43 +1613,52 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   ),
                                 ),
                         ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _adminName,
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                                fontFamily: 'Outfit',
-                              ),
+                        if (!isCompactHeader) ...[
+                          const SizedBox(width: 10),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: isDesktop ? 180 : 140,
                             ),
-                            Container(
-                              margin: const EdgeInsets.only(top: 2),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE6FFFA),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'Admin',
-                                style: TextStyle(
-                                  color: Color(0xFF1F9E84),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 8,
-                                  fontFamily: 'Outfit',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _adminName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    fontFamily: 'Outfit',
+                                  ),
                                 ),
-                              ),
+                                Container(
+                                  margin: const EdgeInsets.only(top: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE6FFFA),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Admin',
+                                    style: TextStyle(
+                                      color: Color(0xFF1F9E84),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 8,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         const Icon(
                           Icons.keyboard_arrow_down_rounded,
                           size: 18,

@@ -223,7 +223,7 @@ The walkthroughs below cover the platform's central journeys: becoming a Trainer
 **Step 2.2 — Fill in the Teaching Profile**
 - On the **"Complete Teaching Profile"** screen, fill in:
   - **1. Personal Information** — upload an avatar, select **Gender**, and enter a **Contact Phone Number** (Vietnamese format).
-  - **2. Experience & Bio** — a **Teaching Experience & Bio** field (minimum 50 characters).
+  - **2. Bio** — a personal introduction field (minimum 50 characters).
   - **3. Degrees & Certificates** — click **"Add Degree & Certificate"** to upload at least one credential (a Teacher application specifically requires a pedagogical degree/teaching certificate; a Tutor application accepts transcripts, English certificates, or competition awards).
 - Click **"Submit Application for Review"**. A toast confirms **"Application submitted for review successfully!"**, and the status screen now shows **"Application Under Review"**.
 

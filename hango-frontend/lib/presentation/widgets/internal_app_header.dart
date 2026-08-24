@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
@@ -8,13 +9,10 @@ import '../pages/learner/learner_home_page.dart';
 import '../pages/trainer/trainer_profile_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/trainer/onboarding/trainer_onboarding_shell_page.dart';
-import '../pages/trainer/onboarding/trainer_onboarding_details_page.dart';
-import '../pages/trainer/onboarding/trainer_onboarding_agreement_page.dart';
-import '../pages/trainer/onboarding/trainer_type_selection_page.dart';
-import '../pages/trainer/onboarding/trainer_onboarding_status_page.dart';
 import '../../../data/services/trainer_onboarding_service.dart';
 import '../../utils/toast_helper.dart';
 import '../../utils/language_manager.dart';
+import '../../utils/trainer_onboarding_flow_utils.dart';
 
 class InternalAppHeader extends StatefulWidget implements PreferredSizeWidget {
   final bool isMobile;
@@ -41,12 +39,11 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
   final _authService = AuthService();
   final _notificationRepository = NotificationRepository();
 
-  bool _isLoggedIn = false;
-  String _userFullName = 'User';
-  String _userInitials = 'U';
-  String _userAvatarUrl = '';
-  List<String> _userRoles = [];
-  
+  late String _userFullName;
+  late String _userInitials;
+  late String _userAvatarUrl;
+  late List<String> _userRoles;
+
   List<NotificationItem> _notifications = [];
   int _unreadNotificationCount = 0;
   bool _isLoadingNotifications = false;
@@ -55,7 +52,22 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
   @override
   void initState() {
     super.initState();
+    _applyCachedUserInfo();
     _loadUserInfo();
+  }
+
+  void _applyCachedUserInfo() {
+    final fullName = AuthService.cachedFullName?.trim();
+    _userFullName = fullName == null || fullName.isEmpty ? 'User' : fullName;
+    _userInitials = _initialsFor(_userFullName);
+    _userAvatarUrl = AuthService.cachedAvatarUrl ?? '';
+    _userRoles = List<String>.from(AuthService.cachedRoles ?? const []);
+  }
+
+  String _initialsFor(String fullName) {
+    final trimmedName = fullName.trim();
+    if (trimmedName.isEmpty) return 'U';
+    return trimmedName.split(' ').last[0].toUpperCase();
   }
 
   Future<void> _loadUserInfo() async {
@@ -63,7 +75,6 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
     final token = prefs.getString('auth_token');
 
     if (token == null) {
-      if (mounted) setState(() => _isLoggedIn = false);
       return;
     }
 
@@ -71,31 +82,37 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
     final roles = prefs.getStringList('user_roles') ?? [];
 
-    String initials = 'U';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
+    final initials = _initialsFor(fullName);
 
     if (mounted) {
-      setState(() {
-        _isLoggedIn = true;
-        _userFullName = fullName;
-        _userInitials = initials;
-        _userAvatarUrl = avatarUrl;
-        _userRoles = roles;
-      });
+      final hasChanged =
+          _userFullName != fullName ||
+          _userInitials != initials ||
+          _userAvatarUrl != avatarUrl ||
+          !listEquals(_userRoles, roles);
+      if (hasChanged) {
+        setState(() {
+          _userFullName = fullName;
+          _userInitials = initials;
+          _userAvatarUrl = avatarUrl;
+          _userRoles = roles;
+        });
+      }
       _loadNotifications();
     }
   }
 
   String get _displayRole {
-    if (_userRoles.contains('ROLE_ADMINISTRATOR') || _userRoles.contains('ADMINISTRATOR')) return 'Admin';
-    if (_userRoles.contains('ROLE_TRAINER') || _userRoles.contains('TRAINER')) return 'Trainer';
-    if (_userRoles.contains('ROLE_COURSE_MANAGER') || _userRoles.contains('COURSE_MANAGER')) return 'Course Manager';
-    if (_userRoles.contains('ROLE_LEARNER') || _userRoles.contains('LEARNER')) return 'Learner';
+    if (_userRoles.contains('ROLE_ADMINISTRATOR') ||
+        _userRoles.contains('ADMINISTRATOR'))
+      return 'Admin';
+    if (_userRoles.contains('ROLE_TRAINER') || _userRoles.contains('TRAINER'))
+      return 'Trainer';
+    if (_userRoles.contains('ROLE_COURSE_MANAGER') ||
+        _userRoles.contains('COURSE_MANAGER'))
+      return 'Course Manager';
+    if (_userRoles.contains('ROLE_LEARNER') || _userRoles.contains('LEARNER'))
+      return 'Learner';
     return 'Staff';
   }
 
@@ -135,21 +152,24 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
       if (!mounted) return;
       setState(() {
         _notifications = _notifications
-            .map((n) => n.id == notification.id
-                ? NotificationItem(
-                    id: n.id,
-                    type: n.type,
-                    title: n.title,
-                    message: n.message,
-                    courseId: n.courseId,
-                    courseTitle: n.courseTitle,
-                    read: true,
-                    createdAt: n.createdAt,
-                  )
-                : n)
+            .map(
+              (n) => n.id == notification.id
+                  ? NotificationItem(
+                      id: n.id,
+                      type: n.type,
+                      title: n.title,
+                      message: n.message,
+                      courseId: n.courseId,
+                      courseTitle: n.courseTitle,
+                      read: true,
+                      createdAt: n.createdAt,
+                    )
+                  : n,
+            )
             .toList();
-        _unreadNotificationCount =
-            _unreadNotificationCount > 0 ? _unreadNotificationCount - 1 : 0;
+        _unreadNotificationCount = _unreadNotificationCount > 0
+            ? _unreadNotificationCount - 1
+            : 0;
       });
     } catch (_) {}
   }
@@ -160,16 +180,18 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
       if (!mounted) return;
       setState(() {
         _notifications = _notifications
-            .map((n) => NotificationItem(
-                  id: n.id,
-                  type: n.type,
-                  title: n.title,
-                  message: n.message,
-                  courseId: n.courseId,
-                  courseTitle: n.courseTitle,
-                  read: true,
-                  createdAt: n.createdAt,
-                ))
+            .map(
+              (n) => NotificationItem(
+                id: n.id,
+                type: n.type,
+                title: n.title,
+                message: n.message,
+                courseId: n.courseId,
+                courseTitle: n.courseTitle,
+                read: true,
+                createdAt: n.createdAt,
+              ),
+            )
             .toList();
         _unreadNotificationCount = 0;
       });
@@ -207,54 +229,34 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
       return;
     }
 
-    if (_userRoles.contains('ROLE_COURSE_MANAGER') || _userRoles.contains('COURSE_MANAGER')) {
+    if (_userRoles.contains('ROLE_COURSE_MANAGER') ||
+        _userRoles.contains('COURSE_MANAGER')) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-            builder: (context) => const CourseManagerMyInformationPage()),
+          builder: (context) => const CourseManagerMyInformationPage(),
+        ),
       );
-    } else if (_userRoles.contains('ROLE_TRAINER') || _userRoles.contains('TRAINER')) {
+    } else if (_userRoles.contains('ROLE_TRAINER') ||
+        _userRoles.contains('TRAINER')) {
       final onboardingService = TrainerOnboardingService();
       final res = await onboardingService.getTrainerProfile();
       if (res['success'] == true) {
-        final data = res['data'] ?? {};
-        final status = (data['status'] ?? '').toString().toUpperCase();
-        final agreementSigned = data['agreementSigned'] ?? false;
-        final trainerType = data['trainerType'];
+        final data = Map<String, dynamic>.from(res['data'] ?? const {});
+        final stage = resolveTrainerOnboardingStage(data);
 
-        if (status == 'ONBOARDING' || status == 'DRAFT' || status == 'REJECTED' || status == 'PENDING_VERIFICATION' || status.isEmpty) {
+        if (stage != TrainerOnboardingStage.complete) {
           if (mounted) {
-            Widget initialBody;
-            if (trainerType == null) {
-              initialBody = const TrainerTypeSelectionPage(isEmbedded: true);
-            } else if (agreementSigned != true) {
-              initialBody = TrainerOnboardingAgreementPage(
-                profilePayload: data,
-                trainerType: trainerType,
-                isEmbedded: true,
-              );
-            } else {
-              initialBody = TrainerOnboardingDetailsPage(initialProfile: data, isEmbedded: true);
-            }
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => TrainerOnboardingShellPage(
-                  initialBody: initialBody,
-                ),
-              ),
+            final initialBody = buildTrainerOnboardingStagePage(
+              data,
+              isEmbedded: true,
             );
-          }
-          return;
-        } else if (status == 'AWAITING_APPROVAL' || status == 'PENDING_REVIEW' || status == 'SUSPENDED') {
-          if (mounted) {
+
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => TrainerOnboardingShellPage(
-                  initialBody: TrainerOnboardingStatusPage(initialProfile: data, isEmbedded: true),
-                ),
+                builder: (context) =>
+                    TrainerOnboardingShellPage(initialBody: initialBody),
               ),
             );
           }
@@ -285,7 +287,9 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
           if (widget.isMobile) ...[
             IconButton(
               icon: const Icon(Icons.menu, color: Color(0xFF64748B)),
-              onPressed: widget.onMenuPressed ?? () => Scaffold.of(context).openDrawer(),
+              onPressed:
+                  widget.onMenuPressed ??
+                  () => Scaffold.of(context).openDrawer(),
             ),
             const SizedBox(width: 8),
           ],
@@ -294,7 +298,9 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
               onTap: () {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+                  MaterialPageRoute(
+                    builder: (context) => const LearnerHomePage(),
+                  ),
                   (route) => false,
                 );
               },
@@ -348,7 +354,8 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                 offset: const Offset(0, 50),
                 color: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 onOpened: _loadNotifications,
                 icon: const Icon(
                   Icons.notifications_none_outlined,
@@ -370,7 +377,9 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
                                 child: Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -408,7 +417,8 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                                   child: Padding(
                                     padding: EdgeInsets.all(16.0),
                                     child: CircularProgressIndicator(
-                                        color: Color(0xFF20B486)),
+                                      color: Color(0xFF20B486),
+                                    ),
                                   ),
                                 )
                               else if (_notifications.isEmpty)
@@ -417,7 +427,9 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                                     padding: EdgeInsets.all(24.0),
                                     child: Text(
                                       'No notifications',
-                                      style: TextStyle(color: Color(0xFF64748B)),
+                                      style: TextStyle(
+                                        color: Color(0xFF64748B),
+                                      ),
                                     ),
                                   ),
                                 )
@@ -429,8 +441,10 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                                     itemBuilder: (context, index) {
                                       final notif = _notifications[index];
                                       return ListTile(
-                                        contentPadding: const EdgeInsets.symmetric(
-                                            horizontal: 8),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
                                         leading: CircleAvatar(
                                           backgroundColor: notif.read
                                               ? const Color(0xFFF1F5F9)
@@ -456,8 +470,9 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                                         subtitle: Text(
                                           '${notif.message}\n${_formatNotificationTime(notif.createdAt)}',
                                           style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Color(0xFF64748B)),
+                                            fontSize: 12,
+                                            color: Color(0xFF64748B),
+                                          ),
                                         ),
                                         onTap: () {
                                           _markNotificationAsRead(notif);
@@ -480,13 +495,19 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                   top: 4,
                   right: 4,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.redAccent,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.white, width: 1.5),
                     ),
-                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
                     alignment: Alignment.center,
                     child: Text(
                       _unreadNotificationCount > 99
@@ -514,19 +535,27 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
             },
             offset: const Offset(0, 56),
             color: Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'profile',
                 child: Row(
                   children: const [
-                    Icon(Icons.person_outline,
-                        size: 18, color: Color(0xFF64748B)),
+                    Icon(
+                      Icons.person_outline,
+                      size: 18,
+                      color: Color(0xFF64748B),
+                    ),
                     SizedBox(width: 10),
-                    Text('My Profile',
-                        style: TextStyle(
-                            fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
+                    Text(
+                      'My Profile',
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -537,11 +566,14 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                   children: const [
                     Icon(Icons.logout, size: 18, color: Colors.redAccent),
                     SizedBox(width: 10),
-                    Text('Logout',
-                        style: TextStyle(
-                            fontFamily: 'Outfit',
-                            color: Colors.redAccent,
-                            fontWeight: FontWeight.w500)),
+                    Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -588,7 +620,9 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                       const SizedBox(height: 2),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFE6F7F2),
                           borderRadius: BorderRadius.circular(4),

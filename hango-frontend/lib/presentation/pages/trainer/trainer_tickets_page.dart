@@ -710,7 +710,7 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final msg = _ticket!.messages[index];
-        final isStaff = msg.senderRole == 'ADMINISTRATOR' || msg.senderRole == 'COURSE_MANAGER';
+        final isStaff = msg.senderRole == 'ADMINISTRATOR';
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(

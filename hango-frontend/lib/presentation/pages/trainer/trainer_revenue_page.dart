@@ -374,8 +374,8 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                   icon: Icons.account_balance_outlined,
                   title: isVi ? '2. Thuế thu nhập cá nhân (10% PIT Tax)' : '2. Personal Income Tax (10% PIT)',
                   content: isVi
-                      ? '• Khấu trừ 10% Thuế TNCN tại nguồn theo quy định pháp luật (Thông tư 111/2013/TT-BTC).\n• Công thức: Thu nhập thực nhận = Doanh thu thô x (1 - 10%).'
-                      : '• Mandatory 10% Personal Income Tax deducted at source per VN Tax Laws.\n• Formula: Net Payout = Gross Earnings x 90%.',
+                      ? '• Khấu trừ 10% Thuế TNCN tại nguồn theo quy định pháp luật (căn cứ theo điểm i khoản 1 Điều 25 của Thông tư 111/2013/TT-BTC do Bộ Tài chính ban hành).\n• Công thức: Thu nhập thực nhận = Doanh thu thô x (1 - 10%).'
+                      : '• Mandatory 10% Personal Income Tax deducted at source per Point i Clause 1 Article 25 of Circular 111/2013/TT-BTC issued by Ministry of Finance.\n• Formula: Net Payout = Gross Earnings x 90%.',
                 ),
                 const SizedBox(height: 16),
                 _buildPolicyRow(

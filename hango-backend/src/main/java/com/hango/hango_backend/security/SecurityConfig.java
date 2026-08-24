@@ -61,6 +61,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Các endpoint công khai của hệ thống
+                        .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/v1/exams", "/api/v1/exams/**").permitAll()
                         .requestMatchers("/api/v1/courses", "/api/v1/courses/**").permitAll()

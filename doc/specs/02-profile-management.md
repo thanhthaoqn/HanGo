@@ -5,7 +5,7 @@
 > ⚠️ **Cập nhật 2026-08-10:** `ProfileUpdateRequest` vẫn **không có** annotation validation nào (`@Valid`/`@NotBlank`/`@Size`) — vẫn mở, chưa sửa. "View Learning History" (FR-PROF-04) hiện được phục vụ qua endpoint danh sách Course có `filterType=ENROLLED|IN_PROGRESS|COMPLETED`, **không phải** một API "learning-profile" tổng hợp riêng như bản trước mô tả.
 
 ## 1. Business Context
-Profile Management cho mọi role đã đăng nhập xem/sửa thông tin cá nhân và đổi mật khẩu. Learner có thêm "View Learning History". Trainer có thêm "View Trainer Public Profile" (bio, kinh nghiệm, danh sách Course) — mức độ công khai thật sự (Guest xem được hay chỉ user đã login) **chưa xác nhận độc lập** ở đợt audit này, cần kiểm tra route cụ thể trước khi coi là hoàn tất.
+Profile Management cho mọi role đã đăng nhập xem/sửa thông tin cá nhân và đổi mật khẩu. Learner có thêm "View Learning History". Trainer có thêm "View Trainer Public Profile" (bio, chứng chỉ, danh sách Course) — mức độ công khai thật sự (Guest xem được hay chỉ user đã login) **chưa xác nhận độc lập** ở đợt audit này, cần kiểm tra route cụ thể trước khi coi là hoàn tất.
 
 ## 2. Acceptance Criteria
 
@@ -13,7 +13,7 @@ Profile Management cho mọi role đã đăng nhập xem/sửa thông tin cá nh
 - [ ] Giao diện xem/sửa profile cho mọi role (họ tên, avatar, số điện thoại, giới tính, ngày sinh, địa chỉ).
 - [ ] Đổi mật khẩu (yêu cầu mật khẩu hiện tại + xác nhận mật khẩu mới).
 - [ ] Learner: "My Learning" hiển thị danh sách Course theo trạng thái (Enrolled/In Progress/Completed) + lịch sử Exam attempt.
-- [ ] Trainer: `trainer_profile_page.dart` — 4 tab (Personal Info, CV & Experience, Bank Account, Security).
+- [ ] Trainer: `trainer_profile_page.dart` — 4 tab (Personal Info, Bio & Credentials, Bank Account, Security).
 
 **Backend (Spring Boot):**
 - [ ] `GET /api/v1/users/me`, `PUT /api/v1/users/me` (không có `@PreAuthorize`, tự check `@AuthenticationPrincipal == null`).

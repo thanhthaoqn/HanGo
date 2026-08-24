@@ -57,6 +57,8 @@ hango-backend/src/main/resources/application-local.properties
 # File backup dữ liệu hoặc log của MySQL
 *.sql
 !hango-backend/db/create_certificates_table.sql
+!hango-backend/db/trainer_profile_expand_20260823.sql
+!hango-backend/db/trainer_profile_contract_20260823.sql
 *.log
 
 # -------------------------------------------------------------------------
