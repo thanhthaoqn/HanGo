@@ -9,6 +9,7 @@ import '../domain/model/auth_session.dart';
 import '../domain/model/course.dart'; // Sử dụng duy nhất model Course này
 
 import '../domain/model/exam_models.dart';
+import '../domain/model/exam_import_error.dart';
 import '../domain/model/recommendation.dart';
 import '../domain/model/ai_pathway_models.dart';
 import '../presentation/pages/course_manager/question_bank/models/course_manager_question.dart';
@@ -21,6 +22,19 @@ class ApiFailure implements Exception {
 
   @override
   String toString() => statusCode != null ? '$message ($statusCode)' : message;
+}
+
+/// Thrown by [HangoApi.importExamExcel] when the backend rejects the file
+/// with a structured list of row/field-level validation errors (as opposed
+/// to a network failure or auth error, which still throw [ApiFailure]).
+class ExamImportValidationFailure implements Exception {
+  const ExamImportValidationFailure(this.message, this.errors);
+
+  final String message;
+  final List<ExamImportError> errors;
+
+  @override
+  String toString() => message;
 }
 
 class HangoApi {
@@ -411,6 +425,15 @@ class HangoApi {
         ? null
         : jsonDecode(utf8.decode(response.bodyBytes));
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (body is Map<String, dynamic> && body['errors'] is List) {
+        final errors = (body['errors'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(ExamImportError.fromJson)
+            .toList();
+        if (errors.isNotEmpty) {
+          throw ExamImportValidationFailure(_errorMessage(body), errors);
+        }
+      }
       throw ApiFailure(_errorMessage(body), statusCode: response.statusCode);
     }
     return body as Map<String, dynamic>;
