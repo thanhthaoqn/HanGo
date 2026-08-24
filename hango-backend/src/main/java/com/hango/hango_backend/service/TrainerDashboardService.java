@@ -8,6 +8,10 @@ import com.hango.hango_backend.entity.SystemParameter;
 public interface TrainerDashboardService {
     TrainerDashboardSummaryDTO getTrainerDashboardSummary(String email);
     TrainerCoursesResponseDTO getTrainerCourses(String email, String status, String search, String sortBy, String timePeriod);
+    
+    List<com.hango.hango_backend.dto.DailyRevenueDTO> getWeeklyRevenue(String email, int weekOffset);
+    List<com.hango.hango_backend.dto.MonthlyRevenueDTO> getMonthlyRevenue(String email, int year);
+    
     void createTrainerCourse(String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request);
     List<SystemParameter> getSystemParametersByType(String paramType);
     Long updateTrainerCourse(Long id, String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request);

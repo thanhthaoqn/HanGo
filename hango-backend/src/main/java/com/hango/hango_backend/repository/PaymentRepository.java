@@ -46,6 +46,24 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
            nativeQuery = true)
     List<Object[]> getRevenueByMonthForCurrentYear(@org.springframework.data.repository.query.Param("trainerId") Long trainerId);
 
+    @org.springframework.data.jpa.repository.Query(value = "SELECT MONTH(p.created_at) as month, SUM(p.amount) as revenue " +
+                   "FROM payments p " +
+                   "JOIN courses c ON p.course_id = c.id " +
+                   "WHERE c.created_by = :trainerId AND p.status = 'SUCCESS' " +
+                   "AND YEAR(p.created_at) = :year " +
+                   "GROUP BY MONTH(p.created_at)", 
+           nativeQuery = true)
+    List<Object[]> getRevenueByMonthForYear(@org.springframework.data.repository.query.Param("trainerId") Long trainerId, @org.springframework.data.repository.query.Param("year") int year);
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT DATE(p.created_at) as date, SUM(p.amount) as revenue " +
+                   "FROM payments p " +
+                   "JOIN courses c ON p.course_id = c.id " +
+                   "WHERE c.created_by = :trainerId AND p.status = 'SUCCESS' " +
+                   "AND p.created_at >= :startDate AND p.created_at < :endDate " +
+                   "GROUP BY DATE(p.created_at)", 
+           nativeQuery = true)
+    List<Object[]> getRevenueByDay(@org.springframework.data.repository.query.Param("trainerId") Long trainerId, @org.springframework.data.repository.query.Param("startDate") java.time.LocalDateTime startDate, @org.springframework.data.repository.query.Param("endDate") java.time.LocalDateTime endDate);
+
     List<Payment> findByCourseCreatorIdAndStatus(Long creatorId, String status);
 
     @Query(value = "SELECT p.trainer_earnings, p.amount, p.settlement_status, p.created_at " +

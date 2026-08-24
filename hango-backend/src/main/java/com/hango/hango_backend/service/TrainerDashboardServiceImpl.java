@@ -238,6 +238,72 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<com.hango.hango_backend.dto.DailyRevenueDTO> getWeeklyRevenue(String email, int weekOffset) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        Long trainerId = user.getId();
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        // Determine Monday of the target week
+        int currentDayOfWeek = today.getDayOfWeek().getValue(); // 1 (Monday) to 7 (Sunday)
+        java.time.LocalDate startOfWeek = today.minusDays(currentDayOfWeek - 1).plusWeeks(weekOffset);
+        java.time.LocalDateTime startDate = startOfWeek.atStartOfDay();
+        java.time.LocalDateTime endDate = startOfWeek.plusDays(7).atStartOfDay();
+
+        List<Object[]> rawRevenues = paymentRepository.getRevenueByDay(trainerId, startDate, endDate);
+        
+        List<com.hango.hango_backend.dto.DailyRevenueDTO> weeklyRevenues = new ArrayList<>();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        java.time.format.DateTimeFormatter dayFormatter = java.time.format.DateTimeFormatter.ofPattern("EEE");
+
+        for (int i = 0; i < 7; i++) {
+            java.time.LocalDate date = startOfWeek.plusDays(i);
+            weeklyRevenues.add(com.hango.hango_backend.dto.DailyRevenueDTO.builder()
+                    .date(date.format(formatter))
+                    .dayOfWeek(date.format(dayFormatter))
+                    .revenue(java.math.BigDecimal.ZERO)
+                    .build());
+        }
+
+        for (Object[] row : rawRevenues) {
+            String dateStr = row[0].toString();
+            java.math.BigDecimal rev = new java.math.BigDecimal(row[1].toString());
+            
+            for (com.hango.hango_backend.dto.DailyRevenueDTO dto : weeklyRevenues) {
+                if (dto.getDate().equals(dateStr)) {
+                    dto.setRevenue(rev);
+                    break;
+                }
+            }
+        }
+
+        return weeklyRevenues;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.hango.hango_backend.dto.MonthlyRevenueDTO> getMonthlyRevenue(String email, int year) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        Long trainerId = user.getId();
+
+        List<Object[]> rawRevenues = paymentRepository.getRevenueByMonthForYear(trainerId, year);
+        List<com.hango.hango_backend.dto.MonthlyRevenueDTO> monthlyRevenues = new ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            monthlyRevenues.add(new com.hango.hango_backend.dto.MonthlyRevenueDTO(i, java.math.BigDecimal.ZERO));
+        }
+        for (Object[] row : rawRevenues) {
+            int month = ((Number) row[0]).intValue();
+            java.math.BigDecimal rev = new java.math.BigDecimal(row[1].toString());
+            if (month >= 1 && month <= 12) {
+                monthlyRevenues.get(month - 1).setRevenue(rev);
+            }
+        }
+        return monthlyRevenues;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public TrainerCoursesResponseDTO getTrainerCourses(String email, String status, String search, String sortBy,
             String timePeriod) {
         User user = userRepository.findByEmail(email)
