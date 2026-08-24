@@ -547,6 +547,10 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!widget.isReadOnly) ...[
+                _buildUsageTypeDropdown(),
+                const SizedBox(height: 16),
+              ],
               for (int i = 0; i < _groups.length; i++) ...[
                 _buildGroupBlock(i),
                 const SizedBox(height: 32),
@@ -1257,6 +1261,54 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           fontFamily: 'Outfit',
         ),
       ),
+    );
+  }
+  Widget _buildUsageTypeDropdown() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        const Text(
+          'Usage Type: ',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E293B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _usageType,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.w500,
+              ),
+              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 18),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Quiz Only')),
+                DropdownMenuItem(value: 2, child: Text('Exam Only')),
+                DropdownMenuItem(value: 3, child: Text('Both (Quiz & Exam)')),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _usageType = val);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

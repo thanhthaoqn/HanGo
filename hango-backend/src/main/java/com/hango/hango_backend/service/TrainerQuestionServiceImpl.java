@@ -63,11 +63,11 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         String usageTypeCondition = "";
         if (usageType != null) {
             if (usageType == 1) {
-                usageTypeCondition = "AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY') ";
+                usageTypeCondition = " AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY' OR q.usage_type = '3' OR q.usage_type = 'BOTH') ";
             } else if (usageType == 2) {
-                usageTypeCondition = "AND (q.usage_type = '2' OR q.usage_type = 'EXAM_ONLY') ";
+                usageTypeCondition = " AND (q.usage_type = '2' OR q.usage_type = 'EXAM_ONLY' OR q.usage_type = '3' OR q.usage_type = 'BOTH') ";
             } else if (usageType == 3) {
-                usageTypeCondition = "AND (q.usage_type = '3' OR q.usage_type = 'BOTH') ";
+                usageTypeCondition = " AND (q.usage_type = '3' OR q.usage_type = 'BOTH') ";
             }
         }
 
