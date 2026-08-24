@@ -59,7 +59,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
   @override
   void initState() {
     super.initState();
-    _loadQuizQuestions(0);
+    _fetchInitialQuestions();
     _loadSkills();
   }
 
@@ -101,18 +101,17 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
   }
 
-  // Load Paginated Questions associated with this Quiz Lesson
-  Future<void> _loadQuizQuestions(int page) async {
+  // Load all Questions associated with this Quiz Lesson into local state
+  Future<void> _fetchInitialQuestions() async {
     setState(() {
       _isLoadingQuestions = true;
-      _currentPage = page;
     });
 
     try {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      final uri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=$page&size=$_pageSize');
+      final uri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=0&size=999');
       final response = await http.get(
         uri,
         headers: {
@@ -125,8 +124,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         setState(() {
           _quizQuestions = data['content'] as List<dynamic>;
-          _totalElements = data['totalElements'] as int;
-          _totalPages = data['totalPages'] as int;
+          _updatePagination();
           _isLoadingQuestions = false;
         });
       } else {
@@ -144,106 +142,106 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
   }
 
-  // Associate new questions to this quiz
-  Future<void> _associateQuestionsToQuiz(List<int> newQuestionIds, List<int> newGroupIds) async {
-    try {
-      final token = await _authService.getToken();
-      if (token == null) return;
-
-      // 1. Fetch all existing question IDs associated with the quiz
-      final getUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=0&size=999');
-      final getRes = await http.get(
-        getUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      List<int> currentIds = [];
-      if (getRes.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(getRes.bodyBytes));
-        final list = data['content'] as List<dynamic>;
-        currentIds = list.map((q) => q['id'] as int).toList();
-      }
-
-      for (var id in newQuestionIds) {
-        if (!currentIds.contains(id)) {
-          currentIds.add(id);
-        }
-      }
-
-      // 2. Save the updated list back to the lesson
-      final postUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions');
-      final postRes = await http.post(
-        postUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'questionIds': currentIds,
-          'groupIds': newGroupIds,
-        }),
-      );
-
-      if (postRes.statusCode == 200) {
-        _loadQuizQuestions(0);
-      } else {
-        ToastHelper.showError(context, 'Failed to associate new questions to quiz.');
-      }
-    } catch (e) {
-      debugPrint('Error associating questions: $e');
+  void _updatePagination() {
+    _totalElements = _quizQuestions.length;
+    _totalPages = (_totalElements / _pageSize).ceil();
+    if (_currentPage >= _totalPages && _totalPages > 0) {
+      _currentPage = _totalPages - 1;
     }
   }
 
-  // Delete question association from this quiz
-  Future<void> _deleteQuestionFromQuiz(int questionId) async {
+  // Add selected questions to local state (Draft Mode)
+  Future<void> _associateQuestionsToQuiz(List<int> newQuestionIds, List<int> newGroupIds, [List<dynamic>? sourceBankQuestions]) async {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      // 1. Fetch all existing question IDs
-      final getUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=0&size=999');
-      final getRes = await http.get(
-        getUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      setState(() {
+        _isLoadingQuestions = true;
+      });
 
-      List<int> currentIds = [];
-      if (getRes.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(getRes.bodyBytes));
-        final list = data['content'] as List<dynamic>;
-        currentIds = list.map((q) => q['id'] as int).toList();
+      List<dynamic> newQuestionsToAdd = [];
+
+      // Fetch details for normal questions
+      for (var id in newQuestionIds) {
+        // Skip if already in the list
+        if (_quizQuestions.any((q) => q['id'] == id)) continue;
+
+        final sourceQ = sourceBankQuestions?.firstWhere((q) => q['id'] == id, orElse: () => null);
+
+        final uri = Uri.parse('$apiBaseUrl/trainer/question-bank/detail/$id?isGroup=false');
+        final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+        if (res.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          final subQs = data['subQuestions'] as List<dynamic>? ?? [];
+          final sub = subQs.isNotEmpty ? subQs[0] : {};
+
+          final formattedQ = {
+            'id': data['id'],
+            'questionText': sub['questionText'] ?? '',
+            'explanation': sub['explanation'] ?? data['explanation'],
+            'categoryName': sourceQ?['categoryName'] ?? 'Single Choice',
+            'difficultyName': sourceQ?['difficultyName'] ?? '',
+            'skillName': sourceQ?['skillName'] ?? '',
+            'options': sub['options'] ?? [],
+          };
+          newQuestionsToAdd.add(formattedQ);
+        }
       }
 
-      currentIds.remove(questionId);
-
-      // 2. Save the updated list back to the quiz
-      final postUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions');
-      final postRes = await http.post(
-        postUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'questionIds': currentIds,
-        }),
-      );
-
-      if (postRes.statusCode == 200) {
-        ToastHelper.showSuccess(context, 'Question removed from quiz.');
-        _loadQuizQuestions(0);
-      } else {
-        ToastHelper.showError(context, 'Failed to remove question.');
+      // Fetch details for group questions (expand sub-questions)
+      for (var gId in newGroupIds) {
+        final sourceQ = sourceBankQuestions?.firstWhere((q) => q['id'] == gId, orElse: () => null);
+        
+        final uri = Uri.parse('$apiBaseUrl/trainer/question-bank/detail/$gId?isGroup=true');
+        final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+        if (res.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          final subQs = data['subQuestions'] as List<dynamic>? ?? [];
+          for (var sub in subQs) {
+            // Skip if already in the list
+            if (_quizQuestions.any((q) => q['id'] == sub['id'])) continue;
+            
+            final formattedQ = {
+              'id': sub['id'],
+              'questionText': sub['questionText'],
+              'explanation': sub['explanation'],
+              'categoryName': sourceQ?['categoryName'] ?? 'Reading Comprehension', 
+              'difficultyName': sourceQ?['difficultyName'] ?? '',
+              'groupId': data['id'],
+              'passageText': data['passageText'],
+              'skillName': sourceQ?['skillName'] ?? '',
+              'groupTypeName': sourceQ?['groupTypeName'] ?? '',
+              'options': sub['options'] ?? [],
+            };
+            newQuestionsToAdd.add(formattedQ);
+          }
+        }
       }
+
+      setState(() {
+        _quizQuestions.addAll(newQuestionsToAdd);
+        _updatePagination();
+        _isLoadingQuestions = false;
+      });
+
+      ToastHelper.showSuccess(context, 'Added ${newQuestionsToAdd.length} questions to draft.');
+
     } catch (e) {
-      debugPrint('Error removing question: $e');
+      debugPrint('Error associating questions locally: $e');
+      setState(() {
+        _isLoadingQuestions = false;
+      });
     }
+  }
+
+  // Delete question association from local draft
+  Future<void> _deleteQuestionFromQuiz(int questionId) async {
+    setState(() {
+      _quizQuestions.removeWhere((q) => q['id'] == questionId);
+      _updatePagination();
+    });
+    ToastHelper.showSuccess(context, 'Question removed from draft.');
   }
 
   // Show dialog to add questions from Question Bank
@@ -655,7 +653,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         qIds.add(id);
                       }
                     }
-                    _associateQuestionsToQuiz(qIds, gIds);
+                    _associateQuestionsToQuiz(qIds, gIds, bankQuestions);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
@@ -947,7 +945,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         ToastHelper.showSuccess(ctx, 'Question updated successfully');
                         if (mounted) {
                           Navigator.pop(ctx);
-                          _loadQuizQuestions(_currentPage);
+                          _fetchInitialQuestions();
                         }
                       } else {
                         ToastHelper.showError(ctx, 'Failed to update question.');
@@ -1389,6 +1387,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
 
   Widget _buildMainContentCard() {
     final String activeSectionTitle = widget.sections[widget.sectionIndex]['title'] as String;
+    final displayList = _quizQuestions.skip(_currentPage * _pageSize).take(_pageSize).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -1478,9 +1477,9 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         : ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _quizQuestions.length,
+                            itemCount: displayList.length,
                             itemBuilder: (context, index) {
-                              final q = _quizQuestions[index];
+                              final q = displayList[index];
                               final int displayNum = (_currentPage * _pageSize) + index + 1;
                               final String text = q['questionText'] ?? '';
                               final String catName = q['categoryName'] ?? 'Single Choice';
@@ -1737,7 +1736,11 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_left, size: 20),
-                  onPressed: _currentPage > 0 ? () => _loadQuizQuestions(_currentPage - 1) : null,
+                  onPressed: _currentPage > 0 ? () {
+                    setState(() {
+                      _currentPage--;
+                    });
+                  } : null,
                 ),
                 Container(
                   width: 32,
@@ -1759,7 +1762,11 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_right, size: 20),
-                  onPressed: _currentPage < _totalPages - 1 ? () => _loadQuizQuestions(_currentPage + 1) : null,
+                  onPressed: _currentPage < _totalPages - 1 ? () {
+                    setState(() {
+                      _currentPage++;
+                    });
+                  } : null,
                 ),
               ],
             ),
@@ -1799,10 +1806,46 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
           const SizedBox(width: 12),
           ElevatedButton(
             onPressed: () async {
-              ToastHelper.showSuccess(context, 'Quiz questions saved successfully');
-              await widget.onSectionsChanged(widget.sections);
-              if (mounted) {
-                Navigator.pop(context);
+              try {
+                final token = await _authService.getToken();
+                if (token == null) return;
+
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))),
+                );
+
+                List<int> questionIds = _quizQuestions.map((q) => q['id'] as int).toList();
+
+                final postUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions');
+                final postRes = await http.post(
+                  postUri,
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: jsonEncode({
+                    'questionIds': questionIds,
+                  }),
+                );
+
+                if (mounted) Navigator.pop(context); // Close loading indicator
+
+                if (postRes.statusCode == 200) {
+                  ToastHelper.showSuccess(context, 'Quiz questions saved successfully');
+                  await widget.onSectionsChanged(widget.sections);
+                  if (mounted) {
+                    Navigator.pop(context); // Close the page
+                  }
+                } else {
+                  ToastHelper.showError(context, 'Failed to save quiz questions: ${postRes.body}');
+                }
+              } catch (e) {
+                if (mounted) Navigator.pop(context); // Close loading indicator
+                debugPrint('Error saving quiz questions: $e');
+                ToastHelper.showError(context, 'Error saving quiz questions.');
               }
             },
             style: ElevatedButton.styleFrom(
