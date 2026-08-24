@@ -54,7 +54,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         Long trainerId = user.getId();
 
         long learnersCount = enrollmentRepository.countDistinctStudentsByCourseCreatorId(trainerId);
-        long examsCount = examRepository.countByCreatedByIdAndDeletedAtIsNull(trainerId);
+        long salesCount = paymentRepository.countByCourseCreatorIdAndStatus(trainerId, "SUCCESS");
 
         java.math.BigDecimal totalRevenue = paymentRepository.sumRevenueByTrainerId(trainerId);
         if (totalRevenue == null) {
@@ -184,7 +184,6 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .timestamp(e.getEnrolledAt())
                     .build());
         }
-
         List<com.hango.hango_backend.entity.CourseRating> recentRatings = courseRatingRepository
                 .findTop20ByCourseCreatorIdOrderByCreatedAtDesc(trainerId);
         for (com.hango.hango_backend.entity.CourseRating r : recentRatings) {
@@ -227,13 +226,79 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         return TrainerDashboardSummaryDTO.builder()
                 .coursesCount(coursesCount)
                 .learnersCount(learnersCount)
-                .examsCount(examsCount)
+                .salesCount(salesCount)
                 .totalRevenue(totalRevenue)
                 .averageRating(averageRating)
                 .courses(courses)
                 .recentActivities(recentActivities)
                 .monthlyRevenues(monthlyRevenues)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.hango.hango_backend.dto.DailyRevenueDTO> getWeeklyRevenue(String email, int weekOffset) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        Long trainerId = user.getId();
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        // Determine Monday of the target week
+        int currentDayOfWeek = today.getDayOfWeek().getValue(); // 1 (Monday) to 7 (Sunday)
+        java.time.LocalDate startOfWeek = today.minusDays(currentDayOfWeek - 1).plusWeeks(weekOffset);
+        java.time.LocalDateTime startDate = startOfWeek.atStartOfDay();
+        java.time.LocalDateTime endDate = startOfWeek.plusDays(7).atStartOfDay();
+
+        List<Object[]> rawRevenues = paymentRepository.getRevenueByDay(trainerId, startDate, endDate);
+        
+        List<com.hango.hango_backend.dto.DailyRevenueDTO> weeklyRevenues = new ArrayList<>();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        java.time.format.DateTimeFormatter dayFormatter = java.time.format.DateTimeFormatter.ofPattern("EEE");
+
+        for (int i = 0; i < 7; i++) {
+            java.time.LocalDate date = startOfWeek.plusDays(i);
+            weeklyRevenues.add(com.hango.hango_backend.dto.DailyRevenueDTO.builder()
+                    .date(date.format(formatter))
+                    .dayOfWeek(date.format(dayFormatter))
+                    .revenue(java.math.BigDecimal.ZERO)
+                    .build());
+        }
+
+        for (Object[] row : rawRevenues) {
+            String dateStr = row[0].toString();
+            java.math.BigDecimal rev = new java.math.BigDecimal(row[1].toString());
+            
+            for (com.hango.hango_backend.dto.DailyRevenueDTO dto : weeklyRevenues) {
+                if (dto.getDate().equals(dateStr)) {
+                    dto.setRevenue(rev);
+                    break;
+                }
+            }
+        }
+
+        return weeklyRevenues;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.hango.hango_backend.dto.MonthlyRevenueDTO> getMonthlyRevenue(String email, int year) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        Long trainerId = user.getId();
+
+        List<Object[]> rawRevenues = paymentRepository.getRevenueByMonthForYear(trainerId, year);
+        List<com.hango.hango_backend.dto.MonthlyRevenueDTO> monthlyRevenues = new ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            monthlyRevenues.add(new com.hango.hango_backend.dto.MonthlyRevenueDTO(i, java.math.BigDecimal.ZERO));
+        }
+        for (Object[] row : rawRevenues) {
+            int month = ((Number) row[0]).intValue();
+            java.math.BigDecimal rev = new java.math.BigDecimal(row[1].toString());
+            if (month >= 1 && month <= 12) {
+                monthlyRevenues.get(month - 1).setRevenue(rev);
+            }
+        }
+        return monthlyRevenues;
     }
 
     @Override
@@ -1351,6 +1416,63 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setPrice(calculatedPrice);
         course.setSuggestedPrice(calculatedPrice);
         courseRepository.save(course);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Long getTrainerIdByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        return user.getId();
+    }
+
+    @Override
+    @Transactional
+    public void seedMockPayments(Long trainerId) {
+        // Find courses by trainer
+        List<com.hango.hango_backend.entity.Course> courses = courseRepository.findByCreatorIdAndDeletedAtIsNull(trainerId);
+        if (courses.isEmpty()) return;
+
+        // Find some learners
+        List<User> learners = userRepository.findAll().stream()
+                .filter(u -> u.getRoles().stream().anyMatch(r -> "LEARNER".equals(r.getRoleName())))
+                .limit(10)
+                .collect(Collectors.toList());
+        if (learners.isEmpty()) learners = userRepository.findAll();
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.util.Random rand = new java.util.Random();
+
+        java.math.BigDecimal splitRatio = new java.math.BigDecimal("0.7"); // default TEACHER
+        User trainer = userRepository.findById(trainerId).orElse(null);
+        if (trainer != null && trainer.getRoles().stream().anyMatch(r -> "TUTOR".equalsIgnoreCase(r.getRoleName()))) {
+            splitRatio = new java.math.BigDecimal("0.6");
+        }
+
+        for (int i = 0; i < 50; i++) {
+            com.hango.hango_backend.entity.Course c = courses.get(rand.nextInt(courses.size()));
+            User learner = learners.get(rand.nextInt(learners.size()));
+            
+            java.math.BigDecimal price = c.getPrice() != null ? c.getPrice() : new java.math.BigDecimal("500000");
+            java.math.BigDecimal trainerEarnings = price.multiply(splitRatio);
+            java.math.BigDecimal platformFee = price.subtract(trainerEarnings);
+
+            int daysAgo = rand.nextInt(28);
+            java.time.LocalDateTime createdAt = now.minusDays(daysAgo).minusHours(rand.nextInt(24));
+            String txnRef = "MOCK-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+
+            paymentRepository.insertMockPayment(
+                price,
+                createdAt,
+                "SUCCESS",
+                c.getId(),
+                learner.getId(),
+                trainerEarnings,
+                platformFee,
+                "PENDING",
+                txnRef
+            );
+        }
     }
 
 }

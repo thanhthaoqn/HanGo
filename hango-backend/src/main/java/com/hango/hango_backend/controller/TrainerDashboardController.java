@@ -250,6 +250,53 @@ public class TrainerDashboardController {
         }
     }
 
+    @PostMapping("/dashboard/seed")
+    public ResponseEntity<?> seedMockData(@RequestParam Long trainerId) {
+        try {
+            trainerDashboardService.seedMockPayments(trainerId);
+            return ResponseEntity.ok(java.util.Map.of("message", "Mock data seeded successfully for trainer: " + trainerId));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/revenue/weekly")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getWeeklyRevenue(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "0") int weekOffset) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            java.util.List<com.hango.hango_backend.dto.DailyRevenueDTO> revenue = trainerDashboardService
+                    .getWeeklyRevenue(userDetails.getUsername(), weekOffset);
+            return ResponseEntity.ok(revenue);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/revenue/monthly")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getMonthlyRevenue(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam int year) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            java.util.List<com.hango.hango_backend.dto.MonthlyRevenueDTO> revenue = trainerDashboardService
+                    .getMonthlyRevenue(userDetails.getUsername(), year);
+            return ResponseEntity.ok(revenue);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @GetMapping("/courses")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getTrainerCourses(

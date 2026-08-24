@@ -13,7 +13,7 @@ import java.util.List;
 public class TrainerDashboardSummaryDTO {
     private long coursesCount;
     private long learnersCount;
-    private long examsCount;
+    private long salesCount;
     private java.math.BigDecimal totalRevenue;
     private Double averageRating;
     private List<TrainerCourseDTO> courses;
