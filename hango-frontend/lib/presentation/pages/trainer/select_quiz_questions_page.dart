@@ -176,14 +176,21 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
           final subQs = data['subQuestions'] as List<dynamic>? ?? [];
           final sub = subQs.isNotEmpty ? subQs[0] : {};
 
+          final skillId = sub['skillParamId'] ?? data['skillParamId'];
+          final difficultyId = sub['difficultyId'] ?? data['difficultyId'];
+          final skillObj = _skillsList.firstWhere((s) => s['id'] == skillId, orElse: () => null);
+          final difficultyObj = _difficultyList.firstWhere((d) => d['id'] == difficultyId, orElse: () => null);
+
           final formattedQ = {
             'id': data['id'],
             'questionText': sub['questionText'] ?? '',
             'explanation': sub['explanation'] ?? data['explanation'],
             'categoryName': sourceQ?['categoryName'] ?? 'Single Choice',
-            'difficultyName': sourceQ?['difficultyName'] ?? '',
-            'skillName': sourceQ?['skillName'] ?? '',
+            'difficultyName': difficultyObj != null ? difficultyObj['paramValue'] : (sourceQ?['difficultyName'] ?? ''),
+            'skillName': skillObj != null ? skillObj['paramValue'] : (sourceQ?['skillName'] ?? ''),
             'options': sub['options'] ?? [],
+            'skillParamId': skillId,
+            'difficultyParamId': difficultyId,
           };
           newQuestionsToAdd.add(formattedQ);
         }
@@ -202,17 +209,31 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
             // Skip if already in the list
             if (_quizQuestions.any((q) => q['id'] == sub['id'])) continue;
             
+            final skillId = sub['skillParamId'];
+            final difficultyId = sub['difficultyId'] ?? data['difficultyId'];
+            final groupTypeId = data['categoryId']; // Backend puts groupTypeParamId in categoryId for groups
+
+            final skillObj = _skillsList.firstWhere((s) => s['id'] == skillId, orElse: () => null);
+            final difficultyObj = _difficultyList.firstWhere((d) => d['id'] == difficultyId, orElse: () => null);
+            final groupTypeObj = _groupTypesList.firstWhere((g) => g['id'] == groupTypeId, orElse: () => null);
+
             final formattedQ = {
               'id': sub['id'],
               'questionText': sub['questionText'],
               'explanation': sub['explanation'],
               'categoryName': sourceQ?['categoryName'] ?? 'Reading Comprehension', 
-              'difficultyName': sourceQ?['difficultyName'] ?? '',
+              'difficultyName': difficultyObj != null ? difficultyObj['paramValue'] : (sourceQ?['difficultyName'] ?? ''),
               'groupId': data['id'],
               'passageText': data['passageText'],
-              'skillName': sourceQ?['skillName'] ?? '',
-              'groupTypeName': sourceQ?['groupTypeName'] ?? '',
+              'skillName': skillObj != null ? skillObj['paramValue'] : (sourceQ?['skillName'] ?? ''),
+              'groupTypeName': groupTypeObj != null ? groupTypeObj['paramValue'] : (sourceQ?['groupTypeName'] ?? ''),
               'options': sub['options'] ?? [],
+              'skillParamId': skillId,
+              'difficultyParamId': difficultyId,
+              'questionGroup': {
+                'groupTypeParamId': groupTypeId,
+                'contextText': data['passageText'],
+              }
             };
             newQuestionsToAdd.add(formattedQ);
           }
@@ -678,19 +699,36 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     int? currentSkillParamId = q['skillParamId'] ?? (q['skillParam'] != null ? q['skillParam']['id'] : null);
     int? currentGroupTypeParamId = q['questionGroup'] != null ? (q['questionGroup']['groupTypeParamId'] ?? (q['questionGroup']['groupTypeParam'] != null ? q['questionGroup']['groupTypeParam']['id'] : null)) : null;
     int? currentDifficultyParamId = q['difficultyParamId'] ?? (q['difficultyParam'] != null ? q['difficultyParam']['id'] : null);
+    
+    if (currentSkillParamId != null && !_skillsList.any((s) => s['id'] == currentSkillParamId)) currentSkillParamId = null;
+    if (currentGroupTypeParamId != null && !_groupTypesList.any((g) => g['id'] == currentGroupTypeParamId)) currentGroupTypeParamId = null;
+    if (currentDifficultyParamId != null && !_difficultyList.any((d) => d['id'] == currentDifficultyParamId)) currentDifficultyParamId = null;
+
     bool isGrouped = q['passageText'] != null || q['questionGroup'] != null;
     
     List<String> options = [];
+    int correctIndex = 0;
     if (q['options'] != null) {
-      options = List<String>.from(q['options']);
+      final opts = q['options'] as List;
+      for (int i = 0; i < opts.length; i++) {
+        final o = opts[i];
+        if (o is Map) {
+          options.add(o['optionText']?.toString() ?? '');
+          if (o['isCorrect'] == true || o['correct'] == true) {
+            correctIndex = i;
+          }
+        } else {
+          options.add(o.toString());
+        }
+      }
     }
+    
     List<TextEditingController> optCtrls = options.map((o) => TextEditingController(text: o)).toList();
     if (optCtrls.isEmpty) {
       optCtrls.add(TextEditingController());
       optCtrls.add(TextEditingController());
     }
     
-    int correctIndex = q['correctIndex'] ?? 0;
     if (correctIndex >= optCtrls.length) correctIndex = 0;
     
     bool isSaving = false;
