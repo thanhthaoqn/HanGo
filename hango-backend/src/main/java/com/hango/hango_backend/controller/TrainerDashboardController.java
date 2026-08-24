@@ -54,7 +54,8 @@ public class TrainerDashboardController {
             return ResponseEntity.ok(java.util.Map.of("transcript", transcript));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
+            return ResponseEntity.badRequest()
+                    .body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
     }
 
@@ -88,8 +89,10 @@ public class TrainerDashboardController {
         try {
             byte[] workbook = courseImportService.buildTemplateWorkbook();
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Hango_Course_Import_Template.xlsx\"")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"Hango_Course_Import_Template.xlsx\"")
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(workbook);
         } catch (Exception e) {
             e.printStackTrace();
@@ -238,7 +241,8 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            TrainerDashboardSummaryDTO summary = trainerDashboardService.getTrainerDashboardSummary(userDetails.getUsername());
+            TrainerDashboardSummaryDTO summary = trainerDashboardService
+                    .getTrainerDashboardSummary(userDetails.getUsername());
             return ResponseEntity.ok(summary);
         } catch (Exception e) {
             e.printStackTrace();
@@ -274,7 +278,8 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            java.util.List<com.hango.hango_backend.dto.TrainerExamResponseDTO> response = trainerDashboardService.getTrainerExams(userDetails.getUsername());
+            java.util.List<com.hango.hango_backend.dto.TrainerExamResponseDTO> response = trainerDashboardService
+                    .getTrainerExams(userDetails.getUsername());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
@@ -310,7 +315,8 @@ public class TrainerDashboardController {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
             Long newId = trainerDashboardService.createTrainerExam(userDetails.getUsername(), request);
-            return ResponseEntity.ok("{\"id\": " + newId + ", \"message\": \"Exam created successfully in DRAFT status\"}");
+            return ResponseEntity
+                    .ok("{\"id\": " + newId + ", \"message\": \"Exam created successfully in DRAFT status\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -362,7 +368,8 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO response = trainerDashboardService.getExamQuestions(id, userDetails.getUsername());
+            com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO response = trainerDashboardService
+                    .getExamQuestions(id, userDetails.getUsername());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
@@ -407,7 +414,8 @@ public class TrainerDashboardController {
                 return ResponseEntity.badRequest().body("{\"error\": \"Visibility is required\"}");
             }
             trainerDashboardService.updateExamVisibility(id, userDetails.getUsername(), newVisibility.toUpperCase());
-            return ResponseEntity.ok("{\"message\": \"Exam visibility updated to " + newVisibility.toUpperCase() + "\"}");
+            return ResponseEntity
+                    .ok("{\"message\": \"Exam visibility updated to " + newVisibility.toUpperCase() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
