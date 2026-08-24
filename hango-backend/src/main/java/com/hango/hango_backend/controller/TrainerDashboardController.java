@@ -250,6 +250,17 @@ public class TrainerDashboardController {
         }
     }
 
+    @PostMapping("/dashboard/seed")
+    public ResponseEntity<?> seedMockData(@RequestParam Long trainerId) {
+        try {
+            trainerDashboardService.seedMockPayments(trainerId);
+            return ResponseEntity.ok(java.util.Map.of("message", "Mock data seeded successfully for trainer: " + trainerId));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @GetMapping("/revenue/weekly")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> getWeeklyRevenue(

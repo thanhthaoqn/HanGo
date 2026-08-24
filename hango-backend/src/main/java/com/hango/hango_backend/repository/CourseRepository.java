@@ -148,6 +148,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     boolean existsByTitleIgnoreCaseAndDeletedAtIsNull(String title);
 
     List<Course> findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(String code);
+    List<Course> findByCreatorIdAndDeletedAtIsNull(Long creatorId);
 
     List<Course> findByParentIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long parentId);
 

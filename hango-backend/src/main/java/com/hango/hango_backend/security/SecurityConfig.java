@@ -80,7 +80,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/payment/payos-webhook", "/api/v1/payment/vnpay-return").permitAll()
                         .requestMatchers("/api/v1/course-manager/**").permitAll()
                         .requestMatchers("/api/v1/payment/**").permitAll()
-                        .requestMatchers("/api/v1/trainer/statements/**", "/api/v1/trainer/revenue-summary").permitAll()
+                        .requestMatchers("/api/v1/trainer/statements/**", "/api/v1/trainer/revenue-summary", "/api/v1/trainer/dashboard/seed").permitAll()
 
                         .anyRequest().authenticated());
 

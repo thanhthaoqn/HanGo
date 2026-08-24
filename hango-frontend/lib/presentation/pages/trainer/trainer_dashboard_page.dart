@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../utils/config.dart';
@@ -29,10 +30,9 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   String _errorMessage = '';
 
   int _coursesCount = 0;
-  int _examsCount = 0;
+  int _salesCount = 0;
   int _learnersCount = 0;
   double _totalRevenue = 0.0;
-  double _averageRating = 0.0;
   List<dynamic> _coursesList = [];
   List<dynamic> _recentActivities = [];
   
@@ -99,9 +99,8 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         setState(() {
           _coursesCount = (data['coursesCount'] ?? 0) as int;
           _learnersCount = (data['learnersCount'] ?? 0) as int;
-          _examsCount = (data['examsCount'] ?? 0) as int;
+          _salesCount = (data['salesCount'] ?? 0) as int;
           _totalRevenue = (data['totalRevenue'] ?? 0.0).toDouble();
-          _averageRating = (data['averageRating'] ?? 0.0).toDouble();
           _coursesList = data['courses'] ?? [];
           _recentActivities = data['recentActivities'] ?? [];
           _isLoading = false;
@@ -183,9 +182,8 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     setState(() {
       _coursesCount = 12;
       _learnersCount = 428;
-      _examsCount = 5;
+      _salesCount = 50;
       _totalRevenue = 15000000.0;
-      _averageRating = 4.8;
       _coursesList = [
         {'id': 1, 'title': 'IELTS Intensive 7.0+', 'learnersCount': 120, 'lessonsCount': 24, 'thumbnailUrl': null},
         {'id': 2, 'title': 'Business English Advanced', 'learnersCount': 85, 'lessonsCount': 16, 'thumbnailUrl': null},
@@ -276,10 +274,21 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                 ),
               ),
               if (isDesktop) const SizedBox(width: 24),
-              if (isDesktop) Expanded(flex: 1, child: _buildRecentActivitySection()),
+              if (isDesktop) Expanded(flex: 1, child: Column(
+                children: [
+                  _buildRecentActivitySection(),
+                  const SizedBox(height: 24),
+                  _buildRevenueInsightsCard(),
+                ],
+              )),
             ],
           ),
-          if (!isDesktop) ...[const SizedBox(height: 32), _buildRecentActivitySection()],
+          if (!isDesktop) ...[
+            const SizedBox(height: 32), 
+            _buildRecentActivitySection(),
+            const SizedBox(height: 32),
+            _buildRevenueInsightsCard(),
+          ],
           const SizedBox(height: 32),
           _buildCoursesSection(),
         ],
@@ -401,7 +410,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                       children: [
                         _buildWelcomeStatBadge('Courses', '$_coursesCount', const Color(0xFF34D399)),
                         const SizedBox(width: 8),
-                        _buildWelcomeStatBadge('Exams', '$_examsCount', const Color(0xFF60A5FA)),
+                        _buildWelcomeStatBadge('Sales', '$_salesCount', const Color(0xFF60A5FA)),
                         const SizedBox(width: 8),
                         _buildWelcomeStatBadge('Learners', '$_learnersCount', const Color(0xFFA78BFA)),
                       ],
@@ -458,7 +467,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         _buildPremiumCard(title: 'Total Revenue', value: _formatCurrency(_totalRevenue), trend: '', accentColor: const Color(0xFF20B486), subtitle: 'All time earnings'),
         _buildPremiumCard(title: 'Total Learners', value: '$_learnersCount', trend: '', accentColor: const Color(0xFF3B82F6), subtitle: 'Unique enrolled students'),
         _buildPremiumCard(title: 'Active Courses', value: '$_coursesCount', trend: '', accentColor: const Color(0xFF8B5CF6), subtitle: 'Published course families'),
-        _buildPremiumCard(title: 'Avg Rating', value: _averageRating.toStringAsFixed(1), trend: '', accentColor: const Color(0xFFF59E0B), subtitle: 'Out of 5.0 stars'),
+        _buildPremiumCard(title: 'Total Sales', value: '$_salesCount', trend: '', accentColor: const Color(0xFFF59E0B), subtitle: 'Successful orders'),
       ],
     );
   }
@@ -566,6 +575,21 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             Expanded(
               child: _isWeeklyLoading ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))) : LineChart(
                 LineChartData(
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (touchedSpot) => const Color(0xFF475569),
+                      getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
+                        return touchedBarSpots.map((barSpot) {
+                          double actualValue = barSpot.y * 1000000;
+                          final formattedValue = NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(actualValue);
+                          return LineTooltipItem(
+                            formattedValue,
+                            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 14),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
                   gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: maxY / 5, getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1)),
                   titlesData: FlTitlesData(
                     show: true,
@@ -670,6 +694,19 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             Expanded(
               child: _isMonthlyLoading ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))) : BarChart(
                 BarChartData(
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (group) => const Color(0xFF475569),
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        double actualValue = rod.toY * 1000000;
+                        final formattedValue = NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(actualValue);
+                        return BarTooltipItem(
+                          formattedValue,
+                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 14),
+                        );
+                      },
+                    ),
+                  ),
                   gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: maxY / 5, getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1)),
                   titlesData: FlTitlesData(
                     show: true,
@@ -798,6 +835,187 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRevenueInsightsCard() {
+    // Calculate insights from existing data
+    final int currentMonth = DateTime.now().month;
+    double thisMonthRevenue = 0;
+    double yearTotal = 0;
+    if (_monthlyRevenuesByYear.isNotEmpty) {
+      for (var m in _monthlyRevenuesByYear) {
+        double rev = ((m['revenue'] as num?) ?? 0).toDouble();
+        yearTotal += rev;
+        int month = (m['month'] as int?) ?? 0;
+        if (month == currentMonth) {
+          thisMonthRevenue = rev;
+        }
+      }
+    }
+
+    return _HoverCard(
+      padding: const EdgeInsets.all(24),
+      child: SizedBox(
+        height: 380,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF10B981)]),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.insights_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Revenue Insights', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+                  SizedBox(height: 2),
+                  Text('Financial summary', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // This Month Revenue
+          _buildInsightRow(
+            icon: Icons.calendar_today_rounded,
+            iconBg: const Color(0xFFEFF6FF),
+            iconColor: const Color(0xFF3B82F6),
+            label: 'This Month',
+            value: _formatCurrency(thisMonthRevenue),
+            valueColor: const Color(0xFF3B82F6),
+          ),
+          const SizedBox(height: 16),
+          // Year Total
+          _buildInsightRow(
+            icon: Icons.trending_up_rounded,
+            iconBg: const Color(0xFFF0FDF4),
+            iconColor: const Color(0xFF20B486),
+            label: 'Year $_selectedYear Total',
+            value: _formatCurrency(yearTotal),
+            valueColor: const Color(0xFF20B486),
+          ),
+          const SizedBox(height: 20),
+          // Revenue Split Visual
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.pie_chart_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                    SizedBox(width: 8),
+                    Text('Revenue Split', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569), fontFamily: 'Outfit')),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Progress bar showing 70/30 split
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 7,
+                        child: Container(height: 10, color: const Color(0xFF20B486)),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Container(height: 10, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF20B486), shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      const Text('You: 70%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569), fontFamily: 'Outfit')),
+                    ]),
+                    Row(children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF94A3B8), shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      const Text('Platform: 30%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8), fontFamily: 'Outfit')),
+                    ]),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Settlement Status
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFF20B486).withValues(alpha: 0.08), const Color(0xFF20B486).withValues(alpha: 0.02)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF20B486).withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: const Color(0xFF20B486).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.account_balance_wallet_rounded, size: 18, color: Color(0xFF20B486)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('All-time Earnings', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                      const SizedBox(height: 2),
+                      Text(_formatCurrency(_totalRevenue), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF20B486), fontFamily: 'Outfit')),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildInsightRow({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required Color valueColor,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, size: 18, color: iconColor),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+        ),
+        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: valueColor, fontFamily: 'Outfit')),
+      ],
     );
   }
 
