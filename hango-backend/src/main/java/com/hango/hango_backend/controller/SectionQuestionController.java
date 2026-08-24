@@ -171,7 +171,7 @@ public class SectionQuestionController {
            .append("FROM questions q ")
            .append("JOIN lesson_quizzes lq ON q.id = lq.question_id ")
            .append("JOIN question_categories qc ON q.category_id = qc.id ")
-           .append("JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
+           .append("LEFT JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
            .append("LEFT JOIN question_groups qg ON q.group_id = qg.id ")
            .append("LEFT JOIN system_parameters sk ON q.skill_param_id = sk.id ")
            .append("LEFT JOIN system_parameters gt ON qg.group_type_param_id = gt.id ")
@@ -274,7 +274,7 @@ public class SectionQuestionController {
             @RequestParam String mode) { // START or RANDOM
 
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT id FROM questions WHERE section_id = ? AND usage_type = 1 ");
+        sql.append("SELECT id FROM questions WHERE section_id = ? AND (usage_type = '1' OR usage_type = 'QUIZ_ONLY') ");
         
         List<Object> params = new ArrayList<>();
         params.add(sectionId);
@@ -305,7 +305,21 @@ public class SectionQuestionController {
             @RequestBody QuizQuestionSelectionRequestDTO request) {
 
         List<Long> questionIds = request.getQuestionIds();
-        if (questionIds != null && !questionIds.isEmpty()) {
+        if (questionIds == null) {
+            questionIds = new ArrayList<>();
+        } else {
+            questionIds = new ArrayList<>(questionIds); // Make mutable
+        }
+
+        List<Long> groupIds = request.getGroupIds();
+        if (groupIds != null && !groupIds.isEmpty()) {
+            for (Long gId : groupIds) {
+                List<Long> subQIds = jdbcTemplate.queryForList("SELECT id FROM questions WHERE group_id = ?", Long.class, gId);
+                questionIds.addAll(subQIds);
+            }
+        }
+
+        if (!questionIds.isEmpty()) {
             for (Long qId : questionIds) {
                 List<Integer> usageTypes = jdbcTemplate.query(
                         "SELECT usage_type FROM questions WHERE id = ?",
@@ -319,8 +333,9 @@ public class SectionQuestionController {
                         },
                         qId
                 );
-                if (usageTypes.isEmpty() || usageTypes.get(0) != 1) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Cannot add EXAM_ONLY or BOTH questions to a Quiz."));
+                Integer usageType = usageTypes.isEmpty() ? 1 : usageTypes.get(0);
+                if (usageType == 2) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Cannot add EXAM_ONLY questions to a Quiz."));
                 }
             }
         }
@@ -329,7 +344,7 @@ public class SectionQuestionController {
         jdbcTemplate.update("DELETE FROM lesson_quizzes WHERE lesson_id = ?", lessonId);
 
         // 2. Insert new quiz questions
-        if (questionIds != null && !questionIds.isEmpty()) {
+        if (!questionIds.isEmpty()) {
             for (int i = 0; i < questionIds.size(); i++) {
                 Long qId = questionIds.get(i);
                 jdbcTemplate.update(

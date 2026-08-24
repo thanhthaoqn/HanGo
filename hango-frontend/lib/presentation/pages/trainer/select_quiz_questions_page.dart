@@ -145,7 +145,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
   }
 
   // Associate new questions to this quiz
-  Future<void> _associateQuestionsToQuiz(List<int> questionIds) async {
+  Future<void> _associateQuestionsToQuiz(List<int> newQuestionIds, List<int> newGroupIds) async {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
@@ -167,7 +167,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         currentIds = list.map((q) => q['id'] as int).toList();
       }
 
-      for (var id in questionIds) {
+      for (var id in newQuestionIds) {
         if (!currentIds.contains(id)) {
           currentIds.add(id);
         }
@@ -183,6 +183,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         },
         body: jsonEncode({
           'questionIds': currentIds,
+          'groupIds': newGroupIds,
         }),
       );
 
@@ -269,7 +270,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         if (token == null) return;
 
         // Fetch Skills
-        http.get(Uri.parse('$apiBaseUrl/metadata/parameters?type=SKILL_TYPE'), headers: {'Authorization': 'Bearer $token'})
+        http.get(Uri.parse('$apiBaseUrl/metadata/parameters?type=SKILL'), headers: {'Authorization': 'Bearer $token'})
           .then((res) {
             if (res.statusCode == 200) setStateSB(() => skillsList = jsonDecode(utf8.decode(res.bodyBytes)));
         });
@@ -527,8 +528,101 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                             }
                                           });
                                         },
-                                        title: Text(q['questionText'] ?? '', style: const TextStyle(fontSize: 14, fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
-                                        subtitle: Text(q['categoryName'] == 'Multiple Choice' ? 'Multiple Question' : (q['categoryName'] ?? 'Multiple Question'), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                                        title: Padding(
+                                          padding: const EdgeInsets.only(bottom: 6),
+                                          child: Text(q['questionText'] ?? '', style: const TextStyle(fontSize: 14, fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
+                                        ),
+                                        subtitle: Wrap(
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE2E8F0),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                q['categoryName'] == 'Multiple Choice' ? 'Multiple Question' : (q['categoryName'] ?? 'Multiple Question'),
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF475569),
+                                                  fontFamily: 'Outfit',
+                                                ),
+                                              ),
+                                            ),
+                                            if (q['skillName'] != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFDBEAFE),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  q['skillName'],
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF1E3A8A),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                            if (q['groupTypeName'] != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEF3C7),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  q['groupTypeName'],
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF92400E),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                            if (q['difficultyName'] != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE0E7FF),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  q['difficultyName'],
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF3730A3),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                            if (q['optionsCount'] != null && q['optionsCount'] > 0)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFD1FAE5),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  '${q['optionsCount']} options',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF065F46),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                         controlAffinity: ListTileControlAffinity.leading,
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         secondary: IconButton(
@@ -551,7 +645,17 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                 ElevatedButton(
                   onPressed: selectedIds.isEmpty ? null : () {
                     Navigator.pop(ctx);
-                    _associateQuestionsToQuiz(selectedIds.toList());
+                    List<int> qIds = [];
+                    List<int> gIds = [];
+                    for (var id in selectedIds) {
+                      var q = bankQuestions.firstWhere((element) => element['id'] == id);
+                      if (q['isGroup'] == true) {
+                        gIds.add(id);
+                      } else {
+                        qIds.add(id);
+                      }
+                    }
+                    _associateQuestionsToQuiz(qIds, gIds);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
@@ -1578,7 +1682,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                               sectionId: widget.sections[widget.sectionIndex]['id'] as int,
                               sectionTitle: widget.sections[widget.sectionIndex]['title'] as String,
                               onQuestionCreated: (newQuestionIds) {
-                                _associateQuestionsToQuiz(newQuestionIds);
+                                _associateQuestionsToQuiz(newQuestionIds, []);
                               },
                             ),
                           ),

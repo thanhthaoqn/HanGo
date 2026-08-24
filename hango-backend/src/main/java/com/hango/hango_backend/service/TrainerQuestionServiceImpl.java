@@ -63,7 +63,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         String usageTypeCondition = "";
         if (usageType != null) {
             if (usageType == 1) {
-                usageTypeCondition = "AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY' OR q.usage_type IS NULL) ";
+                usageTypeCondition = "AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY') ";
             } else if (usageType == 2) {
                 usageTypeCondition = "AND (q.usage_type = '2' OR q.usage_type = 'EXAM_ONLY') ";
             } else if (usageType == 3) {
@@ -96,7 +96,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append("  MAX(u.full_name) as creator_name, ")
                 .append("  MAX(q.created_at) as created_at, ")
                 .append("  MAX(q.updated_at) as updated_at, ")
-                .append("  MAX(q.usage_type) as usage_type ")
+                .append("  MAX(q.usage_type) as usage_type, ")
+                .append("  0 as options_count ")
                 .append("FROM question_groups qg ")
                 .append("JOIN questions q ON q.group_id = qg.id ")
                 .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
@@ -141,7 +142,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append("  u.full_name as creator_name, ")
                 .append("  q.created_at, ")
                 .append("  q.updated_at, ")
-                .append("  q.usage_type ")
+                .append("  q.usage_type, ")
+                .append("  (SELECT COUNT(*) FROM question_options qo WHERE qo.question_id = q.id) as options_count ")
                 .append("FROM questions q ")
                 .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
                 .append("LEFT JOIN system_parameters sp_skill ON q.skill_param_id = sp_skill.id ")
@@ -221,6 +223,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                     .updatedAt(updatedAt)
                     .usageType(parsedUsageType)
                     .usageTypeLabel(QuestionUsageType.fromValue(parsedUsageType).getDescription())
+                    .optionsCount(rs.getInt("options_count"))
                     .build();
         }, params.toArray());
     }
