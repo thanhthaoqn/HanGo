@@ -220,7 +220,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           
           if (isGroup) {
             gState.passageController.text = detail['passageText'] ?? '';
-            gState.selectedGroupTypeId = detail['categoryId'] as int?;
+            gState.selectedGroupTypeId = detail['groupTypeParamId'] as int?;
           }
 
           final subQList = detail['subQuestions'] as List? ?? [];
@@ -445,7 +445,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       for (var group in _groups) {
         final payload = {
           if (widget.question != null) 'id': widget.question!.id,
-          'categoryId': group.selectedGroupTypeId,
+          'groupTypeParamId': group.selectedGroupTypeId,
           'status': _status,
           'usageType': _usageType,
           'passageText': group.isGroup ? group.passageController.text : null,

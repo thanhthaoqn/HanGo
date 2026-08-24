@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart' hide Border;
+import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/download_helper.dart';
+import '../../../../domain/model/exam_import_error.dart';
+import '../../course_manager/exam_import_error_dialog.dart';
 import '../../course_manager/question_bank/course_manager_create_question_page.dart';
 import '../../course_manager/question_bank/models/course_manager_question.dart';
 import '../../course_manager/question_bank/widgets/question_search_bar.dart';
@@ -134,7 +136,8 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         search: _searchQuery,
         sortBy: _sortBy,
         skillId: _selectedSkillId,
-        categoryId: _selectedGroupTypeId,
+        groupTypeId: _selectedGroupTypeId,
+        difficultyId: _selectedDifficultyId,
         usageType: _usageType,
       );
 
@@ -202,19 +205,23 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         _isLoading = true;
       });
 
-      var excel = Excel.decodeBytes(List<int>.from(bytes));
-      var sheet = excel.tables['QUESTIONS'];
+      // Allow UI to render the loading indicator before heavy parsing blocks the thread
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      var decoder = SpreadsheetDecoder.decodeBytes(List<int>.from(bytes));
+      var sheet = decoder.tables['QUESTIONS'];
       if (sheet == null) {
-        var sheetName = excel.tables.keys.firstWhere(
+        var sheetName = decoder.tables.keys.firstWhere(
           (k) =>
               !k.toUpperCase().contains('RULES') &&
               !k.toUpperCase().contains('README'),
-          orElse: () => excel.tables.keys.last,
+          orElse: () => decoder.tables.keys.last,
         );
-        sheet = excel.tables[sheetName];
+        sheet = decoder.tables[sheetName];
       }
 
-      if (sheet == null || sheet.maxRows < 3) {
+      final allRows = sheet?.rows ?? [];
+      if (sheet == null || allRows.length < 3) {
         setState(() {
           _isLoading = false;
         });
@@ -223,10 +230,16 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         return;
       }
 
-      var headerRow = sheet.rows[1];
+      var headerRow = allRows[1];
+      String headerCell0 = headerRow.isNotEmpty
+          ? (headerRow[0]?.toString() ?? '')
+          : '';
+      String headerCell1 = headerRow.length > 1
+          ? (headerRow[1]?.toString() ?? '')
+          : '';
       if (headerRow.length < 12 ||
-          !headerRow[0]!.value.toString().contains('Order Index') ||
-          !headerRow[1]!.value.toString().contains('Passage Text')) {
+          !headerCell0.contains('Order Index') ||
+          !headerCell1.contains('Passage Text')) {
         setState(() {
           _isLoading = false;
         });
@@ -238,29 +251,111 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         return;
       }
 
+      // Ensure filters are loaded before validating
+      if ((_skills == null || _skills!.isEmpty) ||
+          (_difficulties == null || _difficulties!.isEmpty) ||
+          (_groupTypes == null || _groupTypes!.isEmpty)) {
+        await _fetchFilters();
+      }
+
+      final skillOptions = _skills ?? [];
+      final difficultyOptions = _difficulties ?? [];
+      final groupTypeOptions = _groupTypes ?? [];
+
+      bool paramExists(List<Map<String, dynamic>> options, String name) =>
+          options.isEmpty || // skip validation if options not yet loaded
+          options.any(
+            (o) =>
+                (o['paramValue']?.toString().toLowerCase() ?? '') ==
+                name.toLowerCase(),
+          );
+
       List<Map<String, dynamic>> groupsList = [];
       Map<String, Map<String, dynamic>> groupMap = {};
+      List<ExamImportError> errors = [];
 
-      for (int i = 2; i < sheet.maxRows; i++) {
-        var row = sheet.rows[i];
-        if (row.isEmpty ||
-            row.length < 3 ||
-            row[2] == null ||
-            row[2]?.value?.toString().trim().isEmpty == true)
-          continue;
+      for (int i = 2; i < allRows.length; i++) {
+        var row = allRows[i];
+        int rowNum = i + 1;
 
-        String passage = row[1]?.value?.toString().trim() ?? '';
-        String qText = row[2]?.value?.toString() ?? '';
-        String optA = row[3]?.value?.toString() ?? '';
-        String optB = row[4]?.value?.toString() ?? '';
-        String optC = row[5]?.value?.toString() ?? '';
-        String optD = row[6]?.value?.toString() ?? '';
-        String correctAns =
-            row[7]?.value?.toString().trim().toUpperCase() ?? 'A';
-        String explanation = row[8]?.value?.toString() ?? '';
-        String skillName = row[9]?.value?.toString() ?? '';
-        String diffName = row[10]?.value?.toString() ?? '';
-        String groupTypeName = row[11]?.value?.toString() ?? '';
+        String cell(int idx) =>
+            (idx < row.length ? row[idx]?.toString() : null)?.trim() ?? '';
+
+        String passage = cell(1);
+        String qText = cell(2);
+        String optA = cell(3);
+        String optB = cell(4);
+        String optC = cell(5);
+        String optD = cell(6);
+        String correctAns = cell(7).toUpperCase();
+        String explanation = cell(8);
+        String skillName = cell(9);
+        String diffName = cell(10);
+        String groupTypeName = cell(11);
+
+        bool rowHasData =
+            passage.isNotEmpty ||
+            qText.isNotEmpty ||
+            optA.isNotEmpty ||
+            optB.isNotEmpty ||
+            optC.isNotEmpty ||
+            optD.isNotEmpty ||
+            correctAns.isNotEmpty ||
+            skillName.isNotEmpty ||
+            diffName.isNotEmpty;
+        if (!rowHasData) continue;
+
+        if (qText.isEmpty) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Question Text',
+              errorType: 'MISSING_FIELD',
+              message: 'Question Text is required at row $rowNum',
+            ),
+          );
+        }
+
+        if (!RegExp(r'^[A-D]$').hasMatch(correctAns)) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Correct',
+              errorType: 'INVALID_FORMAT',
+              value: correctAns,
+              message: 'Correct Answer must be A, B, C, or D at row $rowNum',
+            ),
+          );
+        }
+
+        if (skillName.isEmpty || !paramExists(skillOptions, skillName)) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Skill',
+              errorType: skillName.isEmpty ? 'MISSING_FIELD' : 'INVALID_VALUE',
+              value: skillName,
+              message: "Invalid or missing Skill '$skillName' at row $rowNum",
+            ),
+          );
+        }
+
+        if (diffName.isEmpty || !paramExists(difficultyOptions, diffName)) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Difficulty',
+              errorType: diffName.isEmpty ? 'MISSING_FIELD' : 'INVALID_VALUE',
+              value: diffName,
+              message:
+                  "Invalid or missing Difficulty '$diffName' at row $rowNum",
+            ),
+          );
+        }
 
         Map<String, dynamic> subQ = {
           'questionText': qText,
@@ -284,6 +379,22 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           });
         } else {
           if (!groupMap.containsKey(passage)) {
+            if (groupTypeName.isEmpty ||
+                !paramExists(groupTypeOptions, groupTypeName)) {
+              errors.add(
+                ExamImportError(
+                  sheet: 'QUESTIONS',
+                  row: rowNum,
+                  field: 'Group Type',
+                  errorType: groupTypeName.isEmpty
+                      ? 'MISSING_FIELD'
+                      : 'INVALID_VALUE',
+                  value: groupTypeName,
+                  message:
+                      "Invalid or missing Group Type '$groupTypeName' for passage at row $rowNum",
+                ),
+              );
+            }
             groupMap[passage] = {
               'isGroup': true,
               'passageText': passage,
@@ -296,19 +407,26 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         }
       }
 
-      if (groupsList.isEmpty) {
-        setState(() {
-          _isLoading = false;
-        });
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (groupsList.isEmpty && errors.isEmpty) {
         if (mounted) ToastHelper.showError(context, 'No valid questions found');
         return;
       }
 
-      Map<String, dynamic> initialData = {'groups': groupsList};
+      if (errors.isNotEmpty) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (_) => ExamImportErrorDialog(errors: errors),
+          );
+        }
+        return;
+      }
 
-      setState(() {
-        _isLoading = false;
-      });
+      Map<String, dynamic> initialData = {'groups': groupsList};
 
       if (mounted) {
         Navigator.push(
@@ -321,12 +439,17 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           ),
         ).then((_) => _fetchQuestions());
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('=== IMPORT EXCEL ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Error importing excel: $e');
+      debugPrint(st.toString());
       setState(() {
         _isLoading = false;
       });
-      if (mounted)
+      if (mounted) {
         ToastHelper.showError(context, 'System error, please try again later.');
+      }
     }
   }
 
