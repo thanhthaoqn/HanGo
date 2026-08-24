@@ -57,6 +57,7 @@ class _AddMultipleChoiceQuestionPageState
 
   String? _selectedSkillType;
   String? _selectedGroupType;
+  int _usageType = 3; // 1 = Quiz Only, 2 = Exam Only, 3 = Both
 
   // AI-generated state lock
   final GlobalKey _aiPanelKey = GlobalKey();
@@ -460,7 +461,7 @@ class _AddMultipleChoiceQuestionPageState
         'skillParamId': 1,
         'groupTypeName': _selectedGroupType,
         'difficultyId': _aiDifficultyId,
-        'usageType': 1,
+        'usageType': _usageType,
         'subQuestions': payloadSubQuestions,
       };
 
@@ -1239,6 +1240,45 @@ class _AddMultipleChoiceQuestionPageState
                                   },
                                 );
                               },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Usage Type Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                value: _usageType,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Color(0xFF64748B),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 1, child: Text('Quiz Only')),
+                                  DropdownMenuItem(value: 2, child: Text('Exam Only')),
+                                  DropdownMenuItem(value: 3, child: Text('Both (Quiz & Exam)')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _usageType = val;
+                                    });
+                                  }
+                                },
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),

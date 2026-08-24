@@ -316,7 +316,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         final token = await _authService.getToken();
         if (token == null) return;
         
-        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy&usageType=1';
+        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy';
         if (selectedSkillId != null) url += '&skillId=$selectedSkillId';
         if (selectedCategoryId != null) url += '&categoryId=$selectedCategoryId';
         if (selectedDifficultyId != null) url += '&difficultyId=$selectedDifficultyId';
@@ -328,9 +328,13 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         });
         
         if (response.statusCode == 200) {
-          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          final data = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+          final filteredData = data.where((q) {
+            final uType = q['usageType'];
+            return uType == 1 || uType == 3;
+          }).toList();
           setStateSB(() {
-            bankQuestions = data as List<dynamic>;
+            bankQuestions = filteredData;
             isLoading = false;
             initialLoaded = true;
           });

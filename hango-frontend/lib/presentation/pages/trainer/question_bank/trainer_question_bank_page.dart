@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
@@ -34,7 +34,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
-  
+
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -42,7 +42,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _selectedType = 'ALL';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
-  int _usageType = 1; // New state for usageType
+  int? _usageType; // null = All, 1 = Quiz, 2 = Exam
   int _currentPage = 1;
   static const int _pageSize = 5;
 
@@ -316,7 +316,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           MaterialPageRoute(
             builder: (context) => CourseManagerCreateQuestionPage(
               initialData: initialData,
-              initialUsageType: _usageType,
+              initialUsageType: _usageType ?? 3,
             ),
           ),
         ).then((_) => _fetchQuestions());
@@ -325,7 +325,8 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
       setState(() {
         _isLoading = false;
       });
-      if (mounted) ToastHelper.showError(context, 'System error, please try again later.');
+      if (mounted)
+        ToastHelper.showError(context, 'System error, please try again later.');
     }
   }
 
@@ -355,24 +356,21 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             },
           )
         : _viewingQuestion != null
-            ? CourseManagerCreateQuestionPage(
-                question: _viewingQuestion,
-                isReadOnly: true,
-                isCourseManager: false,
-                isEmbedded: true,
-                onBack: () {
-                  setState(() {
-                    _viewingQuestion = null;
-                  });
-                },
-              )
-            : _buildBodyContent(isDesktop);
+        ? CourseManagerCreateQuestionPage(
+            question: _viewingQuestion,
+            isReadOnly: true,
+            isCourseManager: false,
+            isEmbedded: true,
+            onBack: () {
+              setState(() {
+                _viewingQuestion = null;
+              });
+            },
+          )
+        : _buildBodyContent(isDesktop);
 
     if (widget.isEmbedded) {
-      return DefaultTabController(
-        length: 2,
-        child: content,
-      );
+      return DefaultTabController(length: 2, child: content);
     }
 
     return DefaultTabController(
@@ -409,21 +407,17 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         children: [
           _buildWelcomeSection(),
           const SizedBox(height: 16),
-          TabBar(
-            onTap: (index) {
-              setState(() {
-                _usageType = index == 0 ? 1 : 2;
-                _currentPage = 1;
-              });
-              _fetchQuestions();
-            },
-            labelColor: const Color(0xFF20B486),
-            unselectedLabelColor: const Color(0xFF64748B),
-            indicatorColor: const Color(0xFF20B486),
-            tabs: const [
-              Tab(text: 'Quiz Questions'),
-              Tab(text: 'Exam Questions'),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildUsageTypePill('All', null),
+                const SizedBox(width: 8),
+                _buildUsageTypePill('Quiz Question', 1),
+                const SizedBox(width: 8),
+                _buildUsageTypePill('Exam Question', 2),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           QuestionSearchBar(
@@ -510,7 +504,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   q.status = oldStatus;
                 });
                 if (context.mounted) {
-                  ToastHelper.showError(context, 'System error, please try again later.');
+                  ToastHelper.showError(
+                    context,
+                    'System error, please try again later.',
+                  );
                 }
               }
             },
@@ -535,122 +532,118 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     );
 
     final actionButtons = Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () async {
-                try {
-                  final token = await _authService.getToken();
-                  if (token == null)
-                    throw Exception('Authentication token not found');
-                  final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                  final bytes = await api.downloadQuestionBankTemplate();
-                  downloadBytes(
-                    bytes: bytes,
-                    filename: 'Hango_Question_Bank_Import_Template.xlsx',
-                    mimeType:
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                  );
-                } catch (e) {
-                  if (context.mounted)
-                    ToastHelper.showError(
-                      context,
-                      'Could not download template: $e',
-                    );
-                }
-              },
-              icon: const Icon(
-                Icons.download_outlined,
-                color: Color(0xFF20B486),
-                size: 18,
-              ),
-              label: const Text(
-                'Download Template',
-                style: TextStyle(
-                  color: Color(0xFF20B486),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                side: const BorderSide(color: Color(0xFF20B486)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            OutlinedButton.icon(
-              onPressed: _importFromExcel,
-              icon: const Icon(
-                Icons.file_upload_outlined,
-                color: Color(0xFF1E293B),
-                size: 18,
-              ),
-              label: const Text(
-                'Import Excel',
-                style: TextStyle(
-                  color: Color(0xFF1E293B),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () async {
+            try {
+              final token = await _authService.getToken();
+              if (token == null)
+                throw Exception('Authentication token not found');
+              final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+              final bytes = await api.downloadQuestionBankTemplate();
+              downloadBytes(
+                bytes: bytes,
+                filename: 'Hango_Question_Bank_Import_Template.xlsx',
+                mimeType:
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              );
+            } catch (e) {
+              if (context.mounted)
+                ToastHelper.showError(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseManagerCreateQuestionPage(
-                      isCourseManager: false,
-                      initialUsageType: _usageType,
-                    ),
-                  ),
-                ).then((_) => _fetchQuestions());
-              },
-              icon: const Icon(
-                Icons.add_circle_outline,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: const Text(
-                'Create Question',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20B486),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 0,
-              ),
+                  'Could not download template: $e',
+                );
+            }
+          },
+          icon: const Icon(
+            Icons.download_outlined,
+            color: Color(0xFF20B486),
+            size: 18,
+          ),
+          label: const Text(
+            'Download Template',
+            style: TextStyle(
+              color: Color(0xFF20B486),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        );
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            side: const BorderSide(color: Color(0xFF20B486)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _importFromExcel,
+          icon: const Icon(
+            Icons.file_upload_outlined,
+            color: Color(0xFF1E293B),
+            size: 18,
+          ),
+          label: const Text(
+            'Import Excel',
+            style: TextStyle(
+              color: Color(0xFF1E293B),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CourseManagerCreateQuestionPage(
+                  isCourseManager: false,
+                  initialUsageType: _usageType ?? 3,
+                ),
+              ),
+            ).then((_) => _fetchQuestions());
+          },
+          icon: const Icon(
+            Icons.add_circle_outline,
+            color: Colors.white,
+            size: 18,
+          ),
+          label: const Text(
+            'Create Question',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF20B486),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+        ),
+      ],
+    );
 
     final isCompact = MediaQuery.of(context).size.width < 820;
 
     if (isCompact) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          title,
-          const SizedBox(height: 16),
-          actionButtons,
-        ],
+        children: [title, const SizedBox(height: 16), actionButtons],
       );
     }
 
@@ -742,7 +735,11 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 );
               } else if (val == 'logout') {
                 _authService.logout();
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
               }
             },
             offset: const Offset(0, 48),
@@ -754,11 +751,18 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 value: 'dashboard',
                 child: Row(
                   children: const [
-                    Icon(Icons.dashboard_outlined, size: 18, color: Color(0xFF20B486)),
+                    Icon(
+                      Icons.dashboard_outlined,
+                      size: 18,
+                      color: Color(0xFF20B486),
+                    ),
                     SizedBox(width: 10),
                     Text(
                       'Dashboard',
-                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -767,11 +771,18 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 value: 'profile',
                 child: Row(
                   children: const [
-                    Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
+                    Icon(
+                      Icons.person_outline,
+                      size: 18,
+                      color: Color(0xFF64748B),
+                    ),
                     SizedBox(width: 10),
                     Text(
                       'My Profile',
-                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -785,7 +796,11 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                     SizedBox(width: 10),
                     Text(
                       'Logout',
-                      style: TextStyle(fontFamily: 'Outfit', color: Colors.redAccent, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -847,6 +862,39 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUsageTypePill(String label, int? usageTypeValue) {
+    final isActive = _usageType == usageTypeValue;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _usageType = usageTypeValue;
+          _currentPage = 1;
+        });
+        _fetchQuestions();
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFE6FFFA) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? const Color(0xFF20B486) : const Color(0xFF4B5563),
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
+            fontFamily: 'Outfit',
+          ),
+        ),
       ),
     );
   }
