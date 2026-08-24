@@ -170,7 +170,7 @@ public class SectionQuestionController {
            .append("sk.id as skill_param_id, gt.id as group_type_param_id, sp.id as difficulty_param_id ")
            .append("FROM questions q ")
            .append("JOIN lesson_quizzes lq ON q.id = lq.question_id ")
-           .append("JOIN question_categories qc ON q.category_id = qc.id ")
+           .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
            .append("LEFT JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
            .append("LEFT JOIN question_groups qg ON q.group_id = qg.id ")
            .append("LEFT JOIN system_parameters sk ON q.skill_param_id = sk.id ")
@@ -318,6 +318,15 @@ public class SectionQuestionController {
                 questionIds.addAll(subQIds);
             }
         }
+        
+        // Remove duplicates to prevent DuplicateKeyException
+        List<Long> uniqueQuestionIds = new ArrayList<>();
+        for (Long id : questionIds) {
+            if (!uniqueQuestionIds.contains(id)) {
+                uniqueQuestionIds.add(id);
+            }
+        }
+        questionIds = uniqueQuestionIds;
 
         if (!questionIds.isEmpty()) {
             for (Long qId : questionIds) {
