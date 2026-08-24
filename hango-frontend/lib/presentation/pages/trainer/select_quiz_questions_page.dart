@@ -182,7 +182,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
           final difficultyObj = _difficultyList.firstWhere((d) => d['id'] == difficultyId, orElse: () => null);
 
           final formattedQ = {
-            'id': data['id'],
+            'id': sub['id'] ?? data['id'],
             'questionText': sub['questionText'] ?? '',
             'explanation': sub['explanation'] ?? data['explanation'],
             'categoryName': sourceQ?['categoryName'] ?? 'Single Choice',
@@ -983,7 +983,29 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         ToastHelper.showSuccess(ctx, 'Question updated successfully');
                         if (mounted) {
                           Navigator.pop(ctx);
-                          _fetchInitialQuestions();
+                          
+                          // Update local draft state instead of fetching from server to preserve unsaved drafts
+                          setState(() {
+                            final index = _quizQuestions.indexWhere((item) => item['id'] == qId);
+                            if (index != -1) {
+                              _quizQuestions[index]['questionText'] = updatedText;
+                              _quizQuestions[index]['explanation'] = updatedExpl;
+                              
+                              if (isGrouped) {
+                                _quizQuestions[index]['passageText'] = passageCtrl.text.trim();
+                              }
+                              
+                              // Re-fetch the param values for display
+                              if (currentSkillParamId != null) {
+                                final sObj = _skillsList.firstWhere((s) => s['id'] == currentSkillParamId, orElse: () => null);
+                                if (sObj != null) _quizQuestions[index]['skillName'] = sObj['paramValue'];
+                              }
+                              if (currentDifficultyParamId != null) {
+                                final dObj = _difficultyList.firstWhere((d) => d['id'] == currentDifficultyParamId, orElse: () => null);
+                                if (dObj != null) _quizQuestions[index]['difficultyName'] = dObj['paramValue'];
+                              }
+                            }
+                          });
                         }
                       } else {
                         ToastHelper.showError(ctx, 'Failed to update question.');
@@ -1855,7 +1877,12 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                   builder: (ctx) => const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))),
                 );
 
-                List<int> questionIds = _quizQuestions.map((q) => q['id'] as int).toList();
+                List<int> questionIds = _quizQuestions.map((q) {
+                  final id = q['id'];
+                  if (id is int) return id;
+                  if (id is String) return int.tryParse(id) ?? 0;
+                  return int.tryParse(id.toString()) ?? 0;
+                }).where((id) => id > 0).toList();
 
                 final postUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions');
                 final postRes = await http.post(
@@ -1883,7 +1910,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
               } catch (e) {
                 if (mounted) Navigator.pop(context); // Close loading indicator
                 debugPrint('Error saving quiz questions: $e');
-                ToastHelper.showError(context, 'Error saving quiz questions.');
+                ToastHelper.showError(context, 'Error saving quiz questions: $e');
               }
             },
             style: ElevatedButton.styleFrom(
