@@ -189,19 +189,22 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
     final cards = [
       _kpiCard('TOTAL COURSES', '${s.activeCoursesCount + s.inactiveCoursesCount}', Icons.school_rounded,
           const Color(0xFF0D9488), const Color(0xFFF0FDFA), s.coursesGrowthPercent),
-      _kpiCard('PENDING APPROVALS', '$totalPending', Icons.pending_actions_rounded,
-          const Color(0xFFF59E0B), const Color(0xFFFFFBEB), null, badge: totalPending > 0),
+      _kpiCard('PENDING APPROVALS', '$totalPending', Icons.assignment_late_rounded,
+          const Color(0xFFF59E0B), const Color(0xFFFEF3C7), null, badge: totalPending > 0),
       _kpiCard('ACTIVE LEARNERS', '${s.activeLearnerCount}', Icons.people_rounded,
           const Color(0xFF3B82F6), const Color(0xFFEFF6FF), s.learnersGrowthPercent),
       _kpiCard('TOTAL EXAMS', '${s.examsCount}', Icons.assignment_rounded,
           const Color(0xFF6366F1), const Color(0xFFEEF2FF), s.examsGrowthPercent),
       _kpiCard('AVG RATING', s.avgCourseRating.toStringAsFixed(1), Icons.star_rounded,
-          const Color(0xFFF59E0B), const Color(0xFFFFFBEB), null),
+          const Color(0xFFF59E0B), const Color(0xFFFEF3C7), null),
     ];
 
     if (isDesktop) {
-      return Row(
-        children: cards.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 16), child: c))).toList(),
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: cards.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 16), child: c))).toList(),
+        ),
       );
     }
     return Wrap(
