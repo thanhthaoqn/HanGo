@@ -150,7 +150,7 @@ public class CourseManagerExamMatrixServiceImpl implements CourseManagerExamMatr
 
     @Override
     @Transactional
-    public Long generateExamFromMatrix(Long matrixId, String examTitle, String description, Integer expectedQuestionCount, Double passingScore, Integer durationMinutes, String email) {
+    public Long generateExamFromMatrix(Long matrixId, String examTitle, String description, Integer expectedQuestionCount, Double passingScore, Integer durationMinutes, Integer questionSourceType, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
@@ -191,6 +191,7 @@ public class CourseManagerExamMatrixServiceImpl implements CourseManagerExamMatr
                     detail.getDifficultyParam().getId(),
                     detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getId() : null,
                     user.getId(),
+                    questionSourceType,
                     requiredQty);
 
             if (randomQuestions.size() < requiredQty) {

@@ -53,9 +53,11 @@ class _CourseManagerQuestionBankPageState
   int? _selectedSkillId;
   int? _selectedGroupTypeId;
   int? _selectedDifficultyId;
+  bool? _selectedIsGroup;
 
   CourseManagerQuestion? _viewingQuestion;
   CourseManagerQuestion? _editingQuestion;
+  bool _isCreatingQuestion = false;
 
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
@@ -113,6 +115,7 @@ class _CourseManagerQuestionBankPageState
         groupTypeId: _selectedGroupTypeId,
         difficultyId: _selectedDifficultyId,
         usageType: _usageType,
+        isGroup: _selectedIsGroup,
       );
 
       setState(() {
@@ -391,6 +394,14 @@ class _CourseManagerQuestionBankPageState
                           });
                           _fetchQuestions();
                         },
+                        selectedIsGroup: _selectedIsGroup,
+                        onIsGroupChanged: (val) {
+                          setState(() {
+                            _selectedIsGroup = val;
+                            _currentPage = 1;
+                          });
+                          _fetchQuestions();
+                        },
                       ),
                       const SizedBox(height: 24),
                       QuestionTable(
@@ -466,7 +477,19 @@ class _CourseManagerQuestionBankPageState
       ],
     );
 
-    final Widget content = _editingQuestion != null
+    final Widget content = _isCreatingQuestion
+        ? CourseManagerCreateQuestionPage(
+            isCourseManager: true,
+            isEmbedded: true,
+            initialUsageType: _usageType,
+            onBack: () {
+              setState(() {
+                _isCreatingQuestion = false;
+              });
+              _fetchQuestions();
+            },
+          )
+        : _editingQuestion != null
         ? CourseManagerCreateQuestionPage(
             question: _editingQuestion,
             isEdit: true,
@@ -623,15 +646,9 @@ class _CourseManagerQuestionBankPageState
         const SizedBox(width: 12),
         ElevatedButton.icon(
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseManagerCreateQuestionPage(
-                  isCourseManager: true,
-                  initialUsageType: _usageType,
-                ),
-              ),
-            ).then((_) => _fetchQuestions());
+            setState(() {
+              _isCreatingQuestion = true;
+            });
           },
           icon: const Icon(
             Icons.add_circle_outline,

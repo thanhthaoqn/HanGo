@@ -14,7 +14,7 @@ public class DebugGenerateExamManualTool {
     @Test
     public void testGenerate() {
         try {
-            Long examId = service.generateExamFromMatrix(21L, "Debug Exam", "Test", null, 5.0, 60, "hoanglead@hango.edu.vn");
+            Long examId = service.generateExamFromMatrix(21L, "Debug Exam", "Test", null, 5.0, 60, null, "hoanglead@hango.edu.vn");
             System.out.println("EXAM GENERATED WITH ID: " + examId);
         } catch (Exception e) {
             e.printStackTrace();
