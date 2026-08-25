@@ -11,14 +11,15 @@ import 'question_bank/course_manager_create_question_page.dart';
 import 'question_bank/models/course_manager_question.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/download_helper.dart';
 
 class CourseManagerQuestionBankPage extends StatefulWidget {
   final bool isEmbedded;
 
-  const CourseManagerQuestionBankPage({Key? key, this.isEmbedded = false}) : super(key: key);
+  const CourseManagerQuestionBankPage({Key? key, this.isEmbedded = false})
+    : super(key: key);
 
   @override
   State<CourseManagerQuestionBankPage> createState() =>
@@ -52,9 +53,11 @@ class _CourseManagerQuestionBankPageState
   int? _selectedSkillId;
   int? _selectedGroupTypeId;
   int? _selectedDifficultyId;
+  bool? _selectedIsGroup;
 
   CourseManagerQuestion? _viewingQuestion;
   CourseManagerQuestion? _editingQuestion;
+  bool _isCreatingQuestion = false;
 
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
@@ -109,9 +112,10 @@ class _CourseManagerQuestionBankPageState
         search: _searchQuery,
         sortBy: _sortBy,
         skillId: _selectedSkillId,
-        categoryId: _selectedGroupTypeId,
+        groupTypeId: _selectedGroupTypeId,
         difficultyId: _selectedDifficultyId,
         usageType: _usageType,
+        isGroup: _selectedIsGroup,
       );
 
       setState(() {
@@ -176,16 +180,19 @@ class _CourseManagerQuestionBankPageState
         _isLoading = true;
       });
 
-      var excel = Excel.decodeBytes(List<int>.from(bytes));
-      var sheet = excel.tables['QUESTIONS'];
+      // Allow UI to render the loading indicator before heavy parsing blocks the thread
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      var decoder = SpreadsheetDecoder.decodeBytes(List<int>.from(bytes));
+      var sheet = decoder.tables['QUESTIONS'];
       if (sheet == null) {
-        var sheetName = excel.tables.keys.firstWhere(
+        var sheetName = decoder.tables.keys.firstWhere(
           (k) =>
               !k.toUpperCase().contains('RULES') &&
               !k.toUpperCase().contains('README'),
-          orElse: () => excel.tables.keys.last,
+          orElse: () => decoder.tables.keys.last,
         );
-        sheet = excel.tables[sheetName];
+        sheet = decoder.tables[sheetName];
       }
 
       if (sheet == null || sheet.maxRows < 3) {
@@ -199,8 +206,8 @@ class _CourseManagerQuestionBankPageState
 
       var headerRow = sheet.rows[1];
       if (headerRow.length < 12 ||
-          !headerRow[0]!.value.toString().contains('Order Index') ||
-          !headerRow[1]!.value.toString().contains('Passage Text')) {
+          !(headerRow[0]?.toString() ?? '').contains('Order Index') ||
+          !(headerRow[1]?.toString() ?? '').contains('Passage Text')) {
         setState(() {
           _isLoading = false;
         });
@@ -220,21 +227,20 @@ class _CourseManagerQuestionBankPageState
         if (row.isEmpty ||
             row.length < 3 ||
             row[2] == null ||
-            row[2]?.value?.toString().trim().isEmpty == true)
+            row[2]?.toString().trim().isEmpty == true)
           continue;
 
-        String passage = row[1]?.value?.toString().trim() ?? '';
-        String qText = row[2]?.value?.toString() ?? '';
-        String optA = row[3]?.value?.toString() ?? '';
-        String optB = row[4]?.value?.toString() ?? '';
-        String optC = row[5]?.value?.toString() ?? '';
-        String optD = row[6]?.value?.toString() ?? '';
-        String correctAns =
-            row[7]?.value?.toString().trim().toUpperCase() ?? 'A';
-        String explanation = row[8]?.value?.toString() ?? '';
-        String skillName = row[9]?.value?.toString() ?? '';
-        String diffName = row[10]?.value?.toString() ?? '';
-        String groupTypeName = row[11]?.value?.toString() ?? '';
+        String passage = row[1]?.toString().trim() ?? '';
+        String qText = row[2]?.toString() ?? '';
+        String optA = row[3]?.toString() ?? '';
+        String optB = row[4]?.toString() ?? '';
+        String optC = row[5]?.toString() ?? '';
+        String optD = row[6]?.toString() ?? '';
+        String correctAns = row[7]?.toString().trim().toUpperCase() ?? 'A';
+        String explanation = row[8]?.toString() ?? '';
+        String skillName = row[9]?.toString() ?? '';
+        String diffName = row[10]?.toString() ?? '';
+        String groupTypeName = row[11]?.toString() ?? '';
 
         Map<String, dynamic> subQ = {
           'questionText': qText,
@@ -299,7 +305,8 @@ class _CourseManagerQuestionBankPageState
       setState(() {
         _isLoading = false;
       });
-      if (mounted) ToastHelper.showError(context, 'System error, please try again later.');
+      if (mounted)
+        ToastHelper.showError(context, 'System error, please try again later.');
     }
   }
 
@@ -316,157 +323,173 @@ class _CourseManagerQuestionBankPageState
         : _allQuestions.sublist(startIndex, endIndex);
 
     final Widget bodyContent = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildContentHeader(context, isDesktop),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: TabBar(
+            onTap: (index) {
+              setState(() {
+                _usageType = index == 0 ? 1 : 2;
+                _currentPage = 1;
+              });
+              _fetchQuestions();
+            },
+            labelColor: const Color(0xFF20B486),
+            unselectedLabelColor: const Color(0xFF64748B),
+            indicatorColor: const Color(0xFF20B486),
+            tabs: const [
+              Tab(text: 'Quiz Questions'),
+              Tab(text: 'Exam Questions'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildContentHeader(context, isDesktop),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: TabBar(
-                    onTap: (index) {
-                      setState(() {
-                        _usageType = index == 0 ? 1 : 2;
-                        _currentPage = 1;
-                      });
-                      _fetchQuestions();
-                    },
-                    labelColor: const Color(0xFF20B486),
-                    unselectedLabelColor: const Color(0xFF64748B),
-                    indicatorColor: const Color(0xFF20B486),
-                    tabs: const [
-                      Tab(text: 'Quiz Questions'),
-                      Tab(text: 'Exam Questions'),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      QuestionSearchBar(
+                        searchController: _searchController,
+                        onSearchChanged: _handleSearch,
+                        selectedType: _selectedType,
+                        onTypeChanged: _handleTypeChanged,
+                        sortBy: _sortBy,
+                        onSortChanged: _handleSortChanged,
+                        onCreatePressed: () {}, // Moved to header
+                        onImportPressed: () {}, // Moved to header
+                        onRefreshPressed: _fetchQuestions,
+                        isCourseManager: true,
+                        skills: _skills,
+                        groupTypes: _groupTypes,
+                        difficulties: _difficulties,
+                        selectedSkillId: _selectedSkillId,
+                        onSkillChanged: (val) {
+                          setState(() {
+                            _selectedSkillId = val;
+                            _currentPage = 1;
+                          });
+                          _fetchQuestions();
+                        },
+                        selectedGroupTypeId: _selectedGroupTypeId,
+                        onGroupTypeChanged: (val) {
+                          setState(() {
+                            _selectedGroupTypeId = val;
+                            _currentPage = 1;
+                          });
+                          _fetchQuestions();
+                        },
+                        selectedDifficultyId: _selectedDifficultyId,
+                        onDifficultyChanged: (val) {
+                          setState(() {
+                            _selectedDifficultyId = val;
+                            _currentPage = 1;
+                          });
+                          _fetchQuestions();
+                        },
+                        selectedIsGroup: _selectedIsGroup,
+                        onIsGroupChanged: (val) {
+                          setState(() {
+                            _selectedIsGroup = val;
+                            _currentPage = 1;
+                          });
+                          _fetchQuestions();
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      QuestionTable(
+                        questions: _displayedQuestions,
+                        isLoading: _isLoading,
+                        currentPage: _currentPage,
+                        totalRecords: _allQuestions.length,
+                        pageSize: _pageSize,
+                        onPageChanged: (page) {
+                          setState(() {
+                            _currentPage = page;
+                          });
+                        },
+                        onViewPressed: (q) {
+                          setState(() {
+                            _viewingQuestion = q;
+                          });
+                        },
+                        onEditPressed: (q) {
+                          setState(() {
+                            _editingQuestion = q;
+                          });
+                        },
+                        onStatusToggled: (q, isPublic) async {
+                          final oldStatus = q.status;
+                          final newStatus = isPublic ? 'PUBLIC' : 'PRIVATE';
+
+                          // Optimistic UI Update
+                          setState(() {
+                            q.status = newStatus;
+                          });
+
+                          try {
+                            final token = await _authService.getToken();
+                            if (token != null) {
+                              final api = HangoApi(
+                                baseUrl: apiBaseUrl,
+                                token: token,
+                              );
+                              await api.toggleQuestionStatus(
+                                q.id,
+                                newStatus,
+                                isGroup: q.isGroup,
+                              );
+                            } else {
+                              throw Exception('No token');
+                            }
+                          } catch (e) {
+                            // Revert on failure
+                            setState(() {
+                              q.status = oldStatus;
+                            });
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'System error, please try again later.',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        isCourseManager: true,
+                      ),
                     ],
                   ),
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              QuestionSearchBar(
-                                searchController: _searchController,
-                                onSearchChanged: _handleSearch,
-                                selectedType: _selectedType,
-                                onTypeChanged: _handleTypeChanged,
-                                sortBy: _sortBy,
-                                onSortChanged: _handleSortChanged,
-                                onCreatePressed: () {}, // Moved to header
-                                onImportPressed: () {}, // Moved to header
-                                onRefreshPressed: _fetchQuestions,
-                                isCourseManager: true,
-                                skills: _skills,
-                                groupTypes: _groupTypes,
-                                difficulties: _difficulties,
-                                selectedSkillId: _selectedSkillId,
-                                onSkillChanged: (val) {
-                                  setState(() {
-                                    _selectedSkillId = val;
-                                    _currentPage = 1;
-                                  });
-                                  _fetchQuestions();
-                                },
-                                selectedGroupTypeId: _selectedGroupTypeId,
-                                onGroupTypeChanged: (val) {
-                                  setState(() {
-                                    _selectedGroupTypeId = val;
-                                    _currentPage = 1;
-                                  });
-                                  _fetchQuestions();
-                                },
-                                selectedDifficultyId: _selectedDifficultyId,
-                                onDifficultyChanged: (val) {
-                                  setState(() {
-                                    _selectedDifficultyId = val;
-                                    _currentPage = 1;
-                                  });
-                                  _fetchQuestions();
-                                },
-                              ),
-                              const SizedBox(height: 24),
-                              QuestionTable(
-                                questions: _displayedQuestions,
-                                isLoading: _isLoading,
-                                currentPage: _currentPage,
-                                totalRecords: _allQuestions.length,
-                                pageSize: _pageSize,
-                                onPageChanged: (page) {
-                                  setState(() {
-                                    _currentPage = page;
-                                  });
-                                },
-                                onViewPressed: (q) {
-                                  setState(() {
-                                    _viewingQuestion = q;
-                                  });
-                                },
-                                onEditPressed: (q) {
-                                  setState(() {
-                                    _editingQuestion = q;
-                                  });
-                                },
-                                onStatusToggled: (q, isPublic) async {
-                                  final oldStatus = q.status;
-                                  final newStatus = isPublic
-                                      ? 'PUBLIC'
-                                      : 'PRIVATE';
-
-                                  // Optimistic UI Update
-                                  setState(() {
-                                    q.status = newStatus;
-                                  });
-
-                                  try {
-                                    final token = await _authService.getToken();
-                                    if (token != null) {
-                                      final api = HangoApi(
-                                        baseUrl: apiBaseUrl,
-                                        token: token,
-                                      );
-                                      await api.toggleQuestionStatus(
-                                        q.id,
-                                        newStatus,
-                                        isGroup: q.isGroup,
-                                      );
-                                    } else {
-                                      throw Exception('No token');
-                                    }
-                                  } catch (e) {
-                                    // Revert on failure
-                                    setState(() {
-                                      q.status = oldStatus;
-                                    });
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'System error, please try again later.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                isCourseManager: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ],
-            );
+            ),
+          ),
+        ),
+      ],
+    );
 
-    final Widget content = _editingQuestion != null
+    final Widget content = _isCreatingQuestion
+        ? CourseManagerCreateQuestionPage(
+            isCourseManager: true,
+            isEmbedded: true,
+            initialUsageType: _usageType,
+            onBack: () {
+              setState(() {
+                _isCreatingQuestion = false;
+              });
+              _fetchQuestions();
+            },
+          )
+        : _editingQuestion != null
         ? CourseManagerCreateQuestionPage(
             question: _editingQuestion,
             isEdit: true,
@@ -481,31 +504,28 @@ class _CourseManagerQuestionBankPageState
             },
           )
         : _viewingQuestion != null
-            ? CourseManagerCreateQuestionPage(
-                question: _viewingQuestion,
-                isReadOnly: true,
-                isCourseManager: true,
-                isEmbedded: true,
-                onBack: () {
-                  setState(() {
-                    _viewingQuestion = null;
-                  });
-                },
-              )
-            : bodyContent;
+        ? CourseManagerCreateQuestionPage(
+            question: _viewingQuestion,
+            isReadOnly: true,
+            isCourseManager: true,
+            isEmbedded: true,
+            onBack: () {
+              setState(() {
+                _viewingQuestion = null;
+              });
+            },
+          )
+        : bodyContent;
 
     if (widget.isEmbedded) {
-      return DefaultTabController(
-        length: 2,
-        child: content,
-      );
+      return DefaultTabController(length: 2, child: content);
     }
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
+        appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: ''),
         drawer: !isDesktop
             ? const Drawer(
                 child: CourseManagerSidebar(currentRoute: 'question_bank'),
@@ -556,108 +576,102 @@ class _CourseManagerQuestionBankPageState
       runSpacing: 12,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-          OutlinedButton.icon(
-            onPressed: () async {
-              try {
-                final token = await _authService.getToken();
-                if (token == null)
-                  throw Exception('Authentication token not found');
-                final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                final bytes = await api.downloadQuestionBankTemplate();
-                downloadBytes(
-                  bytes: bytes,
-                  filename: 'Hango_Question_Bank_Import_Template.xlsx',
-                  mimeType:
-                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        OutlinedButton.icon(
+          onPressed: () async {
+            try {
+              final token = await _authService.getToken();
+              if (token == null)
+                throw Exception('Authentication token not found');
+              final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+              final bytes = await api.downloadQuestionBankTemplate();
+              downloadBytes(
+                bytes: bytes,
+                filename: 'Hango_Question_Bank_Import_Template.xlsx',
+                mimeType:
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              );
+            } catch (e) {
+              if (context.mounted)
+                ToastHelper.showError(
+                  context,
+                  'Could not download template: $e',
                 );
-              } catch (e) {
-                if (context.mounted)
-                  ToastHelper.showError(
-                    context,
-                    'Could not download template: $e',
-                  );
-              }
-            },
-            icon: const Icon(
-              Icons.download_outlined,
+            }
+          },
+          icon: const Icon(
+            Icons.download_outlined,
+            color: Color(0xFF20B486),
+            size: 18,
+          ),
+          label: const Text(
+            'Download Template',
+            style: TextStyle(
               color: Color(0xFF20B486),
-              size: 18,
-            ),
-            label: const Text(
-              'Download Template',
-              style: TextStyle(
-                color: Color(0xFF20B486),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              side: const BorderSide(color: Color(0xFF20B486)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 12),
-          OutlinedButton.icon(
-            onPressed: _importFromExcel,
-            icon: const Icon(
-              Icons.file_upload_outlined,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            side: const BorderSide(color: Color(0xFF20B486)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton.icon(
+          onPressed: _importFromExcel,
+          icon: const Icon(
+            Icons.file_upload_outlined,
+            color: Color(0xFF1E293B),
+            size: 18,
+          ),
+          label: const Text(
+            'Import Excel',
+            style: TextStyle(
               color: Color(0xFF1E293B),
-              size: 18,
-            ),
-            label: const Text(
-              'Import Excel',
-              style: TextStyle(
-                color: Color(0xFF1E293B),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              side: const BorderSide(color: Color(0xFFCBD5E1)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CourseManagerCreateQuestionPage(
-                    isCourseManager: true,
-                    initialUsageType: _usageType,
-                  ),
-                ),
-              ).then((_) => _fetchQuestions());
-            },
-            icon: const Icon(
-              Icons.add_circle_outline,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              _isCreatingQuestion = true;
+            });
+          },
+          icon: const Icon(
+            Icons.add_circle_outline,
+            color: Colors.white,
+            size: 18,
+          ),
+          label: const Text(
+            'Create Question',
+            style: TextStyle(
               color: Colors.white,
-              size: 18,
-            ),
-            label: const Text(
-              'Create Question',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20B486),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
             ),
           ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF20B486),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+        ),
       ],
     );
 
@@ -668,11 +682,7 @@ class _CourseManagerQuestionBankPageState
       child: isCompact
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                titleRow,
-                const SizedBox(height: 16),
-                actionButtons,
-              ],
+              children: [titleRow, const SizedBox(height: 16), actionButtons],
             )
           : Row(
               children: [

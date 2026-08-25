@@ -257,6 +257,8 @@ class HangoApi {
     int? categoryId,
     int? difficultyId,
     int? usageType,
+    int? groupTypeId,
+    bool? isGroup,
   }) async {
     final queryParams = <String, String>{
       'type': type,
@@ -266,6 +268,8 @@ class HangoApi {
       if (categoryId != null) 'categoryId': categoryId.toString(),
       if (difficultyId != null) 'difficultyId': difficultyId.toString(),
       if (usageType != null) 'usageType': usageType.toString(),
+      if (groupTypeId != null) 'groupTypeId': groupTypeId.toString(),
+      if (isGroup != null) 'isGroup': isGroup.toString(),
     };
 
     // Build URL with query params
@@ -518,8 +522,9 @@ class HangoApi {
     String? description,
     int? durationMinutes,
     int? expectedQuestionCount,
-    double? passingScore,
-  ) async {
+    double? passingScore, {
+    int? questionSourceType,
+  }) async {
     final payload = {};
     if (title != null && title.isNotEmpty) payload['title'] = title;
     if (description != null && description.isNotEmpty)
@@ -528,6 +533,8 @@ class HangoApi {
     if (expectedQuestionCount != null)
       payload['expectedQuestionCount'] = expectedQuestionCount;
     if (passingScore != null) payload['passingScore'] = passingScore;
+    if (questionSourceType != null)
+      payload['questionSourceType'] = questionSourceType;
 
     final body = await _send(
       http.post(

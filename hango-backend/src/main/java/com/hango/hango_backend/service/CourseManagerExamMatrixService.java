@@ -11,5 +11,5 @@ public interface CourseManagerExamMatrixService {
     void createExamMatrix(String email, ExamMatrixCreateRequestDTO request);
     void updateExamMatrix(Long id, ExamMatrixCreateRequestDTO request);
     void toggleMatrixStatus(Long id);
-    Long generateExamFromMatrix(Long matrixId, String examTitle, String description, Integer expectedQuestionCount, Double passingScore, Integer durationMinutes, String email);
+    Long generateExamFromMatrix(Long matrixId, String examTitle, String description, Integer expectedQuestionCount, Double passingScore, Integer durationMinutes, Integer questionSourceType, String email);
 }
