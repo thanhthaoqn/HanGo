@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - dev
 
 jobs:
   build-frontend:
@@ -26,4 +27,4 @@ jobs:
 
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - run: flutter test
+      - run: flutter test --platform chrome
