@@ -47,6 +47,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final _profileNameController = TextEditingController();
   final _profileEmailController = TextEditingController();
   final _profileUsernameController = TextEditingController();
+  final _editFormKey = GlobalKey<FormState>();
   final _profilePhoneController = TextEditingController();
   final _profileAvatarController = TextEditingController();
   String _profileGender = 'Male';
@@ -709,6 +710,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Future<void> _updateUserDetails(int userId) async {
+    if (!_editFormKey.currentState!.validate()) {
+      return;
+    }
     setState(() {
       _isLoadingAccounts = true;
     });
@@ -3473,7 +3477,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ? 'Learner Account Detail'
         : 'Trainer Account Detail';
 
-    return Column(
+    return Form(
+      key: _editFormKey,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
@@ -3594,6 +3600,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a name' : null,
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -3640,6 +3647,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a username' : null,
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -3700,6 +3708,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please enter an email';
+                            if (!RegExp(r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+').hasMatch(v)) {
+                              return 'Invalid email format';
+                            }
+                            return null;
+                          },
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -3832,6 +3847,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please select date of birth';
+                            final parts = v.split('/');
+                            if (parts.length != 3) return 'Please enter date in DD/MM/YYYY format';
+                            return null;
+                          },
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -4102,6 +4123,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         ),
       ],
+    ),
     );
   }
 
