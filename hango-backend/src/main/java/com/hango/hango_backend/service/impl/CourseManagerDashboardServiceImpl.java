@@ -40,20 +40,216 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     @Override
     @Transactional(readOnly = true)
     public CourseManagerDashboardSummaryDTO getDashboardSummary() {
+        // === Original KPI cards ===
         long registeredUsersCount = userRepository.countByRoleName("LEARNER");
         long activeCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("PUBLISHED");
-        long inactiveCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("DRAFT")
-                + courseRepository.countByStatusAndDeletedAtIsNull("ARCHIVED")
-                + courseRepository.countByStatusAndDeletedAtIsNull("HIDDEN")
-                + courseRepository.countByStatusAndDeletedAtIsNull("PENDING");
+        long draftCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("DRAFT");
+        long hiddenCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("HIDDEN");
+        long rejectedCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("REJECTED");
+        long pendingCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("PENDING_APPROVAL");
+        long archivedCoursesCount = courseRepository.countByStatusAndDeletedAtIsNull("ARCHIVED");
+        long inactiveCoursesCount = draftCoursesCount + archivedCoursesCount + hiddenCoursesCount + pendingCoursesCount;
         long examsCount = examRepository.count();
+
+        // === Enhanced KPI cards ===
+        long pendingExamsCount = 0;
+        try {
+            pendingExamsCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM exams WHERE (status = 'PENDING_APPROVAL' OR status = 'SUBMITTED') AND deleted_at IS NULL", Long.class);
+        } catch (Exception ignored) {}
+
+        long activeLearnerCount = 0;
+        try {
+            activeLearnerCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(DISTINCT user_id) FROM enrollments", Long.class);
+        } catch (Exception ignored) {}
+
+        double avgCourseRating = 0.0;
+        try {
+            Double avg = jdbcTemplate.queryForObject("SELECT AVG(rating) FROM course_ratings", Double.class);
+            avgCourseRating = avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0;
+        } catch (Exception ignored) {}
+
+        // === Weekly deltas ===
+        double coursesGrowthPercent = computeWeeklyGrowth("courses", "created_at");
+        double learnersGrowthPercent = computeWeeklyGrowth("enrollments", "enrolled_at");
+        double examsGrowthPercent = computeWeeklyGrowth("exams", "created_at");
+
+        // === Enrollment trend (8 weeks) ===
+        List<com.hango.hango_backend.dto.WeeklyEnrollmentDTO> enrollmentTrend = computeEnrollmentTrend();
+
+        // === Top 5 courses by enrollment ===
+        List<com.hango.hango_backend.dto.TopCourseDTO> topCoursesByEnrollment = computeTopCourses();
+
+        // === Top 5 trainers by rating ===
+        List<com.hango.hango_backend.dto.TopTrainerDTO> topTrainersByRating = computeTopTrainers();
+
+        // === Content quality metrics ===
+        long coursesWithoutDescription = 0;
+        long coursesWithFewLessons = 0;
+        long examsWithoutQuestions = 0;
+        double avgLessonsPerCourse = 0.0;
+        long lowRatedCourses = 0;
+        try {
+            coursesWithoutDescription = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM courses WHERE deleted_at IS NULL AND status = 'PUBLISHED' AND (description IS NULL OR description = '')", Long.class);
+            coursesWithFewLessons = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM courses c WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
+                    "AND (SELECT COUNT(*) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id) < 3", Long.class);
+            examsWithoutQuestions = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM exams e WHERE e.deleted_at IS NULL AND (e.expected_question_count IS NULL OR e.expected_question_count = 0)", Long.class);
+            Double avgLessons = jdbcTemplate.queryForObject(
+                    "SELECT AVG(lesson_cnt) FROM (SELECT c.id, COUNT(l.id) AS lesson_cnt FROM courses c " +
+                    "LEFT JOIN sections s ON s.course_id = c.id LEFT JOIN lessons l ON l.section_id = s.id " +
+                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' GROUP BY c.id) sub", Double.class);
+            avgLessonsPerCourse = avgLessons != null ? Math.round(avgLessons * 10.0) / 10.0 : 0.0;
+            lowRatedCourses = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(DISTINCT cr.course_id) FROM course_ratings cr " +
+                    "JOIN courses c ON c.id = cr.course_id WHERE c.deleted_at IS NULL " +
+                    "GROUP BY cr.course_id HAVING AVG(cr.rating) < 3.0", Long.class);
+        } catch (Exception ignored) {}
+
+        // === Course distribution by category ===
+        java.util.Map<String, Long> coursesByCategory = new java.util.LinkedHashMap<>();
+        try {
+            List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT COALESCE(sp.param_value, 'Uncategorized') AS cat, COUNT(c.id) AS cnt " +
+                    "FROM courses c LEFT JOIN system_parameters sp ON c.category_id = sp.id " +
+                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
+                    "GROUP BY cat ORDER BY cnt DESC");
+            for (java.util.Map<String, Object> row : rows) {
+                coursesByCategory.put((String) row.get("cat"), ((Number) row.get("cnt")).longValue());
+            }
+        } catch (Exception ignored) {}
 
         return CourseManagerDashboardSummaryDTO.builder()
                 .registeredUsersCount(registeredUsersCount)
                 .activeCoursesCount(activeCoursesCount)
                 .inactiveCoursesCount(inactiveCoursesCount)
                 .examsCount(examsCount)
+                .pendingCoursesCount(pendingCoursesCount)
+                .pendingExamsCount(pendingExamsCount)
+                .activeLearnerCount(activeLearnerCount)
+                .avgCourseRating(avgCourseRating)
+                .draftCoursesCount(draftCoursesCount)
+                .publishedCoursesCount(activeCoursesCount)
+                .rejectedCoursesCount(rejectedCoursesCount)
+                .hiddenCoursesCount(hiddenCoursesCount)
+                .coursesGrowthPercent(coursesGrowthPercent)
+                .learnersGrowthPercent(learnersGrowthPercent)
+                .examsGrowthPercent(examsGrowthPercent)
+                .enrollmentTrend(enrollmentTrend)
+                .topCoursesByEnrollment(topCoursesByEnrollment)
+                .topTrainersByRating(topTrainersByRating)
+                .coursesWithoutDescription(coursesWithoutDescription)
+                .coursesWithFewLessons(coursesWithFewLessons)
+                .examsWithoutQuestions(examsWithoutQuestions)
+                .avgLessonsPerCourse(avgLessonsPerCourse)
+                .lowRatedCourses(lowRatedCourses)
+                .coursesByCategory(coursesByCategory)
                 .build();
+    }
+
+    // ---- Helper methods for dashboard computations ----
+
+    private double computeWeeklyGrowth(String table, String dateColumn) {
+        try {
+            Long thisWeek = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM " + table + " WHERE " + dateColumn + " >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)", Long.class);
+            Long lastWeek = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM " + table + " WHERE " + dateColumn + " >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND " + dateColumn + " < DATE_SUB(CURDATE(), INTERVAL 7 DAY)", Long.class);
+            if (lastWeek == null || lastWeek == 0) return thisWeek != null && thisWeek > 0 ? 100.0 : 0.0;
+            return Math.round(((thisWeek - lastWeek) * 100.0 / lastWeek) * 10.0) / 10.0;
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    private List<com.hango.hango_backend.dto.WeeklyEnrollmentDTO> computeEnrollmentTrend() {
+        List<com.hango.hango_backend.dto.WeeklyEnrollmentDTO> trend = new java.util.ArrayList<>();
+        try {
+            // Generate 8 weeks of data
+            for (int i = 7; i >= 0; i--) {
+                int startDay = i * 7;
+                int endDay = (i - 1) * 7;
+                String label;
+                if (i == 0) {
+                    label = "This week";
+                } else {
+                    java.time.LocalDate weekStart = java.time.LocalDate.now().minusDays(startDay);
+                    label = weekStart.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"));
+                }
+                Long count = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)" +
+                        (i > 0 ? " AND enrolled_at < DATE_SUB(CURDATE(), INTERVAL ? DAY)" : ""),
+                        i > 0 ? new Object[]{startDay, endDay} : new Object[]{startDay},
+                        Long.class);
+                trend.add(com.hango.hango_backend.dto.WeeklyEnrollmentDTO.builder()
+                        .weekLabel(label)
+                        .count(count != null ? count : 0)
+                        .build());
+            }
+        } catch (Exception e) {
+            // Return empty trend on error
+        }
+        return trend;
+    }
+
+    private List<com.hango.hango_backend.dto.TopCourseDTO> computeTopCourses() {
+        List<com.hango.hango_backend.dto.TopCourseDTO> topCourses = new java.util.ArrayList<>();
+        try {
+            List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT c.id, c.title, u.full_name AS trainer_name, COUNT(e.id) AS enroll_count, " +
+                    "(SELECT AVG(cr.rating) FROM course_ratings cr WHERE cr.course_id = c.id) AS avg_rating " +
+                    "FROM courses c " +
+                    "JOIN users u ON c.creator_id = u.id " +
+                    "LEFT JOIN enrollments e ON e.course_id = c.id " +
+                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
+                    "GROUP BY c.id, c.title, u.full_name " +
+                    "ORDER BY enroll_count DESC LIMIT 5");
+            for (java.util.Map<String, Object> row : rows) {
+                topCourses.add(com.hango.hango_backend.dto.TopCourseDTO.builder()
+                        .id(((Number) row.get("id")).longValue())
+                        .title((String) row.get("title"))
+                        .trainerName((String) row.get("trainer_name"))
+                        .enrollmentCount(((Number) row.get("enroll_count")).longValue())
+                        .avgRating(row.get("avg_rating") != null ? ((Number) row.get("avg_rating")).doubleValue() : null)
+                        .build());
+            }
+        } catch (Exception e) {
+            // Return empty on error
+        }
+        return topCourses;
+    }
+
+    private List<com.hango.hango_backend.dto.TopTrainerDTO> computeTopTrainers() {
+        List<com.hango.hango_backend.dto.TopTrainerDTO> topTrainers = new java.util.ArrayList<>();
+        try {
+            List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT u.id, u.full_name, u.avatar_url, AVG(cr.rating) AS avg_rating, " +
+                    "COUNT(DISTINCT c.id) AS course_count, " +
+                    "(SELECT COUNT(*) FROM enrollments en JOIN courses cc ON en.course_id = cc.id WHERE cc.creator_id = u.id) AS total_enrollments " +
+                    "FROM users u " +
+                    "JOIN courses c ON c.creator_id = u.id " +
+                    "JOIN course_ratings cr ON cr.course_id = c.id " +
+                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
+                    "GROUP BY u.id, u.full_name, u.avatar_url " +
+                    "HAVING COUNT(cr.id) >= 1 " +
+                    "ORDER BY avg_rating DESC LIMIT 5");
+            for (java.util.Map<String, Object> row : rows) {
+                topTrainers.add(com.hango.hango_backend.dto.TopTrainerDTO.builder()
+                        .id(((Number) row.get("id")).longValue())
+                        .fullName((String) row.get("full_name"))
+                        .avatarUrl((String) row.get("avatar_url"))
+                        .avgRating(Math.round(((Number) row.get("avg_rating")).doubleValue() * 10.0) / 10.0)
+                        .courseCount(((Number) row.get("course_count")).longValue())
+                        .totalEnrollments(((Number) row.get("total_enrollments")).longValue())
+                        .build());
+            }
+        } catch (Exception e) {
+            // Return empty on error
+        }
+        return topTrainers;
     }
 
     @Override
