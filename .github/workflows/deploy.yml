@@ -3,8 +3,12 @@ name: CI/CD Pipeline - Deploy to AWS EC2
 on:
   push:
     branches:
-      - dev   # Triggers on push to dev branch
+      - dev
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
 
 concurrency:
   group: deploy-dev
@@ -15,87 +19,110 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout codebase
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Build on the runner so the small EC2 host only stores runtime layers
-      - name: Build Runtime Images
+      - name: Resolve image names
+        id: images
+        shell: bash
         run: |
-          set -euo pipefail
-          docker build --tag hango-backend:latest hango-backend
-          docker builder prune --all --force
-          docker build --tag hango-frontend:latest --file hango-frontend/Dockerfile .
-          docker builder prune --all --force
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "backend=ghcr.io/${owner}/hango-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${owner}/hango-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      # 3. Package only the runtime images and deployment configuration
-      - name: Create Deploy Package
-        run: |
-          set -euo pipefail
-          docker save hango-backend:latest hango-frontend:latest | gzip > hango-images.tar.gz
-          zip -r deploy.zip docker-compose.yml nginx/conf.d
-          sha256sum deploy.zip hango-images.tar.gz > deploy.sha256
-          ls -lh deploy.zip hango-images.tar.gz deploy.sha256
-
-      # 4. Reclaim build artifacts without touching containers or volumes
-      - name: Prepare EC2 Deploy Directory
-        uses: appleboy/ssh-action@v1.2.5
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
-          host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 5m
-          script: |
-            set -eu
-            test -d /home/ubuntu
-            test -w /home/ubuntu
-            rm -f /home/ubuntu/deploy.zip /home/ubuntu/hango-images.tar.gz /home/ubuntu/deploy.sha256
-            docker builder prune --all --force || true
-            docker image prune --all --force || true
-            mkdir -p /home/ubuntu/hango
-            df -h /home/ubuntu
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 5. Copy the runtime images and configuration to AWS EC2
-      - name: Copy Deploy Package to EC2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./hango-backend
+          file: ./hango-backend/Dockerfile
+          push: true
+          tags: ${{ steps.images.outputs.backend }}
+          cache-from: type=gha,scope=hango-backend
+          cache-to: type=gha,mode=max,scope=hango-backend
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./hango-frontend/Dockerfile
+          push: true
+          tags: ${{ steps.images.outputs.frontend }}
+          cache-from: type=gha,scope=hango-frontend
+          cache-to: type=gha,mode=max,scope=hango-frontend
+
+      - name: Package deployment configuration
+        run: zip -r deploy.zip docker-compose.yml nginx/conf.d
+
+      - name: Copy deployment configuration to EC2
         uses: appleboy/scp-action@v1.0.0
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy.zip,hango-images.tar.gz,deploy.sha256"
-          target: "/home/ubuntu"
+          source: deploy.zip
+          target: /home/ubuntu
           overwrite: true
           command_timeout: 15m
-          debug: true
 
-      # 6. Load the pre-built images and restart the application
-      - name: SSH and Restart Containers
+      - name: Pull images and deploy on EC2
         uses: appleboy/ssh-action@v1.2.5
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend }}
+          FRONTEND_IMAGE: ${{ steps.images.outputs.frontend }}
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 30m
+          envs: GHCR_TOKEN,GHCR_USER,BACKEND_IMAGE,FRONTEND_IMAGE
           script: |
             set -eu
-            cd /home/ubuntu
-            sha256sum --check deploy.sha256
+            mkdir -p /home/ubuntu/hango
             unzip -o /home/ubuntu/deploy.zip -d /home/ubuntu/hango
-            docker load --input /home/ubuntu/hango-images.tar.gz
-            rm -f /home/ubuntu/deploy.zip /home/ubuntu/hango-images.tar.gz /home/ubuntu/deploy.sha256
+            rm -f /home/ubuntu/deploy.zip
             cd /home/ubuntu/hango
-            docker-compose up -d --no-build --force-recreate backend frontend nginx
-            sleep 30
-            for container in hango-backend hango-frontend hango-nginx; do
-              running="$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null || true)"
-              restarts="$(docker inspect --format '{{.RestartCount}}' "$container" 2>/dev/null || echo 0)"
-              if [ "$running" != "true" ] || [ "$restarts" -gt 0 ]; then
-                echo "$container failed to start cleanly"
-                docker logs --tail 200 "$container" || true
-                exit 1
-              fi
-            done
-            docker image prune --all --force
-            docker builder prune --all --force
+            test -s .env
+
+            if docker inspect hango-nginx >/dev/null 2>&1; then
+              docker exec hango-nginx nginx -t
+            fi
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
+            previous_backend="$(sed -n 's/^BACKEND_IMAGE=//p' .env | tail -n 1)"
+            previous_frontend="$(sed -n 's/^FRONTEND_IMAGE=//p' .env | tail -n 1)"
+            previous_backend="${previous_backend:-hango-backend:latest}"
+            previous_frontend="${previous_frontend:-hango-frontend:latest}"
+
+            sed -i '/^BACKEND_IMAGE=/d;/^FRONTEND_IMAGE=/d' .env
+            printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\n' "$BACKEND_IMAGE" "$FRONTEND_IMAGE" >> .env
+            chmod 600 .env
+
+            docker-compose pull backend frontend
+            if ! docker-compose up -d --no-build --wait --wait-timeout 180; then
+              echo "Deployment health check failed; restoring previous images."
+              sed -i '/^BACKEND_IMAGE=/d;/^FRONTEND_IMAGE=/d' .env
+              printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\n' "$previous_backend" "$previous_frontend" >> .env
+              docker-compose up -d --no-build --wait --wait-timeout 180
+              exit 1
+            fi
+
+            docker exec hango-nginx nginx -t
+            docker exec hango-nginx nginx -s reload
+            docker image prune -af --filter "until=168h"
             docker-compose ps
+            free -h
             df -h /home/ubuntu
