@@ -1,22 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
 import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
 import '../../../../utils/file_picker_helper.dart';
 import '../../../../utils/trainer_document_utils.dart';
+import '../../../../utils/trainer_revision_notes.dart';
+import '../../../../utils/trainer_onboarding_validation_utils.dart';
 import '../../../widgets/shared_header.dart';
 import '../../../widgets/shared_footer.dart';
 import 'trainer_onboarding_agreement_page.dart';
 import 'trainer_onboarding_status_page.dart';
 import 'trainer_payout_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
+import 'package:hango/presentation/widgets/document_preview_dialog.dart';
 import '../../login_page.dart';
 
 class TrainerOnboardingDetailsPage extends StatefulWidget {
@@ -55,9 +56,14 @@ class _TrainerOnboardingDetailsPageState
   String _initialBio = '';
   String _initialCertJson = '';
 
-  // Validation States
+  // Validation States & Inline Error Messages
   bool _bioError = false;
   bool _phoneNumberError = false;
+  String? _phoneNumberErrorText;
+  String? _bioErrorText;
+  String? _genderErrorText;
+  String? _avatarErrorText;
+  String? _certificatesErrorText;
 
   // Avatar & Gender Onboarding Fields
   String? _avatarUrl;
@@ -77,16 +83,6 @@ class _TrainerOnboardingDetailsPageState
     _loadTrainerHeaderInfo();
   }
 
-  bool _isValidPhoneNumber(String? phone) {
-    if (phone == null) return false;
-    final trimmed = phone.trim();
-    if (trimmed.isEmpty) return false;
-    final vnPhoneRegex = RegExp(r'^(03|05|07|08|09)\d{8}$');
-    final isDummyNumber =
-        RegExp(r'^(\d)\1{9}$').hasMatch(trimmed) || trimmed == '1234567890';
-    return vnPhoneRegex.hasMatch(trimmed) && !isDummyNumber;
-  }
-
   void _populateFields(Map<String, dynamic> p) {
     _bioController.text = p['bio'] ?? '';
     _avatarUrl = p['avatarUrl'];
@@ -94,7 +90,7 @@ class _TrainerOnboardingDetailsPageState
     _gender = (g == 'MALE' || g == 'FEMALE') ? g : null;
 
     final rawPhone = p['phoneNumber']?.toString();
-    if (_isValidPhoneNumber(rawPhone)) {
+    if (isValidVietnamesePhoneNumber(rawPhone)) {
       _phoneNumberController.text = rawPhone!.trim();
     } else {
       _phoneNumberController.clear();
@@ -121,13 +117,14 @@ class _TrainerOnboardingDetailsPageState
       final phone = prefs.getString('user_phone') ?? '';
       final gender = prefs.getString('user_gender');
       final avatar = prefs.getString('user_avatar_url') ?? '';
-      if (!_isValidPhoneNumber(phone)) {
+      if (!isValidVietnamesePhoneNumber(phone)) {
         await prefs.remove('user_phone');
       }
       setState(() {
         _userFullName = name;
         _userEmail = email;
-        if (_phoneNumberController.text.isEmpty && _isValidPhoneNumber(phone)) {
+        if (_phoneNumberController.text.isEmpty &&
+            isValidVietnamesePhoneNumber(phone)) {
           _phoneNumberController.text = phone.trim();
         }
         if (_gender == null || (_gender != 'MALE' && _gender != 'FEMALE')) {
@@ -145,7 +142,7 @@ class _TrainerOnboardingDetailsPageState
   void _syncSharedPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     final phone = _phoneNumberController.text.trim();
-    if (_isValidPhoneNumber(phone)) {
+    if (isValidVietnamesePhoneNumber(phone)) {
       await prefs.setString('user_phone', phone);
     } else {
       await prefs.remove('user_phone');
@@ -215,48 +212,78 @@ class _TrainerOnboardingDetailsPageState
     };
   }
 
-  Future<Map<String, dynamic>?> _uploadFileToCloudinaryWithDetails() async {
+  Future<Map<String, dynamic>?> _uploadFileToCloudinaryWithDetails({
+    required bool allowPdf,
+    required int maxSizeBytes,
+    required Function(String errorMsg) onError,
+  }) async {
     try {
-      final picked = await pickImage();
-      if (picked == null || picked.bytes == null) return null;
+      final picked = allowPdf ? await pickImageOrPdf() : await pickImage();
+      if (picked == null || picked.bytes.isEmpty) return null;
 
-      final url = Uri.parse(
-        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      final validationError = validateTrainerUploadFile(
+        fileName: picked.name,
+        fileSizeBytes: picked.bytes.length,
+        maxSizeBytes: maxSizeBytes,
+        allowPdf: allowPdf,
+        isVi: LanguageManager.isVi,
       );
-      final request = http.MultipartRequest('POST', url)
-        ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            picked.bytes!,
-            filename: picked.name,
-          ),
-        );
+      if (validationError != null) {
+        onError(validationError);
+        return null;
+      }
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody);
+      final result = allowPdf
+          ? await _onboardingService.uploadTrainerDocument(
+              bytes: picked.bytes,
+              fileName: picked.name,
+            )
+          : await _onboardingService.uploadTrainerAvatar(
+              bytes: picked.bytes,
+              fileName: picked.name,
+            );
+      if (result['success'] == true) {
         return {
-          'url': (data['secure_url'] ?? data['url']).toString(),
+          'url': result['data']['url'].toString(),
           'fileName': picked.name,
-          'bytes': Uint8List.fromList(List<int>.from(picked.bytes!)),
         };
       }
-    } catch (e) {
-      debugPrint('Cloudinary upload error: $e');
+      onError(result['message'] ?? 'File upload failed. Please try again.');
+    } catch (_) {
+      onError(
+        LanguageManager.isVi
+            ? 'Không thể tải file. Vui lòng thử lại.'
+            : 'Unable to upload the file. Please try again.',
+      );
     }
     return null;
   }
 
   Future<void> _pickAndUpload(String targetDoc) async {
     try {
-      final res = await _uploadFileToCloudinaryWithDetails();
+      if (targetDoc == 'avatar') {
+        setState(() {
+          _isUploadingAvatar = true;
+          _avatarErrorText = null;
+        });
+      }
+      final res = await _uploadFileToCloudinaryWithDetails(
+        allowPdf: false,
+        maxSizeBytes: 2 * 1024 * 1024,
+        onError: (err) {
+          setState(() {
+            if (targetDoc == 'avatar') {
+              _avatarErrorText = err;
+              _isUploadingAvatar = false;
+            }
+          });
+        },
+      );
       if (res != null && res['url'] != null) {
         setState(() {
           if (targetDoc == 'avatar') {
             _avatarUrl = res['url'];
+            _avatarErrorText = null;
             _isUploadingAvatar = false;
             _updateLocalAvatar(res['url']!);
           }
@@ -270,6 +297,10 @@ class _TrainerOnboardingDetailsPageState
                 : 'Avatar uploaded successfully!',
           );
         }
+      } else {
+        setState(() {
+          _isUploadingAvatar = false;
+        });
       }
     } catch (e) {
       setState(() {
@@ -283,6 +314,8 @@ class _TrainerOnboardingDetailsPageState
     String? tempUrl;
     bool isUploading = false;
     String selectedDocType = trainerDocTypeOther;
+    String? modalCertNameErrorText;
+    String? modalFileErrorText;
 
     showDialog(
       context: context,
@@ -336,7 +369,14 @@ class _TrainerOnboardingDetailsPageState
                     const SizedBox(height: 8),
                     TextField(
                       controller: nameController,
+                      onChanged: (val) {
+                        if (val.trim().isNotEmpty &&
+                            modalCertNameErrorText != null) {
+                          setModalState(() => modalCertNameErrorText = null);
+                        }
+                      },
                       decoration: InputDecoration(
+                        errorText: modalCertNameErrorText,
                         hintText: isVi
                             ? 'Ví dụ: Bachelor of English Pedagogy, IELTS Academic'
                             : 'E.g.: Bachelor of English Pedagogy, IELTS Academic',
@@ -368,6 +408,7 @@ class _TrainerOnboardingDetailsPageState
                                 setModalState(() {
                                   selectedDocType = chipType;
                                   nameController.text = chipTitle;
+                                  modalCertNameErrorText = null;
                                   nameController.selection =
                                       TextSelection.collapsed(
                                         offset: nameController.text.length,
@@ -408,28 +449,54 @@ class _TrainerOnboardingDetailsPageState
                           }).toList(),
                     ),
                     const SizedBox(height: 20),
-                    Text(
-                      isVi
-                          ? 'Ảnh chứng chỉ / Bằng cấp *'
-                          : 'Certificate / Degree Image *',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Color(0xFF334155),
-                        fontFamily: 'Outfit',
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isVi
+                              ? 'Ảnh / File chứng chỉ (Tối đa 5MB) *'
+                              : 'Certificate Image / Document (Max 5MB) *',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF334155),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        Text(
+                          isVi ? 'JPG, PNG, WEBP, PDF' : 'JPG, PNG, WEBP, PDF',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     InkWell(
                       onTap: isUploading
                           ? null
                           : () async {
-                              setModalState(() => isUploading = true);
+                              setModalState(() {
+                                isUploading = true;
+                                modalFileErrorText = null;
+                              });
                               final uploaded =
-                                  await _uploadFileToCloudinaryWithDetails();
+                                  await _uploadFileToCloudinaryWithDetails(
+                                    allowPdf: true,
+                                    maxSizeBytes: 5 * 1024 * 1024,
+                                    onError: (err) {
+                                      setModalState(() {
+                                        modalFileErrorText = err;
+                                        isUploading = false;
+                                      });
+                                    },
+                                  );
                               if (uploaded != null && uploaded['url'] != null) {
                                 setModalState(() {
                                   tempUrl = uploaded['url'];
+                                  modalFileErrorText = null;
                                   isUploading = false;
                                 });
                               } else {
@@ -443,7 +510,9 @@ class _TrainerOnboardingDetailsPageState
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: const Color(0xFFCBD5E1),
+                            color: modalFileErrorText != null
+                                ? Colors.redAccent
+                                : const Color(0xFFCBD5E1),
                             style: BorderStyle.solid,
                           ),
                         ),
@@ -457,8 +526,8 @@ class _TrainerOnboardingDetailsPageState
                                   const SizedBox(height: 12),
                                   Text(
                                     isVi
-                                        ? 'Đang tải ảnh...'
-                                        : 'Uploading image...',
+                                        ? 'Đang tải tài liệu...'
+                                        : 'Uploading document...',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF28B79B),
@@ -479,6 +548,34 @@ class _TrainerOnboardingDetailsPageState
                                             width: double.infinity,
                                             height: 220,
                                             fit: BoxFit.contain,
+                                            errorBuilder: (ctx, err, st) =>
+                                                Center(
+                                                  child: Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      const Icon(
+                                                        Icons.picture_as_pdf,
+                                                        size: 48,
+                                                        color: Color(
+                                                          0xFF28B79B,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Text(
+                                                        tempUrl!
+                                                            .split('/')
+                                                            .last,
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
                                           ),
                                         ),
                                         Positioned(
@@ -534,8 +631,8 @@ class _TrainerOnboardingDetailsPageState
                                                     const SizedBox(width: 4),
                                                     Text(
                                                       isVi
-                                                          ? 'Đổi ảnh khác'
-                                                          : 'Change Image',
+                                                          ? 'Đổi file khác'
+                                                          : 'Change File',
                                                       style: const TextStyle(
                                                         color: Colors.white,
                                                         fontSize: 11,
@@ -563,18 +660,39 @@ class _TrainerOnboardingDetailsPageState
                                         const SizedBox(height: 8),
                                         Text(
                                           isVi
-                                              ? 'Nhấp để tải lên ảnh mới (JPG, PNG, PDF)'
-                                              : 'Click to upload document image (JPG, PNG, PDF)',
+                                              ? 'Nhấp để tải lên chứng chỉ (JPG, PNG, WEBP, PDF)'
+                                              : 'Click to upload document (JPG, PNG, WEBP, PDF)',
                                           style: const TextStyle(
                                             color: Color(0xFF28B79B),
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13,
                                           ),
                                         ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          isVi
+                                              ? 'Dung lượng tối đa: 5MB'
+                                              : 'Maximum file size: 5MB',
+                                          style: const TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 11,
+                                          ),
+                                        ),
                                       ],
                                     )),
                       ),
                     ),
+                    if (modalFileErrorText != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        modalFileErrorText!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -585,32 +703,47 @@ class _TrainerOnboardingDetailsPageState
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
-                          onPressed:
-                              (tempUrl != null &&
-                                  nameController.text.trim().isNotEmpty &&
-                                  selectedDocType != trainerDocTypeOther)
-                              ? () {
-                                  setState(() {
-                                    _certificates = normalizeTrainerDocuments([
-                                      ..._certificates,
-                                      {
-                                        'type': selectedDocType,
-                                        'name': nameController.text.trim(),
-                                        'url': tempUrl!,
-                                        'source': 'trainer_onboarding_manual',
-                                      },
-                                    ]);
-                                  });
-                                  _triggerAutoSave();
-                                  Navigator.pop(context);
-                                  ToastHelper.showSuccess(
-                                    context,
-                                    isVi
-                                        ? 'Đã thêm chứng chỉ!'
-                                        : 'Certificate added!',
-                                  );
-                                }
-                              : null,
+                          onPressed: () {
+                            bool hasErr = false;
+                            if (nameController.text.trim().isEmpty) {
+                              setModalState(
+                                () => modalCertNameErrorText = isVi
+                                    ? 'Vui lòng nhập tên chứng chỉ'
+                                    : 'Please enter certificate name',
+                              );
+                              hasErr = true;
+                            }
+                            if (tempUrl == null) {
+                              setModalState(
+                                () => modalFileErrorText = isVi
+                                    ? 'Vui lòng tải lên tài liệu chứng chỉ (tối đa 5MB)'
+                                    : 'Please upload document file (max 5MB)',
+                              );
+                              hasErr = true;
+                            }
+                            if (hasErr) return;
+
+                            setState(() {
+                              _certificates = normalizeTrainerDocuments([
+                                ..._certificates,
+                                {
+                                  'type': selectedDocType,
+                                  'name': nameController.text.trim(),
+                                  'url': tempUrl!,
+                                  'source': 'trainer_onboarding_manual',
+                                },
+                              ]);
+                              _certificatesErrorText = null;
+                            });
+                            _triggerAutoSave();
+                            Navigator.pop(context);
+                            ToastHelper.showSuccess(
+                              context,
+                              isVi
+                                  ? 'Đã thêm chứng chỉ!'
+                                  : 'Certificate added!',
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF28B79B),
                             foregroundColor: Colors.white,
@@ -742,11 +875,47 @@ class _TrainerOnboardingDetailsPageState
         _buildCertificateRequirementsNoteCard(isVi),
         Container(
           width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.info_outline,
+                size: 18,
+                color: Color(0xFF475569),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isVi
+                      ? 'Định dạng hỗ trợ: JPG, PNG, WEBP, PDF • Dung lượng tối đa: 5MB/tài liệu'
+                      : 'Supported formats: JPG, PNG, WEBP, PDF • Max file size: 5MB per document',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+            border: Border.all(
+              color: _certificatesErrorText != null
+                  ? Colors.redAccent
+                  : const Color(0xFFCBD5E1),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -800,7 +969,11 @@ class _TrainerOnboardingDetailsPageState
                         (isVi
                             ? 'Chứng chỉ ${idx + 1}'
                             : 'Certificate ${idx + 1}');
-                    final url = item['url'] ?? '';
+                    final url = (item['url'] ?? '').trim();
+                    final isPdf =
+                        url.toLowerCase().endsWith('.pdf') ||
+                        url.toLowerCase().contains('.pdf?') ||
+                        url.toLowerCase().contains('/pdf/');
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -814,17 +987,31 @@ class _TrainerOnboardingDetailsPageState
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(6),
-                            child: Image.network(
-                              url,
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                    Icons.insert_drive_file_outlined,
-                                    color: Color(0xFF94A3B8),
+                            child: isPdf
+                                ? Container(
+                                    width: 50,
+                                    height: 50,
+                                    color: const Color(0xFFEFF6FF),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.picture_as_pdf_rounded,
+                                        color: Color(0xFFDC2626),
+                                        size: 26,
+                                      ),
+                                    ),
+                                  )
+                                : Image.network(
+                                    url,
+                                    width: 50,
+                                    height: 50,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Icon(
+                                              Icons.insert_drive_file_outlined,
+                                              color: Color(0xFF94A3B8),
+                                            ),
                                   ),
-                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -854,10 +1041,24 @@ class _TrainerOnboardingDetailsPageState
                           ),
                           IconButton(
                             icon: const Icon(
+                              Icons.visibility_outlined,
+                              color: Color(0xFF2563EB),
+                              size: 20,
+                            ),
+                            tooltip: isVi ? 'Xem tài liệu' : 'Preview Document',
+                            onPressed: () => showDocumentPreviewDialog(
+                              context,
+                              certName,
+                              url,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
                               Icons.delete_outline_rounded,
                               color: Colors.redAccent,
                               size: 20,
                             ),
+                            tooltip: isVi ? 'Xóa tài liệu' : 'Delete Document',
                             onPressed: () {
                               setState(() {
                                 _certificates.removeAt(idx);
@@ -912,6 +1113,38 @@ class _TrainerOnboardingDetailsPageState
             ],
           ),
         ),
+        if (_certificatesErrorText != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFCA5A5)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Colors.redAccent,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _certificatesErrorText!,
+                    style: const TextStyle(
+                      color: Color(0xFF991B1B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -926,72 +1159,75 @@ class _TrainerOnboardingDetailsPageState
         RegExp(r'^(\d)\1{9}$').hasMatch(phoneNumber) ||
         phoneNumber == '1234567890';
 
-    setState(() {
-      _bioError = bio.isEmpty || bio.length < 50;
-      _phoneNumberError =
-          phoneNumber.isEmpty ||
-          !vnPhoneRegex.hasMatch(phoneNumber) ||
-          isDummyNumber;
-    });
-
-    if (_bioError) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Thông tin kinh nghiệm giảng dạy (Bio) cần tối thiểu 50 ký tự.'
-            : 'Biography/Experience must be at least 50 characters long.',
-      );
-      return false;
-    }
-    if (_phoneNumberError) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Số điện thoại không hợp lệ. Phải bắt đầu bằng 03/05/07/08/09, đủ 10 số và không được nhập số giả trùng lặp (ví dụ: 0000000000).'
-            : 'Invalid phone number. Must start with 03/05/07/08/09, be 10 digits, and not a dummy number (e.g. 0000000000).',
-      );
-      return false;
+    String? phoneErr;
+    if (phoneNumber.isEmpty) {
+      phoneErr = isVi
+          ? 'Vui lòng nhập số điện thoại liên hệ.'
+          : 'Please enter contact phone number.';
+    } else if (!vnPhoneRegex.hasMatch(phoneNumber) || isDummyNumber) {
+      phoneErr = isVi
+          ? 'Số điện thoại không hợp lệ (bắt đầu bằng 03/05/07/08/09, đủ 10 số).'
+          : 'Invalid phone number (must be 10 digits starting with 03/05/07/08/09).';
     }
 
-    if (_gender == null) {
-      ToastHelper.showError(
-        context,
-        isVi ? 'Vui lòng chọn giới tính.' : 'Please select your gender.',
-      );
-      return false;
+    String? bioErr;
+    if (bio.isEmpty) {
+      bioErr = isVi
+          ? 'Vui lòng nhập phần giới thiệu bản thân.'
+          : 'Please enter your bio.';
+    } else if (bio.length < 50) {
+      bioErr = isVi
+          ? 'Giới thiệu bản thân cần tối thiểu 50 ký tự (hiện tại: ${bio.length}/50).'
+          : 'Bio must be at least 50 characters long (currently: ${bio.length}/50).';
     }
 
+    String? genderErr;
+    if (_gender == null || (_gender != 'MALE' && _gender != 'FEMALE')) {
+      genderErr = isVi
+          ? 'Vui lòng chọn giới tính.'
+          : 'Please select your gender.';
+    }
+
+    String? avatarErr;
     if (_avatarUrl == null || _avatarUrl!.isEmpty) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Vui lòng tải lên ảnh đại diện.'
-            : 'Please upload an avatar image.',
-      );
-      return false;
+      avatarErr = isVi
+          ? 'Vui lòng tải lên ảnh đại diện.'
+          : 'Please upload an avatar image.';
     }
 
+    String? certErr;
     final trainerType = widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
     final isTeacher = trainerType == 'PROFESSIONAL';
     final normalizedCertificates = normalizeTrainerDocuments(_certificates);
 
-    if (isTeacher &&
+    if (normalizedCertificates.isEmpty) {
+      certErr = isVi
+          ? 'Vui lòng tải lên ít nhất một chứng chỉ/bằng cấp hoặc CV.'
+          : 'Please upload at least one degree, CV, or qualification credential proof.';
+    } else if (isTeacher &&
         !normalizedCertificates.any(
           (doc) => isPedagogicalTrainerDocument(doc['type']),
         )) {
-      ToastHelper.showError(
-        context,
-        'A teaching/pedagogical degree or certificate is mandatory for Teacher applications.',
-      );
-      return false;
+      certErr = isVi
+          ? 'Hồ sơ Giáo viên yêu cầu bắt buộc có Bằng cử nhân Sư phạm hoặc Chứng chỉ nghiệp vụ sư phạm.'
+          : 'A teaching/pedagogical degree or certificate is mandatory for Teacher applications.';
     }
 
-    final hasProof = normalizedCertificates.isNotEmpty;
-    if (!hasProof) {
-      ToastHelper.showError(
-        context,
-        'Please upload at least one degree, CV, or qualification credential proof.',
-      );
+    setState(() {
+      _phoneNumberErrorText = phoneErr;
+      _phoneNumberError = phoneErr != null;
+      _bioErrorText = bioErr;
+      _bioError = bioErr != null;
+      _genderErrorText = genderErr;
+      _avatarErrorText = avatarErr;
+      _certificatesErrorText = certErr;
+    });
+
+    if (phoneErr != null ||
+        bioErr != null ||
+        genderErr != null ||
+        avatarErr != null ||
+        certErr != null) {
       return false;
     }
 
@@ -1005,7 +1241,9 @@ class _TrainerOnboardingDetailsPageState
       if (!bioChanged && !certsChanged) {
         ToastHelper.showError(
           context,
-          'Please update your Bio or upload/change your Certificates according to the admin feedback before re-submitting.',
+          isVi
+              ? 'Vui lòng cập nhật Bio hoặc Chứng chỉ theo yêu cầu từ Ban quản trị trước khi nộp lại.'
+              : 'Please update your Bio or upload/change your Certificates according to the admin feedback before re-submitting.',
         );
         return false;
       }
@@ -1115,57 +1353,43 @@ class _TrainerOnboardingDetailsPageState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Color(0xFF0F172A),
-                        ),
-                        tooltip: 'Back to Terms & Agreement',
-                        onPressed: () {
-                          final payload = _buildPayload();
-                          _onboardingService.saveProfileDraft(payload);
-                          final trainerType =
-                              payload['trainerType'] ?? 'PROFESSIONAL';
-                          final agreementPage = TrainerOnboardingAgreementPage(
-                            profilePayload: payload,
-                            trainerType: trainerType,
-                            isEmbedded: true,
-                          );
-                          final shellState = TrainerOnboardingShellPage.of(
-                            context,
-                          );
-                          if (shellState != null) {
-                            shellState.updateBody(agreementPage);
-                          } else {
-                            Navigator.pop(context);
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Complete Teaching Profile',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Color(0xFF0F172A),
+                    ),
+                    tooltip: 'Back to Terms & Agreement',
+                    onPressed: () {
+                      final payload = _buildPayload();
+                      _onboardingService.saveProfileDraft(payload);
+                      final trainerType =
+                          payload['trainerType'] ?? 'PROFESSIONAL';
+                      final agreementPage = TrainerOnboardingAgreementPage(
+                        profilePayload: payload,
+                        trainerType: trainerType,
+                        isEmbedded: true,
+                      );
+                      final shellState = TrainerOnboardingShellPage.of(context);
+                      if (shellState != null) {
+                        shellState.updateBody(agreementPage);
+                      } else {
+                        Navigator.pop(context);
+                      }
+                    },
                   ),
-                  if (_isSavingDraft)
-                    Text(
-                      _saveDraftText,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF28B79B),
-                        fontStyle: FontStyle.italic,
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Complete Teaching Profile & Application',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                        fontFamily: 'Outfit',
                       ),
                     ),
+                  ),
                 ],
               ),
               const SizedBox(height: 32),
@@ -1212,40 +1436,23 @@ class _TrainerOnboardingDetailsPageState
     );
   }
 
-  String? _getBioAdminNote(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return null;
-    if (raw.contains('Bio:')) {
-      final parts = raw.split('Bio:');
-      if (parts.length > 1) {
-        final text = parts[1].split('|')[0].trim();
-        if (text.isNotEmpty) return text;
-      }
-    }
-    if (!raw.contains('Certificates:')) {
-      return raw.trim();
-    }
-    return null;
-  }
-
-  String? _getCertAdminNote(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return null;
-    if (raw.contains('Certificates:')) {
-      final parts = raw.split('Certificates:');
-      if (parts.length > 1) {
-        final text = parts[1].trim();
-        if (text.isNotEmpty) return text;
-      }
-    }
-    if (!raw.contains('Bio:')) {
-      return raw.trim();
-    }
-    return null;
-  }
-
   Widget _buildFormBody(bool isVi) {
-    final adminNotes = widget.initialProfile['adminNotes'];
-    final bioAdminNote = _getBioAdminNote(adminNotes?.toString());
-    final certAdminNote = _getCertAdminNote(adminNotes?.toString());
+    final revisionNotes = parseTrainerRevisionNotes(
+      widget.initialProfile['adminNotes']?.toString(),
+    );
+    final bioAdminNote = revisionNotes.bio;
+    final certAdminNote = revisionNotes.certificates;
+    final requestedSections = <String>[
+      if (bioAdminNote != null) 'Bio',
+      if (certAdminNote != null) isVi ? 'Chứng chỉ' : 'Certificates',
+    ].join(isVi ? ' và ' : ' and ');
+    final revisionInstruction = revisionNotes.general != null
+        ? (isVi
+              ? 'Phản hồi từ Ban quản trị: ${revisionNotes.general}\n👉 Vui lòng cập nhật thông tin được yêu cầu rồi nộp lại hồ sơ.'
+              : 'Feedback from Administrator: ${revisionNotes.general}\n👉 Please update the requested information and submit your application again.')
+        : (isVi
+              ? '👉 Vui lòng cập nhật $requestedSections theo yêu cầu bên dưới rồi nhấn "Nộp hồ sơ xét duyệt" lại.'
+              : '👉 Please update $requestedSections as requested below, then click "Submit Application for Review" again.');
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
@@ -1263,8 +1470,7 @@ class _TrainerOnboardingDetailsPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (adminNotes != null &&
-              adminNotes.toString().trim().isNotEmpty) ...[
+          if (revisionNotes.hasAny) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -1273,110 +1479,90 @@ class _TrainerOnboardingDetailsPageState
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFFFCA5A5)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.cancel_outlined,
-                        color: Colors.redAccent,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isVi
-                            ? 'Hồ sơ đã bị Từ chối bởi Ban quản trị:'
-                            : 'Application Rejected by Administrator:',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Color(0xFF991B1B),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    adminNotes.toString(),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF7F1D1D),
-                      height: 1.4,
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    isVi
-                        ? '👉 Vui lòng xem lại lý do, bổ sung/sửa đổi thông tin Bio và Chứng chỉ bên dưới rồi nhấn "Nộp hồ sơ xét duyệt" lại.'
-                        : '👉 Please review the rejection reason, update your Bio/Certificates below, and click "Submit Application for Review" again.',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFFB91C1C),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                ],
+              child: Text(
+                revisionInstruction,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFFB91C1C),
+                  fontFamily: 'Outfit',
+                ),
               ),
             ),
             const SizedBox(height: 24),
           ],
           // Avatar Upload Circle Selector
           Center(
-            child: Stack(
+            child: Column(
               children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF28B79B),
-                      width: 2,
-                    ),
-                    color: const Color(0xFFF1F5F9),
-                  ),
-                  child: ClipOval(
-                    child: _isUploadingAvatar
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF28B79B),
-                            ),
-                          )
-                        : (_avatarUrl != null && _avatarUrl!.isNotEmpty
-                              ? Image.network(_avatarUrl!, fit: BoxFit.cover)
-                              : const Icon(
-                                  Icons.person_rounded,
-                                  size: 64,
-                                  color: Color(0xFF94A3B8),
-                                )),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: InkWell(
-                    onTap: _isUploadingAvatar
-                        ? null
-                        : () => _pickAndUpload('avatar'),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF28B79B),
+                Stack(
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _avatarErrorText != null
+                              ? Colors.redAccent
+                              : const Color(0xFF28B79B),
+                          width: 2,
+                        ),
+                        color: const Color(0xFFF1F5F9),
                       ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 16,
+                      child: ClipOval(
+                        child: _isUploadingAvatar
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF28B79B),
+                                ),
+                              )
+                            : (_avatarUrl != null && _avatarUrl!.isNotEmpty
+                                  ? Image.network(
+                                      _avatarUrl!,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : const Icon(
+                                      Icons.person_rounded,
+                                      size: 64,
+                                      color: Color(0xFF94A3B8),
+                                    )),
                       ),
                     ),
-                  ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: InkWell(
+                        onTap: _isUploadingAvatar
+                            ? null
+                            : () => _pickAndUpload('avatar'),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF28B79B),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                if (_avatarErrorText != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _avatarErrorText!,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1399,7 +1585,7 @@ class _TrainerOnboardingDetailsPageState
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,
-              color: Color(0xFF334155),
+              color: Color(0xFF0F172A),
               fontFamily: 'Outfit',
             ),
           ),
@@ -1408,6 +1594,7 @@ class _TrainerOnboardingDetailsPageState
             dropdownColor: Colors.white,
             value: (_gender == 'MALE' || _gender == 'FEMALE') ? _gender : null,
             decoration: InputDecoration(
+              errorText: _genderErrorText,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 12,
@@ -1433,7 +1620,7 @@ class _TrainerOnboardingDetailsPageState
             hint: Text(isVi ? 'Chọn giới tính' : 'Select gender'),
             icon: const Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFF64748B),
+              color: Color(0xFF0F172A),
             ),
             items: [
               DropdownMenuItem(
@@ -1448,6 +1635,7 @@ class _TrainerOnboardingDetailsPageState
             onChanged: (val) {
               setState(() {
                 _gender = val;
+                _genderErrorText = null;
               });
               _triggerAutoSave();
             },
@@ -1457,36 +1645,49 @@ class _TrainerOnboardingDetailsPageState
           _buildTextField(
             label: isVi ? 'Số điện thoại liên hệ *' : 'Contact Phone Number *',
             controller: _phoneNumberController,
-            errorText: _phoneNumberError
-                ? (isVi
-                      ? 'Số điện thoại phải có đúng 10 số'
-                      : 'Phone number must be 10 digits')
-                : null,
+            errorText:
+                _phoneNumberErrorText ??
+                (_phoneNumberError
+                    ? (isVi
+                          ? 'Số điện thoại phải có đúng 10 số'
+                          : 'Phone number must be 10 digits')
+                    : null),
             hintText: '0912345678',
             keyboardType: TextInputType.phone,
+            onChanged: (_) {
+              setState(() {
+                _phoneNumberErrorText = null;
+                _phoneNumberError = false;
+              });
+            },
           ),
           const SizedBox(height: 24),
 
-          // Section 2: Experience & Bio
+          // Section 2: Bio
           _buildSectionHeader(
             Icons.work_outline_rounded,
-            isVi ? '2. Kinh nghiệm giảng dạy' : '2. Experience & Bio',
+            isVi ? '2. Giới thiệu bản thân *' : '2. Bio *',
           ),
           const SizedBox(height: 20),
           _buildTextField(
-            label: isVi
-                ? 'Kinh nghiệm giảng dạy & Giới thiệu bản thân (Bio) *'
-                : 'Teaching Experience & Bio *',
             controller: _bioController,
-            errorText: _bioError
-                ? (isVi
-                      ? 'Giới thiệu cần tối thiểu 50 ký tự'
-                      : 'Bio must be at least 50 characters')
-                : null,
+            errorText:
+                _bioErrorText ??
+                (_bioError
+                    ? (isVi
+                          ? 'Giới thiệu cần tối thiểu 50 ký tự'
+                          : 'Bio must be at least 50 characters')
+                    : null),
             hintText: isVi
-                ? 'Mô tả kinh nghiệm, phương pháp dạy và các thành tích của bạn...'
-                : 'Describe your teaching style, history, credentials...',
+                ? 'Mô tả bản thân, phương pháp dạy và các thành tích của bạn...'
+                : 'Describe yourself, your teaching style, and credentials...',
             maxLines: 5,
+            onChanged: (_) {
+              setState(() {
+                _bioErrorText = null;
+                _bioError = false;
+              });
+            },
           ),
           if (bioAdminNote != null) ...[
             const SizedBox(height: 8),
@@ -1508,8 +1709,8 @@ class _TrainerOnboardingDetailsPageState
                   Expanded(
                     child: Text(
                       isVi
-                          ? 'Lưu ý từ Admin về Bio: $bioAdminNote'
-                          : 'Admin Feedback on Bio: $bioAdminNote',
+                          ? 'Lưu ý về Giới thiệu (Bio): $bioAdminNote'
+                          : 'Feedback on Bio: $bioAdminNote',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF991B1B),
@@ -1528,7 +1729,7 @@ class _TrainerOnboardingDetailsPageState
             Icons.verified_outlined,
             isVi
                 ? '3. Bằng cấp & Chứng chỉ năng lực'
-                : '3. Degrees & Certificates',
+                : '3. Degrees & Certificates *',
           ),
           const SizedBox(height: 8),
           Text(
@@ -1537,8 +1738,10 @@ class _TrainerOnboardingDetailsPageState
                 : 'Upload at least one credentials proof to unlock review.',
             style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
+          const SizedBox(height: 24),
+          _buildUnifiedUploadBox(isVi),
           if (certAdminNote != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -1557,8 +1760,8 @@ class _TrainerOnboardingDetailsPageState
                   Expanded(
                     child: Text(
                       isVi
-                          ? 'Lưu ý từ Admin về Bằng cấp / Chứng chỉ: $certAdminNote'
-                          : 'Admin Feedback on Credentials: $certAdminNote',
+                          ? 'Lưu ý về Bằng cấp / Chứng chỉ: $certAdminNote'
+                          : 'Feedback on Credentials: $certAdminNote',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF991B1B),
@@ -1570,8 +1773,6 @@ class _TrainerOnboardingDetailsPageState
               ),
             ),
           ],
-          const SizedBox(height: 24),
-          _buildUnifiedUploadBox(isVi),
         ],
       ),
     );
@@ -1626,31 +1827,35 @@ class _TrainerOnboardingDetailsPageState
   }
 
   Widget _buildTextField({
-    required String label,
+    String? label,
     required TextEditingController controller,
     String? errorText,
     required String hintText,
     TextInputType? keyboardType,
     int maxLines = 1,
+    ValueChanged<String>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF475569),
+        if (label != null && label.trim().isNotEmpty) ...[
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF475569),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         TextField(
           controller: controller,
           keyboardType: keyboardType,
           maxLines: maxLines,
-          onChanged: (_) {
+          onChanged: (val) {
             _triggerAutoSave();
+            if (onChanged != null) onChanged(val);
           },
           decoration: InputDecoration(
             errorText: errorText,
