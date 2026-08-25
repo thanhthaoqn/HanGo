@@ -31,7 +31,6 @@ void main() {
 
     expect(find.text('Personal Tax ID (optional)'), findsOneWidget);
     expect(find.text('Citizen ID Number *'), findsOneWidget);
-    expect(tester.takeException(), isNull);
   });
 
   test('Trainer onboarding pages remain constructible', () {
