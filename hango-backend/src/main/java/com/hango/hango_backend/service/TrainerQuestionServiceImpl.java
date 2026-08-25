@@ -44,7 +44,10 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
 
     @Override
     public List<QuestionDTO> getTrainerQuestions(String email, String type, String search, String sortBy, Long skillId,
-            Long categoryId, Long difficultyId, Integer usageType, Long groupTypeId) {
+            Long categoryId, Long difficultyId, Integer usageType, Long groupTypeId, Boolean isGroup) {
+        boolean includeGroupQuery = isGroup == null || isGroup;
+        boolean includeSingleQuery = isGroup == null || !isGroup;
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
@@ -85,6 +88,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
 
         sql.append("SELECT * FROM ( ");
 
+        if (includeGroupQuery) {
         // Group query
         sql.append("SELECT ")
                 .append("  TRUE as is_group, ")
@@ -132,9 +136,13 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(difficultyId);
         if (groupTypeId != null)
             params.add(groupTypeId);
+        }
 
-        sql.append(" UNION ALL ");
+        if (includeGroupQuery && includeSingleQuery) {
+            sql.append(" UNION ALL ");
+        }
 
+        if (includeSingleQuery) {
         // Single query
         sql.append("SELECT ")
                 .append("  FALSE as is_group, ")
@@ -178,6 +186,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(categoryId);
         if (difficultyId != null)
             params.add(difficultyId);
+        }
 
         sql.append(") AS combined_results ");
 

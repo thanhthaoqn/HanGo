@@ -31,6 +31,7 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
   List<Map<String, dynamic>> _matrices = [];
   bool _isLoading = true;
   String? _selectedMatrixId;
+  int _questionSourceType = 3;
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
@@ -261,6 +262,40 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
     );
   }
 
+  Widget _buildSourceOption(int value, String label, IconData icon) {
+    final bool selected = _questionSourceType == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _questionSourceType = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFEEF2FF) : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: selected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 18, color: selected ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.w600,
+                  color: selected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -396,6 +431,18 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 16),
+                              const Text('QUESTION SOURCE', style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Outfit')),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  _buildSourceOption(1, 'Quiz Bank', Icons.quiz),
+                                  const SizedBox(width: 8),
+                                  _buildSourceOption(2, 'Exam Bank', Icons.assignment),
+                                  const SizedBox(width: 8),
+                                  _buildSourceOption(3, 'Both', Icons.all_inclusive),
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -478,6 +525,7 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                           int.tryParse(_durationController.text.trim()),
                                           null,
                                           double.tryParse(_passingScoreController.text.trim()),
+                                          questionSourceType: _questionSourceType,
                                         );
                                       } else {
                                         examId = await _api.generateExamFromMatrix(
@@ -487,6 +535,7 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                           int.tryParse(_durationController.text.trim()),
                                           null,
                                           double.tryParse(_passingScoreController.text.trim()),
+                                          questionSourceType: _questionSourceType,
                                         );
                                       }
                                       if (mounted) {

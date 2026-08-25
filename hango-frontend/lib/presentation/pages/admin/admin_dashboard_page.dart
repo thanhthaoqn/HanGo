@@ -17,6 +17,7 @@ import '../../widgets/admin/role/role_matrix_tab.dart';
 import '../../widgets/admin/role/role_detail_drawer.dart';
 import '../../widgets/admin/dashboard/comprehensive_dashboard_tab.dart';
 import '../../../utils/file_picker_helper.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   final int initialIndex;
@@ -47,6 +48,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final _profileNameController = TextEditingController();
   final _profileEmailController = TextEditingController();
   final _profileUsernameController = TextEditingController();
+  final _editFormKey = GlobalKey<FormState>();
   final _profilePhoneController = TextEditingController();
   final _profileAvatarController = TextEditingController();
   String _profileGender = 'Male';
@@ -709,6 +711,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Future<void> _updateUserDetails(int userId) async {
+    if (!_editFormKey.currentState!.validate()) {
+      return;
+    }
     setState(() {
       _isLoadingAccounts = true;
     });
@@ -2982,16 +2987,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 fontFamily: 'Outfit',
               ),
             ),
-            SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('Analytics'), icon: Icon(Icons.analytics_outlined)),
-                ButtonSegment(value: 1, label: Text('Settings'), icon: Icon(Icons.settings_outlined)),
-                ButtonSegment(value: 2, label: Text('Prompts'), icon: Icon(Icons.edit_note_outlined)),
-              ],
-              selected: {_aiSubTabIndex},
-              onSelectionChanged: (Set<int> newSelection) {
-                setState(() => _aiSubTabIndex = newSelection.first);
-              },
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildAiTabButton(0, 'Analytics', Icons.analytics_outlined),
+                  const SizedBox(width: 4),
+                  _buildAiTabButton(1, 'Settings', Icons.settings_outlined),
+                  const SizedBox(width: 4),
+                  _buildAiTabButton(2, 'Prompts', Icons.edit_note_outlined),
+                ],
+              ),
             ),
           ],
         ),
@@ -3000,6 +3011,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         if (_aiSubTabIndex == 1) _buildAiSettingsView(),
         if (_aiSubTabIndex == 2) _buildAiPromptsView(),
       ],
+    );
+  }
+
+  Widget _buildAiTabButton(int index, String label, IconData icon) {
+    final isSelected = _aiSubTabIndex == index;
+    return InkWell(
+      onTap: () => setState(() => _aiSubTabIndex = index),
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected ? [const BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 2))] : [],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: isSelected ? const Color(0xFF0D9488) : const Color(0xFF64748B)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                fontFamily: 'Fira Sans',
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -3012,8 +3055,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           'Question Generation, and Recommendation. No cost/token estimate — no pricing model is configured yet.',
           style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF6B7280),
-            fontFamily: 'Outfit',
+            color: Color(0xFF64748B),
+            fontFamily: 'Fira Sans',
           ),
         ),
         const SizedBox(height: 24),
@@ -3021,48 +3064,59 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // Grid cards
         LayoutBuilder(builder: (context, constraints) {
           final double cardWidth = isDesktop ? (constraints.maxWidth - 32) / 3 : constraints.maxWidth;
+          
+          final otherCalls = _aiTotalCalls - (_aiChatCalls + _aiEmbeddingCalls);
+          final splitText = otherCalls > 0 
+            ? '$_aiChatCalls / $_aiEmbeddingCalls / $otherCalls'
+            : '$_aiChatCalls / $_aiEmbeddingCalls';
+          final splitSub = otherCalls > 0 
+            ? 'Chat / Embedding / Other'
+            : 'Chat / Embedding calls';
+
           final widgets = [
             _buildAnalyticsCard(
                 'Total AI Calls',
                 _isLoadingAiUsage ? '…' : '$_aiTotalCalls',
-                'Chat + Embedding calls, all-time',
-                Icons.bolt,
-                Colors.amber,
+                'Chat + Embedding + Other, all-time',
+                Icons.bolt_rounded,
+                const Color(0xFF0D9488),
+                const Color(0xFFF0FDFA),
                 cardWidth),
             _buildAnalyticsCard(
                 'AI Success Rate',
                 _isLoadingAiUsage ? '…' : '$_aiSuccessRate%',
                 '$_aiTotalCalls calls recorded',
-                Icons.check_circle_outline,
-                Colors.teal,
+                Icons.check_circle_outline_rounded,
+                const Color(0xFF3B82F6),
+                const Color(0xFFEFF6FF),
                 cardWidth),
             _buildAnalyticsCard(
                 'Call Type Split',
-                _isLoadingAiUsage ? '…' : '$_aiChatCalls / $_aiEmbeddingCalls',
-                'Chat calls / Embedding calls',
-                Icons.pie_chart_outline,
-                Colors.purple,
+                _isLoadingAiUsage ? '…' : splitText,
+                splitSub,
+                Icons.pie_chart_outline_rounded,
+                const Color(0xFF8B5CF6),
+                const Color(0xFFF5F3FF),
                 cardWidth),
           ];
 
-            if (isDesktop) {
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: widgets,
-              );
-            } else {
-              return Column(
-                children: [
-                  widgets[0],
-                  const SizedBox(height: 16),
-                  widgets[1],
-                  const SizedBox(height: 16),
-                  widgets[2],
-                ],
-              );
-            }
-          },
-        ),
+          if (isDesktop) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: widgets,
+            );
+          } else {
+            return Column(
+              children: [
+                widgets[0],
+                const SizedBox(height: 16),
+                widgets[1],
+                const SizedBox(height: 16),
+                widgets[2],
+              ],
+            );
+          }
+        }),
 
         const SizedBox(height: 24),
 
@@ -3071,37 +3125,128 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+            boxShadow: const [BoxShadow(color: Color(0x08000000), offset: Offset(0, 4), blurRadius: 12)],
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Weekly AI Call Volume - Last 7 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Outfit')),
-              const SizedBox(height: 16),
+              const Text('Weekly AI Call Volume - Last 7 Days', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, fontFamily: 'Fira Sans', color: Color(0xFF1E293B))),
+              const SizedBox(height: 24),
               _isLoadingAiUsage
                   ? const SizedBox(
                       height: 220,
                       child: Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0D9488)),
                         ),
                       ),
                     )
                   : SizedBox(
-                      height: 220,
+                      height: 260,
                       width: double.infinity,
                       child: Builder(builder: (context) {
                         double maxVal = _aiChartValues.isEmpty ? 10 : _aiChartValues.reduce((a, b) => a > b ? a : b);
                         if (maxVal < 10) maxVal = 10;
                         maxVal = maxVal * 1.25;
-                        return CustomPaint(
-                          painter: LineChartPainter(
-                            values: _aiChartValues,
-                            labels: _aiChartLabels,
-                            maxVal: maxVal,
-                            minVal: 0,
+                        
+                        return LineChart(
+                          LineChartData(
+                            gridData: FlGridData(
+                              show: true,
+                              drawVerticalLine: false,
+                              horizontalInterval: maxVal / 4,
+                              getDrawingHorizontalLine: (value) {
+                                return const FlLine(color: Color(0xFFF1F5F9), strokeWidth: 1);
+                              },
+                            ),
+                            titlesData: FlTitlesData(
+                              show: true,
+                              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 30,
+                                  interval: 1,
+                                  getTitlesWidget: (value, meta) {
+                                    final index = value.toInt();
+                                    if (index >= 0 && index < _aiChartLabels.length) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 8.0),
+                                        child: Text(
+                                          _aiChartLabels[index],
+                                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontFamily: 'Fira Sans'),
+                                        ),
+                                      );
+                                    }
+                                    return const Text('');
+                                  },
+                                ),
+                              ),
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  interval: maxVal / 4,
+                                  reservedSize: 42,
+                                  getTitlesWidget: (value, meta) {
+                                    return Text(
+                                      value.toInt().toString(),
+                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontFamily: 'Fira Sans'),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            borderData: FlBorderData(show: false),
+                            minX: 0,
+                            maxX: (_aiChartLabels.length - 1).toDouble(),
+                            minY: 0,
+                            maxY: maxVal,
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: List.generate(_aiChartValues.length, (index) => FlSpot(index.toDouble(), _aiChartValues[index])),
+                                isCurved: true,
+                                color: const Color(0xFF0D9488),
+                                barWidth: 3,
+                                isStrokeCapRound: true,
+                                dotData: FlDotData(
+                                  show: true,
+                                  getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                                    radius: 4,
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                    strokeColor: const Color(0xFF0D9488),
+                                  ),
+                                ),
+                                belowBarData: BarAreaData(
+                                  show: true,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      const Color(0xFF0D9488).withValues(alpha: 0.2),
+                                      const Color(0xFF0D9488).withValues(alpha: 0.0),
+                                    ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            lineTouchData: LineTouchData(
+                              touchTooltipData: LineTouchTooltipData(
+                                getTooltipColor: (_) => const Color(0xFF1E293B),
+                                getTooltipItems: (touchedSpots) {
+                                  return touchedSpots.map((LineBarSpot touchedSpot) {
+                                    return LineTooltipItem(
+                                      '${touchedSpot.y.toInt()} calls',
+                                      const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Fira Sans'),
+                                    );
+                                  }).toList();
+                                },
+                              ),
+                            ),
                           ),
                         );
                       }),
@@ -3113,6 +3258,41 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Widget _buildAnalyticsCard(String title, String value, String subtitle, IconData icon, Color color, Color bgColor, double width) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: const [BoxShadow(color: Color(0x08000000), offset: Offset(0, 4), blurRadius: 12)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: Color(0xFF64748B), fontFamily: 'Fira Sans')),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: color, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontFamily: 'Fira Code')),
+          const SizedBox(height: 4),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontFamily: 'Fira Sans')),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAiSettingsView() {
     if (_isLoadingAiConfig) {
       return const Center(child: CircularProgressIndicator());
@@ -3120,40 +3300,113 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: const [BoxShadow(color: Color(0x08000000), offset: Offset(0, 4), blurRadius: 12)],
       ),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Manage AI Tokens & Models', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFF0FDFA), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.tune_rounded, color: Color(0xFF0D9488), size: 24),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Manage AI Tokens & Models', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Fira Sans', color: Color(0xFF1E293B))),
+                    SizedBox(height: 4),
+                    Text('Configure API keys and select the appropriate Gemini models for chat and embeddings.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Fira Sans')),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          _buildSettingsSection('Security', [
+            _buildEnhancedTextField('Gemini API Key', _apiKeyController, isPassword: true, icon: Icons.key_rounded, placeholder: 'AIzaSy...'),
+          ]),
           const SizedBox(height: 24),
-          _buildTextField('Gemini API Key', _apiKeyController, isPassword: true),
-          const SizedBox(height: 16),
-          _buildTextField('Chat Model', _chatModelController),
-          const SizedBox(height: 16),
-          _buildTextField('Embedding Model', _embeddingModelController),
-          const SizedBox(height: 16),
-          _buildTextField('Timeout (seconds)', _timeoutController, isNumber: true),
-          const SizedBox(height: 24),
+          _buildSettingsSection('Model Configuration', [
+            _buildEnhancedTextField('Chat Model', _chatModelController, icon: Icons.chat_bubble_outline_rounded, placeholder: 'gemini-1.5-pro'),
+            const SizedBox(height: 16),
+            _buildEnhancedTextField('Embedding Model', _embeddingModelController, icon: Icons.schema_outlined, placeholder: 'text-embedding-004'),
+            const SizedBox(height: 16),
+            _buildEnhancedTextField('Timeout (seconds)', _timeoutController, isNumber: true, icon: Icons.timer_outlined, placeholder: '60'),
+          ]),
+          const SizedBox(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               ElevatedButton.icon(
                 onPressed: _saveAiConfig,
                 icon: const Icon(Icons.save_outlined, size: 18),
-                label: const Text('Save Settings'),
+                label: const Text('Save Settings', style: TextStyle(fontFamily: 'Fira Sans', fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF28B79B),
+                  backgroundColor: const Color(0xFF0D9488),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
                 ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSettingsSection(String title, List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF334155), fontFamily: 'Fira Sans', letterSpacing: 0.5)),
+          const SizedBox(height: 20),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedTextField(String label, TextEditingController controller, {bool isPassword = false, bool isNumber = false, int maxLines = 1, IconData? icon, String? placeholder}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF475569), fontFamily: 'Fira Sans')),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          obscureText: isPassword,
+          maxLines: isPassword ? 1 : maxLines,
+          keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+          style: TextStyle(fontFamily: isPassword ? 'Fira Code' : 'Fira Sans', fontSize: 14, color: const Color(0xFF1E293B)),
+          decoration: InputDecoration(
+            hintText: placeholder,
+            hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
+            prefixIcon: icon != null ? Icon(icon, color: const Color(0xFF94A3B8), size: 20) : null,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF0D9488))),
+          ),
+        ),
+      ],
     );
   }
 
@@ -3164,34 +3417,71 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: const [BoxShadow(color: Color(0x08000000), offset: Offset(0, 4), blurRadius: 12)],
       ),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Prompt Input Configurations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Use {lesson_title}, {lesson_content}, {transcript_block}, {practice_block} in the AI Assistant prompt.', style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 24),
-          _buildTextField('AI Assistant System Prompt', _assistantPromptController, maxLines: 10),
-          const SizedBox(height: 24),
-          _buildTextField('Trainer Exam Chat Prompt', _examChatPromptController, maxLines: 6),
-          const SizedBox(height: 24),
-          _buildTextField('Trainer Exam Generation Prompt', _examGenPromptController, maxLines: 6),
-          const SizedBox(height: 24),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: const Color(0xFFF0FDFA), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.code_rounded, color: Color(0xFF0D9488), size: 24),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Prompt Engineering Center', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Fira Sans', color: Color(0xFF1E293B))),
+                    SizedBox(height: 4),
+                    Text('Design the core instructions for AI models. Use monospace editing for precision.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Fira Sans')),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Add logic to reset to default
+                  _assistantPromptController.text = "You are an AI assistant...";
+                },
+                icon: const Icon(Icons.restore_rounded, size: 16),
+                label: const Text('Reset', style: TextStyle(fontFamily: 'Fira Sans', fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF64748B),
+                  elevation: 0,
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          _buildPromptTextField('AI Assistant System Prompt', _assistantPromptController, maxLines: 10,
+              variables: ['{lesson_title}', '{lesson_content}', '{transcript_block}', '{practice_block}']),
+          const SizedBox(height: 32),
+          _buildPromptTextField('Trainer Exam Chat Prompt', _examChatPromptController, maxLines: 6),
+          const SizedBox(height: 32),
+          _buildPromptTextField('Trainer Exam Generation Prompt', _examGenPromptController, maxLines: 6),
+          const SizedBox(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               ElevatedButton.icon(
                 onPressed: _saveAiConfig,
                 icon: const Icon(Icons.save_outlined, size: 18),
-                label: const Text('Save Prompts'),
+                label: const Text('Save Prompts', style: TextStyle(fontFamily: 'Fira Sans', fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF28B79B),
+                  backgroundColor: const Color(0xFF0D9488),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
                 ),
               ),
             ],
@@ -3201,87 +3491,48 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {bool isPassword = false, bool isNumber = false, int maxLines = 1}) {
+  Widget _buildPromptTextField(String label, TextEditingController controller, {int maxLines = 6, List<String>? variables}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF374151))),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: isPassword,
-          maxLines: maxLines,
-          keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF1E293B), fontFamily: 'Fira Sans')),
+        if (variables != null && variables.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: variables.map((v) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: Text(v, style: const TextStyle(fontFamily: 'Fira Code', fontSize: 11, color: Color(0xFF475569))),
+            )).toList(),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2))],
+          ),
+          child: TextField(
+            controller: controller,
+            maxLines: maxLines,
+            style: const TextStyle(fontFamily: 'Fira Code', fontSize: 13, color: Color(0xFFE2E8F0), height: 1.5),
+            decoration: InputDecoration(
+              hintText: 'Enter your prompt here...',
+              hintStyle: const TextStyle(color: Color(0xFF64748B)),
+              filled: true,
+              fillColor: Colors.transparent,
+              contentPadding: const EdgeInsets.all(20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildAnalyticsCard(
-    String label,
-    String value,
-    String desc,
-    IconData icon,
-    Color color,
-    double width,
-  ) {
-    return Container(
-      width: width,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFF6B7280),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-              Icon(icon, color: color, size: 22),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-              fontFamily: 'Outfit',
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            desc,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Outfit',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // ------------------------------------------------------------------------
   // TAB 7: AUDIT LOG (FR-RBAC-08) — admin actions on user accounts & roles
@@ -3486,7 +3737,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ? 'Learner Account Detail'
         : 'Trainer Account Detail';
 
-    return Column(
+    return Form(
+      key: _editFormKey,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
@@ -3607,6 +3860,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a name' : null,
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -3653,6 +3907,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter a username' : null,
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -3713,6 +3968,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please enter an email';
+                            if (!RegExp(r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+').hasMatch(v)) {
+                              return 'Invalid email format';
+                            }
+                            return null;
+                          },
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -3845,6 +4107,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             color: Color(0xFF1F2937),
                             fontFamily: 'Outfit',
                           ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return 'Please select date of birth';
+                            final parts = v.split('/');
+                            if (parts.length != 3) return 'Please enter date in DD/MM/YYYY format';
+                            return null;
+                          },
                           decoration: InputDecoration(
                             fillColor: Colors.white,
                             filled: true,
@@ -4115,6 +4383,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         ),
       ],
+    ),
     );
   }
 

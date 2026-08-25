@@ -59,9 +59,11 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   int? _selectedSkillId;
   int? _selectedGroupTypeId;
   int? _selectedDifficultyId;
+  bool? _selectedIsGroup;
 
   CourseManagerQuestion? _viewingQuestion;
   CourseManagerQuestion? _editingQuestion;
+  bool _isCreatingQuestion = false;
 
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
@@ -139,6 +141,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         groupTypeId: _selectedGroupTypeId,
         difficultyId: _selectedDifficultyId,
         usageType: _usageType,
+        isGroup: _selectedIsGroup,
       );
 
       if (!mounted) return;
@@ -465,7 +468,19 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         ? []
         : _allQuestions.sublist(startIndex, endIndex);
 
-    final Widget content = _editingQuestion != null
+    final Widget content = _isCreatingQuestion
+        ? CourseManagerCreateQuestionPage(
+            isCourseManager: false,
+            isEmbedded: true,
+            initialUsageType: _usageType ?? 3,
+            onBack: () {
+              setState(() {
+                _isCreatingQuestion = false;
+              });
+              _fetchQuestions();
+            },
+          )
+        : _editingQuestion != null
         ? CourseManagerCreateQuestionPage(
             question: _editingQuestion,
             isEdit: true,
@@ -577,6 +592,14 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             onDifficultyChanged: (val) {
               setState(() {
                 _selectedDifficultyId = val;
+                _currentPage = 1;
+              });
+              _fetchQuestions();
+            },
+            selectedIsGroup: _selectedIsGroup,
+            onIsGroupChanged: (val) {
+              setState(() {
+                _selectedIsGroup = val;
                 _currentPage = 1;
               });
               _fetchQuestions();
@@ -726,15 +749,9 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         ),
         ElevatedButton.icon(
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseManagerCreateQuestionPage(
-                  isCourseManager: false,
-                  initialUsageType: _usageType ?? 3,
-                ),
-              ),
-            ).then((_) => _fetchQuestions());
+            setState(() {
+              _isCreatingQuestion = true;
+            });
           },
           icon: const Icon(
             Icons.add_circle_outline,

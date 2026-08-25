@@ -259,6 +259,21 @@ class QuestionTable extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: q.isGroup ? const Color(0xFFFDF2F8) : const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            q.isGroup ? 'Question Group' : 'Single Question',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: q.isGroup ? const Color(0xFFDB2777) : const Color(0xFF16A34A),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                         if (q.categoryName.isNotEmpty && q.categoryName != 'Chưa phân loại')
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
