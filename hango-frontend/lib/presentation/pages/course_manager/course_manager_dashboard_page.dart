@@ -686,7 +686,14 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
             children: [
               const Text('Recent Pending Courses', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), fontFamily: 'Fira Sans')),
               TextButton(
-                onPressed: () => Navigator.pushNamed(context, '/course-manager/courses'),
+                onPressed: () {
+                  final shellState = context.findAncestorStateOfType<CourseManagerShellPageState>();
+                  if (shellState != null) {
+                    shellState.selectTab(1); // 1 is 'courses' tab
+                  } else {
+                    Navigator.pushNamed(context, '/course-manager/courses');
+                  }
+                },
                 child: const Text('View All →', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0D9488), fontFamily: 'Fira Sans')),
               ),
             ],
@@ -709,10 +716,15 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
-                leading: Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFF0FDFA), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.school_outlined, color: Color(0xFF0D9488), size: 20),
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 40, height: 40,
+                    color: const Color(0xFFF0FDFA),
+                    child: course.thumbnailUrl.isNotEmpty
+                        ? Image.network(course.thumbnailUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.school_outlined, color: Color(0xFF0D9488), size: 20))
+                        : const Icon(Icons.school_outlined, color: Color(0xFF0D9488), size: 20),
+                  ),
                 ),
                 title: Text(course.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B), fontFamily: 'Fira Sans'), maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text('by ${course.creatorName}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Fira Sans')),
