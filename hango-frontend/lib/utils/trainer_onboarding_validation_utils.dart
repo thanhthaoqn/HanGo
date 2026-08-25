@@ -166,3 +166,14 @@ String? validateTrainerUploadFile({
       ? 'Định dạng file "$fileName" không được hỗ trợ. Chỉ chấp nhận (${allowedExtensions.join(", ")}).'
       : 'File format of "$fileName" is not supported. Allowed formats: (${allowedExtensions.join(", ")}).';
 }
+
+String trainerUploadFailureMessage({
+  required int statusCode,
+  required String fallbackMessage,
+}) {
+  if (statusCode == 413) {
+    return 'The upload request is too large. Maximum file size is 5MB.';
+  }
+
+  return fallbackMessage;
+}

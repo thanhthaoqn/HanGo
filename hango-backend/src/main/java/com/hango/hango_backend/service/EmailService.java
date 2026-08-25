@@ -101,7 +101,7 @@ public class EmailService {
             subtitle = "Hi <strong style=\"color: #0d9488 !important;\">" + safeName
                     + "</strong>, we are thrilled to welcome you to the HanGo teaching community! Your application has been reviewed and officially approved by administration.";
             ctaText = "Access Trainer Dashboard &rarr;";
-            ctaUrl = "https://hangog92.online/login";
+            ctaUrl = "https://hangog92.online";
             ctaColor = "#28b79b";
 
             detailsHtml = "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; padding: 20px 24px;\">"
@@ -124,13 +124,6 @@ public class EmailService {
                     + "          <td align=\"right\" style=\"color: #059669 !important; font-size: 13.5px; font-weight: 700;\">Active & Verified ✓</td>"
                     + "        </tr>"
                     + "      </table>"
-                    + (!safeNotes.isEmpty()
-                            ? "<div style=\"margin-top: 14px; padding: 12px 16px; background-color: #ecfdf5; border-radius: 8px; border-left: 4px solid #059669; text-align: left;\">"
-                                    + "<strong style=\"color: #065f46 !important; font-size: 13px; display: block; margin-bottom: 4px;\">Admin Notes:</strong>"
-                                    + "<span style=\"color: #047857 !important; font-size: 13.5px; line-height: 1.5;\">"
-                                    + safeNotes + "</span>"
-                                    + "</div>"
-                            : "")
                     + "    </td>"
                     + "  </tr>"
                     + "</table>"
@@ -184,7 +177,7 @@ public class EmailService {
             subtitle = "Hi <strong style=\"color: #e11d48 !important;\">" + safeName
                     + "</strong>, thank you for applying to become a Trainer on HanGo. After evaluating your profile and documents, your application was not approved at this time.";
             ctaText = "Update and Resubmit Application &rarr;";
-            ctaUrl = "https://hangog92.online/login";
+                ctaUrl = "https://hangog92.online/login";
             ctaColor = "#0f172a";
 
             detailsHtml = "<div style=\"background-color: #fff1f2; border: 1px solid #fecdd3; border-left: 4px solid #e11d48; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; text-align: left;\">"

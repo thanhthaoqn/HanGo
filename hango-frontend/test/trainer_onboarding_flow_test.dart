@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hango/utils/trainer_document_utils.dart';
+import 'package:hango/utils/trainer_onboarding_payload_utils.dart';
 import 'package:hango/utils/trainer_onboarding_stage.dart';
+import 'package:hango/utils/trainer_onboarding_validation_utils.dart';
 import 'package:hango/utils/trainer_revision_notes.dart';
 
 void main() {
@@ -145,6 +147,32 @@ void main() {
       });
 
       expect(stage, TrainerOnboardingStage.agreement);
+    });
+
+    test('Agreement save does not resend stale profile fields', () {
+      final payload = buildTrainerAgreementDraftPayload();
+
+      expect(payload, {'agreementSigned': true});
+      expect(payload.containsKey('phoneNumber'), isFalse);
+      expect(payload.containsKey('bankAccount'), isFalse);
+      expect(payload.containsKey('certificates'), isFalse);
+    });
+
+    test('Explains gateway upload limit errors', () {
+      expect(
+        trainerUploadFailureMessage(
+          statusCode: 413,
+          fallbackMessage: 'Unable to upload the trainer document.',
+        ),
+        'The upload request is too large. Maximum file size is 5MB.',
+      );
+      expect(
+        trainerUploadFailureMessage(
+          statusCode: 500,
+          fallbackMessage: 'Unable to upload the trainer document.',
+        ),
+        'Unable to upload the trainer document.',
+      );
     });
 
     test('Keeps trainer revision feedback in its requested section only', () {

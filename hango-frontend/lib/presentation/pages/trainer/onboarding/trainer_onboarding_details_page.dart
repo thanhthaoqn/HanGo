@@ -1738,8 +1738,10 @@ class _TrainerOnboardingDetailsPageState
                 : 'Upload at least one credentials proof to unlock review.',
             style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
+          const SizedBox(height: 24),
+          _buildUnifiedUploadBox(isVi),
           if (certAdminNote != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -1771,8 +1773,6 @@ class _TrainerOnboardingDetailsPageState
               ),
             ),
           ],
-          const SizedBox(height: 24),
-          _buildUnifiedUploadBox(isVi),
         ],
       ),
     );

@@ -5,6 +5,7 @@ import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
+import '../../../../utils/trainer_onboarding_payload_utils.dart';
 import '../../../../utils/trainer_onboarding_stage.dart';
 import '../../../widgets/shared_header.dart';
 import '../../../widgets/shared_footer.dart';
@@ -79,10 +80,9 @@ class _TrainerOnboardingAgreementPageState
       _isSubmitting = true;
     });
 
-    final finalPayload = Map<String, dynamic>.from(widget.profilePayload);
-    finalPayload['agreementSigned'] = true;
-
-    final result = await _onboardingService.saveProfileDraft(finalPayload);
+    final result = await _onboardingService.saveProfileDraft(
+      buildTrainerAgreementDraftPayload(),
+    );
 
     if (!mounted) return;
     setState(() {
@@ -91,7 +91,7 @@ class _TrainerOnboardingAgreementPageState
 
     if (result['success'] == true) {
       final savedProfile = Map<String, dynamic>.from(
-        result['data'] ?? finalPayload,
+        result['data'] ?? widget.profilePayload,
       );
       final nextStage = resolveTrainerOnboardingStage(savedProfile);
       final Widget nextPage = switch (nextStage) {

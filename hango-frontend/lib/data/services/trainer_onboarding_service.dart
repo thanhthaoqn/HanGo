@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../utils/config.dart';
+import '../../utils/trainer_onboarding_validation_utils.dart';
 import 'auth_service.dart';
 
 class TrainerOnboardingService {
@@ -228,7 +229,13 @@ class TrainerOnboardingService {
           };
         }
       }
-      return _failure(response, fallbackMessage);
+      return _failure(
+        response,
+        trainerUploadFailureMessage(
+          statusCode: response.statusCode,
+          fallbackMessage: fallbackMessage,
+        ),
+      );
     } catch (error) {
       return _networkFailure(error);
     }

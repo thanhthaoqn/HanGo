@@ -8,6 +8,7 @@ import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,25 @@ class EmailServiceTest {
 
     @InjectMocks
     private EmailService emailService;
+
+    @Test
+    void approvedTrainerEmailShouldNotExposeAdminNotes() throws Exception {
+        MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(message);
+
+        emailService.sendTrainerStatusNotificationEmail(
+                "trainer@example.com",
+                "Trainer Name",
+                "VERIFIED",
+                "Verified credentials valid");
+
+        verify(mailSender).send(message);
+        assertEquals("HanGo - Trainer Profile Approved!", message.getSubject());
+
+        String html = extractText(message);
+        assertFalse(html.contains("Admin Notes:"));
+        assertFalse(html.contains("Verified credentials valid"));
+    }
 
     @Test
     void rejectedTrainerEmailShouldIncludeActionableNextSteps() throws Exception {

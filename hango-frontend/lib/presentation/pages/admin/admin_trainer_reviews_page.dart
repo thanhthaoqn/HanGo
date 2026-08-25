@@ -816,11 +816,13 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                         const Divider(color: Color(0xFFE2E8F0)),
                         const SizedBox(height: 16),
                         if (isRejectingMode)
-                          Wrap(
-                            alignment: WrapAlignment.end,
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Wrap(
+                              alignment: WrapAlignment.end,
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
                               TextButton(
                                 onPressed: () {
                                   setModalState(() {
@@ -883,14 +885,17 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                                   ),
                                 ),
                               ),
-                            ],
+                              ],
+                            ),
                           )
                         else
-                          Wrap(
-                            alignment: WrapAlignment.end,
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Wrap(
+                              alignment: WrapAlignment.end,
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
                               OutlinedButton.icon(
                                 onPressed: () {
                                   setModalState(() {
@@ -939,7 +944,8 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                                   ),
                                 ),
                               ),
-                            ],
+                              ],
+                            ),
                           ),
                       ] else ...[
                         const SizedBox(height: 32),
