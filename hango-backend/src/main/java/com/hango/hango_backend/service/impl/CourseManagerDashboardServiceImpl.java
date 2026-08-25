@@ -114,13 +114,15 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         try {
             List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT COALESCE(sp.param_value, 'Uncategorized') AS cat, COUNT(c.id) AS cnt " +
-                    "FROM courses c LEFT JOIN system_parameters sp ON c.category_id = sp.id " +
+                    "FROM courses c LEFT JOIN system_parameters sp ON c.category_param_id = sp.id " +
                     "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
                     "GROUP BY cat ORDER BY cnt DESC");
             for (java.util.Map<String, Object> row : rows) {
                 coursesByCategory.put((String) row.get("cat"), ((Number) row.get("cnt")).longValue());
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         return CourseManagerDashboardSummaryDTO.builder()
                 .registeredUsersCount(registeredUsersCount)
@@ -190,6 +192,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                         .build());
             }
         } catch (Exception e) {
+            e.printStackTrace();
             // Return empty trend on error
         }
         return trend;
@@ -202,7 +205,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     "SELECT c.id, c.title, u.full_name AS trainer_name, COUNT(e.id) AS enroll_count, " +
                     "(SELECT AVG(cr.rating) FROM course_ratings cr WHERE cr.course_id = c.id) AS avg_rating " +
                     "FROM courses c " +
-                    "JOIN users u ON c.creator_id = u.id " +
+                    "JOIN users u ON c.created_by = u.id " +
                     "LEFT JOIN enrollments e ON e.course_id = c.id " +
                     "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
                     "GROUP BY c.id, c.title, u.full_name " +
@@ -217,6 +220,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                         .build());
             }
         } catch (Exception e) {
+            e.printStackTrace();
             // Return empty on error
         }
         return topCourses;
@@ -228,9 +232,9 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT u.id, u.full_name, u.avatar_url, AVG(cr.rating) AS avg_rating, " +
                     "COUNT(DISTINCT c.id) AS course_count, " +
-                    "(SELECT COUNT(*) FROM enrollments en JOIN courses cc ON en.course_id = cc.id WHERE cc.creator_id = u.id) AS total_enrollments " +
+                    "(SELECT COUNT(*) FROM enrollments en JOIN courses cc ON en.course_id = cc.id WHERE cc.created_by = u.id) AS total_enrollments " +
                     "FROM users u " +
-                    "JOIN courses c ON c.creator_id = u.id " +
+                    "JOIN courses c ON c.created_by = u.id " +
                     "JOIN course_ratings cr ON cr.course_id = c.id " +
                     "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
                     "GROUP BY u.id, u.full_name, u.avatar_url " +
@@ -247,6 +251,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                         .build());
             }
         } catch (Exception e) {
+            e.printStackTrace();
             // Return empty on error
         }
         return topTrainers;

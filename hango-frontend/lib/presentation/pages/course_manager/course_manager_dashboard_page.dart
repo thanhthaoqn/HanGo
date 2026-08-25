@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../../utils/toast_helper.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
+import 'course_manager_shell_page.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../data/models/course_manager_dashboard_summary.dart';
 
@@ -695,9 +696,13 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
             String timeAgo = 'Just now';
             if (course.submittedAt != null) {
               final diff = DateTime.now().difference(course.submittedAt!);
-              if (diff.inDays > 0) timeAgo = '${diff.inDays}d ago';
-              else if (diff.inHours > 0) timeAgo = '${diff.inHours}h ago';
-              else if (diff.inMinutes > 0) timeAgo = '${diff.inMinutes}m ago';
+              if (diff.inDays > 0) {
+                timeAgo = '${diff.inDays}d ago';
+              } else if (diff.inHours > 0) {
+                timeAgo = '${diff.inHours}h ago';
+              } else if (diff.inMinutes > 0) {
+                timeAgo = '${diff.inMinutes}m ago';
+              }
             }
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
@@ -723,10 +728,10 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
 
   Widget _buildQuickActions() {
     final actions = [
-      _QuickAction('Manage Courses', Icons.school_outlined, const Color(0xFF0D9488), const Color(0xFFF0FDFA), '/course-manager/courses'),
-      _QuickAction('Manage Exams', Icons.assignment_outlined, const Color(0xFFF97316), const Color(0xFFFFF7ED), '/course-manager/exams'),
-      _QuickAction('Matrix Builder', Icons.grid_view_outlined, const Color(0xFF6366F1), const Color(0xFFEEF2FF), '/course-manager/matrix'),
-      _QuickAction('Question Bank', Icons.question_answer_outlined, const Color(0xFF3B82F6), const Color(0xFFEFF6FF), '/course-manager/question-bank'),
+      _QuickAction('Manage Courses', Icons.school_outlined, const Color(0xFF0D9488), const Color(0xFFF0FDFA), 1),
+      _QuickAction('Manage Exams', Icons.assignment_outlined, const Color(0xFFF97316), const Color(0xFFFFF7ED), 2),
+      _QuickAction('Matrix Builder', Icons.grid_view_outlined, const Color(0xFF6366F1), const Color(0xFFEEF2FF), 3),
+      _QuickAction('Question Bank', Icons.question_answer_outlined, const Color(0xFF3B82F6), const Color(0xFFEFF6FF), 4),
     ];
 
     return _DashCard(
@@ -743,7 +748,19 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
             crossAxisSpacing: 12,
             childAspectRatio: 2.2,
             children: actions.map((a) => InkWell(
-              onTap: () => Navigator.pushNamed(context, a.route),
+              onTap: () {
+                // Find shell page state and switch tab
+                final shellState = context.findAncestorStateOfType<CourseManagerShellPageState>();
+                if (shellState != null) {
+                  shellState.selectTab(a.tabIndex);
+                } else {
+                  // Fallback for standalone view
+                  final routes = ['/course-manager', '/course-manager/courses', '/course-manager/exams', '/course-manager/matrix', '/course-manager/question-bank'];
+                  if (a.tabIndex >= 0 && a.tabIndex < routes.length) {
+                    Navigator.pushNamed(context, routes[a.tabIndex]);
+                  }
+                }
+              },
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 decoration: BoxDecoration(
@@ -791,6 +808,6 @@ class _QuickAction {
   final IconData icon;
   final Color color;
   final Color bgColor;
-  final String route;
-  const _QuickAction(this.label, this.icon, this.color, this.bgColor, this.route);
+  final int tabIndex;
+  const _QuickAction(this.label, this.icon, this.color, this.bgColor, this.tabIndex);
 }
