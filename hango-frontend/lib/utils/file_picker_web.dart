@@ -3,11 +3,33 @@ import 'dart:async';
 import 'dart:html' as html;
 import 'file_picker_helper.dart';
 
-Future<PickedFile?> pickImageFile() async {
+Future<PickedFile?> _pickFileFromInput(html.InputElement uploadInput) {
   final completer = Completer<PickedFile?>();
-  final uploadInput = html.InputElement()..type = 'file'..accept = 'image/*';
-  uploadInput.click();
 
+  StreamSubscription? focusSub;
+
+  void completeSafely(PickedFile? file) {
+    focusSub?.cancel();
+    if (!completer.isCompleted) {
+      completer.complete(file);
+    }
+  }
+
+  // 1. Listen for HTML5 'cancel' event on input (triggered when user cancels file dialog)
+  uploadInput.addEventListener('cancel', (event) {
+    completeSafely(null);
+  });
+
+  // 2. Listen for window focus regaining (fallback for browsers/OS dialogs where cancel event doesn't fire)
+  focusSub = html.window.onFocus.listen((_) {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!completer.isCompleted) {
+        completeSafely(null);
+      }
+    });
+  });
+
+  // 3. Listen for file selection
   uploadInput.onChange.listen((e) {
     final files = uploadInput.files;
     if (files != null && files.isNotEmpty) {
@@ -15,66 +37,40 @@ Future<PickedFile?> pickImageFile() async {
       final reader = html.FileReader();
       reader.readAsArrayBuffer(file);
       reader.onLoadEnd.listen((e) {
-        completer.complete(PickedFile(
+        completeSafely(PickedFile(
           name: file.name,
           bytes: reader.result as List<int>,
         ));
       });
     } else {
-      completer.complete(null);
+      completeSafely(null);
     }
   });
 
+  uploadInput.click();
   return completer.future;
+}
+
+Future<PickedFile?> pickImageFile() async {
+  final uploadInput = html.InputElement()..type = 'file'..accept = 'image/*';
+  return _pickFileFromInput(uploadInput);
 }
 
 Future<PickedFile?> pickVideoFile() async {
-  final completer = Completer<PickedFile?>();
   final uploadInput = html.InputElement()..type = 'file'..accept = 'video/mp4,video/x-m4v,video/*';
-  uploadInput.click();
-
-  uploadInput.onChange.listen((e) {
-    final files = uploadInput.files;
-    if (files != null && files.isNotEmpty) {
-      final file = files[0];
-      final reader = html.FileReader();
-      reader.readAsArrayBuffer(file);
-      reader.onLoadEnd.listen((e) {
-        completer.complete(PickedFile(
-          name: file.name,
-          bytes: reader.result as List<int>,
-        ));
-      });
-    } else {
-      completer.complete(null);
-    }
-  });
-
-  return completer.future;
+  return _pickFileFromInput(uploadInput);
 }
+
 Future<PickedFile?> pickPdfFile() async {
-  final completer = Completer<PickedFile?>();
   final uploadInput = html.InputElement()..type = 'file'..accept = 'application/pdf';
-  uploadInput.click();
+  return _pickFileFromInput(uploadInput);
+}
 
-  uploadInput.onChange.listen((e) {
-    final files = uploadInput.files;
-    if (files != null && files.isNotEmpty) {
-      final file = files[0];
-      final reader = html.FileReader();
-      reader.readAsArrayBuffer(file);
-      reader.onLoadEnd.listen((e) {
-        completer.complete(PickedFile(
-          name: file.name,
-          bytes: reader.result as List<int>,
-        ));
-      });
-    } else {
-      completer.complete(null);
-    }
-  });
-
-  return completer.future;
+Future<PickedFile?> pickImageOrPdfFile() async {
+  final uploadInput = html.InputElement()
+    ..type = 'file'
+    ..accept = 'image/*,application/pdf,.pdf';
+  return _pickFileFromInput(uploadInput);
 }
 
 StreamSubscription? _dragOverSub;

@@ -1,6 +1,8 @@
 package com.hango.hango_backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,13 +20,15 @@ public class TrainerProfileDTO {
     private Long userId;
     private String trainerType; // PROFESSIONAL | PEER_TUTOR
     private Double revenueShare;
+    @Size(max = 5000)
     private String bio;
-    private String workplace;
 
     // documents
     private String scoreReportUrl;
     private String pedagogicalDegreeUrl;
     private String cvUrl;
+    @Valid
+    @Size(max = 10)
     private List<TrainerDocumentDTO> certificates;
 
     // payout
@@ -36,6 +40,8 @@ public class TrainerProfileDTO {
 
     // status & agreement
     private Boolean agreementSigned;
+    private String agreementVersion;
+    private LocalDateTime agreementAcceptedAt;
     private String status;
     private LocalDateTime submittedAt;
     private LocalDateTime reviewedAt;

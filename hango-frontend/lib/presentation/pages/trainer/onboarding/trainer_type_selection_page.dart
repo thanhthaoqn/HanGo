@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
 import 'trainer_onboarding_agreement_page.dart';
-import 'trainer_onboarding_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
 
 class TrainerTypeSelectionPage extends StatefulWidget {
@@ -12,7 +12,8 @@ class TrainerTypeSelectionPage extends StatefulWidget {
   const TrainerTypeSelectionPage({super.key, this.isEmbedded = false});
 
   @override
-  State<TrainerTypeSelectionPage> createState() => _TrainerTypeSelectionPageState();
+  State<TrainerTypeSelectionPage> createState() =>
+      _TrainerTypeSelectionPageState();
 }
 
 class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
@@ -27,19 +28,29 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
   @override
   void initState() {
     super.initState();
+    final cachedFullName = AuthService.cachedFullName ?? '';
+    _trainerName = cachedFullName;
+    _trainerInitials = _initialsFor(cachedFullName);
+    _trainerAvatarUrl = AuthService.cachedAvatarUrl ?? '';
     _loadTrainerInfo();
+  }
+
+  String _initialsFor(String fullName) {
+    final trimmedName = fullName.trim();
+    if (trimmedName.isEmpty) return 'T';
+    return trimmedName.split(' ').last[0].toUpperCase();
   }
 
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? '';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
+    final initials = _initialsFor(fullName);
+    if (!mounted ||
+        (_trainerName == fullName &&
+            _trainerInitials == initials &&
+            _trainerAvatarUrl == avatarUrl)) {
+      return;
     }
     setState(() {
       _trainerName = fullName;
@@ -78,47 +89,52 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
 
     final result = await _onboardingService.becomeTrainer(_selectedType!);
 
+    if (!mounted) return;
     setState(() {
       _isSubmitting = false;
     });
 
-    if (mounted) {
-      if (result['success'] == true) {
-        ToastHelper.showSuccess(
-          context,
-          LanguageManager.isVi
-              ? 'Đã khởi tạo vai trò giáo viên thành công!'
-              : 'Trainer role initialized successfully!',
-        );
-        final Map<String, dynamic> initialProfile = {};
-        if (result['data'] != null && result['data']['profile'] != null) {
-          initialProfile.addAll(Map<String, dynamic>.from(result['data']['profile']));
-        }
-        initialProfile['trainerType'] = _selectedType;
-
-        final nextPage = TrainerOnboardingAgreementPage(
-          profilePayload: initialProfile,
-          trainerType: _selectedType!,
-          isEmbedded: true,
-        );
-
-        final shellState = TrainerOnboardingShellPage.of(context);
-        if (shellState != null) {
-          shellState.updateBody(nextPage);
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
-            ),
-          );
-        }
-      } else {
-        ToastHelper.showError(
-          context,
-          result['message'] ?? (LanguageManager.isVi ? 'Lỗi không xác định' : 'An unexpected error occurred'),
+    if (result['success'] == true) {
+      ToastHelper.showSuccess(
+        context,
+        LanguageManager.isVi
+            ? 'Đã khởi tạo vai trò giáo viên thành công!'
+            : 'Trainer role initialized successfully!',
+      );
+      final Map<String, dynamic> initialProfile = {};
+      if (result['data'] != null && result['data']['profile'] != null) {
+        initialProfile.addAll(
+          Map<String, dynamic>.from(result['data']['profile']),
         );
       }
+      initialProfile['trainerType'] = _selectedType;
+
+      final nextPage = TrainerOnboardingAgreementPage(
+        profilePayload: initialProfile,
+        trainerType: _selectedType!,
+        isEmbedded: true,
+      );
+
+      final shellState = TrainerOnboardingShellPage.of(context);
+      if (shellState != null) {
+        shellState.updateBody(nextPage);
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                TrainerOnboardingShellPage(initialBody: nextPage),
+          ),
+        );
+      }
+    } else {
+      ToastHelper.showError(
+        context,
+        result['message'] ??
+            (LanguageManager.isVi
+                ? 'Lỗi không xác định'
+                : 'An unexpected error occurred'),
+      );
     }
   }
 
@@ -170,9 +186,13 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _buildSelectionCard('PROFESSIONAL', isVi)),
+                        Expanded(
+                          child: _buildSelectionCard('PROFESSIONAL', isVi),
+                        ),
                         const SizedBox(width: 24),
-                        Expanded(child: _buildSelectionCard('PEER_TUTOR', isVi)),
+                        Expanded(
+                          child: _buildSelectionCard('PEER_TUTOR', isVi),
+                        ),
                       ],
                     )
                   : Column(
@@ -192,7 +212,9 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF28B79B),
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFF28B79B).withOpacity(0.5),
+                    disabledBackgroundColor: const Color(
+                      0xFF28B79B,
+                    ).withOpacity(0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -212,7 +234,9 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              isVi ? 'Tiếp tục hoàn thiện hồ sơ' : 'Proceed with profile',
+                              isVi
+                                  ? 'Tiếp tục hoàn thiện hồ sơ'
+                                  : 'Proceed with profile',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -242,11 +266,11 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
 
     final desc = isPro
         ? (isVi
-            ? 'Dành cho giáo viên trường THPT, giáo viên đại học hoặc giáo viên trung tâm luyện thi lâu năm có bằng cấp học thuật.'
-            : 'For school teachers, university professors, or center lecturers with formal educational degrees.')
+              ? 'Dành cho giáo viên trường THPT, giáo viên đại học hoặc giáo viên trung tâm luyện thi lâu năm có bằng cấp học thuật.'
+              : 'For school teachers, university professors, or center lecturers with formal educational degrees.')
         : (isVi
-            ? 'Dành cho sinh viên, trợ giảng hoặc cá nhân có điểm thi THPT QG 9+ hoặc chứng chỉ IELTS đạt thành tích xuất sắc.'
-            : 'For students, teaching assistants, or peers with 9+ THPT QG scores or stellar IELTS levels.');
+              ? 'Dành cho sinh viên, trợ giảng hoặc cá nhân có điểm thi THPT QG 9+ hoặc chứng chỉ IELTS đạt thành tích xuất sắc.'
+              : 'For students, teaching assistants, or peers with 9+ THPT QG scores or stellar IELTS levels.');
 
     final icon = isPro ? Icons.workspace_premium_rounded : Icons.school_rounded;
 
@@ -269,7 +293,9 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isSelected ? const Color(0xFF28B79B) : const Color(0xFFE2E8F0),
+                color: isSelected
+                    ? const Color(0xFF28B79B)
+                    : const Color(0xFFE2E8F0),
                 width: isSelected ? 2.5 : 1,
               ),
               boxShadow: [
@@ -304,7 +330,9 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
                   ),
                   child: Icon(
                     icon,
-                    color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+                    color: isSelected
+                        ? const Color(0xFF28B79B)
+                        : const Color(0xFF64748B),
                     size: 32,
                   ),
                 ),
@@ -314,7 +342,9 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? const Color(0xFF1E293B) : const Color(0xFF334155),
+                    color: isSelected
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFF334155),
                     fontFamily: 'Outfit',
                   ),
                 ),
@@ -348,9 +378,7 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
               children: [
-
                 Image.network(
-
                   'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
 
                   height: 36,
@@ -358,45 +386,34 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
                   fit: BoxFit.contain,
 
                   errorBuilder: (context, error, stackTrace) {
-
                     return Row(
-
                       children: [
-
                         Container(
-
                           width: 32,
 
                           height: 32,
 
                           decoration: const BoxDecoration(
-
                             color: Color(0xFFE6FFFA),
 
                             shape: BoxShape.circle,
-
                           ),
 
                           child: const Icon(
-
                             Icons.school,
 
                             size: 18,
 
                             color: Color(0xFF20B486),
-
                           ),
-
                         ),
 
                         const SizedBox(width: 8),
 
                         const Text(
-
                           'HanGo',
 
                           style: TextStyle(
-
                             fontSize: 20,
 
                             fontWeight: FontWeight.bold,
@@ -404,45 +421,78 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
                             color: Color(0xFF1F2937),
 
                             fontFamily: 'Outfit',
-
                           ),
-
                         ),
-
                       ],
-
                     );
-
                   },
-
                 ),
-
               ],
             ),
           ),
           const SizedBox(height: 40),
-          _buildSidebarItem(Icons.dashboard_outlined, isVi ? 'Bảng điều khiển' : 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.book_outlined, isVi ? 'Khóa học' : 'Courses', isEnabled: false),
-          _buildSidebarItem(Icons.assignment_outlined, isVi ? 'Đề thi' : 'Exam', isEnabled: false),
-          _buildSidebarItem(Icons.people_outline, isVi ? 'Học sinh' : 'Learner', isEnabled: false),
-          _buildSidebarItem(Icons.question_answer_outlined, isVi ? 'Ngân hàng câu hỏi' : 'Question Bank', isEnabled: false),
+          _buildSidebarItem(
+            Icons.dashboard_outlined,
+            isVi ? 'Bảng điều khiển' : 'Dashboard',
+            isActive: true,
+          ),
+          _buildSidebarItem(
+            Icons.book_outlined,
+            isVi ? 'Khóa học' : 'Courses',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.assignment_outlined,
+            isVi ? 'Đề thi' : 'Exam',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.people_outline,
+            isVi ? 'Học sinh' : 'Learner',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            isVi ? 'Ngân hàng câu hỏi' : 'Question Bank',
+            isEnabled: false,
+          ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, isVi ? 'Đăng xuất' : 'Logout', color: Colors.redAccent, isEnabled: true, onTap: _handleLogout),
+          _buildSidebarItem(
+            Icons.logout,
+            isVi ? 'Đăng xuất' : 'Logout',
+            color: Colors.redAccent,
+            isEnabled: true,
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, bool isEnabled = true, Color? color, VoidCallback? onTap}) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    bool isEnabled = true,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: InkWell(
-        onTap: isEnabled ? (onTap ?? () {}) : () {
-          ToastHelper.show(context, LanguageManager.isVi ? 'Tài khoản của bạn đang chờ phê duyệt' : 'Your account is awaiting approval');
-        },
+        onTap: isEnabled
+            ? (onTap ?? () {})
+            : () {
+                ToastHelper.show(
+                  context,
+                  LanguageManager.isVi
+                      ? 'Tài khoản của bạn đang chờ phê duyệt'
+                      : 'Your account is awaiting approval',
+                );
+              },
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -454,14 +504,22 @@ class _TrainerTypeSelectionPageState extends State<TrainerTypeSelectionPage> {
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF4B5563)) : Colors.grey.shade400),
+                color: isActive
+                    ? Colors.white
+                    : (isEnabled
+                          ? (color ?? const Color(0xFF4B5563))
+                          : Colors.grey.shade400),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF1F2937)) : Colors.grey.shade400),
+                  color: isActive
+                      ? Colors.white
+                      : (isEnabled
+                            ? (color ?? const Color(0xFF1F2937))
+                            : Colors.grey.shade400),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',
