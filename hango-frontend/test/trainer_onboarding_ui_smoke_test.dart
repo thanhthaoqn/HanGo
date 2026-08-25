@@ -27,6 +27,7 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('Personal Tax ID (optional)'), findsOneWidget);
     expect(find.text('Citizen ID Number *'), findsOneWidget);
