@@ -31,7 +31,8 @@ public class PathwayReroutePolicyService {
             return new PolicyDecision(PolicyAction.NO_CHANGE, null, null);
         }
 
-        // Evaluate DETOUR first
+        // Uu tien kiem tra DETOUR truoc: node dang hoc ma thi quiz that bai >= 2 lan lien tiep
+        // -> can chen khoa remedial de hoc lai
         for (ProgressSnapshotDTO.NodeSnapshotDTO node : snapshot.getNodesSnapshot()) {
             if ("IN_PROGRESS".equalsIgnoreCase(node.getStatus()) && node.getFailStreak() != null && node.getFailStreak() >= 2) {
                 return new PolicyDecision(
@@ -42,7 +43,8 @@ public class PathwayReroutePolicyService {
             }
         }
 
-        // Evaluate FAST_TRACK
+        // FAST_TRACK: buoc truoc hoan thanh voi diem 100/100 va buoc ke tiep khong trung skill yeu
+        // -> cho phep bo qua buoc ke tiep
         for (int i = 0; i < snapshot.getNodesSnapshot().size(); i++) {
             ProgressSnapshotDTO.NodeSnapshotDTO node = snapshot.getNodesSnapshot().get(i);
             

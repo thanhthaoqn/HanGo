@@ -8,6 +8,7 @@ class PathwayRepository {
   final String baseUrl = EnvConfig.v1BaseUrl;
 
   Future<LearningPathway> getMyPathway() async {
+    // Doc JWT tu SharedPreferences (key: auth_token) va dinh kem vao header
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final uri = Uri.parse('$baseUrl/pathways/me');
@@ -49,6 +50,7 @@ class PathwayRepository {
       throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
     }
 
+    // Body gui len backend: examAttemptId la bat buoc, cac truong planning la optional
     final body = {
       'examAttemptId': examAttemptId,
       if (goalName != null) 'goalName': goalName,
@@ -67,6 +69,7 @@ class PathwayRepository {
     );
 
     if (response.statusCode != 200) {
+      // Backend tra ve loi (404 attempt khong ton tai, 500 AI loi...) -> nem Exception
       final resBody = utf8.decode(response.bodyBytes);
       throw Exception('Unable to generate pathway: ${response.statusCode}. $resBody');
     }
