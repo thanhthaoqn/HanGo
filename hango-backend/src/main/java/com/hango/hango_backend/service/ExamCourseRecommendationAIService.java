@@ -48,16 +48,16 @@ public class ExamCourseRecommendationAIService {
         ExamAttempt attempt = examAttemptRepository.findById(examAttemptId)
                 .orElseThrow(() -> new ApiException("ExamAttempt not found", HttpStatus.NOT_FOUND));
 
-        // Phân tích CHỈ dựa trên examAttemptId hiện tại (không dùng các bài exam khác).
-        // Lý do: tránh việc UI/AI suy luận sai do tổng hợp nhiều exam.
+        // Buoc 1: phan tich answersJson cua attempt de rut ra lo hong kien thuc
         ExamResultAnalysisDTO analysis = examResultAnalyzerService.analyzeLatestExamAttempt(attempt);
 
 
-        // Lấy danh sách course hiện có (để AI chỉ chọn đúng course_id).
+        // Buoc 2: lay danh sach course con song (chua bi xoa mem) de AI chi duoc chon trong danh sach nay
         List<Course> allCourses = courseRepository.findAll().stream()
                 .filter(c -> c.getDeletedAt() == null)
                 .toList();
 
+        // Buoc 3: anh xa skill yeu nhat (do FE gui len) sang Category tuong ung
         String mappedCategory = skillCategoryMappingService.getCategoryForSkill(weakestSkill);
         String categoryHint = "";
         if (mappedCategory != null) {
@@ -124,6 +124,8 @@ public class ExamCourseRecommendationAIService {
                         .build()
         );
 
+        // Buoc 4: goi Gemini voi prompt chua danh sach course + phan tich diem yeu,
+        // ep AI tra ve dung JSON schema {weaknessSummary, recommendedCourses[3]}
         try {
             String aiResponseText = geminiClientService.generateChatResponse(systemPrompt, chatHistory);
             aiResponseText = aiResponseText.replaceAll("(?s)^```json\\s*", "")
@@ -139,7 +141,8 @@ public class ExamCourseRecommendationAIService {
 
             if (recs == null) recs = Collections.emptyList();
 
-            // Map course info back to include title/category/difficulty.
+            // Map courseId AI tra ve lai voi Course that trong DB de lay title/thumbnail.
+            // courseId AI bia ra se bi loai (orElse(null) -> title rong)
             return ExamCourseRecommendationAIResponseDTO.builder()
                     .examAttemptId(examAttemptId)
                     .weaknessSummary(weaknessSummary)
@@ -160,6 +163,8 @@ public class ExamCourseRecommendationAIService {
                     }).toList())
                     .build();
         } catch (Exception e) {
+            // FALLBACK (SUY GIAM NHE NHANG): Neu AI loi, Google sap, tra ve mang rong (emptyList)
+            // de Frontend khong bi crash ma tu dong an tinh nang AI di
             log.warn("AI recommend failed, fallback empty. cause={}", e.getMessage());
             return ExamCourseRecommendationAIResponseDTO.builder()
                     .examAttemptId(examAttemptId)

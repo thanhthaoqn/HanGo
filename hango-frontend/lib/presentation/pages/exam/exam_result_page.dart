@@ -81,6 +81,8 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   void _analyzeSkills() {
+    // Phan tich diem yeu NGAY TREN CLIENT: dem ti le dung/sai theo tung skill
+    // tu correctnessMap do TakeExamPage truyen sang; skill co accuracy thap nhat = weakest
     Map<String, int> totalPerSkill = {};
     Map<String, int> correctPerSkill = {};
 
@@ -126,8 +128,8 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   Future<void> _loadAiRecommendations() async {
-    // Tạo “bong bóng phân tích AI + khóa học gợi ý”
-    // Dựa trên examAttemptId lấy từ attempt history gần nhất.
+    // Goi API AI recommend: gui examAttemptId (lay tu attempt vua nop) + weakestSkill (client tinh)
+    // Neu AI that bai thi fallback ve rule-based recommendations ben duoi
     try {
       final latestAttemptId = (() {
         if (widget.attempt['id'] != null)

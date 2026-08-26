@@ -40,6 +40,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     });
 
     try {
+      // GET /pathways/me - backend tra pathway ACTIVE duy nhat cua user
       final pathway = _preparePathwayForDisplay(await _repository.getMyPathway());
       if (!mounted) return;
       setState(() {
@@ -48,6 +49,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       });
     } catch (e) {
       if (!mounted) return;
+      // 404 = user chua co pathway nao (chua lam exam) -> hien man hinh empty state
       setState(() {
         _pathway = null;
         _errorMessage = e.toString().contains('404')
@@ -215,6 +217,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     
     if (_pathway == null) return;
     try {
+      // Gui action FAST_TRACK den backend: node dang hoc -> COMPLETED, mo khoa node ke tiep
       final updatedPathway = await _repository.sendMentorAction(
         pathwayId: _pathway!.pathwayId,
         actionType: 'FAST_TRACK',

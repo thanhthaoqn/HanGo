@@ -55,12 +55,14 @@ public class LearningPathwayService {
     @Transactional
     public LearningPathwayResponseDTO generatePathway(Long studentId, PathwayGenerateRequestDTO requestDTO) {
         Long examAttemptId = requestDTO.getExamAttemptId();
+        // Khoa optimistic (findByIdForUpdate) tranh 2 request generate pathway song song
         User student = userRepository.findByIdForUpdate(studentId)
                 .orElseThrow(() -> new ApiException("User not found", HttpStatus.NOT_FOUND));
 
         ExamAttempt examAttempt = examAttemptRepository.findById(examAttemptId)
                 .orElseThrow(() -> new ApiException("Exam Attempt not found", HttpStatus.NOT_FOUND));
 
+        // Ownership check: attempt phai thuoc ve chinh student dang login
         if (!examAttempt.getStudent().getId().equals(studentId)) {
             throw new ApiException("Access denied to this exam attempt", HttpStatus.FORBIDDEN);
         }
@@ -95,8 +97,7 @@ public class LearningPathwayService {
                     course.getDescription()));
         }
 
-        // AI cần đầu vào chuẩn dựa trên lịch sử làm bài của learner.
-        // Giữ examAttemptId làm mốc (để đúng yêu cầu API), nhưng vẫn tổng hợp thêm N attempts gần nhất.
+        // Rut ra 10 bai thi gan nhat de PHAN TICH KEP: loi vua mac (latest) + loi kinh nien (historical)
         List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
         ExamResultAnalysisDTO examAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
         if (examAnalysis == null) {
@@ -104,6 +105,7 @@ public class LearningPathwayService {
             examAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(examAttempt);
         }
 
+        // Phan tich kep: boc tach "loi kinh nien" (weakCategories) va "loi moi mac" (latestWeakCategories)
         List<String> weakCategories = extractWeakCategories(examAnalysis.getKnowledgeGapsJson());
         List<String> latestWeakCategories = extractLatestWeakCategories(examAnalysis.getKnowledgeGapsJson());
 
@@ -171,6 +173,7 @@ public class LearningPathwayService {
                         .parts(List.of(GeminiGenerateRequest.Part.builder().text(userContent).build()))
                         .build());
 
+        // Goi Gemini sinh pathway dang JSON; neu AI loi thi dung fallback deterministic
         LearningPathwayResponseDTO responseDto;
         try {
             String aiResponseText = geminiClientService.generateChatResponse(systemPrompt, chatHistory);
@@ -179,10 +182,12 @@ public class LearningPathwayService {
                     .trim();
             responseDto = objectMapper.readValue(aiResponseText, LearningPathwayResponseDTO.class);
         } catch (Exception e) {
+            // Fallback: khong goi AI nua - uu tien course thuoc category yeu, gioi han 4 node
             log.warn("Falling back to deterministic learning pathway because AI generation failed: {}", e.getMessage());
             responseDto = buildFallbackPathwayDto(examAttempt, availableCourses, usingExistingCoursesFallback, weakCategories);
         }
 
+        // Pathway cu (ACTIVE) chuyen sang ARCHIVED de moi user chi co 1 pathway hieu luc
         archiveActivePathway(studentId);
 
         LearningPathway newPathway = LearningPathway.builder()
@@ -199,6 +204,7 @@ public class LearningPathwayService {
                 .build();
 
         if (responseDto.getNodes() != null) {
+            // Chi chap nhan course_id ton tai trong availableCourses - courseId AI bia ra bi bo qua
             for (PathwayNodeDTO nodeDto : responseDto.getNodes()) {
                 Course course = availableCourses.stream()
                         .filter(candidate -> candidate.getId().equals(nodeDto.getCourseId()))
@@ -227,6 +233,7 @@ public class LearningPathwayService {
             addFallbackNodes(newPathway, examAttempt, availableCourses);
         }
 
+        // Time-boxing: neu user nhap targetDate + hoursPerWeek thi tinh ngay start/deadline tung node
         if (requestDTO.getTargetDate() != null && requestDTO.getHoursPerWeek() != null && requestDTO.getHoursPerWeek() > 0) {
             applyTimeboxing(newPathway, requestDTO.getTargetDate(), requestDTO.getHoursPerWeek(), requestDTO.getPreferredStudyDays());
         }
@@ -475,6 +482,7 @@ public class LearningPathwayService {
     private void applyTimeboxing(LearningPathway pathway, LocalDate targetDate, Integer hoursPerWeek, List<Integer> preferredStudyDays) {
         if (pathway.getNodes() == null || pathway.getNodes().isEmpty()) return;
 
+        // Uoc luong so gio moi node = so lesson * 2h (node COMPLETED khong ton nang luong)
         List<Integer> estimatedHoursPerNode = new java.util.ArrayList<>();
         for (PathwayNode node : pathway.getNodes()) {
             if ("COMPLETED".equalsIgnoreCase(node.getStatus())) {
@@ -655,10 +663,11 @@ public class LearningPathwayService {
                 .orElseThrow(() -> new ApiException("Node not found in pathway", HttpStatus.NOT_FOUND));
 
         node.setMasteryScore(request.getScore());
-        
+
+        // Mastery + Spaced Repetition: score >= 80 thi dat mastered va tang chu ky on tap 1->3->7->14->30 ngay
         if (request.getScore() != null && request.getScore() >= 80) { // Assuming 80 is the mastery threshold
             node.setIsMastered(true);
-            
+
             // Spaced Repetition logic
             if (node.getReviewIntervalDays() == null) {
                 node.setReviewIntervalDays(1);
@@ -715,6 +724,8 @@ public class LearningPathwayService {
     }
 
     private void archiveActivePathway(Long studentId) {
+        // @OneToOne voi exam_attempt: phai go bo tham chieu cu truoc khi pathway moi
+        // duoc dung lai cung examAttemptId, neu roi vao constraint violation
         Optional<LearningPathway> existingPathway = learningPathwayRepository.findByStudentIdAndStatus(studentId, "ACTIVE");
         existingPathway.ifPresent(pathway -> {
             pathway.setStatus("ARCHIVED");

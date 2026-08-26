@@ -15,10 +15,10 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.time.LocalDateTime;
 
-@RestControllerAdvice
+@RestControllerAdvice // Danh chan tat ca cac loi bi nem ra (throw) tu bat cu Controller/Service nao trong toan he thong
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ApiException.class)
+    @ExceptionHandler(ApiException.class) // Bat tat ca nhung loi mang kieu ApiException (loi nghiep vu chu dong)
     public ResponseEntity<ApiErrorDTO> handleApiException(ApiException ex, HttpServletRequest request) {
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()
                 .timestamp(LocalDateTime.now())
@@ -110,9 +110,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorDTO);
     }
 
-    @ExceptionHandler(Exception.class)
+    @ExceptionHandler(Exception.class) // Bat TAT CA nhung loi ngoai y muon (NullPointer, Loi ket noi DB...) ma lap trinh vien chua kip xu ly
     public ResponseEntity<ApiErrorDTO> handleGlobalException(Exception ex, HttpServletRequest request) {
-        // Log the exception securely on the server side
+        // Ghi log vao server de dev biet duong sua, khong in ra man hinh cua user
         ex.printStackTrace();
         
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()

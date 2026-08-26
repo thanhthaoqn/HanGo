@@ -261,10 +261,12 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
 
     try {
       final pathwayRepo = PathwayRepository();
-      
+
+      // Ghep muc tieu tu input user: targetDate = hom nay + so tuan chon
       final goalName = "Target Score: $_selectedScore";
       final targetDate = DateTime.now().add(Duration(days: _selectedWeeks! * 7)).toIso8601String().substring(0, 10);
-      
+
+      // POST /pathways/generate - backend se goi Gemini sinh pathway va luu DB
       await pathwayRepo.generatePathway(
         examAttemptId: widget.examAttemptId,
         goalName: goalName,
@@ -274,6 +276,7 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
 
       if (!mounted) return;
       Navigator.pop(context);
+      // Chuyen thang sang man hinh pathway vua duoc tao
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LearningPathwayPage()),
