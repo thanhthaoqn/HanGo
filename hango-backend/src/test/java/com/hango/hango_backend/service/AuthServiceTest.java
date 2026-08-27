@@ -203,6 +203,50 @@ class AuthServiceTest {
     }
 
     @Test
+    void authenticateUserShouldLockAccountAfter5FailedAttempts() {
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        user.setFailedLoginAttempts(4);
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
+
+        ApiException ex = assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
+
+        assertEquals("Account is locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.", ex.getMessage());
+        assertEquals(5, user.getFailedLoginAttempts());
+        assertNotNull(user.getLockedUntil());
+        assertTrue(user.getLockedUntil().isAfter(java.time.LocalDateTime.now()));
+    }
+
+    @Test
+    void authenticateUserShouldRejectLoginWhenAccountIsCurrentlyLocked() {
+        User user = activeVerifiedUser("locked@example.com", "ACTIVE");
+        user.setLockedUntil(java.time.LocalDateTime.now().plusMinutes(10));
+        when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
+
+        ApiException ex = assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("locked@example.com", "any-password")));
+
+        assertEquals("Account is locked due to multiple failed login attempts. Please try again after 15 minutes.", ex.getMessage());
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    void authenticateUserShouldUnlockAccountWhenLockoutPeriodExpires() {
+        User user = activeVerifiedUser("unlocked@example.com", "ACTIVE");
+        user.setFailedLoginAttempts(5);
+        user.setLockedUntil(java.time.LocalDateTime.now().minusMinutes(1));
+        when(userRepository.findByEmail("unlocked@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+
+        LoginResponse response = authService.authenticateUser(loginRequest("unlocked@example.com", "correct-password"));
+
+        assertNotNull(response);
+        assertEquals(0, user.getFailedLoginAttempts());
+        assertNull(user.getLockedUntil());
+    }
+
+    @Test
     void authenticateUserShouldRejectAccountThatIsNotActiveStatus() {
         User user = activeVerifiedUser("locked-status@example.com", "LOCKED");
         when(userRepository.findByEmail("locked-status@example.com")).thenReturn(Optional.of(user));
