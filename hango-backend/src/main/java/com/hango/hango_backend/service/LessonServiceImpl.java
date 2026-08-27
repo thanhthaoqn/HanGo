@@ -53,11 +53,11 @@ public class LessonServiceImpl implements LessonService {
 
         List<QuizQuestionDTO> questions = jdbcTemplate.query(
                 "SELECT q.id AS question_id, q.question_text, q.explanation, qg.context_text AS passage " +
-                "FROM lesson_quizzes lq " +
-                "JOIN questions q ON lq.question_id = q.id " +
-                "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
-                "WHERE lq.lesson_id = ? " +
-                "ORDER BY lq.display_order ASC",
+                        "FROM lesson_quizzes lq " +
+                        "JOIN questions q ON lq.question_id = q.id " +
+                        "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
+                        "WHERE lq.lesson_id = ? " +
+                        "ORDER BY lq.display_order ASC",
                 (rs, rowNum) -> {
                     Long qId = rs.getLong("question_id");
                     String questionText = rs.getString("question_text");
@@ -73,8 +73,7 @@ public class LessonServiceImpl implements LessonService {
                             .correctIndex(0)
                             .build();
                 },
-                lessonId
-        );
+                lessonId);
         if (questions == null) {
             questions = new ArrayList<>();
         }
@@ -87,9 +86,8 @@ public class LessonServiceImpl implements LessonService {
             String placeholders = questionIds.stream().map(id -> "?").collect(Collectors.joining(", "));
             List<Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
                     "SELECT question_id, option_text, is_correct FROM question_options " +
-                    "WHERE question_id IN (" + placeholders + ") ORDER BY question_id ASC, id ASC",
-                    questionIds.toArray()
-            );
+                            "WHERE question_id IN (" + placeholders + ") ORDER BY question_id ASC, id ASC",
+                    questionIds.toArray());
 
             if (optionsRows != null) {
                 Map<Long, List<String>> optionsByQuestionId = new HashMap<>();
@@ -127,16 +125,20 @@ public class LessonServiceImpl implements LessonService {
         }
 
         int qCount = questions != null ? questions.size() : 0;
-        int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime() 
-                      : ("quiz".equalsIgnoreCase(lesson.getLessonType()) ? (10 + qCount * 2) : 15);
+        // FINAL_QUIZ tinh thoi gian nhu quiz (10 phut + 2 phut moi cau)
+        boolean isQuizType = "quiz".equalsIgnoreCase(lesson.getLessonType())
+                || Lesson.DISPLAY_TYPE_FINAL_QUIZ.equalsIgnoreCase(lesson.getLessonType());
+        int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime()
+                : (isQuizType ? (10 + qCount * 2) : 15);
 
         return LessonDetailDTO.builder()
                 .id(lesson.getId())
                 .title(lesson.getTitle())
                 .content(lesson.getContent())
                 .sectionId(lesson.getSection() != null ? lesson.getSection().getId() : null)
-                .courseId(lesson.getSection() != null && lesson.getSection().getCourse() != null 
-                            ? lesson.getSection().getCourse().getId() : null)
+                .courseId(lesson.getSection() != null && lesson.getSection().getCourse() != null
+                        ? lesson.getSection().getCourse().getId()
+                        : null)
                 .comments(comments)
                 .questions(questions)
                 .isCompleted(isCompleted)
@@ -148,14 +150,15 @@ public class LessonServiceImpl implements LessonService {
                 .learningObjectives(lesson.getLearningObjectives())
                 .mediaFileUrl(lesson.getPdfName())
                 .mediaType(lesson.getPdfName() != null && !lesson.getPdfName().isEmpty() ? "pdf" : null)
-                .itemType(lesson.getLessonType())
+                .itemType(Lesson.displayItemType(lesson.getLessonType()))
                 .videoTranscript(lesson.getVideoTranscript())
                 .build();
     }
 
     @Override
     public List<LessonQuizAttemptDTO> getQuizAttempts(Long lessonId, Long userId) {
-        List<LessonQuizAttempt> attempts = quizAttemptRepository.findByLessonIdAndStudentIdOrderByAttemptNumberAsc(lessonId, userId);
+        List<LessonQuizAttempt> attempts = quizAttemptRepository
+                .findByLessonIdAndStudentIdOrderByAttemptNumberAsc(lessonId, userId);
         return attempts.stream().map(a -> {
             Map<String, Integer> answers = null;
             try {
@@ -247,20 +250,22 @@ public class LessonServiceImpl implements LessonService {
 
         if (lesson.getSection() != null && lesson.getSection().getCourse() != null) {
             Long courseId = lesson.getSection().getCourse().getId();
-            
-            // Acquire pessimistic write lock to calculate progress and prevent concurrency races
+
+            // Acquire pessimistic write lock to calculate progress and prevent concurrency
+            // races
             Enrollment enrollment = enrollmentRepository.findByUserIdAndCourseIdWithLock(userId, courseId)
                     .orElse(null);
-            
+
             if (enrollment != null) {
                 long totalLessons = lessonRepository.countByCourseId(courseId);
                 if (totalLessons > 0) {
-                    long completedLessons = lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(userId, courseId);
+                    long completedLessons = lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(userId,
+                            courseId);
                     BigDecimal percentage = BigDecimal.valueOf((double) completedLessons / totalLessons * 100)
                             .setScale(2, RoundingMode.HALF_UP);
-                    
+
                     enrollment.setProgressPercentage(percentage);
-                    
+
                     if (completedLessons == totalLessons) {
                         enrollment.setStatus("COMPLETED");
                         enrollment.setCompletedAt(LocalDateTime.now());

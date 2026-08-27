@@ -51,10 +51,11 @@ import com.hango.hango_backend.util.JwtUtils;
 @Service
 public class AuthService {
 
-
     private static final int MAX_OTP_ATTEMPTS = 5;
     private static final long OTP_RESEND_COOLDOWN_SECONDS = 60;
     private static final long VERIFICATION_TOKEN_VALIDITY_HOURS = 12;
+    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
+    private static final long LOCKOUT_DURATION_MINUTES = 15;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Autowired
@@ -140,13 +141,38 @@ public class AuthService {
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
 
+        if (user.getLockedUntil() != null) {
+            if (user.getLockedUntil().isAfter(LocalDateTime.now())) {
+                logAudit(user, "LOGIN_FAILURE", user.getId(), "Account is locked until " + user.getLockedUntil());
+                throw new ApiException("Account is locked due to multiple failed login attempts. Please try again after 15 minutes.", HttpStatus.FORBIDDEN);
+            } else {
+                user.setLockedUntil(null);
+                user.setFailedLoginAttempts(0);
+                userRepository.save(user);
+            }
+        }
+
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, loginRequest.getPassword()));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (AuthenticationException ex) {
+            int attempts = (user.getFailedLoginAttempts() == null ? 0 : user.getFailedLoginAttempts()) + 1;
+            user.setFailedLoginAttempts(attempts);
+            if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_DURATION_MINUTES));
+                userRepository.save(user);
+                logAudit(user, "LOGIN_FAILURE", user.getId(), "Account locked for 15 minutes after " + attempts + " failed attempts");
+                throw new ApiException("Account is locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.", HttpStatus.FORBIDDEN);
+            }
+            userRepository.save(user);
             logAudit(user, "LOGIN_FAILURE", user.getId(), "Bad credentials");
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
+        }
+
+        if ((user.getFailedLoginAttempts() != null && user.getFailedLoginAttempts() > 0) || user.getLockedUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
         }
 
         // Checked before the generic "not active" status: a freshly registered
@@ -178,8 +204,6 @@ public class AuthService {
         return new LoginResponse(jwt, refreshToken, user.getId(), user.getEmail(), user.getFullName(), roles,
                 user.getAvatarUrl());
     }
-
-
 
     // =================================================================
     // registerUser

@@ -198,6 +198,7 @@ class AppState extends ChangeNotifier {
       final String finalChatUrl = _buildAiUrl('/ai-assistant/messages');
       debugPrint('[AppState] Sending message to: $finalChatUrl');
 
+      // Gui POST kem JWT tu session; body chua lessonId + conversationId + message
       final response = await http
           .post(
             Uri.parse(finalChatUrl), // Đường dẫn: /api/v1/ai-assistant/messages

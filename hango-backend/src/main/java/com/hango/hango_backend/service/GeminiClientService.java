@@ -182,6 +182,8 @@ public class GeminiClientService {
          * nếu máy chủ Google báo lỗi 429 quá tải (Too Many Requests).
          */
         public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
+                // Goi 1 request HTTP POST duy nhat sang Google: system prompt ep vai tro +
+                // lich su chat (contents) + cau hinh nhiet do 0.4 va toi da 8192 token
                 GeminiGenerateRequest request = GeminiGenerateRequest.builder()
                                 .systemInstruction(GeminiGenerateRequest.SystemInstruction.builder()
                                                 .parts(List.of(GeminiGenerateRequest.Part.builder().text(systemPrompt)
@@ -198,6 +200,7 @@ public class GeminiClientService {
                 long startedAt = System.currentTimeMillis();
 
                 try {
+                        // block() bien call reactive thanh dong bo; tu retry 2 lan neu bi 429 (qua tai)
                         GeminiGenerateResponse response = webClient.post()
                                         .uri(path)
                                         .bodyValue(request)
@@ -210,6 +213,7 @@ public class GeminiClientService {
 
                         String text = response != null ? response.extractText() : null;
 
+                        // Response rong coi nhu loi he thong AI -> nem ApiException 502
                         if (text == null || text.isBlank()) {
                                 recordUsage("CHAT", false, System.currentTimeMillis() - startedAt, "Empty response");
                                 throw new ApiException("AI returned an invalid response", HttpStatus.BAD_GATEWAY);
@@ -275,11 +279,6 @@ public class GeminiClientService {
                 }
         }
 
-        /**
-<<<<<<< Updated upstream
-         * Auto-generate transcript for a video using Gemini 1.5 Flash Audio/Video
-         * capability.
-         */
         /**
          * Tính năng Trích xuất Phụ đề Video (Multimodal Video Processing).
          * Tác dụng: Khi giảng viên upload một video bài giảng, hàm này sẽ nhờ Gemini 

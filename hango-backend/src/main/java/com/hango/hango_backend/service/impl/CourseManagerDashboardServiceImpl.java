@@ -8,6 +8,7 @@ import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Lesson;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamRepository;
+import com.hango.hango_backend.service.CourseQuizValidationService;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.repository.SectionRepository;
@@ -36,6 +37,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     private final NotificationService notificationService;
     private final ExamHistoryService examHistoryService;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final CourseQuizValidationService courseQuizValidationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -55,20 +57,24 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         long pendingExamsCount = 0;
         try {
             pendingExamsCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM exams WHERE (status = 'PENDING_APPROVAL' OR status = 'SUBMITTED') AND deleted_at IS NULL", Long.class);
-        } catch (Exception ignored) {}
+                    "SELECT COUNT(*) FROM exams WHERE (status = 'PENDING_APPROVAL' OR status = 'SUBMITTED') AND deleted_at IS NULL",
+                    Long.class);
+        } catch (Exception ignored) {
+        }
 
         long activeLearnerCount = 0;
         try {
             activeLearnerCount = jdbcTemplate.queryForObject(
                     "SELECT COUNT(DISTINCT user_id) FROM enrollments", Long.class);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         double avgCourseRating = 0.0;
         try {
             Double avg = jdbcTemplate.queryForObject("SELECT AVG(rating) FROM course_ratings", Double.class);
             avgCourseRating = avg != null ? Math.round(avg * 10.0) / 10.0 : 0.0;
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         // === Weekly deltas ===
         double coursesGrowthPercent = computeWeeklyGrowth("courses", "created_at");
@@ -92,31 +98,37 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         long lowRatedCourses = 0;
         try {
             coursesWithoutDescription = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM courses WHERE deleted_at IS NULL AND status = 'PUBLISHED' AND (description IS NULL OR description = '')", Long.class);
+                    "SELECT COUNT(*) FROM courses WHERE deleted_at IS NULL AND status = 'PUBLISHED' AND (description IS NULL OR description = '')",
+                    Long.class);
             coursesWithFewLessons = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM courses c WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
-                    "AND (SELECT COUNT(*) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id) < 3", Long.class);
+                            "AND (SELECT COUNT(*) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id) < 3",
+                    Long.class);
             examsWithoutQuestions = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM exams e WHERE e.deleted_at IS NULL AND (e.expected_question_count IS NULL OR e.expected_question_count = 0)", Long.class);
+                    "SELECT COUNT(*) FROM exams e WHERE e.deleted_at IS NULL AND (e.expected_question_count IS NULL OR e.expected_question_count = 0)",
+                    Long.class);
             Double avgLessons = jdbcTemplate.queryForObject(
                     "SELECT AVG(lesson_cnt) FROM (SELECT c.id, COUNT(l.id) AS lesson_cnt FROM courses c " +
-                    "LEFT JOIN sections s ON s.course_id = c.id LEFT JOIN lessons l ON l.section_id = s.id " +
-                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' GROUP BY c.id) sub", Double.class);
+                            "LEFT JOIN sections s ON s.course_id = c.id LEFT JOIN lessons l ON l.section_id = s.id " +
+                            "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' GROUP BY c.id) sub",
+                    Double.class);
             avgLessonsPerCourse = avgLessons != null ? Math.round(avgLessons * 10.0) / 10.0 : 0.0;
             lowRatedCourses = jdbcTemplate.queryForObject(
                     "SELECT COUNT(DISTINCT cr.course_id) FROM course_ratings cr " +
-                    "JOIN courses c ON c.id = cr.course_id WHERE c.deleted_at IS NULL " +
-                    "GROUP BY cr.course_id HAVING AVG(cr.rating) < 3.0", Long.class);
-        } catch (Exception ignored) {}
+                            "JOIN courses c ON c.id = cr.course_id WHERE c.deleted_at IS NULL " +
+                            "GROUP BY cr.course_id HAVING AVG(cr.rating) < 3.0",
+                    Long.class);
+        } catch (Exception ignored) {
+        }
 
         // === Course distribution by category ===
         java.util.Map<String, Long> coursesByCategory = new java.util.LinkedHashMap<>();
         try {
             List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT COALESCE(sp.param_value, 'Uncategorized') AS cat, COUNT(c.id) AS cnt " +
-                    "FROM courses c LEFT JOIN system_parameters sp ON c.category_param_id = sp.id " +
-                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
-                    "GROUP BY cat ORDER BY cnt DESC");
+                            "FROM courses c LEFT JOIN system_parameters sp ON c.category_param_id = sp.id " +
+                            "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
+                            "GROUP BY cat ORDER BY cnt DESC");
             for (java.util.Map<String, Object> row : rows) {
                 coursesByCategory.put((String) row.get("cat"), ((Number) row.get("cnt")).longValue());
             }
@@ -157,10 +169,16 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     private double computeWeeklyGrowth(String table, String dateColumn) {
         try {
             Long thisWeek = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM " + table + " WHERE " + dateColumn + " >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)", Long.class);
+                    "SELECT COUNT(*) FROM " + table + " WHERE " + dateColumn
+                            + " >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
+                    Long.class);
             Long lastWeek = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM " + table + " WHERE " + dateColumn + " >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND " + dateColumn + " < DATE_SUB(CURDATE(), INTERVAL 7 DAY)", Long.class);
-            if (lastWeek == null || lastWeek == 0) return thisWeek != null && thisWeek > 0 ? 100.0 : 0.0;
+                    "SELECT COUNT(*) FROM " + table + " WHERE " + dateColumn
+                            + " >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND " + dateColumn
+                            + " < DATE_SUB(CURDATE(), INTERVAL 7 DAY)",
+                    Long.class);
+            if (lastWeek == null || lastWeek == 0)
+                return thisWeek != null && thisWeek > 0 ? 100.0 : 0.0;
             return Math.round(((thisWeek - lastWeek) * 100.0 / lastWeek) * 10.0) / 10.0;
         } catch (Exception e) {
             return 0.0;
@@ -183,8 +201,8 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 }
                 Long count = jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM enrollments WHERE enrolled_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)" +
-                        (i > 0 ? " AND enrolled_at < DATE_SUB(CURDATE(), INTERVAL ? DAY)" : ""),
-                        i > 0 ? new Object[]{startDay, endDay} : new Object[]{startDay},
+                                (i > 0 ? " AND enrolled_at < DATE_SUB(CURDATE(), INTERVAL ? DAY)" : ""),
+                        i > 0 ? new Object[] { startDay, endDay } : new Object[] { startDay },
                         Long.class);
                 trend.add(com.hango.hango_backend.dto.WeeklyEnrollmentDTO.builder()
                         .weekLabel(label)
@@ -203,20 +221,21 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         try {
             List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT c.id, c.title, u.full_name AS trainer_name, COUNT(e.id) AS enroll_count, " +
-                    "(SELECT AVG(cr.rating) FROM course_ratings cr WHERE cr.course_id = c.id) AS avg_rating " +
-                    "FROM courses c " +
-                    "JOIN users u ON c.created_by = u.id " +
-                    "LEFT JOIN enrollments e ON e.course_id = c.id " +
-                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
-                    "GROUP BY c.id, c.title, u.full_name " +
-                    "ORDER BY enroll_count DESC LIMIT 5");
+                            "(SELECT AVG(cr.rating) FROM course_ratings cr WHERE cr.course_id = c.id) AS avg_rating " +
+                            "FROM courses c " +
+                            "JOIN users u ON c.created_by = u.id " +
+                            "LEFT JOIN enrollments e ON e.course_id = c.id " +
+                            "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
+                            "GROUP BY c.id, c.title, u.full_name " +
+                            "ORDER BY enroll_count DESC LIMIT 5");
             for (java.util.Map<String, Object> row : rows) {
                 topCourses.add(com.hango.hango_backend.dto.TopCourseDTO.builder()
                         .id(((Number) row.get("id")).longValue())
                         .title((String) row.get("title"))
                         .trainerName((String) row.get("trainer_name"))
                         .enrollmentCount(((Number) row.get("enroll_count")).longValue())
-                        .avgRating(row.get("avg_rating") != null ? ((Number) row.get("avg_rating")).doubleValue() : null)
+                        .avgRating(
+                                row.get("avg_rating") != null ? ((Number) row.get("avg_rating")).doubleValue() : null)
                         .build());
             }
         } catch (Exception e) {
@@ -231,15 +250,16 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
         try {
             List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
                     "SELECT u.id, u.full_name, u.avatar_url, AVG(cr.rating) AS avg_rating, " +
-                    "COUNT(DISTINCT c.id) AS course_count, " +
-                    "(SELECT COUNT(*) FROM enrollments en JOIN courses cc ON en.course_id = cc.id WHERE cc.created_by = u.id) AS total_enrollments " +
-                    "FROM users u " +
-                    "JOIN courses c ON c.created_by = u.id " +
-                    "JOIN course_ratings cr ON cr.course_id = c.id " +
-                    "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
-                    "GROUP BY u.id, u.full_name, u.avatar_url " +
-                    "HAVING COUNT(cr.id) >= 1 " +
-                    "ORDER BY avg_rating DESC LIMIT 5");
+                            "COUNT(DISTINCT c.id) AS course_count, " +
+                            "(SELECT COUNT(*) FROM enrollments en JOIN courses cc ON en.course_id = cc.id WHERE cc.created_by = u.id) AS total_enrollments "
+                            +
+                            "FROM users u " +
+                            "JOIN courses c ON c.created_by = u.id " +
+                            "JOIN course_ratings cr ON cr.course_id = c.id " +
+                            "WHERE c.deleted_at IS NULL AND c.status = 'PUBLISHED' " +
+                            "GROUP BY u.id, u.full_name, u.avatar_url " +
+                            "HAVING COUNT(cr.id) >= 1 " +
+                            "ORDER BY avg_rating DESC LIMIT 5");
             for (java.util.Map<String, Object> row : rows) {
                 topTrainers.add(com.hango.hango_backend.dto.TopTrainerDTO.builder()
                         .id(((Number) row.get("id")).longValue())
@@ -259,15 +279,17 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
 
     @Override
     @Transactional(readOnly = true)
-    public org.springframework.data.domain.Page<CourseReviewDetailDTO> getCoursesForReview(String status, int page, int size) {
+    public org.springframework.data.domain.Page<CourseReviewDetailDTO> getCoursesForReview(String status, int page,
+            int size) {
         String normalizedStatus = normalizeStatus(status);
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
         org.springframework.data.domain.Page<Course> coursePage;
-        
+
         if ("ALL".equals(normalizedStatus)) {
             coursePage = courseRepository.findByDeletedAtIsNullOrderByCreatedAtDesc(pageable);
         } else {
-            coursePage = courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(normalizedStatus, pageable);
+            coursePage = courseRepository.findByStatusAndDeletedAtIsNullOrderByCreatedAtDesc(normalizedStatus,
+                    pageable);
         }
 
         return coursePage.map(course -> mapCourse(course, false));
@@ -291,6 +313,12 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
 
         if (!"PENDING_APPROVAL".equalsIgnoreCase(course.getStatus())) {
             throw new RuntimeException("Only courses in PENDING_APPROVAL status can be published");
+        }
+
+        // A1 (spec 20): chan publish neu course chua co it nhat 1 quiz co cau hoi
+        if (!courseQuizValidationService.hasAtLeastOneQuiz(course.getId())) {
+            throw new RuntimeException("Cannot publish \"" + course.getTitle()
+                    + "\": the course must contain at least one quiz with questions before publishing.");
         }
 
         if (courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode())) {
@@ -317,7 +345,8 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 courseRepository.save(originalCourse);
             }
 
-            List<Long> priorVersionIds = courseRepository.findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(course.getCode())
+            List<Long> priorVersionIds = courseRepository
+                    .findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(course.getCode())
                     .stream()
                     .map(Course::getId)
                     .filter(id -> !id.equals(course.getId()))
@@ -326,9 +355,11 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 enrollmentRepository.findByCourseIdIn(priorVersionIds).stream()
                         .map(enrollment -> enrollment.getUser())
                         .distinct()
-                        .forEach(learner -> notificationService.notifyUser(learner, NotificationService.TYPE_COURSE_UPDATED,
+                        .forEach(learner -> notificationService.notifyUser(learner,
+                                NotificationService.TYPE_COURSE_UPDATED,
                                 "Course updated",
-                                "\"" + course.getTitle() + "\" has a new version (" + course.getVersion() + ") available.",
+                                "\"" + course.getTitle() + "\" has a new version (" + course.getVersion()
+                                        + ") available.",
                                 course));
             }
         }
@@ -352,7 +383,9 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
 
         notificationService.notifyUser(course.getCreator(), NotificationService.TYPE_CONTENT_REJECTED,
                 "Course rejected",
-                "Your course \"" + course.getTitle() + "\" was rejected" + (reason != null && !reason.isBlank() ? " with reason: " + reason : "."), course);
+                "Your course \"" + course.getTitle() + "\" was rejected"
+                        + (reason != null && !reason.isBlank() ? " with reason: " + reason : "."),
+                course);
     }
 
     @Override
@@ -397,7 +430,9 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     }
 
     private CourseReviewDetailDTO mapCourse(Course course, boolean includeSessions) {
-        int sectionsCount = includeSessions ? sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId()).size() : (int) sectionRepository.countByCourseId(course.getId());
+        int sectionsCount = includeSessions
+                ? sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId()).size()
+                : (int) sectionRepository.countByCourseId(course.getId());
         int lessonsCount = (int) lessonRepository.countByCourseId(course.getId());
 
         List<CourseSessionDTO> sessions = includeSessions
@@ -408,7 +443,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                                     .id(lesson.getId())
                                     .title(lesson.getTitle())
                                     .orderIndex(lesson.getDisplayOrder())
-                                    .itemType(lesson.getLessonType())
+                                    .itemType(Lesson.displayItemType(lesson.getLessonType()))
                                     .description(lesson.getDescription())
                                     .questionText(lesson.getContent())
                                     .pdfName(lesson.getPdfName())
@@ -420,55 +455,53 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                                     .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes())
                                     .learningObjectives(lesson.getLearningObjectives())
                                     .videoTranscript(lesson.getVideoTranscript())
-                                    .questions("quiz".equalsIgnoreCase(lesson.getLessonType()) ? 
-                                            jdbcTemplate.query(
-                                                "SELECT q.id AS question_id, q.question_text, q.explanation, qg.context_text AS passage " +
-                                                "FROM lesson_quizzes lq " +
-                                                "JOIN questions q ON lq.question_id = q.id " +
-                                                "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
-                                                "WHERE lq.lesson_id = ? " +
-                                                "ORDER BY lq.display_order ASC",
-                                                (rs, rowNum) -> {
-                                                    Long qId = rs.getLong("question_id");
-                                                    String questionText = rs.getString("question_text");
-                                                    String explanation = rs.getString("explanation");
-                                                    String passage = rs.getString("passage");
-                                                    
-                                                    java.util.List<java.util.Map<String, Object>> optionsRows = jdbcTemplate.queryForList(
-                                                            "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
-                                                            qId
-                                                    );
-                                                    
-                                                    java.util.List<String> options = new java.util.ArrayList<>();
-                                                    Integer correctIndex = 0;
-                                                    for (int i = 0; i < optionsRows.size(); i++) {
-                                                        java.util.Map<String, Object> row = optionsRows.get(i);
-                                                        options.add((String) row.get("option_text"));
-                                                        Object isCorrectObj = row.get("is_correct");
-                                                        boolean isCorrect = false;
-                                                        if (isCorrectObj instanceof Boolean) {
-                                                            isCorrect = (Boolean) isCorrectObj;
-                                                        } else if (isCorrectObj instanceof Number) {
-                                                            isCorrect = ((Number) isCorrectObj).intValue() == 1;
-                                                        }
-                                                        if (isCorrect) {
-                                                            correctIndex = i;
-                                                        }
+                                    .questions("quiz".equalsIgnoreCase(lesson.getLessonType()) ? jdbcTemplate.query(
+                                            "SELECT q.id AS question_id, q.question_text, q.explanation, qg.context_text AS passage "
+                                                    +
+                                                    "FROM lesson_quizzes lq " +
+                                                    "JOIN questions q ON lq.question_id = q.id " +
+                                                    "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
+                                                    "WHERE lq.lesson_id = ? " +
+                                                    "ORDER BY lq.display_order ASC",
+                                            (rs, rowNum) -> {
+                                                Long qId = rs.getLong("question_id");
+                                                String questionText = rs.getString("question_text");
+                                                String explanation = rs.getString("explanation");
+                                                String passage = rs.getString("passage");
+
+                                                java.util.List<java.util.Map<String, Object>> optionsRows = jdbcTemplate
+                                                        .queryForList(
+                                                                "SELECT option_text, is_correct FROM question_options WHERE question_id = ? ORDER BY id ASC",
+                                                                qId);
+
+                                                java.util.List<String> options = new java.util.ArrayList<>();
+                                                Integer correctIndex = 0;
+                                                for (int i = 0; i < optionsRows.size(); i++) {
+                                                    java.util.Map<String, Object> row = optionsRows.get(i);
+                                                    options.add((String) row.get("option_text"));
+                                                    Object isCorrectObj = row.get("is_correct");
+                                                    boolean isCorrect = false;
+                                                    if (isCorrectObj instanceof Boolean) {
+                                                        isCorrect = (Boolean) isCorrectObj;
+                                                    } else if (isCorrectObj instanceof Number) {
+                                                        isCorrect = ((Number) isCorrectObj).intValue() == 1;
                                                     }
-                                                    
-                                                    return com.hango.hango_backend.dto.QuizQuestionDTO.builder()
-                                                            .id(qId)
-                                                            .passage(passage)
-                                                            .questionText(questionText)
-                                                            .explanation(explanation)
-                                                            .options(options)
-                                                            .correctIndex(correctIndex)
-                                                            .build();
-                                                },
-                                                lesson.getId()
-                                            )
-                                            : null
-                                    )
+                                                    if (isCorrect) {
+                                                        correctIndex = i;
+                                                    }
+                                                }
+
+                                                return com.hango.hango_backend.dto.QuizQuestionDTO.builder()
+                                                        .id(qId)
+                                                        .passage(passage)
+                                                        .questionText(questionText)
+                                                        .explanation(explanation)
+                                                        .options(options)
+                                                        .correctIndex(correctIndex)
+                                                        .build();
+                                            },
+                                            lesson.getId())
+                                            : null)
                                     .build())
                             .collect(Collectors.toList());
                     return CourseSessionDTO.builder()
@@ -579,7 +612,8 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
 
         notificationService.notifyUser(exam.getCreatedBy(), NotificationService.TYPE_CONTENT_REJECTED,
                 "Exam rejected",
-                "Your exam \"" + exam.getTitle() + "\" was rejected" + (reason != null && !reason.isBlank() ? ": " + reason : "."),
+                "Your exam \"" + exam.getTitle() + "\" was rejected"
+                        + (reason != null && !reason.isBlank() ? ": " + reason : "."),
                 null);
     }
 }

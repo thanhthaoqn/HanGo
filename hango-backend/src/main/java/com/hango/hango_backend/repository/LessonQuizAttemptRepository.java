@@ -11,4 +11,8 @@ public interface LessonQuizAttemptRepository extends JpaRepository<LessonQuizAtt
     List<LessonQuizAttempt> findByLessonIdAndStudentIdOrderByAttemptNumberAsc(Long lessonId, Long studentId);
     int countByLessonIdAndStudentId(Long lessonId, Long studentId);
     List<LessonQuizAttempt> findByStudentIdAndLessonSectionCourseIdOrderBySubmittedAtDesc(Long studentId, Long courseId);
+
+    // Chi lay cac attempt thuoc lesson duoc danh dau la bai danh gia cuoi khoa (FINAL_QUIZ)
+    List<LessonQuizAttempt> findByStudentIdAndLessonSectionCourseIdAndLessonLessonTypeOrderBySubmittedAtDesc(
+            Long studentId, Long courseId, String lessonType);
 }

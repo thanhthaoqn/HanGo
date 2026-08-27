@@ -55,9 +55,10 @@ public class CourseServiceImpl implements CourseService {
     public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
         Long enrolledUserId = null;
         String enrollmentStatus = null;
-        
+
         if ("ENROLLED".equalsIgnoreCase(filterType) || "IN_PROGRESS".equalsIgnoreCase(filterType)) {
-            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.security.UserDetailsImpl) {
                 enrolledUserId = ((com.hango.hango_backend.security.UserDetailsImpl) auth.getPrincipal()).getId();
                 if ("IN_PROGRESS".equalsIgnoreCase(filterType)) {
@@ -65,7 +66,8 @@ public class CourseServiceImpl implements CourseService {
                 }
             }
         } else if ("COMPLETED".equalsIgnoreCase(filterType)) {
-            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof com.hango.hango_backend.security.UserDetailsImpl) {
                 enrolledUserId = ((com.hango.hango_backend.security.UserDetailsImpl) auth.getPrincipal()).getId();
                 enrollmentStatus = "COMPLETED";
@@ -78,15 +80,16 @@ public class CourseServiceImpl implements CourseService {
             diffFilter = difficulty.toUpperCase();
         }
 
-        List<CourseSummaryDTO> dtos = courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId, enrollmentStatus);
-        
+        List<CourseSummaryDTO> dtos = courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId,
+                enrollmentStatus);
+
         if (dtos.isEmpty()) {
             return dtos;
         }
 
         List<Long> courseIds = dtos.stream().map(CourseSummaryDTO::getId).collect(Collectors.toList());
         List<Object[]> courseCategories = courseRepository.findCategoriesByCourseIds(courseIds);
-        
+
         Map<Long, List<String>> categoryMap = new HashMap<>();
         for (Object[] row : courseCategories) {
             Long courseId = (Long) row[0];
@@ -141,11 +144,11 @@ public class CourseServiceImpl implements CourseService {
 
         for (CourseSummaryDTO dto : dtos) {
             List<String> catNames = categoryMap.getOrDefault(dto.getId(), new ArrayList<>());
-            
+
             if (catNames.isEmpty() && dto.getCategoryName() != null && !dto.getCategoryName().isEmpty()) {
                 catNames.add(dto.getCategoryName());
             }
-            
+
             dto.setCategories(catNames);
             dto.setCategoryName(catNames.isEmpty() ? "" : String.join(", ", catNames));
 
@@ -171,13 +174,13 @@ public class CourseServiceImpl implements CourseService {
         if (course.getDeletedAt() != null) {
             if (course.getLatestVersionId() != null && !course.getLatestVersionId().equals(course.getId())) {
                 Course latestCourse = courseRepository.findById(course.getLatestVersionId()).orElse(null);
-                if (latestCourse != null && "PUBLISHED".equalsIgnoreCase(latestCourse.getStatus()) && latestCourse.getDeletedAt() == null) {
+                if (latestCourse != null && "PUBLISHED".equalsIgnoreCase(latestCourse.getStatus())
+                        && latestCourse.getDeletedAt() == null) {
                     return getCourseDetail(latestCourse.getId(), currentUserId);
                 }
             }
             throw new RuntimeException("Course not found");
         }
-
 
         boolean isEnrolled = false;
         Optional<Enrollment> enrollmentOpt = Optional.empty();
@@ -185,7 +188,8 @@ public class CourseServiceImpl implements CourseService {
             enrollmentOpt = enrollmentRepository.findByUserIdAndCourseId(currentUserId, id);
             if (enrollmentOpt.isEmpty()) {
                 List<Enrollment> familyE = enrollmentRepository.findFamilyEnrollments(currentUserId, id);
-                if (!familyE.isEmpty() && familyE.get(0).getCourse() != null && !familyE.get(0).getCourse().getId().equals(id)) {
+                if (!familyE.isEmpty() && familyE.get(0).getCourse() != null
+                        && !familyE.get(0).getCourse().getId().equals(id)) {
                     return getCourseDetail(familyE.get(0).getCourse().getId(), currentUserId);
                 }
             }
@@ -193,25 +197,28 @@ public class CourseServiceImpl implements CourseService {
         }
 
         if (!"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
-            boolean isCreator = (currentUserId != null && course.getCreator() != null && course.getCreator().getId().equals(currentUserId));
-            boolean isHiddenOrArchivedAndEnrolled = ("HIDDEN".equalsIgnoreCase(course.getStatus()) || "ARCHIVED".equalsIgnoreCase(course.getStatus())) && isEnrolled;
-            
+            boolean isCreator = (currentUserId != null && course.getCreator() != null
+                    && course.getCreator().getId().equals(currentUserId));
+            boolean isHiddenOrArchivedAndEnrolled = ("HIDDEN".equalsIgnoreCase(course.getStatus())
+                    || "ARCHIVED".equalsIgnoreCase(course.getStatus())) && isEnrolled;
+
             boolean isAdminOrManager = false;
-            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
             if (auth != null) {
-                isAdminOrManager = auth.getAuthorities().stream().anyMatch(a -> 
-                    a.getAuthority().equals("ROLE_ADMINISTRATOR") || 
-                    a.getAuthority().equals("MANAGE_ACCOUNTS_ROLES") ||
-                    a.getAuthority().equals("VIEW_PLATFORM_DASHBOARD") ||
-                    a.getAuthority().equals("APPROVE_REJECT_COURSES") ||
-                    a.getAuthority().equals("MANAGE_ALL_COURSES")
-                );
+                isAdminOrManager = auth.getAuthorities().stream()
+                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR") ||
+                                a.getAuthority().equals("MANAGE_ACCOUNTS_ROLES") ||
+                                a.getAuthority().equals("VIEW_PLATFORM_DASHBOARD") ||
+                                a.getAuthority().equals("APPROVE_REJECT_COURSES") ||
+                                a.getAuthority().equals("MANAGE_ALL_COURSES"));
             }
-            
+
             if (!isCreator && !isHiddenOrArchivedAndEnrolled && !isAdminOrManager) {
                 if (course.getLatestVersionId() != null && !course.getLatestVersionId().equals(course.getId())) {
                     Course latestCourse = courseRepository.findById(course.getLatestVersionId()).orElse(null);
-                    if (latestCourse != null && "PUBLISHED".equalsIgnoreCase(latestCourse.getStatus()) && latestCourse.getDeletedAt() == null) {
+                    if (latestCourse != null && "PUBLISHED".equalsIgnoreCase(latestCourse.getStatus())
+                            && latestCourse.getDeletedAt() == null) {
                         return getCourseDetail(latestCourse.getId(), currentUserId);
                     }
                 }
@@ -223,20 +230,23 @@ public class CourseServiceImpl implements CourseService {
         boolean hasNewVersionAvailable = false;
         Long latestPublishedCourseId = null;
         String latestPublishedVersion = null;
- 
+
         if (currentUserId != null) {
-            completedLessonIds.addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
+            completedLessonIds
+                    .addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
 
             if (isEnrolled) {
                 Enrollment enrollment = enrollmentOpt.get();
-                Long enrolledVerId = enrollment.getEnrolledVersionId() != null ? enrollment.getEnrolledVersionId() : course.getId();
+                Long enrolledVerId = enrollment.getEnrolledVersionId() != null ? enrollment.getEnrolledVersionId()
+                        : course.getId();
 
                 Long targetLatestId = course.getLatestVersionId();
                 Course latestCourse = null;
                 if (targetLatestId != null) {
                     latestCourse = courseRepository.findById(targetLatestId).orElse(null);
                 } else if (course.getCode() != null && !course.getCode().isBlank()) {
-                    List<Course> publishedVersions = courseRepository.findPublishedByCodeOrderByPublishedAtDesc(course.getCode());
+                    List<Course> publishedVersions = courseRepository
+                            .findPublishedByCodeOrderByPublishedAtDesc(course.getCode());
                     if (!publishedVersions.isEmpty()) {
                         latestCourse = publishedVersions.get(0);
                     }
@@ -249,14 +259,15 @@ public class CourseServiceImpl implements CourseService {
                 }
             }
         }
- 
+
         List<Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(id);
         List<Lesson> allLessons = lessonRepository.findByCourseIdOrdered(id);
         java.util.Map<Long, List<Lesson>> lessonsBySectionId = allLessons.stream()
                 .collect(Collectors.groupingBy(l -> l.getSection().getId()));
         Map<Long, Integer> questionCountsByLessonId = new HashMap<>();
         List<Long> quizLessonIds = allLessons.stream()
-                .filter(l -> "quiz".equalsIgnoreCase(l.getLessonType()) || "practice".equalsIgnoreCase(l.getLessonType()))
+                .filter(l -> "quiz".equalsIgnoreCase(l.getLessonType())
+                        || "practice".equalsIgnoreCase(l.getLessonType()))
                 .map(Lesson::getId)
                 .collect(Collectors.toList());
         if (!quizLessonIds.isEmpty()) {
@@ -267,22 +278,23 @@ public class CourseServiceImpl implements CourseService {
                 }
             }
         }
-        
+
         List<CourseSessionDTO> sessionDTOs = sections.stream().map(section -> {
             List<Lesson> lessons = lessonsBySectionId.getOrDefault(section.getId(), new ArrayList<>());
             List<CourseLessonDTO> lessonDTOs = lessons.stream().map(lesson -> {
-                    Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
-                    int qCount = 0;
-                    if ("quiz".equalsIgnoreCase(lesson.getLessonType()) || "practice".equalsIgnoreCase(lesson.getLessonType())) {
-                        qCount = questionCountsByLessonId.getOrDefault(lesson.getId(), 0);
-                    }
-                    int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime() 
-                                  : ("quiz".equalsIgnoreCase(lesson.getLessonType()) ? (10 + qCount * 2) : 15);
-                    return CourseLessonDTO.builder()
+                Long examId = lesson.getExam() != null ? lesson.getExam().getId() : null;
+                int qCount = 0;
+                if ("quiz".equalsIgnoreCase(lesson.getLessonType())
+                        || "practice".equalsIgnoreCase(lesson.getLessonType())) {
+                    qCount = questionCountsByLessonId.getOrDefault(lesson.getId(), 0);
+                }
+                int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime()
+                        : ("quiz".equalsIgnoreCase(lesson.getLessonType()) ? (10 + qCount * 2) : 15);
+                return CourseLessonDTO.builder()
                         .id(lesson.getId())
                         .title(lesson.getTitle())
                         .orderIndex(lesson.getDisplayOrder())
-                        .itemType(lesson.getLessonType())
+                        .itemType(Lesson.displayItemType(lesson.getLessonType()))
                         .examId(examId)
                         .questionCount(qCount)
                         .isCompleted(completedLessonIds.contains(lesson.getId()))
@@ -294,11 +306,12 @@ public class CourseServiceImpl implements CourseService {
                         .lessonCode(lesson.getCode())
                         .mediaDurationSeconds(lesson.getMediaDurationSeconds())
                         .mediaSizeBytes(lesson.getMediaSizeBytes())
-                        .estimatedTimeMinutes(lesson.getEstimatedTimeMinutes() != null ? lesson.getEstimatedTimeMinutes() : estTime)
+                        .estimatedTimeMinutes(
+                                lesson.getEstimatedTimeMinutes() != null ? lesson.getEstimatedTimeMinutes() : estTime)
                         .learningObjectives(lesson.getLearningObjectives())
                         .videoTranscript(lesson.getVideoTranscript())
                         .build();
-                }).collect(Collectors.toList());
+            }).collect(Collectors.toList());
 
             return CourseSessionDTO.builder()
                     .id(section.getId())
@@ -310,7 +323,8 @@ public class CourseServiceImpl implements CourseService {
         }).collect(Collectors.toList());
 
         // For Learners Count and Rating
-        String baseCode = course.getCode() != null && !course.getCode().isBlank() ? toBaseCourseCode(course.getCode()) : String.valueOf(course.getId());
+        String baseCode = course.getCode() != null && !course.getCode().isBlank() ? toBaseCourseCode(course.getCode())
+                : String.valueOf(course.getId());
         List<Long> familyIds = course.getCode() != null && !course.getCode().isBlank()
                 ? courseRepository.findFamilyCourseIdsByBaseCode(baseCode)
                 : List.of(course.getId());
@@ -318,7 +332,7 @@ public class CourseServiceImpl implements CourseService {
             familyIds = List.of(course.getId());
         }
         int learnersCount = enrollmentRepository.countDistinctUsersByCourseIdIn(familyIds);
-        
+
         String creatorName = "Unknown Trainer";
         try {
             if (course.getCreator() != null) {
@@ -358,7 +372,8 @@ public class CourseServiceImpl implements CourseService {
         String categoryKey = categoryKeys.isEmpty() ? "" : categoryKeys.get(0);
         String categoryName = categoryNames.isEmpty() ? "" : String.join(", ", categoryNames);
 
-        // Average rating / total ratings are cached on Course by CourseRatingServiceImpl, but for V7 they are 0.
+        // Average rating / total ratings are cached on Course by
+        // CourseRatingServiceImpl, but for V7 they are 0.
         // We must aggregate across the entire family.
         long totalRatingsCount = courseRatingRepository.countByCourseIdIn(familyIds);
         Double avgRating = courseRatingRepository.getAverageRatingByCourseIds(familyIds);
@@ -444,7 +459,8 @@ public class CourseServiceImpl implements CourseService {
                 : courseRepository.findById(actualCourseId).orElse(requestedCourse);
 
         if (courseToEnroll.getCreator() != null) {
-            com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(courseToEnroll.getCreator().getId()).orElse(null);
+            com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository
+                    .findById(courseToEnroll.getCreator().getId()).orElse(null);
             if (profile == null || !"VERIFIED".equalsIgnoreCase(profile.getStatus())) {
                 throw new RuntimeException("Khóa học chưa được xuất bản hoặc giáo viên chưa được phê duyệt.");
             }
@@ -467,10 +483,12 @@ public class CourseServiceImpl implements CourseService {
 
         // Gửi email xác nhận cho Learner
         try {
-            String priceText = (courseToEnroll.getPrice() != null && courseToEnroll.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0)
-                    ? String.format("%,.0fđ", courseToEnroll.getPrice())
-                    : "Free";
-            emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), courseToEnroll.getTitle(), priceText, courseToEnroll.getThumbnailUrl());
+            String priceText = (courseToEnroll.getPrice() != null
+                    && courseToEnroll.getPrice().compareTo(java.math.BigDecimal.ZERO) > 0)
+                            ? String.format("%,.0fđ", courseToEnroll.getPrice())
+                            : "Free";
+            emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), courseToEnroll.getTitle(),
+                    priceText, courseToEnroll.getThumbnailUrl());
         } catch (Exception e) {
             System.err.println("[EMAIL WARN] Failed to send enrollment email: " + e.getMessage());
         }
@@ -502,7 +520,8 @@ public class CourseServiceImpl implements CourseService {
         }
 
         if (latestPublishedCourse == null && currentCourse.getCode() != null && !currentCourse.getCode().isBlank()) {
-            List<Course> publishedVersions = courseRepository.findPublishedByCodeOrderByPublishedAtDesc(currentCourse.getCode());
+            List<Course> publishedVersions = courseRepository
+                    .findPublishedByCodeOrderByPublishedAtDesc(currentCourse.getCode());
             if (!publishedVersions.isEmpty()) {
                 latestPublishedCourse = publishedVersions.get(0);
             }
@@ -513,22 +532,29 @@ public class CourseServiceImpl implements CourseService {
         }
 
         if (latestPublishedCourse.getId().equals(currentCourse.getId())) {
-            throw new com.hango.hango_backend.exception.ApiException("You are already on the latest course version", org.springframework.http.HttpStatus.BAD_REQUEST);
+            throw new com.hango.hango_backend.exception.ApiException("You are already on the latest course version",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
         }
 
         if (enrollmentRepository.existsByUserIdAndCourseId(userId, latestPublishedCourse.getId())) {
-            // User is already enrolled in the latest version (e.g. from a double-click or manual enrollment)
-            throw new com.hango.hango_backend.exception.ApiException("You are already enrolled in the latest version. Please refresh the page.", org.springframework.http.HttpStatus.BAD_REQUEST);
+            // User is already enrolled in the latest version (e.g. from a double-click or
+            // manual enrollment)
+            throw new com.hango.hango_backend.exception.ApiException(
+                    "You are already enrolled in the latest version. Please refresh the page.",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
         }
 
-        // Map completed lesson progress from the old course to the latest published course version
-        List<LessonProgress> completedProgress = lessonProgressRepository.findCompletedProgressByUserIdAndCourseId(userId, courseId);
+        // Map completed lesson progress from the old course to the latest published
+        // course version
+        List<LessonProgress> completedProgress = lessonProgressRepository
+                .findCompletedProgressByUserIdAndCourseId(userId, courseId);
         Map<String, LessonProgress> progressByLessonCode = new HashMap<>();
         Map<String, LessonProgress> progressByLessonTitle = new HashMap<>();
 
         for (LessonProgress progress : completedProgress) {
             Lesson lesson = progress.getLesson();
-            if (lesson == null) continue;
+            if (lesson == null)
+                continue;
             if (lesson.getCode() != null && !lesson.getCode().isBlank()) {
                 progressByLessonCode.put(lesson.getCode().trim().toLowerCase(), progress);
             } else if (lesson.getTitle() != null && !lesson.getTitle().isBlank()) {
@@ -538,7 +564,8 @@ public class CourseServiceImpl implements CourseService {
 
         int totalLessons = 0;
         int carriedCompletedLessons = 0;
-        List<Section> newSections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(latestPublishedCourse.getId());
+        List<Section> newSections = sectionRepository
+                .findByCourseIdOrderByDisplayOrderAsc(latestPublishedCourse.getId());
         List<Lesson> latestAllLessons = lessonRepository.findByCourseIdOrdered(latestPublishedCourse.getId());
         java.util.Map<Long, List<Lesson>> latestLessonsBySectionId = latestAllLessons.stream()
                 .collect(Collectors.groupingBy(l -> l.getSection().getId()));
@@ -559,7 +586,8 @@ public class CourseServiceImpl implements CourseService {
                     shouldCarry = true;
                 }
 
-                if (shouldCarry && !lessonProgressRepository.existsByUserIdAndLessonIdAndIsCompletedTrue(userId, lesson.getId())) {
+                if (shouldCarry && !lessonProgressRepository.existsByUserIdAndLessonIdAndIsCompletedTrue(userId,
+                        lesson.getId())) {
                     LessonProgress newProgress = LessonProgress.builder()
                             .user(currentEnrollment.getUser())
                             .lesson(lesson)
@@ -588,9 +616,10 @@ public class CourseServiceImpl implements CourseService {
         }
 
         enrollmentRepository.save(currentEnrollment);
-        
+
         // Also update the course reference in the user's Learning Pathway nodes
-        List<PathwayNode> affectedNodes = pathwayNodeRepository.findByCourseIdAndLearningPathway_Student_Id(currentCourse.getId(), userId);
+        List<PathwayNode> affectedNodes = pathwayNodeRepository
+                .findByCourseIdAndLearningPathway_Student_Id(currentCourse.getId(), userId);
         for (PathwayNode node : affectedNodes) {
             node.setCourse(latestPublishedCourse);
         }
@@ -620,7 +649,7 @@ public class CourseServiceImpl implements CourseService {
 
         List<Course> allVersions = courseRepository.findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(course.getCode());
         List<Map<String, Object>> versionHistory = new ArrayList<>();
-        
+
         for (Course version : allVersions) {
             Map<String, Object> versionInfo = new LinkedHashMap<>();
             versionInfo.put("id", version.getId());
@@ -632,7 +661,7 @@ public class CourseServiceImpl implements CourseService {
             versionInfo.put("learnersCount", enrollmentRepository.countByCourseId(version.getId()));
             versionHistory.add(versionInfo);
         }
-        
+
         return versionHistory;
     }
 }

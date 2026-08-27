@@ -163,6 +163,7 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     final text = _messageController.text.trim();
     if (text.isEmpty || _sending) return;
 
+    // Optimistic UI: them tin nhan user vao man hinh NGAY truoc khi goi API
     setState(() {
       _sending = true;
       _error = null;
@@ -172,12 +173,14 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
     _scrollToEnd();
 
     try {
+      // Goi qua AppState -> HTTP POST /api/v1/ai-assistant/messages
       final response = await context.read<AppState>().sendAiMessage(
         lessonId: widget.lessonId,
         conversationId: _conversationId,
         message: text,
       );
 
+      // Them tin nhan ASSISTANT vao UI va luu cache local (SharedPreferences)
       setState(() {
         _conversationId = response.conversationId;
         _messages.add(
@@ -193,6 +196,7 @@ class _LessonAiChatboxState extends State<LessonAiChatbox> {
       _scrollToEnd();
       _saveToCache();
     } catch (e) {
+      // Neu loi: hien thong bao va RUT lai tin nhan user vua gui (roll-back optimistic UI)
       setState(() {
         _error = e.toString();
         if (_messages.isNotEmpty && _messages.last.role == 'USER') {
@@ -288,7 +292,6 @@ class _ChatPanel extends StatelessWidget {
           children: [
             // 1. HEADER: Contains the top decorative gradient line
             // Top Accent Gradient Line
-
             Container(
               height: 4,
               width: double.infinity,
@@ -444,31 +447,58 @@ class _ChatPanel extends StatelessWidget {
                                     builder: (context) {
                                       return AlertDialog(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
                                         ),
                                         title: const Row(
                                           children: [
-                                            Icon(Icons.delete_sweep_rounded, color: Color(0xFFE11D48)),
+                                            Icon(
+                                              Icons.delete_sweep_rounded,
+                                              color: Color(0xFFE11D48),
+                                            ),
                                             SizedBox(width: 8),
-                                            Text('Clear chat history?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                            Text(
+                                              'Clear chat history?',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                         content: const Text(
                                           'All AI conversation history for this lesson on this device will be cleared so you can start fresh.',
-                                          style: TextStyle(color: Color(0xFF475569), height: 1.5),
+                                          style: TextStyle(
+                                            color: Color(0xFF475569),
+                                            height: 1.5,
+                                          ),
                                         ),
                                         actions: [
                                           TextButton(
-                                            onPressed: () => Navigator.of(context).pop(false),
-                                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                                            onPressed: () => Navigator.of(
+                                              context,
+                                            ).pop(false),
+                                            child: const Text(
+                                              'Cancel',
+                                              style: TextStyle(
+                                                color: Color(0xFF64748B),
+                                              ),
+                                            ),
                                           ),
                                           ElevatedButton(
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFE11D48),
+                                              backgroundColor: const Color(
+                                                0xFFE11D48,
+                                              ),
                                               foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
                                             ),
-                                            onPressed: () => Navigator.of(context).pop(true),
+                                            onPressed: () =>
+                                                Navigator.of(context).pop(true),
                                             child: const Text('Clear history'),
                                           ),
                                         ],
@@ -491,29 +521,34 @@ class _ChatPanel extends StatelessWidget {
                 ],
               ),
             ),
+
             // 3. MESSAGES AREA: The central chat view.
             // Uses Expanded to automatically fill the remaining space between the Header and the Input Bar.
             // Messages Area
-
             Expanded(
               child: Container(
                 color: const Color(0xFFFAFCFF),
                 child: messages.isEmpty
                     // 3A. IF NO MESSAGES YET: Show the Empty State screen with 3 random suggested prompts.
                     ? LessonAiChatboxEmptyState(
-                        title: 'Select a suggested prompt below or ask any question to get detailed answers about this lesson.',
+                        title:
+                            'Select a suggested prompt below or ask any question to get detailed answers about this lesson.',
                         questions: defaultLessonAiSuggestedQuestions(),
                         onTapQuestion: (q) {
                           controller.text = q;
-                          controller.selection =
-                              TextSelection.collapsed(offset: q.length);
+                          controller.selection = TextSelection.collapsed(
+                            offset: q.length,
+                          );
                           onSend();
                         },
                       )
                     // 3B. IF MESSAGES EXIST: Use ListView.builder to render the chat history vertically.
                     : ListView.builder(
                         controller: scroll,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
                           final msg = messages[index];
@@ -533,7 +568,9 @@ class _ChatPanel extends StatelessWidget {
                                   onTapQuestion: (q) {
                                     controller.text = q;
                                     controller.selection =
-                                        TextSelection.collapsed(offset: q.length);
+                                        TextSelection.collapsed(
+                                          offset: q.length,
+                                        );
                                     onSend();
                                   },
                                 ),
@@ -597,7 +634,9 @@ class _ChatPanel extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   MouseRegion(
-                    cursor: sending ? SystemMouseCursors.basic : SystemMouseCursors.click,
+                    cursor: sending
+                        ? SystemMouseCursors.basic
+                        : SystemMouseCursors.click,
                     child: GestureDetector(
                       onTap: sending ? null : onSend,
                       child: AnimatedContainer(
@@ -607,10 +646,16 @@ class _ChatPanel extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: sending
                               ? const LinearGradient(
-                                  colors: [Color(0xFF94A3B8), Color(0xFF64748B)],
+                                  colors: [
+                                    Color(0xFF94A3B8),
+                                    Color(0xFF64748B),
+                                  ],
                                 )
                               : const LinearGradient(
-                                  colors: [Color(0xFF28B79B), Color(0xFF0D9488)],
+                                  colors: [
+                                    Color(0xFF28B79B),
+                                    Color(0xFF0D9488),
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
@@ -693,32 +738,31 @@ class _ChatBubble extends StatelessWidget {
           child: MarkdownBody(
             data: message.content,
             selectable: true,
-            styleSheet: MarkdownStyleSheet.fromTheme(
-              Theme.of(context),
-            ).copyWith(
-              p: const TextStyle(
-                color: Colors.white,
-                height: 1.45,
-                fontSize: 13.5,
-              ),
-              strong: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-              em: const TextStyle(
-                color: Colors.white,
-                fontStyle: FontStyle.italic,
-              ),
-              listBullet: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-              code: const TextStyle(
-                color: Colors.white,
-                backgroundColor: Color(0x33000000),
-                fontSize: 12.5,
-              ),
-            ),
+            styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
+                .copyWith(
+                  p: const TextStyle(
+                    color: Colors.white,
+                    height: 1.45,
+                    fontSize: 13.5,
+                  ),
+                  strong: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  em: const TextStyle(
+                    color: Colors.white,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  listBullet: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  code: const TextStyle(
+                    color: Colors.white,
+                    backgroundColor: Color(0x33000000),
+                    fontSize: 12.5,
+                  ),
+                ),
           ),
         ),
       );
@@ -738,7 +782,9 @@ class _ChatBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFE6F7F4),
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF28B79B).withOpacity(0.3)),
+                border: Border.all(
+                  color: const Color(0xFF28B79B).withOpacity(0.3),
+                ),
               ),
               child: const Icon(
                 Icons.auto_awesome_rounded,
@@ -748,7 +794,10 @@ class _ChatBubble extends StatelessWidget {
             ),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: const BorderRadius.only(
@@ -777,7 +826,11 @@ class _ChatBubble extends StatelessWidget {
                     if (message.wasOutOfScope) ...[
                       Row(
                         children: [
-                          const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFFE11D48)),
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            size: 14,
+                            color: Color(0xFFE11D48),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Off-topic question',
@@ -794,64 +847,70 @@ class _ChatBubble extends StatelessWidget {
                     MarkdownBody(
                       data: message.content,
                       selectable: true,
-                      styleSheet: MarkdownStyleSheet.fromTheme(
-                        Theme.of(context),
-                      ).copyWith(
-                        p: const TextStyle(
-                          color: Color(0xFF1E293B),
-                          height: 1.5,
-                          fontSize: 13.5,
-                        ),
-                        strong: const TextStyle(
-                          color: Color(0xFF0F172A),
-                          fontWeight: FontWeight.bold,
-                        ),
-                        em: const TextStyle(
-                          color: Color(0xFF1E293B),
-                          fontStyle: FontStyle.italic,
-                        ),
-                        h1: const TextStyle(
-                          color: Color(0xFF0F172A),
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          height: 1.4,
-                        ),
-                        h2: const TextStyle(
-                          color: Color(0xFF0F172A),
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.bold,
-                          height: 1.4,
-                        ),
-                        h3: const TextStyle(
-                          color: Color(0xFF0F172A),
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.bold,
-                          height: 1.4,
-                        ),
-                        listBullet: const TextStyle(
-                          color: Color(0xFF28B79B),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        code: const TextStyle(
-                          color: Color(0xFF0D9488),
-                          backgroundColor: Color(0xFFF1F5F9),
-                          fontSize: 12.5,
-                        ),
-                        codeblockPadding: const EdgeInsets.all(10),
-                        codeblockDecoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        blockquoteDecoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
-                          border: const Border(
-                            left: BorderSide(color: Color(0xFF28B79B), width: 3),
+                      styleSheet:
+                          MarkdownStyleSheet.fromTheme(
+                            Theme.of(context),
+                          ).copyWith(
+                            p: const TextStyle(
+                              color: Color(0xFF1E293B),
+                              height: 1.5,
+                              fontSize: 13.5,
+                            ),
+                            strong: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            em: const TextStyle(
+                              color: Color(0xFF1E293B),
+                              fontStyle: FontStyle.italic,
+                            ),
+                            h1: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              height: 1.4,
+                            ),
+                            h2: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.bold,
+                              height: 1.4,
+                            ),
+                            h3: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.bold,
+                              height: 1.4,
+                            ),
+                            listBullet: const TextStyle(
+                              color: Color(0xFF28B79B),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            code: const TextStyle(
+                              color: Color(0xFF0D9488),
+                              backgroundColor: Color(0xFFF1F5F9),
+                              fontSize: 12.5,
+                            ),
+                            codeblockPadding: const EdgeInsets.all(10),
+                            codeblockDecoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            blockquoteDecoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: const Border(
+                                left: BorderSide(
+                                  color: Color(0xFF28B79B),
+                                  width: 3,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -880,12 +939,20 @@ class _InlineError extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFBE123C), size: 18),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Color(0xFFBE123C),
+            size: 18,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFF9F1239), fontSize: 12, height: 1.4),
+              style: const TextStyle(
+                color: Color(0xFF9F1239),
+                fontSize: 12,
+                height: 1.4,
+              ),
             ),
           ),
         ],
