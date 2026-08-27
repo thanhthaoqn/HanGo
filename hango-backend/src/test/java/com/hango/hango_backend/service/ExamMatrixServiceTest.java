@@ -38,7 +38,7 @@ import com.hango.hango_backend.repository.SystemParameterRepository;
 import com.hango.hango_backend.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
-class CourseManagerExamMatrixServiceTest {
+class ExamMatrixServiceTest {
 
     @Mock
     private ExamMatrixRepository examMatrixRepository;
@@ -58,7 +58,7 @@ class CourseManagerExamMatrixServiceTest {
     private ExamQuestionRepository examQuestionRepository;
 
     @InjectMocks
-    private CourseManagerExamMatrixServiceImpl service;
+    private ExamMatrixServiceImpl service;
 
     private User user(Long id, String email) {
         return User.builder().id(id).email(email).fullName("Trainer").build();
