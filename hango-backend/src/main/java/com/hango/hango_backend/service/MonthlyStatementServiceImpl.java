@@ -541,16 +541,35 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
     }
 
     private MonthlyStatementDTO mapToDTO(MonthlyStatement s) {
+        if (s == null) return null;
 
-        TrainerProfile profile = trainerProfileRepository.findById(s.getTrainer().getId()).orElse(null);
+        User trainer = s.getTrainer();
+        Long trainerId = null;
+        String trainerName = "N/A";
+        String trainerEmail = "";
+        TrainerProfile profile = null;
+
+        if (trainer != null) {
+            try {
+                trainerId = trainer.getId();
+                trainerName = trainer.getFullName() != null ? trainer.getFullName() : "N/A";
+                trainerEmail = trainer.getEmail() != null ? trainer.getEmail() : "";
+                if (trainerId != null) {
+                    profile = trainerProfileRepository.findById(trainerId).orElse(null);
+                }
+            } catch (Exception e) {
+                log.warn("Could not load trainer details for statement {}: {}", s.getId(), e.getMessage());
+            }
+        }
+
         String tType = profile != null && profile.getTrainerType() != null ? profile.getTrainerType() : "PROFESSIONAL";
 
         return MonthlyStatementDTO.builder()
                 .id(s.getId())
                 .statementCode(s.getStatementCode())
-                .trainerId(s.getTrainer().getId())
-                .trainerName(s.getTrainer().getFullName())
-                .trainerEmail(s.getTrainer().getEmail())
+                .trainerId(trainerId)
+                .trainerName(trainerName)
+                .trainerEmail(trainerEmail)
                 .trainerType(tType)
                 .periodMonth(s.getPeriodMonth())
                 .totalOrders(s.getTotalOrders())
@@ -570,6 +589,5 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 .payoutReceiptUrl(s.getPayoutReceiptUrl())
                 .createdAt(s.getCreatedAt())
                 .build();
-
     }
 }

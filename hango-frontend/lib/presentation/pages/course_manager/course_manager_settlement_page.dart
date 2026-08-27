@@ -1315,11 +1315,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                 fontFamily: 'Outfit',
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              isVi ? 'Đối soát doanh thu, chốt kỳ tháng, quản lý giao dịch và giải ngân.' : 'Reconcile revenue, run monthly cutoffs, manage transactions and payouts.',
-              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
-            ),
           ],
         ),
       ],
