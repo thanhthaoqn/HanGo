@@ -70,6 +70,48 @@ class NotificationServiceTest {
     }
 
     // =================================================================
+    // notifyRole
+    // =================================================================
+
+    @Test
+    void notifyRoleShouldSaveOneNotificationPerUserHoldingTheGivenRole() {
+        User admin1 = user(2L);
+        User admin2 = user(3L);
+        when(userRepository.findByRoleName("ADMINISTRATOR")).thenReturn(List.of(admin1, admin2));
+
+        notificationService.notifyRole("ADMINISTRATOR", "TicketCreated", "New Support Ticket: #ABC", "Help needed", null);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, org.mockito.Mockito.times(2)).saveAndFlush(captor.capture());
+        List<Notification> saved = captor.getAllValues();
+        assertEquals(admin1, saved.get(0).getUser());
+        assertEquals(admin2, saved.get(1).getUser());
+        assertEquals("ADMINISTRATOR", saved.get(0).getRecipientRole());
+        assertEquals("TicketCreated", saved.get(0).getType());
+    }
+
+    @Test
+    void notifyRoleShouldSaveBroadcastNotificationWithNoUserWhenNobodyHoldsTheRole() {
+        when(userRepository.findByRoleName("ADMINISTRATOR")).thenReturn(List.of());
+
+        notificationService.notifyRole("ADMINISTRATOR", "TicketCreated", "title", "message", null);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).saveAndFlush(captor.capture());
+        assertNull(captor.getValue().getUser());
+        assertEquals("ADMINISTRATOR", captor.getValue().getRecipientRole());
+    }
+
+    @Test
+    void notifyRoleShouldSwallowExceptionsWithoutPropagating() {
+        when(userRepository.findByRoleName("ADMINISTRATOR")).thenThrow(new RuntimeException("DB down"));
+
+        notificationService.notifyRole("ADMINISTRATOR", "TicketCreated", "title", "message", null);
+
+        verify(notificationRepository, never()).saveAndFlush(any());
+    }
+
+    // =================================================================
     // notifyUser
     // =================================================================
 

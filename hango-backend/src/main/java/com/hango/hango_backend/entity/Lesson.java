@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 @Builder
 public class Lesson {
 
+    /** Gia tri lesson_type danh dau bai danh gia cuoi khoa (spec 20 - A1). */
+    public static final String DISPLAY_TYPE_FINAL_QUIZ = "FINAL_QUIZ";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -92,5 +95,20 @@ public class Lesson {
     /** Đóng vai trò là cầu nối giúp AIPromptBuilder lấy nội dung không bị lỗi */
     public String getContentText() {
         return this.content;
+    }
+
+    /**
+     * Chuan hoa lesson_type thanh itemType de FE hien thi (spec 20).
+     * FINAL_QUIZ la bai danh gia cuoi khoa nhung van phai duoc FE coi nhu 'quiz'
+     * de hien thi danh sach cau hoi practice; con lai giu nguyen chu thuong.
+     */
+    public static String displayItemType(String lessonType) {
+        if (lessonType == null || lessonType.isBlank()) {
+            return "learning";
+        }
+        if ("FINAL_QUIZ".equalsIgnoreCase(lessonType.trim())) {
+            return "quiz";
+        }
+        return lessonType.trim().toLowerCase();
     }
 }

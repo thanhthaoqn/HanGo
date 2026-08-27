@@ -357,6 +357,49 @@ class ExamMatrixServiceTest {
     }
 
     @Test
+    void generateExamFromMatrixShouldPassGroupTypeIdWhenDetailHasGroupType() {
+        User creator = user(1L, "trainer@example.com");
+        ExamMatrix m = matrix(1L, "IELTS Matrix", creator);
+        SystemParameter skill = param(1L, "Reading");
+        SystemParameter diff = param(2L, "Medium");
+        SystemParameter groupType = param(3L, "Group A");
+        ExamMatrixDetail d = detail(1L, m, skill, diff, null, 2);
+        d.setGroupTypeParam(groupType);
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(creator));
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+        when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of(d));
+        when(examRepository.save(any(Exam.class))).thenAnswer(inv -> {
+            Exam e = inv.getArgument(0);
+            e.setId(500L);
+            return e;
+        });
+        when(questionRepository.findRandomQuestionsByCriteria(1L, 2L, 3L, 1L, null, 2))
+                .thenReturn(List.of(question(11L), question(12L)));
+
+        service.generateExamFromMatrix(1L, "My Exam", null, null, null, null, null, "trainer@example.com");
+
+        verify(questionRepository).findRandomQuestionsByCriteria(1L, 2L, 3L, 1L, null, 2);
+    }
+
+    @Test
+    void generateExamFromMatrixShouldApplyDefaultsForDescriptionPassingScoreAndDurationWhenNull() {
+        User creator = user(1L, "trainer@example.com");
+        ExamMatrix m = matrix(1L, "IELTS Matrix", creator);
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(creator));
+        when(examMatrixRepository.findById(1L)).thenReturn(Optional.of(m));
+        when(examMatrixDetailRepository.findByMatrixId(1L)).thenReturn(List.of());
+        when(examRepository.save(any(Exam.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.generateExamFromMatrix(1L, "My Exam", null, null, null, null, null, "trainer@example.com");
+
+        ArgumentCaptor<Exam> captor = ArgumentCaptor.forClass(Exam.class);
+        verify(examRepository).save(captor.capture());
+        assertEquals("Generated from matrix: IELTS Matrix", captor.getValue().getDescription());
+        assertEquals(0.0, captor.getValue().getPassingScore());
+        assertEquals(0, captor.getValue().getDurationMinutes());
+    }
+
+    @Test
     void generateExamFromMatrixShouldSkipDetailWithZeroOrNegativeQuantity() {
         User creator = user(1L, "trainer@example.com");
         ExamMatrix m = matrix(1L, "IELTS Matrix", creator);

@@ -6,9 +6,11 @@ import com.hango.hango_backend.dto.TrainerDashboardSummaryDTO;
 import com.hango.hango_backend.dto.TrainerCourseDetailDTO;
 import com.hango.hango_backend.dto.TrainerCoursesResponseDTO;
 import com.hango.hango_backend.entity.User;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.*;
 import com.hango.hango_backend.util.ExamQuestionDiffUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final NotificationService notificationService;
     private final CloudinaryService cloudinaryService;
     private final ExamHistoryService examHistoryService;
+    private final CourseQuizValidationService courseQuizValidationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private String getBaseCode(String code, Long id) {
@@ -505,7 +508,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Transactional
     public void createTrainerCourse(String email, com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                .orElseThrow(() -> new ApiException("User not found with email: " + email, HttpStatus.NOT_FOUND));
 
         java.util.Set<com.hango.hango_backend.entity.SystemParameter> categorySet = resolveCategories(request);
         com.hango.hango_backend.entity.SystemParameter firstCategory = categorySet.iterator().next();
@@ -517,15 +520,20 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         com.hango.hango_backend.entity.SystemParameter difficulty = systemParameterRepository
                 .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
-                .orElseThrow(() -> new RuntimeException("Academic Level not found: " + request.getDifficultyKey()));
+                .orElseThrow(() -> new ApiException("Academic Level not found: " + request.getDifficultyKey(), HttpStatus.BAD_REQUEST));
 
         // Auto-generate a unique course code to avoid DB unique constraint violations
         String generatedCode = generateUniqueCourseCode();
 
         com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(user.getId()).orElse(null);
         int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
-        java.math.BigDecimal calculatedPrice = calculateCoursePrice(user.getId(), generatedCode, profile, difficulty, 0, durationMinutes);
+        java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, 0, durationMinutes);
+        // Trainer tu chon gia ban that su qua request.getPrice(); neu vi ly do
+        // gi request khong kem gia (vd goi truc tiep bo qua validation Controller),
+        // mac dinh ve dung gia tham khao thay vi de trong/null.
+        java.math.BigDecimal trainerPrice = request.getPrice() != null ? request.getPrice() : suggestedPrice;
 
+        // Tao ban ghi Course moi, LUON o trang thai DRAFT va version "v1".
         com.hango.hango_backend.entity.Course course = com.hango.hango_backend.entity.Course.builder()
                 .title(request.getTitle())
                 .code(generatedCode)
@@ -536,9 +544,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .categories(categorySet)
                 .difficulty(difficulty)
                 .thumbnailUrl(request.getThumbnailUrl())
-                .price(calculatedPrice)
-                .suggestedPrice(calculatedPrice)
-                .priceNote("")
+                .price(trainerPrice)
+                .suggestedPrice(suggestedPrice)
+                .priceNote(request.getPriceNote() != null ? request.getPriceNote() : "")
                 .version("v1")
                 .estimatedDuration(request.getEstimatedDuration())
                 .status("DRAFT")
@@ -557,10 +565,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     public Long updateTrainerCourse(Long id, String email,
             com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO request) {
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + id, HttpStatus.NOT_FOUND));
 
+        // Kiem tra QUYEN SO HUU: chi chinh nguoi tao (Trainer) khoa hoc nay moi
+        // duoc sua no. Day la kiem tra o TANG NGHIEP VU (business-level), khac voi
+        // @PreAuthorize o Controller (chi kiem tra co ROLE Trainer hay khong).
+        // hasRole('ADMINISTRATOR') o Controller khong bypass duoc check nay.
         if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
-            throw new RuntimeException("You are not authorized to edit this course");
+            throw new ApiException("You are not authorized to edit this course", HttpStatus.FORBIDDEN);
         }
 
         java.util.Set<com.hango.hango_backend.entity.SystemParameter> categorySet = resolveCategories(request);
@@ -603,8 +615,16 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 }
             }
         }
-        java.math.BigDecimal calculatedPrice = calculateCoursePrice(course.getCreator().getId(), course.getCode(), profile, difficulty, lessonCount, durationMinutes);
+        java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, lessonCount, durationMinutes);
+        // Trainer tu chon gia qua request.getPrice() (mac dinh ve gia tham
+        // khao neu request khong kem gia).
+        java.math.BigDecimal trainerPrice = request.getPrice() != null ? request.getPrice() : suggestedPrice;
+        String trainerPriceNote = request.getPriceNote() != null ? request.getPriceNote() : "";
 
+        // needsNewDraftVersion = true khi khoa hoc dang sua da o trang thai PUBLISHED
+        // (co the da co hoc vien dang hoc). Thay vi ghi de truc tiep, he thong
+        // TAO 1 BAN GHI COURSE MOI (version V2) de khoa hoc dang PUBLISHED (V1)
+        // khong bi thay doi giua chung - hoc vien cu van thay noi dung cu binh thuong.
         if (needsNewDraftVersion) {
             // Clone V1 → V2: Create a new DRAFT version preserving the original published
             // course (V1).
@@ -633,9 +653,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .categories(categorySet)
                     .difficulty(difficulty)
                     .thumbnailUrl(request.getThumbnailUrl())
-                    .price(calculatedPrice)
-                    .priceNote("")
-                    .suggestedPrice(calculatedPrice)
+                    .price(trainerPrice)
+                    .priceNote(trainerPriceNote)
+                    .suggestedPrice(suggestedPrice)
                     .version(newVersion)
                     .estimatedDuration(durationMinutes)
                     .status("DRAFT")
@@ -651,8 +671,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         if (request.getCode() != null && !request.getCode().equalsIgnoreCase(course.getCode())) {
             if (courseRepository.existsByCodeIgnoreCaseAndIdNot(request.getCode(), course.getId())) {
-                throw new RuntimeException(
-                        "Course code " + request.getCode() + " already exists. Please choose another code.");
+                throw new ApiException(
+                        "Course code " + request.getCode() + " already exists. Please choose another code.",
+                        HttpStatus.CONFLICT);
             }
             course.setCode(request.getCode());
         }
@@ -661,9 +682,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         course.setCategory(firstCategory);
         course.setCategories(categorySet);
         course.setDifficulty(difficulty);
-        course.setPrice(calculatedPrice);
-        course.setSuggestedPrice(calculatedPrice);
-        course.setPriceNote("");
+        course.setPrice(trainerPrice);
+        course.setSuggestedPrice(suggestedPrice);
+        course.setPriceNote(trainerPriceNote);
         course.setEstimatedDuration(durationMinutes);
         if (request.getThumbnailUrl() != null && !request.getThumbnailUrl().isEmpty()) {
             if (course.getThumbnailUrl() != null && !course.getThumbnailUrl().equals(request.getThumbnailUrl())) {
@@ -854,28 +875,38 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Transactional
     public void submitTrainerCourse(Long id, String email) {
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + id, HttpStatus.NOT_FOUND));
 
         if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
-            throw new RuntimeException("You are not authorized to submit this course");
+            throw new ApiException("You are not authorized to submit this course", HttpStatus.FORBIDDEN);
         }
 
         if (!"DRAFT".equalsIgnoreCase(course.getStatus()) && !"REJECTED".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only draft or rejected courses can be submitted for review");
+            throw new ApiException("Only draft or rejected courses can be submitted for review", HttpStatus.BAD_REQUEST);
         }
 
+        // Neu chinh nguoi tao khoa hoc da la COURSE_MANAGER/ADMINISTRATOR thi
+        // khong can quy trinh duyet (ho tu la nguoi duyet) -> bo qua PENDING_APPROVAL.
         boolean isManager = course.getCreator().getRoles().stream()
                 .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
                         || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
                         || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR")
                         || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
+        // Chinh sach tang truong: khoa hoc DAU TIEN cua 1 Trainer luon mien phi,
+        // BAT KE gia Trainer da tu chon la bao nhieu - chi ep GIA BAN (price) ve 0,
+        // KHONG dong cham toi suggestedPrice (van giu nguyen gia tham khao 300k-700k
+        // de Course Manager biet khoa hoc nay "dang" dang gia bao nhieu).
         if (courseRepository.countDistinctCourseCodesByCreatorId(course.getCreator().getId()) <= 1) {
             course.setPrice(java.math.BigDecimal.ZERO);
-            course.setSuggestedPrice(java.math.BigDecimal.ZERO);
         }
 
         if (isManager) {
+            // A1 (spec 20): chan publish neu course chua co it nhat 1 quiz co cau hoi
+            if (!courseQuizValidationService.hasAtLeastOneQuiz(course.getId())) {
+                throw new RuntimeException("Cannot publish \"" + course.getTitle()
+                        + "\": the course must contain at least one quiz with questions before publishing.");
+            }
             course.setStatus("PUBLISHED");
             course.setPublishedAt(java.time.LocalDateTime.now());
             course.setLatestVersionId(course.getId());
@@ -1278,18 +1309,20 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Transactional
     public void deleteTrainerCourse(Long id, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                .orElseThrow(() -> new ApiException("User not found with email: " + email, HttpStatus.NOT_FOUND));
 
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + id, HttpStatus.NOT_FOUND));
 
         if (!course.getCreator().getId().equals(user.getId())) {
-            throw new RuntimeException("You are not authorized to delete this course");
+            throw new ApiException("You are not authorized to delete this course", HttpStatus.FORBIDDEN);
         }
 
         String status = course.getStatus() != null ? course.getStatus().toUpperCase() : "";
         if (!"DRAFT".equals(status) && !"REJECTED".equals(status)) {
-            throw new RuntimeException("Chỉ có thể xoá khóa học ở trạng thái Nháp (Draft) hoặc Bị từ chối (Rejected).");
+            throw new ApiException(
+                    "Chỉ có thể xoá khóa học ở trạng thái Nháp (Draft) hoặc Bị từ chối (Rejected).",
+                    HttpStatus.BAD_REQUEST);
         }
 
         // Hard delete sections which will cascade to lessons, questions, etc.
@@ -1329,10 +1362,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     public void publishTrainerCourse(Long id, String email) {
         // Legacy direct publish (for new courses without enrolled learners)
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + id, HttpStatus.NOT_FOUND));
 
         if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
-            throw new RuntimeException("You are not authorized to publish this course");
+            throw new ApiException("You are not authorized to publish this course", HttpStatus.FORBIDDEN);
         }
 
         com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository
@@ -1342,13 +1375,25 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     "Bạn cần hoàn thiện hồ sơ và được Admin phê duyệt để bắt đầu bán khóa học.");
         }
 
+        // A1 (spec 20): chan publish neu course chua co it nhat 1 quiz co cau hoi
+        if (!courseQuizValidationService.hasAtLeastOneQuiz(course.getId())) {
+            throw new RuntimeException("Cannot publish \"" + course.getTitle()
+                    + "\": the course must contain at least one quiz with questions before publishing.");
+        }
+
         course.setStatus("PUBLISHED");
         course.setPublishedAt(java.time.LocalDateTime.now());
         course.setLatestVersionId(course.getId());
         courseRepository.save(course);
     }
 
-    private java.math.BigDecimal calculateCoursePrice(Long creatorId, String courseCode, com.hango.hango_backend.entity.TrainerProfile profile,
+    // Tinh GIA THAM KHAO (KHONG con la gia ban that su nua). Gia ban that su
+    // do Trainer tu nhap qua request.getPrice() - xem createTrainerCourse/
+    // updateTrainerCourse. Ham nay chi con phuc vu 1 muc dich: dua ra 1 con so
+    // "de nhin" (luon la boi so cua 50.000d, luon nam trong khoang 300.000d -
+    // 700.000d) de Trainer va Course Manager doi chieu voi gia Trainer chon -
+    // xem panel "Price Negotiation" trong course_review_dashboard_dialog.dart.
+    private java.math.BigDecimal calculateSuggestedPrice(com.hango.hango_backend.entity.TrainerProfile profile,
             com.hango.hango_backend.entity.SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
@@ -1373,22 +1418,29 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
         price += (lessonCount * 10000L);
         price += (durationMinutes * 1000L);
-        
-        if (courseRepository.isEligibleForFirstCoursePromotion(creatorId, courseCode)) {
-            return java.math.BigDecimal.ZERO;
+
+        long roundingStepVnd = 50000L;
+        long rounded = Math.round(price / (double) roundingStepVnd) * roundingStepVnd;
+        java.math.BigDecimal result = java.math.BigDecimal.valueOf(rounded);
+        java.math.BigDecimal min = java.math.BigDecimal.valueOf(300000);
+        java.math.BigDecimal max = java.math.BigDecimal.valueOf(700000);
+        if (result.compareTo(min) < 0) {
+            return min;
         }
-        
-        return java.math.BigDecimal.valueOf(price);
+        if (result.compareTo(max) > 0) {
+            return max;
+        }
+        return result;
     }
 
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void reEvaluateCoursePrice(Long id, String email) {
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + id));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + id, HttpStatus.NOT_FOUND));
 
         if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
-            throw new RuntimeException("You are not authorized to edit this course");
+            throw new ApiException("You are not authorized to edit this course", HttpStatus.FORBIDDEN);
         }
 
         com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository
@@ -1411,10 +1463,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         course.setEstimatedDuration(durationMinutes);
-        java.math.BigDecimal calculatedPrice = calculateCoursePrice(course.getCreator().getId(), course.getCode(), profile, course.getDifficulty(), lessonCount, durationMinutes);
-        
-        course.setPrice(calculatedPrice);
-        course.setSuggestedPrice(calculatedPrice);
+        // Chi lam moi lai GIA THAM KHAO (suggestedPrice) sau khi Trainer them/bot
+        // bai hoc - KHONG con dung de ghi de gia ban that su (price) Trainer da
+        // tu chon nua. Nut "Refresh" o Frontend gio chi co nghia la "tinh lai gia
+        // tham khao", khong con la "dat lai gia ban cua toi".
+        java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, course.getDifficulty(), lessonCount, durationMinutes);
+        course.setSuggestedPrice(suggestedPrice);
         courseRepository.save(course);
     }
 

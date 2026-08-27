@@ -280,11 +280,6 @@ public class GeminiClientService {
         }
 
         /**
-<<<<<<< Updated upstream
-         * Auto-generate transcript for a video using Gemini 1.5 Flash Audio/Video
-         * capability.
-         */
-        /**
          * Tính năng Trích xuất Phụ đề Video (Multimodal Video Processing).
          * Tác dụng: Khi giảng viên upload một video bài giảng, hàm này sẽ nhờ Gemini 
          * nghe và dịch lại toàn bộ lời thoại trong video thành văn bản (Transcript). 

@@ -144,8 +144,15 @@ public class CourseImportService {
             }
         }
 
-        BigDecimal calculatedPrice = calculateCoursePrice(trainer.getId(), persistedCourseCode, trainerProfile,
-                difficulty, lessonCount, durationMinutes);
+        // Gia THAM KHAO, cung cong thuc/gioi han (lam tron 50k, 300k-700k) nhu
+        // luc Trainer tu tao/sua course qua UI - xem TrainerDashboardServiceImpl
+        // .calculateSuggestedPrice.
+        BigDecimal suggestedPrice = calculateSuggestedPrice(trainerProfile, difficulty, lessonCount, durationMinutes);
+        // Cot "Price" trong sheet COURSE la TUY CHON (template .xlsx hien co
+        // chua chua cot nay) - neu Trainer co dien, dung dung gia do; neu
+        // khong, mac dinh ve gia tham khao thay vi de trong/0.
+        Long importedPriceRaw = parseLong(courseData.get("Price"), null);
+        BigDecimal importedPrice = importedPriceRaw != null ? BigDecimal.valueOf(importedPriceRaw) : suggestedPrice;
 
         Course course = Course.builder()
                 .title(courseTitle)
@@ -155,8 +162,8 @@ public class CourseImportService {
                 .difficulty(difficulty)
                 .thumbnailUrl(valueOrDefault(courseData, "Thumbnail URL", ""))
                 .code(persistedCourseCode)
-                .price(calculatedPrice)
-                .suggestedPrice(calculatedPrice)
+                .price(importedPrice)
+                .suggestedPrice(suggestedPrice)
                 .priceNote("")
                 .version(valueOrDefault(courseData, "Version", ""))
                 .objectives(valueOrDefault(courseData, "Objectives", ""))
@@ -295,7 +302,7 @@ public class CourseImportService {
             question.setUsageType(1);
 
             Question savedQuestion = questionRepository.save(question);
-            saveQuestionOptions(savedQuestion, questionRow);
+            saveQuestionOptions(savedQuestion, questionRow, warnings);
 
             int displayOrder = parseInt(valueOrDefault(questionRow, "Order Index", ""), importedQuestions + 1);
             jdbcTemplate.update(
@@ -668,21 +675,44 @@ public class CourseImportService {
                 warnings);
     }
 
-    private void saveQuestionOptions(Question question, Map<String, String> questionRow) {
+    private void saveQuestionOptions(Question question, Map<String, String> questionRow, List<String> warnings) {
         String correctAnswer = valueOrDefault(questionRow, "Correct Answer", "A").trim();
         String[] optionColumns = { "Option A", "Option B", "Option C", "Option D" };
         String[] optionKeys = { "A", "B", "C", "D" };
 
+        // Phat hien loi du lieu THAT SU tung bi AN DI: neu cot "Correct Answer"
+        // trong Excel co gia tri khong khop bat ky option nao (vd go nham "E",
+        // hoac mot so ngoai pham vi A-D), TRUOC DAY khong co option nao duoc
+        // danh dau is_correct=true - cau hoi do bi nhap vao he thong ma KHONG CO
+        // dap an dung nao ca (hoc vien khong the nao lam dung cau do), va Trainer
+        // khong he duoc canh bao ve viec nay. O day KHONG doi logic xac dinh dap
+        // an dung (isCorrectAnswer giu nguyen 100%, tranh rui ro doi hanh vi tren
+        // 1 file chua co unit test nao) - chi THEM canh bao de Trainer biet ma tu
+        // vao sua lai cau hoi trong Question Bank.
+        List<String> presentKeys = new ArrayList<>();
+        boolean anyMarkedCorrect = false;
         for (int i = 0; i < optionColumns.length; i++) {
             String optionText = valueOrDefault(questionRow, optionColumns[i], "");
             if (optionText.isBlank()) {
                 continue;
             }
+            presentKeys.add(optionKeys[i]);
+            boolean isCorrect = isCorrectAnswer(correctAnswer, optionKeys[i], i);
+            if (isCorrect) {
+                anyMarkedCorrect = true;
+            }
             QuestionOption option = new QuestionOption();
             option.setQuestion(question);
             option.setOptionText(optionText);
-            option.setIsCorrect(isCorrectAnswer(correctAnswer, optionKeys[i], i));
+            option.setIsCorrect(isCorrect);
             questionOptionRepository.save(option);
+        }
+
+        if (!anyMarkedCorrect && !presentKeys.isEmpty()) {
+            warnings.add("Question '" + valueOrDefault(questionRow, "Question Title", "(untitled)")
+                    + "': Correct Answer value '" + correctAnswer + "' did not match any option ("
+                    + String.join(", ", presentKeys)
+                    + "); this question was imported with NO correct answer set - please fix it in the Question Bank.");
         }
     }
 
@@ -872,7 +902,13 @@ public class CourseImportService {
         }
     }
 
-    private BigDecimal calculateCoursePrice(Long creatorId, String courseCode, TrainerProfile profile,
+    // Gia THAM KHAO cho khoa hoc import tu Excel - dung CHINH XAC cong thuc va
+    // gioi han (lam tron boi so 50.000d, ke trong 300.000d-700.000d) nhu
+    // TrainerDashboardServiceImpl.calculateSuggestedPrice, de nhat quan giua
+    // 2 con duong tao course (thu cong qua UI vs import hang loat). Gia BAN
+    // THAT SU khong con tinh o day nua - xem importWorkbook() (doc cot "Price"
+    // tuy chon, hoac mac dinh ve dung gia tham khao nay).
+    private BigDecimal calculateSuggestedPrice(TrainerProfile profile,
             SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
@@ -898,11 +934,18 @@ public class CourseImportService {
         price += (lessonCount * 10000L);
         price += (durationMinutes * 1000L);
 
-        if (courseRepository.isEligibleForFirstCoursePromotion(creatorId, courseCode)) {
-            return BigDecimal.ZERO;
+        long roundingStepVnd = 50000L;
+        long rounded = Math.round(price / (double) roundingStepVnd) * roundingStepVnd;
+        BigDecimal result = BigDecimal.valueOf(rounded);
+        BigDecimal min = BigDecimal.valueOf(300000);
+        BigDecimal max = BigDecimal.valueOf(700000);
+        if (result.compareTo(min) < 0) {
+            return min;
         }
-
-        return BigDecimal.valueOf(price);
+        if (result.compareTo(max) > 0) {
+            return max;
+        }
+        return result;
     }
 
     private record WorkbookData(Map<String, List<Map<String, String>>> rowsBySheet) {

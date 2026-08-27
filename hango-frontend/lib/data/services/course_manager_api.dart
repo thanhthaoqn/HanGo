@@ -184,6 +184,10 @@ class CourseManagerApi {
     );
   }
 
+  // User action: Course Manager bam "Approve/Publish" tren hang doi cho duyet.
+  // Goi POST /api/v1/course-manager/courses/{id}/publish ->
+  // CourseManagerDashboardServiceImpl.publishCourse() ben backend se doi
+  // status PENDING_APPROVAL -> PUBLISHED va gui notification cho Trainer.
   Future<void> publishCourse(int courseId) async {
     final response = await _post('/courses/$courseId/publish');
     if (response.statusCode != 200) {
@@ -193,6 +197,10 @@ class CourseManagerApi {
     }
   }
 
+  // User action: Course Manager bam "Reject" kem ly do. Backend yeu cau reason
+  // khong duoc rong (AdminController-style validation trong
+  // CourseManagerDashboardController.rejectCourse) va se luu vao
+  // course.rejectionReason de Trainer xem va sua lai truoc khi nop lai.
   Future<void> rejectCourse(int courseId, {String? reason}) async {
     final response = await _post(
       '/courses/$courseId/reject',

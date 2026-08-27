@@ -32,16 +32,27 @@ public class UserDetailsImpl implements UserDetails {
         this.authorities = authorities;
     }
 
+    // Day la noi CHUYEN DOI tu du lieu Role/Permission trong DB sang danh sach
+    // GrantedAuthority ma Spring Security hieu duoc. Ham nay duoc goi lai o MOI
+    // request (trong JwtAuthFilter/UserDetailsServiceImpl) nen luon phan anh
+    // dung quyen moi nhat cua user, khong bi "cu" theo token.
     public static UserDetailsImpl build(User user) {
         List<GrantedAuthority> authoritiesList = new java.util.ArrayList<>();
         if (user.getRoles() != null) {
             user.getRoles().forEach(role -> {
                 String r = role.getRoleName() != null ? role.getRoleName().trim() : "";
                 if (!r.isEmpty()) {
+                    // Them CA 2 dang: "ADMINISTRATOR" (dung cho hasAuthority)
+                    // va "ROLE_ADMINISTRATOR" (dung cho hasRole - Spring tu them tiep dau ROLE_)
                     String cleanRole = r.startsWith("ROLE_") ? r.substring(5) : r;
                     authoritiesList.add(new SimpleGrantedAuthority(cleanRole));
                     authoritiesList.add(new SimpleGrantedAuthority("ROLE_" + cleanRole));
                 }
+                // Cac permission le (vd: MANAGE_OWN_COURSES, MANAGE_ACCOUNTS_ROLES...)
+                // gan cho Role trong bang role_permissions cung duoc coi la authority
+                // -> day chinh la co che RBAC dong: doi permission cua 1 Role trong
+                // AdminController.updateRolePermissions() se anh huong ngay lan
+                // dang nhap/refresh token tiep theo cua moi user co role do.
                 if (role.getPermissions() != null) {
                     role.getPermissions().forEach(permission -> {
                         if (permission.getCode() != null && !permission.getCode().isEmpty()) {

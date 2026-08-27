@@ -6,6 +6,7 @@ class InteractiveNodeTree extends StatelessWidget {
   final List<PathwayNode> nodes;
   final Function(PathwayNode) onNodeTap;
   final Function(PathwayNode)? onFastTrackTap;
+  final Function(PathwayNode)? onMasteryTap; // B4 (spec 20): mo Mastery Quiz that
   final PathwayNode? selectedNode;
   final bool isDarkMode;
   final EdgeInsetsGeometry? contentPadding;
@@ -16,6 +17,7 @@ class InteractiveNodeTree extends StatelessWidget {
     required this.nodes,
     required this.onNodeTap,
     this.onFastTrackTap,
+    this.onMasteryTap,
     this.selectedNode,
     this.isDarkMode = false,
     this.contentPadding,
@@ -60,6 +62,7 @@ class InteractiveNodeTree extends StatelessWidget {
             isDarkMode: isDarkMode,
             onTap: () => onNodeTap(node),
             onFastTrackTap: onFastTrackTap != null ? () => onFastTrackTap!(node) : null,
+            onMasteryTap: onMasteryTap != null ? () => onMasteryTap!(node) : null,
           ),
         );
       },
@@ -75,6 +78,7 @@ class _NodeRow extends StatelessWidget {
   final bool isDarkMode;
   final VoidCallback onTap;
   final VoidCallback? onFastTrackTap;
+  final VoidCallback? onMasteryTap;
 
   const _NodeRow({
     required this.node,
@@ -84,6 +88,7 @@ class _NodeRow extends StatelessWidget {
     required this.isDarkMode,
     required this.onTap,
     this.onFastTrackTap,
+    this.onMasteryTap,
   });
 
   @override
@@ -144,6 +149,7 @@ class _NodeRow extends StatelessWidget {
                         isSelected: isSelected,
                         isDarkMode: isDarkMode,
                         onFastTrackTap: onFastTrackTap,
+                        onMasteryTap: onMasteryTap,
                       ),
                     ),
                   ),
@@ -163,12 +169,14 @@ class _NodeCard extends StatelessWidget {
   final bool isSelected;
   final bool isDarkMode;
   final VoidCallback? onFastTrackTap;
+  final VoidCallback? onMasteryTap;
 
   const _NodeCard({
     required this.node,
     required this.isSelected,
     required this.isDarkMode,
     this.onFastTrackTap,
+    this.onMasteryTap,
   });
 
   @override
@@ -341,42 +349,53 @@ class _NodeCard extends StatelessWidget {
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CourseDetailPage(courseId: node.courseId),
+              child: Builder(builder: (context) {
+                // B4 (spec 20): neu day la hanh dong mastery (review due / completed-chua-mastered)
+                // thi mo Mastery Quiz thay vi mo CourseDetailPage
+                final isMasteryAction = node.isReviewDue ||
+                    (node.status == NodeStatus.completed && !node.isMastered);
+                final handleTap = isMasteryAction && onMasteryTap != null
+                    ? () => onMasteryTap!()
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CourseDetailPage(courseId: node.courseId),
+                          ),
+                        );
+                      };
+                return ElevatedButton.icon(
+                  onPressed: handleTap,
+                  icon: Icon(
+                    node.isReviewDue ? Icons.replay : 
+                    (node.status == NodeStatus.completed && !node.isMastered) ? Icons.workspace_premium : 
+                    (node.status == NodeStatus.completed && node.isMastered) ? Icons.done_all_rounded :
+                    Icons.play_arrow_rounded, 
+                    size: 18
+                  ),
+                  label: Text(
+                    node.isReviewDue ? 'Review Now' :
+                    (node.status == NodeStatus.completed && !node.isMastered) ? 'Take Mastery Quiz' :
+                    (node.status == NodeStatus.completed && node.isMastered) ? 'Review Course' :
+                    'Start learning'
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: node.isReviewDue ? const Color(0xFFF59E0B) :
+                                    (node.status == NodeStatus.completed && !node.isMastered) ? const Color(0xFFEC4899) :
+                                    (isDarkMode ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  );
-                },
-                icon: Icon(
-                  node.isReviewDue ? Icons.replay : 
-                  (node.status == NodeStatus.completed && !node.isMastered) ? Icons.workspace_premium : 
-                  Icons.play_arrow_rounded, 
-                  size: 18
-                ),
-                label: Text(
-                  node.isReviewDue ? 'Review Now' :
-                  (node.status == NodeStatus.completed && !node.isMastered) ? 'Take Mastery Quiz' :
-                  'Start learning'
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: node.isReviewDue ? const Color(0xFFF59E0B) :
-                                  (node.status == NodeStatus.completed && !node.isMastered) ? const Color(0xFFEC4899) :
-                                  (isDarkMode ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    elevation: 0,
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
-                  elevation: 0,
-                  textStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
+                );
+              }),
             ),
           ],
           if (node.status == NodeStatus.inProgress && node.courseId > 0 && onFastTrackTap != null) ...[
@@ -745,14 +764,22 @@ class _NodePalette {
   static _NodePalette forStatus(NodeStatus status, bool dark) {
     if (status == NodeStatus.completed) {
       return _NodePalette(
-        surface: const Color(0xFF063F32),
-        border: const Color(0xFF10B981),
-        text: Colors.white,
-        muted: const Color(0xFFD1FAE5),
-        glow: const Color(0xFF10B981),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F766E), Color(0xFF10B981)],
-        ),
+        surface: dark ? const Color(0xFF161B22) : Colors.white,
+        border: dark ? const Color(0xFF10B981).withOpacity(0.6) : const Color(0xFF10B981).withOpacity(0.5),
+        text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
+        muted: dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        glow: const Color(0xFF10B981).withOpacity(0.3),
+        gradient: dark
+            ? LinearGradient(
+                colors: [const Color(0xFF10B981).withOpacity(0.05), const Color(0xFF161B22)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: [const Color(0xFF10B981).withOpacity(0.05), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
       );
     }
     if (status == NodeStatus.inProgress) {

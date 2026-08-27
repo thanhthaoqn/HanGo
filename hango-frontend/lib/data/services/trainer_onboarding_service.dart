@@ -183,11 +183,14 @@ class TrainerOnboardingService {
     required List<int> bytes,
     required String fileName,
   }) {
-    return _uploadTrainerFile(
-      path: '/trainers/documents/upload',
+    final isPdf = fileName.toLowerCase().endsWith('.pdf');
+    final resourceType = isPdf ? 'raw' : 'image';
+    return _uploadTrainerFileToCloudinary(
+      resourceType: resourceType,
       bytes: bytes,
       fileName: fileName,
       fallbackMessage: 'Unable to upload the trainer document.',
+      backendFallbackPath: '/trainers/documents/upload',
     );
   }
 
@@ -195,11 +198,52 @@ class TrainerOnboardingService {
     required List<int> bytes,
     required String fileName,
   }) {
-    return _uploadTrainerFile(
-      path: '/trainers/avatar/upload',
+    return _uploadTrainerFileToCloudinary(
+      resourceType: 'image',
       bytes: bytes,
       fileName: fileName,
       fallbackMessage: 'Unable to upload the trainer avatar.',
+      backendFallbackPath: '/trainers/avatar/upload',
+    );
+  }
+
+  Future<Map<String, dynamic>> _uploadTrainerFileToCloudinary({
+    required String resourceType,
+    required List<int> bytes,
+    required String fileName,
+    required String fallbackMessage,
+    required String backendFallbackPath,
+  }) async {
+    try {
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/$resourceType/upload',
+      );
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'hango_preset'
+        ..files.add(
+          http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+        );
+      final streamedResponse = await request.send().timeout(_uploadTimeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final uploadedUrl = data['secure_url'] ?? data['url'];
+        if (uploadedUrl != null && uploadedUrl.toString().isNotEmpty) {
+          return {
+            'success': true,
+            'data': {'url': uploadedUrl.toString()},
+          };
+        }
+      }
+    } catch (_) {
+      // Fall back to backend upload endpoint
+    }
+
+    return _uploadTrainerFile(
+      path: backendFallbackPath,
+      bytes: bytes,
+      fileName: fileName,
+      fallbackMessage: fallbackMessage,
     );
   }
 
