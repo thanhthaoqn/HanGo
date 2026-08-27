@@ -369,12 +369,14 @@ class _NodeCard extends StatelessWidget {
                   icon: Icon(
                     node.isReviewDue ? Icons.replay : 
                     (node.status == NodeStatus.completed && !node.isMastered) ? Icons.workspace_premium : 
+                    (node.status == NodeStatus.completed && node.isMastered) ? Icons.done_all_rounded :
                     Icons.play_arrow_rounded, 
                     size: 18
                   ),
                   label: Text(
                     node.isReviewDue ? 'Review Now' :
                     (node.status == NodeStatus.completed && !node.isMastered) ? 'Take Mastery Quiz' :
+                    (node.status == NodeStatus.completed && node.isMastered) ? 'Review Course' :
                     'Start learning'
                   ),
                   style: ElevatedButton.styleFrom(
@@ -762,14 +764,22 @@ class _NodePalette {
   static _NodePalette forStatus(NodeStatus status, bool dark) {
     if (status == NodeStatus.completed) {
       return _NodePalette(
-        surface: const Color(0xFF063F32),
-        border: const Color(0xFF10B981),
-        text: Colors.white,
-        muted: const Color(0xFFD1FAE5),
-        glow: const Color(0xFF10B981),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F766E), Color(0xFF10B981)],
-        ),
+        surface: dark ? const Color(0xFF161B22) : Colors.white,
+        border: dark ? const Color(0xFF10B981).withOpacity(0.6) : const Color(0xFF10B981).withOpacity(0.5),
+        text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
+        muted: dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        glow: const Color(0xFF10B981).withOpacity(0.3),
+        gradient: dark
+            ? LinearGradient(
+                colors: [const Color(0xFF10B981).withOpacity(0.05), const Color(0xFF161B22)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: [const Color(0xFF10B981).withOpacity(0.05), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
       );
     }
     if (status == NodeStatus.inProgress) {

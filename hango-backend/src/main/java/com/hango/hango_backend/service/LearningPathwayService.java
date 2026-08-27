@@ -587,7 +587,9 @@ public class LearningPathwayService {
     }
 
     private LearningPathwayResponseDTO toResponseDto(LearningPathway pathway, Long studentId) {
-        List<PathwayNodeDTO> nodeDTOs = pathway.getNodes().stream().map(node -> {
+        List<PathwayNodeDTO> nodeDTOs = pathway.getNodes().stream()
+                .sorted(java.util.Comparator.comparingInt(PathwayNode::getStepOrder))
+                .map(node -> {
             int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
             long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
             long completedLessons = countCompletedLessons(studentId, node.getCourse().getId());
