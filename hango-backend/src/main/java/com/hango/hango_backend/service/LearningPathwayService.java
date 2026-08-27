@@ -718,6 +718,7 @@ public class LearningPathwayService {
                 .totalSteps(totalSteps)
                 .completedSteps(completedSteps)
                 .weakSkills(weakSkills)
+                .analyzedAttempts(recentAttempts.size())
                 .goalName(pathway.getGoalName())
                 .targetDate(pathway.getTargetDate() != null ? pathway.getTargetDate().toString() : null)
                 .hoursPerWeek(pathway.getHoursPerWeek())

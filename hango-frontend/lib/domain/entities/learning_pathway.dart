@@ -352,6 +352,7 @@ class LearningPathway {
   final int totalSteps;
   final int completedSteps;
   final List<String> suggestedActions; // <--- New field
+  final int analyzedAttempts; // <--- Added for real count
 
   // Smart time-boxing metadata
   final String? goalName;
@@ -371,6 +372,7 @@ class LearningPathway {
     this.totalSteps = 0,
     this.completedSteps = 0,
     this.suggestedActions = const [],
+    this.analyzedAttempts = 10,
     this.goalName,
     this.targetDate,
     this.hoursPerWeek,
@@ -389,6 +391,7 @@ class LearningPathway {
     int? totalSteps,
     int? completedSteps,
     List<String>? suggestedActions,
+    int? analyzedAttempts,
     String? goalName,
     String? targetDate,
     int? hoursPerWeek,
@@ -407,6 +410,7 @@ class LearningPathway {
       totalSteps: totalSteps ?? this.totalSteps,
       completedSteps: completedSteps ?? this.completedSteps,
       suggestedActions: suggestedActions ?? this.suggestedActions,
+      analyzedAttempts: analyzedAttempts ?? this.analyzedAttempts,
       goalName: goalName ?? this.goalName,
       targetDate: targetDate ?? this.targetDate,
       hoursPerWeek: hoursPerWeek ?? this.hoursPerWeek,
@@ -468,6 +472,7 @@ class LearningPathway {
       suggestedActions: (json['suggested_actions'] as List?)
               ?.map((e) => e.toString())
               .toList() ?? [],
+      analyzedAttempts: json['analyzed_attempts'] ?? json['analyzedAttempts'] ?? 10,
       goalName: json['goal_name'] ?? json['goalName'],
       targetDate: json['target_date'] ?? json['targetDate'],
       hoursPerWeek: json['hours_per_week'] ?? json['hoursPerWeek'],
