@@ -1,12 +1,14 @@
 Feature,Course Management
 Test requirement,Functional integration tests for course browsing/enrollment (CourseController) and trainer/course-manager authoring workflow (TrainerDashboardController, CourseManagerDashboardController, CourseImportService)
-Number of TCs,59
+Number of TCs,58
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,59,0
-Round 2,0,0,59,0
-Round 3,0,0,59,0
+Round 1,0,0,58,0
+Round 2,0,0,58,0
+Round 3,0,0,58,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+
+
 Browse/Search Course Catalog,,,,
 COURSE_FT01,"Anyone can browse the public course catalog listing every PUBLISHED course, without logging in.","1. Confirm at least one PUBLISHED course exists.
 2. Discard any Authorization token.
@@ -21,6 +23,8 @@ COURSE_FT03,"An unrecognized filterType or difficulty value degrades silently to
 2. Prepare and send GET /api/v1/courses?difficulty=NOT_A_LEVEL; inspect the response.
 3. Compare both against the plain, unfiltered catalog call.","1. Step 1: 200 OK, treated like ALL (no error).
 2. Step 2-3: 200 OK, empty result set (no error) since no course matches the unknown difficulty key.","- None."
+
+
 View Course Detail,,,,
 COURSE_FT04,"Anyone can view a PUBLISHED course's full detail without logging in.","1. Identify a PUBLISHED course.
 2. Discard any Authorization token.
@@ -39,6 +43,8 @@ COURSE_FT07,"A HIDDEN or ARCHIVED course remains visible to learners who were al
 COURSE_FT08,"Requesting a course you're NOT directly enrolled in, while enrolled in a sibling version of the same family, silently redirects to the version you ARE enrolled in.","1. Log in as a learner and enroll in version V2 (course id=20) of a multi-version course family.
 2. Prepare and send GET /api/v1/courses/10 (V1's id, same family, not directly enrolled).
 3. Inspect the returned CourseDetailDTO's id field.","1. 200 OK; the returned CourseDetailDTO is actually V2's detail (id=20), not V1's — a silent redirect, not an error or the literally-requested course.","- Learner enrolled in one version of a multi-version course family; requests a sibling version's id."
+
+
 Enroll Course,,,,
 COURSE_FT09,"A logged-in learner can enroll in a published course whose creator is a VERIFIED trainer.","1. Log in as a learner and identify a PUBLISHED course whose creator's TrainerProfile.status=VERIFIED, not already enrolled.
 2. Prepare and send POST /api/v1/courses/{id}/enroll.
@@ -56,15 +62,19 @@ COURSE_FT12,"Enrollment is blocked if the course's creator is not yet a VERIFIED
 2. Prepare and send POST /api/v1/courses/{id}/enroll for that course.
 3. Inspect the response status and message.
 4. Confirm no Enrollment row was created.","1. 400 Bad Request, body {""error"": ""Khóa học chưa được xuất bản hoặc giáo viên chưa được phê duyệt.""}; no Enrollment row created.","- PUBLISHED course exists whose creator is not VERIFIED."
+
+
 Unenroll Course,,,,
 COURSE_FT13,"A learner can unenroll from a course they are currently enrolled in.","1. Log in as a learner enrolled in a course.
 2. Prepare and send DELETE /api/v1/courses/{id}/enroll.
 3. Inspect the response message.
 4. Confirm the Enrollment row is gone.","1. 200 OK {""message"": ""Unenrollment successful""}; the Enrollment row is removed.","- Learner is currently enrolled in the target course."
-COURSE_FT14,"Unenrolling using the original/parent course id after switching to a newer version incorrectly reports ""not enrolled"" (documented gap).","1. Log in as a learner and enroll in course V1 (id=10).
+COURSE_FT14,"Unenrolling using the original/parent course id after switching to a newer version incorrectly reports \"not enrolled\" (documented gap).","1. Log in as a learner and enroll in course V1 (id=10).
 2. Switch to the newer version V2 (id=20) via COURSE_FT15.
 3. Prepare and send DELETE /api/v1/courses/10/enroll (the OLD id).
 4. Inspect the response status and message.","1. Step 3-4: 400 Bad Request, body {""error"": ""User is not enrolled in this course""} — even though the learner is still enrolled in the course family (now under id=20). Unenroll checks the raw path id, unlike enroll/switch-version which resolve to the latest-version id.","- Learner switched from V1 to V2 as in COURSE_FT15."
+
+
 Switch Course Version,,,,
 COURSE_FT15,"Switching to the newest published version succeeds and carries forward completed-lesson progress by matching lesson code or title.","1. Log in as a learner enrolled in course V1, and complete some of its lessons.
 2. Confirm a newer PUBLISHED version V2 (same code family) exists, sharing at least one lesson code/title with a completed V1 lesson.
@@ -76,39 +86,45 @@ COURSE_FT16,"Switching version is rejected when no newer published version of th
 COURSE_FT17,"Switching version is rejected when the learner is already enrolled in the latest version.","1. Log in as a learner already enrolled in the family's latest published version.
 2. Prepare and send POST /api/v1/courses/{id}/switch-version.
 3. Inspect the response status and message.","1. 400 Bad Request, body {""error"": ""You are already on the latest course version""}.","- Enrollment's version already equals the family's latest published version."
+
+
 View / Add / Delete Course Review,,,,
 COURSE_FT18,"Anyone can view a course's review summary, with each reviewer's identity masked to protect privacy.","1. Identify a course with ≥1 review.
 2. Discard any Authorization token.
 3. Prepare and send GET /api/v1/courses/{id}/reviews.
-4. Inspect averageRating, ratingCounts, and each review's masked email.","1. 200 OK; averageRating (1 decimal), totalRatings, ratingCounts for stars 1-5 (present even at 0), reviews[] with each reviewer's email masked: local parts ≤3 chars mask to just the FIRST character + a fixed ""***"" (e.g. ""abc@domain"" → ""a***@domain"", not ""abc***""); longer local parts keep up to their first 6 characters then append a fixed 8-asterisk block (e.g. ""johnsmith@domain"" → ""johnsm********@domain"").","- Course has ≥1 review."
-COURSE_FT19,"A learner who has earned a Certificate for the course (i.e. completed it) can post exactly ONE review — reviews are now one-time-only with no edit/upsert path at all.","1. Log in as a learner who has earned a Certificate for a course (completed all its lessons, triggering CertificateService.generateCertificateIfNotExists).
+4. Inspect averageRating, ratingCounts, and each review's masked email.","1. 200 OK; averageRating (1 decimal), totalRatings, ratingCounts for stars 1-5 (present even at 0), reviews[] with each reviewer's email masked (e.g. ""abc***@domain"" for short local parts).","- Course has ≥1 review."
+COURSE_FT19,"An enrolled, COMPLETED learner can post a review and then edit it, which upserts the same row rather than creating a duplicate.","1. Log in as a learner who has COMPLETED a course.
 2. Prepare and send POST /api/v1/courses/{id}/reviews body {""rating"":4,""content"":""Great course""}.
-3. Prepare and send the SAME endpoint again (any rating) for the same course.
-4. Confirm only one review row exists and inspect the second call's response.","1. Step 2: 200 OK {""message"": ""Review posted successfully""}; Course.averageRating/totalRatings recalculated.
-2. Step 3-4: 400 Bad Request, {""error"": ""You can only rate this course once.""} — courseRatingRepository already has a row for this (courseId, studentId) pair, so the second call is rejected outright; NO upsert/edit occurs, the original review row is untouched.","- Learner has earned a Certificate for the target course (completed it)."
-COURSE_FT20,"A learner who never enrolled in the course cannot post a review — gated purely on Certificate existence, with no separate enrollment check.","1. Log in as a learner never enrolled in a particular course (so certainly no Certificate for it).
+3. Prepare and send the same endpoint again with a different rating for the same course.
+4. Confirm only one review row exists and Course.averageRating/totalRatings reflect the latest value.","1. Step 2: 200 OK {""message"": ""Review posted successfully""}.
+2. Step 3-4: the SAME review row is updated in place (no duplicate), and Course.averageRating/totalRatings are recalculated after each call.","- Learner enrolled and COMPLETED for the target course."
+COURSE_FT20,"A learner who never enrolled in the course cannot post a review.","1. Log in as a learner never enrolled in a particular course.
 2. Prepare and send POST /api/v1/courses/{id}/reviews for that course.
-3. Inspect the response status and message.","1. 400 Bad Request, body {""error"": ""You must complete the course and receive a certificate before rating it""} — addCourseReview only checks certificateRepository.existsByUserIdAndCourseId; it never looks at Enrollment at all, so this is the SAME message as COURSE_FT21's enrolled-but-incomplete case.","- Logged in learner, not enrolled in the target course."
-COURSE_FT21,"An enrolled but not-yet-completed learner (no Certificate issued yet) cannot post a review.","1. Log in as a learner and enroll in a course without completing it (no Certificate row exists for this user/course).
+3. Inspect the response status and message.","1. 400 Bad Request, body {""error"": ""You must enroll in this course before rating it""}.","- Logged in learner, not enrolled in the target course."
+COURSE_FT21,"An enrolled but not-yet-completed learner cannot post a review.","1. Log in as a learner and enroll in a course without completing it.
 2. Prepare and send POST /api/v1/courses/{id}/reviews.
-3. Inspect the response status and message.","1. 400 Bad Request, body {""error"": ""You must complete the course and receive a certificate before rating it""} — identical message to COURSE_FT20's never-enrolled case, since the gate is Certificate existence, not Enrollment status.","- Enrolled, but no Certificate row exists yet for this user/course."
-COURSE_FT22,"Rating a course 3 stars or lower notifies course managers, admins, AND the course's own creator/trainer; the average crossing from above 4.0 down to 4.0-or-below fires a second, distinct notification to the same three audiences.","1. As a learner with a Certificate for the course, prepare and send POST /api/v1/courses/{id}/reviews with rating=2; confirm a low-rating notification fires.
-2. Separately, arrange a course whose current average is above 4.0, then submit a new low rating (from a different Certificate-holding learner) that pulls the recalculated average down to 4.0 or below.
-3. Inspect the notifications fired in both cases and their recipients.","1. Step 1: a TYPE_LOW_RATING notification is sent to course managers, admins, AND the course's creator, embedding the review text.
-2. Step 2-3: an ADDITIONAL TYPE_LOW_AVERAGE_RATING notification fires to the SAME three audiences (managers, admins, creator) only because the average crossed the 4.0 threshold on this call (a rating that keeps the average already-below-4.0 without crossing does not re-fire it).","- Certificate-holding learners; for step 2, a course whose current average is >4.0."
-COURSE_FT23,"Deleting a course review is now permanently disabled — the endpoint unconditionally rejects every request, regardless of who owns the review (reviews were previously learner-deletable; this is now a one-way, permanent action once submitted).","1. Log in as a learner who has posted a review on a course (or any other authenticated eligible role).
+3. Inspect the response status and message.","1. 400 Bad Request, body {""error"": ""You must complete the course before rating it""}.","- Enrollment.status is ENROLLED, not COMPLETED."
+COURSE_FT22,"Rating a course 3 stars or lower notifies course managers/admins; the average crossing from above 4.0 down to 4.0-or-below fires a second, distinct notification.","1. As a COMPLETED learner, prepare and send POST /api/v1/courses/{id}/reviews with rating=2; confirm a low-rating notification fires.
+2. Separately, arrange a course whose current average is above 4.0, then submit a new low rating that pulls the recalculated average down to 4.0 or below.
+3. Inspect the notifications fired in both cases.","1. Step 1: a TYPE_LOW_RATING notification is sent to managers/admins embedding the review text.
+2. Step 2-3: an ADDITIONAL TYPE_LOW_AVERAGE_RATING notification fires only because the average crossed the 4.0 threshold on this call (a rating that keeps the average already-below-4.0 without crossing does not re-fire it).","- COMPLETED enrollment; for step 2, a course whose current average is >4.0."
+COURSE_FT23,"A learner can delete their own review, which recalculates the course's aggregate rating stats.","1. Log in as a learner who has posted a review on a course.
 2. Prepare and send DELETE /api/v1/courses/{id}/reviews.
-3. Inspect the response status and message.
-4. Confirm Course.averageRating/totalRatings and the review row are completely unchanged.","1. 400 Bad Request, body {""error"": ""Reviews cannot be edited or deleted once submitted""} — deleteCourseReview now unconditionally throws this for every call; nothing is ever deleted or recalculated.","- A review exists on a course; caller can be its author or anyone else — the outcome is identical."
+3. Inspect the response message.
+4. Confirm Course.averageRating/totalRatings no longer include the deleted review.","1. 200 OK {""message"": ""Review deleted successfully""}; Course.averageRating/totalRatings recalculated to exclude the deleted review.","- Caller has posted a review on the target course."
+
+
 View Course Version History,,,,
 COURSE_FT24,"Version history lists every non-deleted version sharing the same course code, newest-created-first.","1. Identify a course family with 2+ published/draft versions.
 2. Prepare and send GET /api/v1/courses/{id}/versions.
 3. Inspect the returned array's ordering and each entry's learnersCount/isCurrent.","1. 200 OK; array covering every version in the family, each with learnersCount (per-version, not family-wide) and isCurrent flag; sorted by creation date descending.","- A course family with ≥2 version rows exists."
+
+
 Upload Course File / Import Template / Import Excel,,,,
-COURSE_FT25,"An eligible authoring role can upload a course thumbnail image (correction: this endpoint's @PreAuthorize is ""MANAGE_OWN_COURSES or MANAGE_ACCOUNTS_ROLES or ADMINISTRATOR"" only — there is no hasRole('COURSE_MANAGER') clause and no ""TRAINER_LEAD"" role exists in the system at all; a plain COURSE_MANAGER account, seeded with only VIEW_PLATFORM_DASHBOARD + CREATE_AND_MANAGE_EXAMS_CM, is NOT eligible here unless separately granted MANAGE_OWN_COURSES).","1. Log in as TRAINER or ADMINISTRATOR (i.e. a caller holding MANAGE_OWN_COURSES, MANAGE_ACCOUNTS_ROLES, or the ADMINISTRATOR role).
+COURSE_FT25,"An eligible authoring role can upload a course thumbnail image.","1. Log in as TRAINER/ADMIN/TRAINER_LEAD/COURSE_MANAGER.
 2. Prepare a valid image file.
 3. Prepare and send POST /api/v1/trainer/courses/upload (multipart, key=""file"") with that image.
-4. Inspect the returned URL and confirm the image is reachable.","1. 200 OK {""url"": ""<cloudinary url>""}.","- Logged in as TRAINER or ADMINISTRATOR (or any account explicitly granted MANAGE_OWN_COURSES)."
+4. Inspect the returned URL and confirm the image is reachable.","1. 200 OK {""url"": ""<cloudinary url>""}.","- Logged in as an eligible role."
 COURSE_FT26,"An eligible authoring role can download the course-import Excel template.","1. Log in as an eligible role.
 2. Prepare and send GET /api/v1/trainer/courses/import/template.
 3. Inspect the response's status and Content-Disposition header.","1. 200 OK; binary .xlsx with Content-Disposition attachment filename Hango_Course_Import_Template.xlsx.","- Logged in as an eligible role; the template file exists on disk."
@@ -138,6 +154,8 @@ COURSE_FT32,"A QUESTIONS-sheet row whose lesson title doesn't match any lesson i
 2. Log in and prepare/send POST /api/v1/trainer/courses/import with that workbook.
 3. Inspect the response status and warnings[].
 4. Confirm the other, valid rows in the same file still imported successfully.","1. 200 OK; the mismatched question row is skipped; warnings[] contains ""Question row skipped because lesson with title '<title>' was not found in SYLLABUS.""; all other valid rows still import.","- Workbook prepared with one intentionally-mismatched question row."
+
+
 Create / Update / Delete Trainer Course,,,,
 COURSE_FT33,"Creating a course always results in DRAFT status with a server-generated code — the client-supplied code field is validated but then silently discarded.","1. Log in as an eligible authoring role.
 2. Prepare POST /api/v1/trainer/courses body including ""code"":""MY-CUSTOM-CODE"" plus valid title/sessions.
@@ -157,14 +175,14 @@ COURSE_FT36,"Creating a course succeeds even with zero sections/lessons — a mi
 2. Prepare POST /api/v1/trainer/courses body with a valid title/category/difficulty but sessions=[] (empty array) or omitted.
 3. Send the request.
 4. Inspect the response and confirm the course was created despite having no content.","1. 200 OK; course created in DRAFT with no content — no server-side rule currently requires at least one section/lesson before creation.","- Logged in as an eligible authoring role."
-COURSE_FT37,"Updating a DRAFT or REJECTED course overwrites it in place — versioning only triggers when the course's CURRENT status is PUBLISHED, never while it's still Draft/Rejected.","1. Log in as the owner of a DRAFT (or REJECTED) course with existing content.
+COURSE_FT37,"Updating a course that has zero enrollments overwrites it in place, even if it is currently PUBLISHED — no new version is created.","1. Publish a course with zero enrollments, owned by the caller.
 2. Prepare PUT /api/v1/trainer/courses/{id} with changed content.
 3. Send the request and inspect the response's courseId.
-4. Confirm the SAME course row was modified directly, with no new version row appearing.","1. 200 OK {""message"": ""Course updated successfully"", ""courseId"": <same id>}; the SAME course row is modified directly; status remains DRAFT/REJECTED as applicable, no clone/new version row appears.","- A DRAFT or REJECTED course, owned by the caller."
-COURSE_FT38,"Updating a PUBLISHED course ALWAYS creates a new DRAFT version — the version-cloning trigger in updateTrainerCourse is purely ""course.status == PUBLISHED""; it is NOT gated on enrollment count at all, so even a zero-enrollment Published course is version-cloned exactly like one with active enrollments (confirmed by code read — no enrollment lookup exists anywhere in this method).","1. Publish a course owned by the caller (with or without any learner enrolled).
+4. Confirm the SAME course row was modified directly, with no new version row appearing.","1. 200 OK {""message"": ""Course updated successfully"", ""courseId"": <same id>}; the SAME course row is modified directly; status remains PUBLISHED (or as set), no clone/new version row appears.","- A PUBLISHED course with 0 enrollments, owned by the caller."
+COURSE_FT38,"Updating a PUBLISHED course that already has enrollments creates a new DRAFT version instead of overwriting it in place.","1. Publish a course and have at least one learner enroll in it.
 2. Prepare PUT /api/v1/trainer/courses/{id} with changed content.
 3. Send the request and inspect the response's courseId.
-4. Confirm the original PUBLISHED course (and any enrollments) are untouched, and a new DRAFT row with a fresh code exists.","1. 200 OK; response courseId is a DIFFERENT (new) id than the path {id} — a new Course row is created with status=DRAFT, version incremented, parentId=original id, a fresh auto-suffixed code; the original PUBLISHED course and its enrollments (if any) are left completely untouched.","- A PUBLISHED course owned by the caller; enrollment count is irrelevant to the outcome."
+4. Confirm the original PUBLISHED course and its enrollments are untouched, and a new DRAFT row with a fresh code exists.","1. 200 OK; response courseId is a DIFFERENT (new) id than the path {id} — a new Course row is created with status=DRAFT, version incremented, parentId=original id, a fresh auto-suffixed code; the original PUBLISHED course and its enrollments are left untouched.","- A PUBLISHED course with ≥1 enrollment, owned by the caller."
 COURSE_FT39,"Omitting the sessions field entirely on update deletes ALL existing sections and lessons for that course — a critical, high-severity gap worth verifying carefully before relying on it in other tests.","1. Create a course with 2 sections and several lessons, owned by the caller.
 2. Prepare PUT /api/v1/trainer/courses/{id} with a body that omits the sessions field entirely (or sends sessions:null).
 3. Send the request and inspect the response.
@@ -186,29 +204,30 @@ COURSE_FT43,"Deleting a course in any status other than DRAFT/REJECTED (e.g. PUB
 2. Prepare and send DELETE /api/v1/trainer/courses/{id} for that course.
 3. Inspect the response status and message.
 4. Confirm the course was not deleted.","1. 400 Bad Request, {""error"": ""Chỉ có thể xoá khóa học ở trạng thái Nháp (Draft) hoặc Bị từ chối (Rejected).""}; course not deleted.","- Owned course in PUBLISHED status."
+
+
 Submit / Publish / Approve / Reject Trainer Course,,,,
 COURSE_FT44,"A plain trainer's submit moves an owned DRAFT course to PENDING_APPROVAL and notifies course managers.","1. Log in as a plain TRAINER (no COURSE_MANAGER/ADMINISTRATOR role) who owns a DRAFT course.
 2. Prepare and send POST /api/v1/trainer/courses/{id}/submit.
 3. Inspect the response message.
 4. Confirm the course's status and that course managers received a notification.","1. 200 OK {""message"": ""Course submitted for review""}; course status becomes PENDING_APPROVAL; a TYPE_COURSE_SUBMITTED notification is sent to course managers.","- Plain TRAINER, owns a DRAFT course."
-COURSE_FT45,"A course creator who ALSO holds COURSE_MANAGER or ADMINISTRATOR self-publishes immediately on ""submit"", completely bypassing review (highest-priority gap in this module).","1. Log in as a user holding TRAINER + COURSE_MANAGER (or ADMINISTRATOR).
+COURSE_FT45,"A course creator who ALSO holds COURSE_MANAGER or ADMINISTRATOR self-publishes immediately on \"submit\", completely bypassing review (highest-priority gap in this module).","1. Log in as a user holding TRAINER + COURSE_MANAGER (or ADMINISTRATOR).
 2. Create a DRAFT course under that same account.
 3. Prepare and send POST /api/v1/trainer/courses/{id}/submit.
 4. Inspect the response message and the course's ACTUAL persisted status.","1. 200 OK — SAME success message ({""message"": ""Course submitted for review""}) as COURSE_FT44 — but the course's actual status is immediately PUBLISHED (publishedAt stamped, latestVersionId updated), with NO PENDING_APPROVAL step and no notification to anyone. The response gives no indication which outcome occurred.","- Caller's account holds both an authoring role and COURSE_MANAGER/ADMINISTRATOR, and is the creator of the target course."
 COURSE_FT46,"Submitting a course that is not currently DRAFT or REJECTED is rejected.","1. Log in as the owner of a course already in PENDING_APPROVAL or PUBLISHED status.
 2. Prepare and send POST /api/v1/trainer/courses/{id}/submit.
 3. Inspect the response status and message.","1. 400 Bad Request, {""error"": ""Only draft or rejected courses can be submitted for review""}.","- Owned course in PENDING_APPROVAL or PUBLISHED status."
-COURSE_FT59,"A trainer's very first course (their only distinct course code) is auto-forced to price=0/suggestedPrice=0 at the moment it's submitted for review — a previously-undocumented promotional rule that fires on submit, not on create/re-evaluate, and applies uniformly to both the plain-trainer and self-publishing-manager submit paths.","1. Log in as a trainer who has no other course besides the one being submitted (countDistinctCourseCodesByCreatorId ≤1 including it).
-2. Create a Draft course and set/re-evaluate a non-zero price/suggestedPrice on it.
-3. Prepare and send POST /api/v1/trainer/courses/{id}/submit.
-4. Prepare and send GET on the course detail (or the trainer's own course list) to inspect price/suggestedPrice.","1. Step 3: 200 OK, same success message as COURSE_FT44/COURSE_FT45.
-2. Step 4: both price AND suggestedPrice are now 0, overwriting whatever non-zero value was set beforehand — the zeroing happens regardless of whether the submit results in PENDING_APPROVAL (plain trainer) or an immediate self-publish (COURSE_FT45's manager-trainer path), since it runs before the manager/non-manager branch.","- A trainer whose distinct-course-code count (including the course being submitted) is ≤1; a non-zero price/suggestedPrice was set beforehand."
+
+
 Re-evaluate Suggested Price,,,,
-COURSE_FT47,"Re-evaluating price recalculates BOTH price and suggestedPrice from the tiered formula — they are always overwritten to the identical freshly-computed value; there is no separate ""trainer's actual price"" preserved (the request DTO has a price/priceNote field, but calculateCoursePrice unconditionally overwrites both on create/update/re-evaluate — the current UI matches this by only ever showing a read-only ""System Auto-Price"" value, never an editable price input).","1. Log in as the owner of a course and note its current price and suggestedPrice.
+COURSE_FT47,"Re-evaluating price recalculates only the suggestedPrice from the tiered formula, leaving the trainer's actual price untouched.","1. Log in as the owner of a course and note its current price and suggestedPrice.
 2. Prepare and send POST /api/v1/trainer/courses/{id}/re-evaluate-price.
 3. Inspect the response message.
 4. Prepare and send GET on the course detail again and compare price/suggestedPrice against step 1.","1. Step 2-3: 200 OK {""message"": ""Course price re-evaluated successfully""}.
-2. Step 4: BOTH price and suggestedPrice have been recalculated to the SAME new value (trainerType bonus + credentials bonus + difficulty tier + lessonCount×10,000 + durationMinutes×1,000, or 0 if the creator is eligible for the first-course promotion) — price is NOT preserved from step 1, contrary to the notion of a trainer-set price surviving re-evaluation.","- Owned course exists."
+2. Step 4: suggestedPrice has been recalculated (trainerType bonus + credentials bonus + difficulty tier + lessonCount×10,000); price is unchanged from step 1.","- Owned course exists."
+
+
 Publish / Reject Course (Course Manager) & Direct Publish (Trainer),,,,
 COURSE_FT48,"A trainer can direct-publish their own course via the legacy endpoint with NO status precondition at all — even a fresh DRAFT that never went through review.","1. Log in as the owning, VERIFIED trainer and create a brand-new DRAFT course (do not submit it).
 2. Prepare and send POST /api/v1/trainer/courses/{id}/publish.
@@ -235,33 +254,20 @@ COURSE_FT53,"Rejecting without a reason is blocked by the controller before it e
 2. Prepare POST /api/v1/course-manager/courses/{id}/reject with an empty or missing ""reason"" field.
 3. Send the request.
 4. Inspect the response status and confirm the course's status is unchanged.","1. 400 Bad Request, {""error"": ""Rejection reason is required""}; status unchanged.","- COURSE_MANAGER logged in; a PENDING_APPROVAL course exists."
-Hide / Unhide Course,,,,
-COURSE_FT54,"A Course Manager can hide a PUBLISHED course; hiding a course in any other status is rejected.","1. Log in as COURSE_MANAGER and identify a PUBLISHED course.
-2. Prepare and send POST /api/v1/course-manager/courses/{id}/hide for that course; inspect the response.
-3. Identify a DRAFT course and repeat the same hide call.
-4. Compare both response statuses/messages.","1. Step 2: 200 OK {""message"": ""Course hidden successfully""}; status becomes HIDDEN.
-2. Step 3-4: 400 Bad Request, {""error"": ""Only courses in PUBLISHED status can be hidden""}.","- A PUBLISHED course and a DRAFT course both exist."
-COURSE_FT55,"Unhiding a HIDDEN or ARCHIVED course always results in PUBLISHED status, with no separate restore-to-archived path.","1. Log in as COURSE_MANAGER and identify a HIDDEN course.
-2. Prepare and send POST /api/v1/course-manager/courses/{id}/unhide; inspect the resulting status.
-3. Identify an ARCHIVED course and repeat the same unhide call.
-4. Compare both resulting statuses.","1. Both: 200 OK {""message"": ""Course unhidden successfully""}; status becomes PUBLISHED in both cases, regardless of the prior state being HIDDEN or ARCHIVED.","- A HIDDEN course and an ARCHIVED course both exist."
+
+
+
+
 View Courses for Review / Review Detail,,,,
-COURSE_FT56,"A Course Manager can view the pending-review queue, both with the default status filter and with ALL.","1. Log in as COURSE_MANAGER/ADMINISTRATOR in an environment with courses in multiple statuses.
+COURSE_FT54,"A Course Manager can view the pending-review queue, both with the default status filter and with ALL.","1. Log in as COURSE_MANAGER/ADMINISTRATOR in an environment with courses in multiple statuses.
 2. Prepare and send GET /api/v1/course-manager/courses/review (default status=PENDING, normalized internally to PENDING_APPROVAL); inspect the returned list.
 3. Prepare and send GET /api/v1/course-manager/courses/review?status=ALL; inspect the returned list.
 4. Confirm the default call excludes non-PENDING_APPROVAL courses and lacks full sessions[] detail.","1. Step 2: 200 OK; only PENDING_APPROVAL courses, newest first, without full sessions[] (only sectionsCount/lessonsCount).
 2. Step 3-4: 200 OK; every non-deleted course regardless of status.","- COURSE_MANAGER/ADMINISTRATOR logged in; courses in multiple statuses exist."
-COURSE_FT57,"Viewing a single course's full review detail includes its sessions[]; a missing or soft-deleted course returns 400 rather than 404 — an inconsistency vs. the learner-facing detail endpoint.","1. Log in as COURSE_MANAGER and identify a valid course.
+COURSE_FT55,"Viewing a single course's full review detail includes its sessions[]; a missing or soft-deleted course returns 400 rather than 404 — an inconsistency vs. the learner-facing detail endpoint.","1. Log in as COURSE_MANAGER and identify a valid course.
 2. Prepare and send GET /api/v1/course-manager/courses/{id}/review-detail; inspect the response for full sessions[].
 3. Prepare and send the same call for a non-existent or soft-deleted course id.
 4. Compare the second response's status against COURSE_FT05's 404 for the equivalent learner-facing case.","1. Step 2: 200 OK; full sessions[]/lessons tree included (contrast with the review-queue list, which omits it).
 2. Step 3-4: 400 Bad Request, {""error"": ""Course not found with ID: <id>""} — HTTP 400, not 404, unlike CourseController's equivalent detail endpoint (COURSE_FT05) which correctly uses 404 for the same class of error.","- id from step 2 unused or belongs to a soft-deleted course."
-Lookup System Parameters / Metadata,,,,
-COURSE_FT58,"Authoring dropdown data and public metadata lookups return only active values, and an unrecognized type returns an empty list rather than an error.","1. Log in as an eligible authoring role and prepare/send GET /api/v1/trainer/system-parameters?type=COURSE_CATEGORY; inspect the returned active parameters.
-2. Prepare and send GET /api/v1/trainer/system-parameters?type=NOT_A_REAL_TYPE; inspect the response.
-3. Discard the Authorization token and prepare/send GET /api/v1/metadata/categories and GET /api/v1/metadata/parameters?type=COURSE_CATEGORY.
-4. Confirm both public calls succeed with no authentication.","1. Step 1: 200 OK, active parameters of that type.
-2. Step 2: 200 OK, empty list — no error for an unrecognized type.
-3. Step 3-4: 200 OK, public lookup data returned with no authentication required.","- Logged in as an eligible authoring role for steps 1-2; step 3 needs no login."
-NOTE,"Verification pass (2026-08-18) footer — flagged, NOT fixed (production behavior, ambiguous intent):","N/A","1) TrainerCreateCourseRequestDTO.price and .priceNote carry @Min(0)/size validation but are never read by createTrainerCourse/updateTrainerCourse — price is always server-recalculated via calculateCoursePrice and priceNote is always hardcoded to """" (see COURSE_FT47). This is harmless under the CURRENT frontend, which never populates or sends either field (edit_course_page.dart's price UI is a read-only ""System Auto-Price"" box — see SYS_FLOW_CRS_TC03/TC04), but the DTO fields themselves are dead code that could mislead a future API consumer into thinking price is client-settable.
-2) COURSE_FT44/45/59: submitTrainerCourse forces price/suggestedPrice to 0 for a trainer's first course (countDistinctCourseCodesByCreatorId ≤1), layered on TOP of calculateCoursePrice's own isEligibleForFirstCoursePromotion check already applied at create/update/re-evaluate/course-manager-publish time — two independent, overlapping ""first course is free"" checks with slightly different eligibility logic (blunt count-based vs. per-family code-based). Not a bug, just worth knowing both exist if either is ever changed in isolation.","N/A"
+
+

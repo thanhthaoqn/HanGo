@@ -1247,12 +1247,19 @@ class TrainerDashboardServiceImplTest {
 
         service.reEvaluateCoursePrice(1L, "trainer@example.com");
 
-        assertEquals(0, java.math.BigDecimal.valueOf(670000).compareTo(c.getSuggestedPrice()));
+        // Raw = 300000 (professional) + 150000 (score report) + 200000 (advanced)
+        // + 2*10000 (lessons) = 670000, rounded to nearest 50000 = 650000 (still
+        // within the 300k-700k reference range so no clamping applies).
+        assertEquals(0, java.math.BigDecimal.valueOf(650000).compareTo(c.getSuggestedPrice()));
         verify(courseRepository).save(c);
+        // reEvaluateCoursePrice only refreshes the reference suggestedPrice; it
+        // must never touch the Trainer's own chosen price anymore (still ZERO,
+        // the Course entity's untouched default value).
+        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(c.getPrice()));
     }
 
     @Test
-    void reEvaluateCoursePriceShouldTreatMissingTrainerProfileAndDifficultyAsZeroBaseContribution() {
+    void reEvaluateCoursePriceShouldClampSuggestedPriceToMinimumWhenRawScoreIsZero() {
         User owner = trainer(1L, "trainer@example.com");
         Course c = course(1L, owner);
         when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
@@ -1261,7 +1268,10 @@ class TrainerDashboardServiceImplTest {
 
         service.reEvaluateCoursePrice(1L, "trainer@example.com");
 
-        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(c.getSuggestedPrice()));
+        // Raw = 0, clamped up to the 300000 floor so the reference price never
+        // reads as "free" (that's a distinct, deliberate business rule handled
+        // separately by the first-course promotion, not by this formula).
+        assertEquals(0, java.math.BigDecimal.valueOf(300000).compareTo(c.getSuggestedPrice()));
         verify(courseRepository).save(c);
     }
 

@@ -66,7 +66,10 @@ class AuthService {
     return text;
   }
 
-  // Perform login request
+  // Goi API POST /api/auth/login. Day la diem bat dau flow dang nhap o Frontend:
+  // gui email+password (KHONG kem token, vi luc nay chua co token) -> nhan ve
+  // JSON { token, refreshToken, id, email, fullName, roles, avatarUrl } tu
+  // AuthController.authenticateUser (backend) neu thanh cong.
   Future<Map<String, dynamic>> login(
     String email,
     String password, {
@@ -82,6 +85,7 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setRememberMe(rememberMe);
+        // Luu token + thong tin user vao SharedPreferences (local storage cua thiet bi)
         await saveSession(data);
 
         // 🔥 PHÁT TÍN HIỆU NGẦM: Báo cho AppState biết để cập nhật UI ngay lập tức
@@ -108,7 +112,10 @@ class AuthService {
     userChangeNotifier.value++;
   }
 
-  // Save session details
+  // Luu toan bo phien dang nhap vao SharedPreferences (key-value storage cua
+  // Flutter, tuong duong localStorage tren web). Tu day ve sau, MOI request
+  // toi API co bao ve deu doc token tu day (xem getToken()) va gan vao header
+  // "Authorization: Bearer <token>" - khong co store/context toan cuc rieng.
   Future<void> saveSession(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, data['token']);

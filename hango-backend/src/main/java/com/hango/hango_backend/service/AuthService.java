@@ -55,6 +55,12 @@ public class AuthService {
     private static final int MAX_OTP_ATTEMPTS = 5;
     private static final long OTP_RESEND_COOLDOWN_SECONDS = 60;
     private static final long VERIFICATION_TOKEN_VALIDITY_HOURS = 12;
+    // Chong brute-force dang nhap: dung lai chinh 2 cot da co san tren User
+    // (failedLoginAttempts, lockedUntil) - truoc day 2 cot nay chi bi RESET ve
+    // 0/null (trong resetPassword/changePassword) chu KHONG he bi TANG len o
+    // dau, nghia la co che khoa tai khoan chua bao gio thuc su hoat dong.
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final long LOGIN_LOCKOUT_MINUTES = 15;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Autowired
@@ -130,6 +136,10 @@ public class AuthService {
     // authenticateUser
     // =================================================================
 
+    // Diem bat dau cua ca luong dang nhap (duoc AuthController.authenticateUser goi).
+    // Thu tu kiem tra: (1) email co ton tai, (2) mat khau dung, (3) email da
+    // verify chua, (4) status tai khoan co ACTIVE khong -> chi khi qua het 4
+    // buoc moi cap JWT + refresh token.
     @org.springframework.transaction.annotation.Transactional
     public LoginResponse authenticateUser(LoginRequest loginRequest) {
         String email = normalizeEmail(loginRequest.getEmail());
@@ -140,12 +150,48 @@ public class AuthService {
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
 
+        // Tai khoan dang bi khoa tam thoi do dang nhap sai qua nhieu lan
+        // (xem nhanh catch AuthenticationException ben duoi) - chan luon tu day,
+        // KHONG goi authenticationManager.authenticate() nua du mat khau co dung
+        // hay khong, tranh brute-force tiep tuc do trong luc bi khoa.
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            logAudit(user, "LOGIN_FAILURE", user.getId(), "Account temporarily locked until " + user.getLockedUntil());
+            throw new ApiException(
+                    "Too many failed login attempts. Please try again in a few minutes.",
+                    HttpStatus.FORBIDDEN);
+        }
+
+        // Uy quyen viec so sanh mat khau cho Spring Security: authenticationManager
+        // se goi UserDetailsServiceImpl.loadUserByUsername() de lay passwordHash tu DB,
+        // roi dung PasswordEncoder (BCrypt, xem SecurityConfig.passwordEncoder())
+        // de so sanh voi mat khau nguoi dung nhap - code o day KHONG tu so sanh password.
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, loginRequest.getPassword()));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (AuthenticationException ex) {
-            logAudit(user, "LOGIN_FAILURE", user.getId(), "Bad credentials");
+            // Chong brute-force: dem so lan sai lien tiep, khoa tam thoi
+            // LOGIN_LOCKOUT_MINUTES phut sau khi vuot qua MAX_LOGIN_ATTEMPTS lan.
+            // Bo dem duoc RESET VE 0 ngay khi dang nhap dung (xem ben duoi) hoac
+            // khi doi mat khau (xem resetPassword/changePassword).
+            int attempts = (user.getFailedLoginAttempts() == null ? 0 : user.getFailedLoginAttempts()) + 1;
+            user.setFailedLoginAttempts(attempts);
+            boolean justLocked = attempts >= MAX_LOGIN_ATTEMPTS;
+            if (justLocked) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOGIN_LOCKOUT_MINUTES));
+            }
+            userRepository.save(user);
+
+            logAudit(user, "LOGIN_FAILURE", user.getId(),
+                    "Bad credentials (attempt " + attempts + "/" + MAX_LOGIN_ATTEMPTS + ")"
+                            + (justLocked ? " - account locked" : ""));
+
+            if (justLocked) {
+                throw new ApiException(
+                        "Too many failed login attempts. Your account has been temporarily locked for "
+                                + LOGIN_LOCKOUT_MINUTES + " minutes.",
+                        HttpStatus.FORBIDDEN);
+            }
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
 
@@ -163,8 +209,14 @@ public class AuthService {
         }
 
         user.setLastLoginAt(LocalDateTime.now());
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         userRepository.save(user);
 
+        // Danh sach role/permission nay duoc tra ve cho Frontend de FE tu quyet dinh
+        // dieu huong (xem login_page.dart _navigateAfterSuccess) - day chi la
+        // GOI Y hien thi, KHONG phai co che phan quyen that su. Phan quyen that
+        // su van do Backend kiem tra lai qua @PreAuthorize o moi API.
         List<String> roles = new java.util.ArrayList<>();
         for (org.springframework.security.core.GrantedAuthority authority : UserDetailsImpl.build(user)
                 .getAuthorities()) {

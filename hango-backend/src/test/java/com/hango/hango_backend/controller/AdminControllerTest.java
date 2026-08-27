@@ -489,6 +489,42 @@ class AdminControllerTest {
     }
 
     @Test
+    void updateUserByAdminShouldRejectAdminChangingOwnRole() {
+        // Mirrors the existing self-status-lock guard: an Admin editing their own
+        // account record must not be able to demote/change their own role either,
+        // or a lone Admin could accidentally lock themselves out of the whole system.
+        User admin = userWithRole(1L, "admin@example.com", "ADMINISTRATOR");
+        Role learnerRole = Role.builder().id(2L).roleName("LEARNER").build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(roleRepository.findByRoleName("LEARNER")).thenReturn(Optional.of(learnerRole));
+        AdminUserUpdateRequest request = new AdminUserUpdateRequest();
+        request.setRole("learner");
+
+        ResponseEntity<?> response = adminController.updateUserByAdmin(1L, request, adminPrincipal("admin@example.com"));
+
+        assertEquals(400, response.getStatusCode().value());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateUserByAdminShouldAllowAdminSettingOwnRoleToSameCurrentValue() {
+        // Same-value "changes" (just different casing) are not a real demotion,
+        // so they must be allowed through, exactly like the status self-guard.
+        User admin = userWithRole(1L, "admin@example.com", "ADMINISTRATOR");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(roleRepository.findByRoleName("ADMINISTRATOR")).thenReturn(Optional.of(
+                admin.getRoles().iterator().next()));
+        when(authService.getUserById(1L)).thenReturn(UserResponse.builder().id(1L).build());
+        AdminUserUpdateRequest request = new AdminUserUpdateRequest();
+        request.setRole("administrator");
+
+        ResponseEntity<?> response = adminController.updateUserByAdmin(1L, request, adminPrincipal("admin@example.com"));
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(userRepository).save(admin);
+    }
+
+    @Test
     void updateUserByAdminShouldAllowAdminSettingOwnStatusToSameCurrentValue() {
         // The self-lock guard only fires when the requested status differs from the current
         // one, so requesting the SAME status (just different casing) bypasses it entirely.

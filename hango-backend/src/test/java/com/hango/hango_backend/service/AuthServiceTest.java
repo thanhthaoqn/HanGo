@@ -203,6 +203,82 @@ class AuthServiceTest {
     }
 
     @Test
+    void authenticateUserShouldIncrementFailedAttemptsButStillReturn401BelowLockThreshold() {
+        // Regression test for the login brute-force lockout fix: below the
+        // threshold, behavior must be unchanged (still 401, account not locked).
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        user.setFailedLoginAttempts(3);
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertApiException(HttpStatus.UNAUTHORIZED,
+                () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
+
+        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(savedUser.capture());
+        assertEquals(4, savedUser.getValue().getFailedLoginAttempts());
+        assertNull(savedUser.getValue().getLockedUntil());
+    }
+
+    @Test
+    void authenticateUserShouldLockAccountAfterMaxFailedAttempts() {
+        // The 5th consecutive bad-credentials failure must lock the account
+        // (lockedUntil set in the future) and respond 403, not the usual 401.
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        user.setFailedLoginAttempts(4);
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ApiException ex = assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
+        assertTrue(ex.getMessage().toLowerCase().contains("locked"));
+
+        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(savedUser.capture());
+        assertEquals(5, savedUser.getValue().getFailedLoginAttempts());
+        assertNotNull(savedUser.getValue().getLockedUntil());
+        assertTrue(savedUser.getValue().getLockedUntil().isAfter(LocalDateTime.now()));
+    }
+
+    @Test
+    void authenticateUserShouldRejectLoginWhileAccountIsLockedWithoutCheckingPassword() {
+        // While locked, must fail fast with 403 and never even call the
+        // authenticationManager (avoids continued brute-force during lockout).
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+
+        assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("active@example.com", "correct-password")));
+
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    void authenticateUserShouldAllowLoginAgainAfterLockWindowExpires() {
+        // A lockedUntil timestamp in the PAST must no longer block login.
+        User user = activeVerifiedUser("active@example.com", "ACTIVE");
+        user.setLockedUntil(LocalDateTime.now().minusMinutes(1));
+        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(jwtUtils.generateJwtTokenFromUsername(anyString())).thenReturn("mock-jwt-token");
+        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
+        when(jwtUtils.hashToken(anyString())).thenReturn("hashed");
+        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LoginResponse response = authService.authenticateUser(loginRequest("active@example.com", "correct-password"));
+
+        assertEquals("mock-jwt-token", response.getToken());
+        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(savedUser.capture());
+        assertNull(savedUser.getValue().getLockedUntil());
+        assertEquals(0, savedUser.getValue().getFailedLoginAttempts());
+    }
+
+    @Test
     void authenticateUserShouldRejectAccountThatIsNotActiveStatus() {
         User user = activeVerifiedUser("locked-status@example.com", "LOCKED");
         when(userRepository.findByEmail("locked-status@example.com")).thenReturn(Optional.of(user));

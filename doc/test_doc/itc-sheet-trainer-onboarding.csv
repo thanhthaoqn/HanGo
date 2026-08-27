@@ -1,12 +1,14 @@
 Feature,Trainer Onboarding
 Test requirement,Functional integration tests for trainer onboarding (TrainerOnboardingController / TrainerOnboardingServiceImpl)
-Number of TCs,18
+Number of TCs,17
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,18,0
-Round 2,0,0,18,0
-Round 3,0,0,18,0
+Round 1,0,0,17,0
+Round 2,0,0,17,0
+Round 3,0,0,17,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+
+
 Become Trainer,,,,
 ONBOARDING_FT01,"A logged-in Learner becomes a Trainer immediately upon request, receiving a fresh session token with the new role already active.","1. Log in as a LEARNER who is not yet a TRAINER.
 2. Prepare POST /api/v1/trainers/become-trainer?trainerType=PROFESSIONAL with the Authorization header set.
@@ -21,11 +23,15 @@ ONBOARDING_FT03,"Attempting to become a trainer with no Authorization header at 
 2. Prepare POST /api/v1/trainers/become-trainer with no Authorization header.
 3. Send the request.
 4. Inspect the response status and body.","1. 401 Unauthorized, body {""error"": ""Unauthorized""}.","- None."
+
+
 View Own Trainer Profile,,,,
 ONBOARDING_FT04,"A user who already holds the TRAINER role but has no profile row yet gets one automatically created (just-in-time) the first time they view it.","1. Log in as a TRAINER (or ADMIN/TRAINER_LEAD) account confirmed to have no existing TrainerProfile row.
 2. Prepare GET /api/v1/trainers/profile with the Authorization header set.
 3. Send the request.
 4. Inspect the response body and confirm a new row was persisted for that user.","1. 200 OK; a new TrainerProfileDTO is returned with status=PENDING_VERIFICATION, revenueShare=0.70 defaults, and is now persisted.","- Logged in as TRAINER (or ADMIN/TRAINER_LEAD) with no prior TrainerProfile row."
+
+
 Save Trainer Profile Draft,,,,
 ONBOARDING_FT05,"Saving a profile draft with bio/workplace/bank details updates every field, and the bank account holder name is normalized to upper-case.","1. Log in as a TRAINER whose profile status is not AWAITING_APPROVAL/SUSPENDED.
 2. Prepare PUT /api/v1/trainers/profile body {""bio"":""...50+ chars..."",""workplace"":""ABC Corp"",""bankName"":""VCB"",""bankAccount"":""123456"",""bankAccountName"":""nguyen van a""}.
@@ -34,64 +40,60 @@ ONBOARDING_FT05,"Saving a profile draft with bio/workplace/bank details updates 
 ONBOARDING_FT06,"Attempting to save a draft while the application is already AWAITING_APPROVAL is blocked, since edits should be frozen during admin review.","1. Submit a valid profile for review so its status becomes AWAITING_APPROVAL (per ONBOARDING_FT08).
 2. Prepare PUT /api/v1/trainers/profile with any field change (e.g. a different bio).
 3. Send the request.
-4. Inspect the response and confirm the profile's fields are unchanged.","1. 400 Bad Request; body {""error"": ""Application is currently awaiting approval. Profile details cannot be modified.""}; fields unchanged.","- Profile status is currently AWAITING_APPROVAL."
+4. Inspect the response and confirm the profile's fields are unchanged.","1. 400/500 error; message ""Hồ sơ đang chờ duyệt, bạn không thể chỉnh sửa thông tin.""; fields unchanged.","- Profile status is currently AWAITING_APPROVAL."
 ONBOARDING_FT07,"Attempting to save a draft while the trainer account is SUSPENDED is blocked.","1. As an ADMINISTRATOR, set a trainer's profile status to SUSPENDED via the review endpoint.
 2. Log back in as that suspended trainer and prepare PUT /api/v1/trainers/profile with any field change.
 3. Send the request.
-4. Inspect the response and confirm the profile's fields are unchanged.","1. 400 Bad Request; body {""error"": ""Your trainer account has been suspended.""}; fields unchanged.","- Profile status is currently SUSPENDED."
+4. Inspect the response and confirm the profile's fields are unchanged.","1. Error response; message ""Tài khoản của bạn đã bị đình chỉ hoạt động.""; fields unchanged.","- Profile status is currently SUSPENDED."
+
+
 Submit Trainer Profile for Review,,,,
-ONBOARDING_FT08,"Submitting the trainer profile for review succeeds once every mandatory field meets its individual requirement, moving the application into the review queue.","1. Log in as a TRAINER with trainerType=PEER_TUTOR and fill in bio (≥50 chars), a phone number matching ^(03|05|07|08|09)\d{8}$ (not all-same-digit and not exactly 1234567890), gender, avatarUrl, and at least one uploaded credentials document.
+ONBOARDING_FT08,"Submitting the trainer profile for review succeeds once every mandatory field meets its individual requirement, moving the application into the review queue.","1. Log in as a TRAINER and fill in bio (≥50 chars), a phone number matching ^(03|05|07|08|09)\d{8}$ (not all-same-digit and not exactly 1234567890), gender, avatarUrl, and scoreReportUrl.
 2. Prepare POST /api/v1/trainers/profile/submit.
 3. Send the request.
 4. Inspect the response's status/submittedAt and confirm ADMINISTRATOR accounts received an in-app notification.","1. 200 OK; status becomes AWAITING_APPROVAL, submittedAt is set, adminNotes cleared.
-2. An in-app notification is sent to ADMINISTRATOR users (""New Trainer Application Submitted"").","- All mandatory fields valid; profile not already AWAITING_APPROVAL; trainerType=PEER_TUTOR (see ONBOARDING_FT18 for the extra PROFESSIONAL-only credential rule)."
+2. An in-app notification is sent to ADMINISTRATOR users (""New Trainer Application Submitted"").","- All mandatory fields valid; profile not already AWAITING_APPROVAL."
 ONBOARDING_FT09,"Submitting with a bio shorter than the 50-character minimum is rejected, and the application stays out of the review queue.","1. Log in as a TRAINER and set bio to a short, 10-character string while leaving every other mandatory field valid.
 2. Prepare POST /api/v1/trainers/profile/submit.
 3. Send the request.
-4. Inspect the response message and confirm the profile status did not change.","1. 400 Bad Request; body {""error"": ""Teaching experience & bio must be at least 50 characters long.""}; status not changed.","- Other fields may be valid; bio is too short."
+4. Inspect the response message and confirm the profile status did not change.","1. 400/error; message ""Teaching experience & bio must be at least 50 characters long.""; status not changed.","- Other fields may be valid; bio is too short."
 ONBOARDING_FT10,"Submitting with a phone number that fails the required prefix/length/blacklist rules is rejected.","1. Log in as a TRAINER and set phone to a value that fails validation — try one of: a wrong-prefix number (""02912345678""), a repeated-digit number (""1111111111""), or the blacklisted ""1234567890"" — while leaving every other field valid.
 2. Prepare POST /api/v1/trainers/profile/submit.
 3. Send the request.
-4. Inspect the response message and confirm the profile status did not change.","1. 400 Bad Request; body {""error"": ""A valid 10-digit contact phone number starting with 03/05/07/08/09 is required.""}; status not changed.","- All other fields valid; phone is invalid/blacklisted."
+4. Inspect the response message and confirm the profile status did not change.","1. Error; message ""A valid 10-digit contact phone number starting with 03/05/07/08/09 is required.""; status not changed.","- All other fields valid; phone is invalid/blacklisted."
 ONBOARDING_FT11,"Submitting with gender, avatar, or credentials-proof left empty is rejected with a distinct message per missing field.","1. Log in as a TRAINER with bio and phone otherwise valid; leave gender unset and submit — record the response message.
 2. Reset gender, then leave avatarUrl unset instead and submit — record the response message.
-3. Reset avatarUrl, then leave all documents (scoreReportUrl/pedagogicalDegreeUrl/cvUrl/certificates) unset instead and submit — record the response message.
+3. Reset avatarUrl, then leave scoreReportUrl unset instead and submit — record the response message.
 4. Compare the three response messages against each other.","1. Case 1 (missing gender): ""Please select your gender.""
 2. Case 2 (missing avatar): ""Please upload an avatar image.""
-3. Case 3 (missing credentials): ""Please upload at least one credentials proof document or CV.""
-(All other fields valid in each case; status not changed in any of the three sub-cases; all three are 400 Bad Request.)","- bio and phone valid in all three sub-cases; the one field under test is left empty."
+3. Case 3 (missing credentials): ""Please upload at least one credentials proof document.""
+(All other fields valid in each case; status not changed in any of the three sub-cases.)","- bio and phone valid in all three sub-cases; the one field under test is left empty."
 ONBOARDING_FT12,"Submitting a second time while the application is already AWAITING_APPROVAL from a prior submission is rejected.","1. Submit a fully valid profile once so its status becomes AWAITING_APPROVAL (per ONBOARDING_FT08).
 2. Before any admin review happens, prepare and send POST /api/v1/trainers/profile/submit again.
-3. Inspect the response message.","1. 400 Bad Request; body {""error"": ""Application is currently under review.""}","- Profile already AWAITING_APPROVAL from a prior submission."
-ONBOARDING_FT18,"For trainerType=PROFESSIONAL specifically, submitting without at least one pedagogical/teaching credential (a degree, teaching certificate, or CV document — not just any proof) is rejected, even though a generic proof would be enough for a PEER_TUTOR.","1. Log in as a TRAINER with trainerType=PROFESSIONAL; fill bio, phone, gender, avatar validly.
-2. Upload only a non-pedagogical document (e.g. type=LANGUAGE_PROFICIENCY, an IELTS certificate) as the sole credential proof.
-3. Prepare and send POST /api/v1/trainers/profile/submit.
-4. Inspect the response message and confirm the profile status did not change.
-5. Add a second document of type PEDAGOGICAL_DEGREE (or TEACHING_CERTIFICATE/TEACHING_CV) and resubmit.","1. First submit: 400 Bad Request; body {""error"": ""A teaching/pedagogical degree or credential is required for Teacher applications.""}; status not changed.
-2. Second submit (after adding the pedagogical document): 200 OK; status becomes AWAITING_APPROVAL.","- trainerType=PROFESSIONAL; bio/phone/gender/avatar valid; only a non-pedagogical document uploaded initially."
+3. Inspect the response message.","1. Error; message ""Hồ sơ đang ở trạng thái chờ xét duyệt.""","- Profile already AWAITING_APPROVAL from a prior submission."
+
+
 Review Trainer Profile (Admin),,,,
 ONBOARDING_FT13,"Admin lists and filters trainer applications, first by status alone and then combined with a search keyword, confirming the results narrow correctly each time.","1. Log in as ADMINISTRATOR with at least 2 applications in different statuses.
 2. Prepare and send GET /api/admin/trainer-profiles?status=AWAITING_APPROVAL; inspect the returned list.
 3. Prepare and send GET /api/admin/trainer-profiles?search=<part of an applicant's name or email>&status=ALL; inspect the returned list.
-4. Confirm both result sets only contain matching entries, sorted by submittedAt descending.","1. Each call returns only profiles matching the given status filter and/or search substring (name/email, case-insensitive), sorted by submittedAt descending (nulls last). Note: status=REJECTED or status=PENDING_VERIFICATION both resolve to the same bucket server-side (PENDING_VERIFICATION + SUSPENDED + REJECTED are all treated as ""rejected/needs-action"").","- ADMINISTRATOR logged in; at least 2 trainer applications in different statuses exist."
-ONBOARDING_FT14,"Admin approves a pending application, which grants the TRAINER role if missing, sets a fixed revenue share by trainer type, and sends a confirmation email/notification.","1. Log in as ADMINISTRATOR and identify a pending TrainerProfile (userId known).
-2. Prepare PUT /api/admin/trainer-profiles/{userId}/review body {""status"":""VERIFIED""} (no revenueShare in the body).
+4. Confirm both result sets only contain matching entries, sorted by submittedAt descending.","1. Each call returns only profiles matching the given status filter and/or search substring (name/email, case-insensitive), sorted by submittedAt descending (nulls last).","- ADMINISTRATOR logged in; at least 2 trainer applications in different statuses exist."
+ONBOARDING_FT14,"Admin approves a pending application, which grants the TRAINER role if missing, sets a default revenue share, and sends a confirmation email/notification.","1. Log in as ADMINISTRATOR and identify a pending TrainerProfile (userId known).
+2. Prepare PUT /api/admin/trainer-profiles/{userId}/review body {""status"":""VERIFIED""} (no custom revenueShare).
 3. Send the request.
-4. Inspect the response's status/revenueShare, confirm the user's roles[] now includes TRAINER, and check that an approval email/notification was sent.","1. 200 OK; profile status=VERIFIED, reviewedAt set, revenueShare fixed at 0.70 (PROFESSIONAL) or 0.60 (PEER_TUTOR) based on the profile's trainerType.
+4. Inspect the response's status/revenueShare, confirm the user's roles[] now includes TRAINER, and check that an approval email/notification was sent.","1. 200 OK; profile status=VERIFIED, reviewedAt set, revenueShare defaulted (0.70 or 0.60 for PEER_TUTOR).
 2. The user's roles[] gains TRAINER if it didn't already have it.
 3. An approval email and in-app notification (""Trainer Application Approved"") are sent.","- ADMINISTRATOR logged in; a pending TrainerProfile exists for the target user."
-ONBOARDING_FT15,"[Confirmed behavior change] Admin-supplied custom revenueShare in the review request is silently ignored on approval — the endpoint always applies the fixed 70%/60% split by trainerType regardless of what value (if any) is sent, and out-of-range values no longer produce a validation error.","1. Log in as ADMINISTRATOR and identify a pending TrainerProfile with trainerType=PROFESSIONAL.
-2. Prepare PUT /api/admin/trainer-profiles/{userId}/review body {""status"":""VERIFIED"",""revenueShare"":0.99} (an out-of-range custom value).
+ONBOARDING_FT15,"Admin supplying a custom revenue share outside the allowed 0.50-0.95 range on approval is rejected, leaving the profile's status unchanged.","1. Log in as ADMINISTRATOR and identify a pending TrainerProfile.
+2. Prepare PUT /api/admin/trainer-profiles/{userId}/review body {""status"":""VERIFIED"",""revenueShare"":0.99}.
 3. Send the request.
-4. Inspect the response's revenueShare value and status.","1. 200 OK (NOT an error) — the submitted revenueShare=0.99 is ignored; the response's revenueShare is 0.70 (the fixed PROFESSIONAL default), profile status=VERIFIED. There is no server-side 0.50-0.95 range check anymore; TrainerReviewRequest.revenueShare is accepted by the DTO but never read by TrainerOnboardingServiceImpl.reviewTrainerProfile.","- ADMINISTRATOR logged in; pending profile exists with trainerType=PROFESSIONAL."
+4. Inspect the response message and confirm the profile's status was not changed.","1. Error; message ""Trainer revenue share must be between 0.50 (50%) and 0.95 (95%).""; profile status unchanged.","- ADMINISTRATOR logged in; pending profile exists."
 ONBOARDING_FT16,"Admin can suspend an application or send it back for revisions instead of approving it, and each outcome fires a distinctly worded notification without granting the TRAINER role.","1. Log in as ADMINISTRATOR with two separate pending profiles ready for review.
 2. Prepare and send PUT /api/admin/trainer-profiles/{userId}/review body {""status"":""SUSPENDED"",""adminNotes"":""Policy violation""} against the first profile.
-3. Prepare and send PUT /api/admin/trainer-profiles/{userId}/review body {""status"":""PENDING_VERIFICATION"",""adminNotes"":""Please add more credentials""} against the second profile (this is the status value the real Admin UI's ""Reject Application"" action actually sends — see SYS_FLOW_TRN_TC13).","1. Case 1: status=SUSPENDED; email/notification titled ""Trainer Account Suspended"" including the reason.
-2. Case 2: status=PENDING_VERIFICATION with adminNotes set; notification titled ""Trainer Application Revisions Requested"" including the reason; TRAINER role is NOT auto-granted in either case.","- ADMINISTRATOR logged in; pending profile exists for each sub-case."
+3. Prepare and send PUT /api/admin/trainer-profiles/{userId}/review body {""status"":""REJECTED"",""adminNotes"":""Please add more credentials""} against the second profile.
+4. Inspect both responses and the notifications/emails sent for each.","1. Case 1: status=SUSPENDED; email/notification titled ""Trainer Account Suspended"" including the reason.
+2. Case 2: status set accordingly; notification titled ""Trainer Application Revisions Requested"" including the reason; TRAINER role is NOT auto-granted in either case.","- ADMINISTRATOR logged in; pending profile exists for each sub-case."
 ONBOARDING_FT17,"A non-admin TRAINER account is forbidden from both listing and reviewing trainer applications through the admin endpoints.","1. Log in as a TRAINER account (no MANAGE_ACCOUNTS_ROLES authority).
 2. Prepare and send GET /api/admin/trainer-profiles with that account's Authorization header.
 3. Prepare and send PUT /api/admin/trainer-profiles/{id}/review with the same account's Authorization header.
 4. Inspect both response statuses.","1. Both calls return 403 Forbidden.","- TRAINER logged in (no MANAGE_ACCOUNTS_ROLES authority)."
-
-[Doc note] TrainerReviewRequest.status accepts any string uncoerced (no enum validation) — a caller could technically persist a literal status="REJECTED" via direct API call even though the current Admin UI never sends that value (it only ever sends VERIFIED / PENDING_VERIFICATION / SUSPENDED). Not fixed here per task scope (doc-accuracy only); flagged for awareness.
-[Doc note] The admin-custom-revenue-share feature (with its 0.50-0.95 validation) that ONBOARDING_FT15 previously tested was removed from TrainerOnboardingServiceImpl.reviewTrainerProfile at some point after the original ITC build; the request DTO field (TrainerReviewRequest.revenueShare) and the Admin UI's old call site (trainer_onboarding_service.dart reviewTrainerProfile(revenueShare:)) still exist and still send a value, but the backend no longer reads it. Confirmed via `git log -p` on TrainerOnboardingServiceImpl.java. Not a crash/bug, just a dead code path — flagged for awareness, not fixed here.

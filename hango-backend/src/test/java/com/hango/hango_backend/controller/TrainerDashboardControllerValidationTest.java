@@ -74,4 +74,43 @@ class TrainerDashboardControllerValidationTest {
                 .anyMatch(v -> v.getPropertyPath().toString().equals("price"));
         assertTrue(hasPriceViolation, "Should have a validation error on 'price' field");
     }
+
+    @Test
+    void createCourse_WithRealCreatePagePayloadShape_HasNoViolations() {
+        // Regression test: create_course_page.dart's real POST body never
+        // includes "code" (the server auto-generates it in
+        // TrainerDashboardServiceImpl.createTrainerCourse via
+        // generateUniqueCourseCode()) but DOES always include "price" (the
+        // Trainer's own chosen price). Previously `code` was @NotBlank,
+        // which made the real create-course request always fail Spring's
+        // @Valid with 400 "Code cannot be blank" before ever reaching the
+        // controller method body.
+        TrainerCreateCourseRequestDTO request = TrainerCreateCourseRequestDTO.builder()
+                .title("Some title")
+                .description("desc")
+                .categoryKey("GRAMMAR")
+                .difficultyKey("BASIC")
+                .price(BigDecimal.valueOf(500000))
+                .build();
+
+        Set<ConstraintViolation<TrainerCreateCourseRequestDTO>> violations = validator.validate(request);
+
+        assertTrue(violations.isEmpty(),
+                "Create-course payload without 'code' should be valid: " + violations);
+    }
+
+    @Test
+    void createCourse_WithMissingPrice_HasViolations() {
+        TrainerCreateCourseRequestDTO request = TrainerCreateCourseRequestDTO.builder()
+                .title("Valid Title")
+                .code("VALID-CODE")
+                .sessions(new ArrayList<>())
+                .build();
+
+        Set<ConstraintViolation<TrainerCreateCourseRequestDTO>> violations = validator.validate(request);
+
+        boolean hasPriceViolation = violations.stream()
+                .anyMatch(v -> v.getPropertyPath().toString().equals("price"));
+        assertTrue(hasPriceViolation, "Missing price should cause a validation error");
+    }
 }

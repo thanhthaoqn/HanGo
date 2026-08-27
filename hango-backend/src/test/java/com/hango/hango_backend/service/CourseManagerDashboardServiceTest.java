@@ -150,8 +150,11 @@ class CourseManagerDashboardServiceTest {
 
         service.publishCourse(1L);
 
+        // price (gia ban that su) bi ep ve 0 boi khuyen mai khoa dau tien, nhung
+        // suggestedPrice (gia tham khao) van giu nguyen - khong con bi zero-out
+        // theo (xem CourseManagerDashboardServiceImpl.publishCourse).
         assertEquals(0, java.math.BigDecimal.ZERO.compareTo(c.getPrice()));
-        assertEquals(0, java.math.BigDecimal.ZERO.compareTo(c.getSuggestedPrice()));
+        assertEquals(0, java.math.BigDecimal.valueOf(120).compareTo(c.getSuggestedPrice()));
     }
 
     // =================================================================
