@@ -1526,6 +1526,8 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           isVi ? 'Không tìm thấy Báo cáo Quyết toán nào phù hợp.' : 'No matching settlement statements found.',
                           style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                         ),
+                      ],
+                    ),
                   );
                 }
 
