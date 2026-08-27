@@ -2002,14 +2002,11 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     if (totalItems == 0) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          Text(
+      padding: const EdgeInsets.only(top: 20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 650;
+          final entriesText = Text(
             isVi
                 ? 'Hiển thị ${totalItems == 0 ? 0 : startIndex + 1} đến $endIndex của $totalItems mục'
                 : 'Showing ${totalItems == 0 ? 0 : startIndex + 1} to $endIndex of $totalItems entries',
@@ -2018,8 +2015,9 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
               fontSize: 14,
               fontFamily: 'Outfit',
             ),
-          ),
-          SingleChildScrollView(
+          );
+
+          final paginationControls = SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -2055,8 +2053,28 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                 ),
               ],
             ),
-          ),
-        ],
+          );
+
+          if (isNarrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                entriesText,
+                const SizedBox(height: 12),
+                paginationControls,
+              ],
+            );
+          }
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              entriesText,
+              paginationControls,
+            ],
+          );
+        },
       ),
     );
   }
